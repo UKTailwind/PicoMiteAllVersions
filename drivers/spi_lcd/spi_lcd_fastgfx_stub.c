@@ -8,7 +8,7 @@
  * — the stubs throw MMBasic errors except close/reset which silently
  * no-op (so cleanup paths don't barf).
  *
- * Host has its own richer FASTGFX simulator in host/host_fastgfx.c; it
+ * Host has its own richer FASTGFX simulator in ports/host_native/host_fastgfx.c; it
  * does not link this file. `merge_optimized` is PICOMITE-only (runs
  * under the FASTGFX DMA path); the non-PICOMITE callers never reach it
  * because `ShadowBuf` stays NULL on those builds.

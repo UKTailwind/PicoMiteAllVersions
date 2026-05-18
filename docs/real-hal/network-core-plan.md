@@ -84,7 +84,7 @@ Completed or materially advanced:
   `HAL_NET_UNSUPPORTED`.
 - Host-wasm has a browser smoke for the fetch plus unsupported raw-socket
   surface:
-  `host/web/smoke_network_unsupported.mjs` boots the shipping app, runs a BASIC
+  `ports/host_wasm/web/smoke_network_unsupported.mjs` boots the shipping app, runs a BASIC
   probe through the REPL, verifies unsupported/offline `MM.INFO(...)` values,
   verifies same-origin fetch-backed GET and POST `WEB TCP CLIENT REQUEST`
   behavior including allowed headers/request body delivery, and checks explicit
@@ -94,7 +94,7 @@ Completed or materially advanced:
   command parser and MQTT wire helpers. The WebSocket is owned by the
   Emscripten main runtime worker so browser socket callbacks can fire while the
   interpreter pthread is sleeping.
-- `host/web/smoke_network_mqtt_ws.mjs` boots the shipping app and a tiny local
+- `ports/host_wasm/web/smoke_network_mqtt_ws.mjs` boots the shipping app and a tiny local
   WebSocket MQTT broker, then verifies BASIC can receive a subscribed publish
   and publish a QoS 0 message back to the broker.
 - Local Pico WEB-family build gates pass for `WEB`, `WEBRP2350`,
@@ -490,7 +490,7 @@ Host-wasm backend behavior:
   options report unsupported through the WASM-specific hook surface. Basic
   network status `MM.INFO(...)` returns unsupported/empty values instead of
   pretending a loopback stack exists. Browser smoke coverage exists in
-  `host/web/smoke_network_unsupported.mjs`.
+  `ports/host_wasm/web/smoke_network_unsupported.mjs`.
 - Future MQTT over WebSocket: supported if the broker exposes `ws://` or
   `wss://`.
 - Raw TCP server, raw TCP stream, raw non-HTTP TCP client traffic, and raw UDP:
@@ -609,11 +609,11 @@ Started:
   small adapter that drains incoming MQTT events into shared
   `MM.TOPIC$`/`MM.MESSAGE$` state from `ProcessWeb()`, while `shared/net/mqtt.c` remains
   the lwIP protocol implementation.
-- Added `host/web/smoke_network_unsupported.mjs` for the host-wasm capability
+- Added `ports/host_wasm/web/smoke_network_unsupported.mjs` for the host-wasm capability
   smoke. It verifies the browser build's no-raw-socket contract and
   fetch-backed HTTP client path using the actual shipping app and JS filesystem
   hooks, not a native-host surrogate.
-- Added `host/web/smoke_network_mqtt_ws.mjs` for the host-wasm MQTT-over-
+- Added `ports/host_wasm/web/smoke_network_mqtt_ws.mjs` for the host-wasm MQTT-over-
   WebSocket path. It uses the actual shipping app plus a local WebSocket MQTT
   broker implemented in the smoke harness, covering subscribe/receive and
   publish from BASIC.

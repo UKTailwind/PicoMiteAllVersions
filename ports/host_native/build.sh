@@ -1,8 +1,7 @@
 #!/bin/bash
 # build.sh — Build the MMBasic native host test binary.
 #
-# Output: host/mmbasic_test (legacy location, kept stable while
-# retirement completes).
+# Output: ports/host_native/build/mmbasic_test
 
 set -e
 cd "$(dirname "$0")"
@@ -20,5 +19,5 @@ case "${1:-}" in
 esac
 
 echo ""
-echo "Build complete: host/mmbasic_test"
-echo "Run host/run_tests.sh to execute the test suite."
+echo "Build complete: ports/host_native/build/mmbasic_test"
+echo "Run ports/host_native/run_tests.sh to execute the test suite."

@@ -3,7 +3,7 @@
 
 This runner keeps the browser-facing conformance gate in one place while
 delegating the detailed BASIC/Playwright interactions to the existing
-host/web smoke suites.
+ports/host_wasm/web smoke suites.
 """
 
 from __future__ import annotations
@@ -38,18 +38,18 @@ class SmokeSuite:
 
 
 PROXY_SUITES: tuple[SmokeSuite, ...] = (
-    SmokeSuite("tcp-client", "proxy TCP client HTTP request", "host/web/smoke_network_proxy.mjs", True),
-    SmokeSuite("tcp-stream", "proxy TCP client stream", "host/web/smoke_network_proxy_tcp_stream.mjs", True),
-    SmokeSuite("tcp-server", "proxy TCP server/transmit helpers", "host/web/smoke_network_proxy_tcp_server.mjs", True),
-    SmokeSuite("udp-ntp", "proxy UDP and NTP", "host/web/smoke_network_proxy_udp_ntp.mjs", True),
-    SmokeSuite("tftp", "proxy TFTP", "host/web/smoke_network_proxy_tftp.mjs", True),
-    SmokeSuite("telnet", "proxy Telnet", "host/web/smoke_network_proxy_telnet.mjs", True),
-    SmokeSuite("mqtt", "proxy plain MQTT", "host/web/smoke_network_proxy_mqtt.mjs", True),
+    SmokeSuite("tcp-client", "proxy TCP client HTTP request", "ports/host_wasm/web/smoke_network_proxy.mjs", True),
+    SmokeSuite("tcp-stream", "proxy TCP client stream", "ports/host_wasm/web/smoke_network_proxy_tcp_stream.mjs", True),
+    SmokeSuite("tcp-server", "proxy TCP server/transmit helpers", "ports/host_wasm/web/smoke_network_proxy_tcp_server.mjs", True),
+    SmokeSuite("udp-ntp", "proxy UDP and NTP", "ports/host_wasm/web/smoke_network_proxy_udp_ntp.mjs", True),
+    SmokeSuite("tftp", "proxy TFTP", "ports/host_wasm/web/smoke_network_proxy_tftp.mjs", True),
+    SmokeSuite("telnet", "proxy Telnet", "ports/host_wasm/web/smoke_network_proxy_telnet.mjs", True),
+    SmokeSuite("mqtt", "proxy plain MQTT", "ports/host_wasm/web/smoke_network_proxy_mqtt.mjs", True),
 )
 
 STATIC_SUITES: tuple[SmokeSuite, ...] = (
-    SmokeSuite("static-http", "static browser HTTP/unsupported network surface", "host/web/smoke_network_unsupported.mjs", False),
-    SmokeSuite("mqtt-ws", "static browser MQTT over WebSocket", "host/web/smoke_network_mqtt_ws.mjs", False),
+    SmokeSuite("static-http", "static browser HTTP/unsupported network surface", "ports/host_wasm/web/smoke_network_unsupported.mjs", False),
+    SmokeSuite("mqtt-ws", "static browser MQTT over WebSocket", "ports/host_wasm/web/smoke_network_mqtt_ws.mjs", False),
 )
 
 SUITE_ALIASES: dict[str, tuple[str, ...]] = {
@@ -132,7 +132,7 @@ def validate_prerequisites(steps: list[CommandStep], suites: list[SmokeSuite], a
         raise SystemExit("missing smoke script(s): " + ", ".join(missing_scripts))
 
     if args.skip_build and any(suite.proxy for suite in suites):
-        proxy = REPO_ROOT / "host/wasm_network_proxy"
+        proxy = REPO_ROOT / "ports/host_native/build/wasm_network_proxy"
         if not proxy.exists():
             raise SystemExit(f"{proxy.relative_to(REPO_ROOT)} is missing; rerun without --skip-build")
 

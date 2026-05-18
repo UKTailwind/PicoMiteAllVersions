@@ -53,9 +53,9 @@ If a HAL boundary costs perf in a hot path, the fix is **not** to add a back-cha
 
 ## Safety net (per phase)
 
-1. `cd host/ && ./build.sh && ./run_tests.sh` — 192/192 in default mode (correctness gate, see `CLAUDE.md`).
+1. `cd ports/host_native/ && ./build.sh && ./run_tests.sh` — 192/192 in default mode (correctness gate, see `CLAUDE.md`).
 2. `./buildall.sh` — every device target compiles.
-3. `cd host/ && make -f Makefile.wasm` — WASM links (host/WASM untouched until Phase 12, so this is a regression check on the device-side HAL not breaking shared core code).
+3. `cd ports/host_wasm && make` — WASM links (host/WASM untouched until Phase 12, so this is a regression check on the device-side HAL not breaking shared core code).
 4. `tools/check_hal_purity.sh` — passes for files in scope this phase.
 5. `tools/check_ram_baseline.sh` — passes for every device target (or baseline updated with explicit justification).
 6. Performance battery for any phase touching hot paths (Phases 2, 3, 6, 7a–d, 8).
@@ -89,10 +89,10 @@ Copied from the top of the original plan, unchanged:
 
 - **Never `git stash` + check out an earlier commit to prove a failure is "pre-existing."** The exercise is wasted motion — any failure seen at tip is one to fix now, on the branch, in the next commit. Do not investigate blame, investigate the root cause.
 
-- **When you fix something, rebuild every artefact the user might be running.** The source tree is not the deliverable. `mmbasic_test`, `mmbasic_sim`, and `host/web/picomite.{mjs,wasm,data}` are three distinct binaries — fixing FileIO.c and only rebuilding the one you happened to run tests against leaves the user on stale bytes. Before reporting a fix as landed: rebuild `./host/build.sh`, `./host/build_sim.sh`, and `./host/build_wasm.sh` (when emcc is available). If a fix touches shared core code, all three must be regenerated in the same step.
+- **When you fix something, rebuild every artefact the user might be running.** The source tree is not the deliverable. `mmbasic_test`, `mmbasic_sim`, and `ports/host_wasm/web/picomite.{mjs,wasm,data}` are three distinct binaries — fixing FileIO.c and only rebuilding the one you happened to run tests against leaves the user on stale bytes. Before reporting a fix as landed: rebuild `./ports/host_native/build.sh`, `make -C ports/host_native sim`, and `./ports/host_wasm/build.sh` (when emcc is available). If a fix touches shared core code, all three must be regenerated in the same step.
 
 - **Commit-message pass counts must be scraped, not recalled.** Any commit that states a pass count ("Host N/N", "239/239 green", etc.) must derive that number from the `Results: X passed, Y failed` line of a fresh `./run_tests.sh` invocation run against the built binary immediately before `git commit`. Not from an earlier session, not from `--interp`-only, not from a single-file run. If `Y != 0`, the commit does not go out — fix first. Commit `20a8629` ("Host 239/239") actually shipped at 237/239; the two failures (t195, t197) sat on `real-hal` tip for two commits before they were noticed. This rule exists because of that.
 
-- **Verify-baseline ritual at session start.** Before the first code edit of any new session on `real-hal`, run `./host/build.sh && ./host/run_tests.sh` and report the verbatim `Results:` line. If `Y != 0`, the first task of the session is to fix it — no matter what the user asked for. This catches regressions the previous session shipped but didn't notice.
+- **Verify-baseline ritual at session start.** Before the first code edit of any new session on `real-hal`, run `./ports/host_native/build.sh && ./ports/host_native/run_tests.sh` and report the verbatim `Results:` line. If `Y != 0`, the first task of the session is to fix it — no matter what the user asked for. This catches regressions the previous session shipped but didn't notice.
 
 - **`run_tests.sh` single-file mode must honour `RUN_ARGS:`.** Single-file invocations (`./run_tests.sh tests/t195_save_image_posix.bas --interp`) today pass `$MODE` but ignore the test file's `RUN_ARGS:` header, so `--sd-root=/tmp/mmbasic-t195` never reaches the binary. That's why spot-checking a named failing test returned PASS while the full suite was red — the POSIX-routing path isn't exercised in single-file mode. Fix: parse RUN_ARGS in the single-file branch the same way `run_one_test()` already does.

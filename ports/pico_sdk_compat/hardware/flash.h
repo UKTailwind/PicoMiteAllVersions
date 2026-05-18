@@ -10,11 +10,11 @@
  * inside FileIO.c (fs_flash_read, SaveOptions) collapses to plain buffer
  * offsets. Setting XIP_BASE to 0 keeps those expressions well-formed; the
  * code paths that actually matter on host (flash_range_*) are routed
- * through host_stubs_legacy.c which writes to flash_prog_buf directly. */
+ * through the host flash shim which writes to flash_prog_buf directly. */
 #define XIP_BASE 0
 /* On the device these hit real flash. On host they simulate flash against
  * the flash_prog_buf in host_main.c, so NEW / SAVE / program-memory edits
- * actually take effect. Implementations live in host_stubs_legacy.c. */
+ * actually take effect. Implementations live in the host flash shim. */
 void flash_range_erase(uint32_t off, uint32_t count);
 void flash_range_program(uint32_t off, const uint8_t *data, uint32_t count);
 /* flash_do_cmd: device-only SPI command to the flash chip (used by

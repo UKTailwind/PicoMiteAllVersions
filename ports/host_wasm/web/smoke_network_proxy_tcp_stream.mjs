@@ -1,6 +1,6 @@
 // Headless smoke for host-WASM proxy-mode TCP client streams.
 //
-// Starts a local TCP peer, serves the app through host/wasm_network_proxy, then
+// Starts a local TCP peer, serves the app through ports/host_native/build/wasm_network_proxy, then
 // verifies WEB OPEN TCP STREAM / WEB TCP CLIENT STREAM exchange bytes through
 // the C proxy.
 

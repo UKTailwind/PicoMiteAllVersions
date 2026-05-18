@@ -60,7 +60,7 @@ static uint8_t vm_sys_graphics_rgb121(uint32_t c) {
 /* FRAMEBUFFER merge-pipeline + copy scratch state + PICOMITE-side
  * internal helpers have moved to drivers/vm_framebuffer_picomite/
  * vm_framebuffer_picomite.c. Host impl lives in
- * host/hal_vm_framebuffer_host.c; scanout ports (VGA/HDMI/WEB) link
+ * ports/host_native/hal_vm_framebuffer_host.c; scanout ports (VGA/HDMI/WEB) link
  * the error-stub at drivers/vm_framebuffer_unsupported/. */
 
 void vm_sys_graphics_reset(void) {

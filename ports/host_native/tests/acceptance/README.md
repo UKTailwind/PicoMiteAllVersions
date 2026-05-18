@@ -1,4 +1,4 @@
-# host/tests/acceptance/
+# ports/host_native/tests/acceptance/
 
 Feature-level acceptance specs. These tests are **not** run by the default
 gate (`./run_tests.sh`) or the frontend smoke gate (`./run_frontend_tests.sh`) —
@@ -23,17 +23,17 @@ last gate before tagging a feature as complete.
 
   Used as the spec for the TYPE/STRUCT port tracked in
   `docs/type-struct-port-plan.md`. Each phase of that plan adds a
-  focused test in `host/tests/frontend/` for its slice; when all phases
+  focused test in `ports/host_native/tests/frontend/` for its slice; when all phases
   land, this file should run clean end-to-end under both the
   interpreter and the VM.
 
 ## How to run one manually
 
 ```
-cd host
-./mmbasic_test tests/acceptance/struct_full.bas           # compare mode
-./mmbasic_test tests/acceptance/struct_full.bas --interp  # interpreter only
-./mmbasic_test tests/acceptance/struct_full.bas --vm      # VM only
+cd ports/host_native
+./build/mmbasic_test tests/acceptance/struct_full.bas           # compare mode
+./build/mmbasic_test tests/acceptance/struct_full.bas --interp  # interpreter only
+./build/mmbasic_test tests/acceptance/struct_full.bas --vm      # VM only
 ```
 
 ## When an acceptance spec passes

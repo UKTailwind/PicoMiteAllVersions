@@ -103,7 +103,7 @@ The REPL renders into the framebuffer using the existing on-screen text renderer
 
 Delivered:
 
-- `./host/mmbasic_test --repl [--sd-root DIR]` enters an interactive MMBasic session. Default `sd-root` is cwd.
+- `./ports/host_native/build/mmbasic_test --repl [--sd-root DIR]` enters an interactive MMBasic session. Default `sd-root` is cwd.
 - Uses the device's real `EditInputLine` (moved to `core/mmbasic/MMBasic_Prompt.c` — see below). UP/DOWN history, LEFT/RIGHT cursor edit, HOME/END, INSERT, F1–F12, TAB, backspace — all working on a real terminal via VT100 escape codes.
 - Terminal raw mode and escape-sequence decoding in `host/host_terminal.{c,h}`. Terminal size auto-detected via `TIOCGWINSZ`. Cooked-mode fallback when stdin is piped (CI / scripts still work).
 - `EDIT` runs over VT100 and calls through to the full device editor. F1 saves edits back to ProgMemory.
@@ -227,9 +227,9 @@ The protocol is small enough that neither side needs a schema file — one comme
 
 ## Build integration
 
-- `./host/build_sim.sh` (or `make sim`) builds `mmbasic_sim` separately from `mmbasic_test`. Existing `host/build.sh` and `host/run_tests.sh` untouched.
-- `./host/run_sim.sh` launches with sensible defaults (port 5150, web-root `../web`, sd-root repo root, 320×320).
-- Object files live in `host/sim_obj/` so the simulator build doesn't stomp on the test-harness build.
+- `make -C ports/host_native sim` builds `mmbasic_sim` separately from `mmbasic_test`. Existing `ports/host_native/build.sh` and `ports/host_native/run_tests.sh` are the native test-harness entry points.
+- `ports/host_native/run_sim.sh` launches with sensible defaults (port 5150, web-root `../web`, sd-root repo root, 320x320).
+- Object files live under `ports/host_native/build/sim/` so the simulator build doesn't stomp on the test-harness build.
 - Mongoose adds no dependencies to the test harness. The web frontend has no build step and no dependencies at all — just static files.
 - CI continues to build and run only `mmbasic_test`.
 
@@ -306,7 +306,7 @@ Notes from building Phase 0 that a fresh conversation should know before touchin
 - **Commits**:
   - `51bb8ce` — Add host REPL and begin breaking up PicoMite.c
   - `da6d070` — Fix REPL state bugs: load stale tail, F1 save, Ctrl-D, inpbuf echo
-- **Existing host build**: `host/host_main.c`, `host/host_stubs_legacy.c`, `host/Makefile`, `host/build.sh`
+- **Existing host build**: `ports/host_native/host_main.c`, `ports/host_native/Makefile`, `ports/host_native/build.sh`
 - **VM syscall ABI**: `vm_sys_*.h`, `bytecode.h`
-- **Framebuffer primitives**: `host_stubs_legacy.c` (search for `host_fill_rect_pixels`, `host_draw_*`)
+- **Framebuffer primitives**: `ports/host_native/host_fb.c` and the shared graphics drivers
 - **Mongoose**: https://github.com/cesanta/mongoose

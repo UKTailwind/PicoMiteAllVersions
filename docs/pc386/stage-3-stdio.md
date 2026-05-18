@@ -8,7 +8,7 @@ This stage does NOT add interrupts, PS/2 keyboard, VGA graphics, or PC speaker �
 
 1. **Fresh HAL impls, no link-time overrides.** Each pc386 HAL surface gets its own implementation file in `ports/pc386/` (or shared spot — see "Restructure"). We do *not* compile `hal_*_host.c` and silently override host_*-named symbols from a port-local TU. If a host HAL impl is genuinely identical to what pc386 needs (watchdog no-op is the canonical case), it gets relocated into a port-neutral spot that both ports compile.
 2. **HAL purity stays green.** `tools/check_hal_purity.sh` must stay clean — no new `#if PORT_PC386` in core or VM. Behavior differences are expressed by which HAL impl gets linked, not by ifdefs.
-3. **`host/run_tests.sh` doesn't regress.** Same source files, no new options that change shared semantics.
+3. **`ports/host_native/run_tests.sh` doesn't regress.** Same source files, no new options that change shared semantics.
 4. **No reach-back into mmbasic_stdio.** That port is the litmus for HAL purity in a POSIX environment; pc386 is the litmus in a bare-metal one. They're peers, not parent/child.
 
 ## HAL surface audit
@@ -107,7 +107,7 @@ A stage-3 close requires all of:
 
 1. `cd ports/pc386 && make` — clean build, no warnings.
 2. `ports/pc386/run_tests.sh` — green for the stage-3 corpus (6 of the 8 mmbasic_stdio tests; the two pin/pixel error tests need pc386-specific `.ok` files).
-3. `host/run_tests.sh` — still green (no regression in host_native or mmbasic_stdio).
+3. `ports/host_native/run_tests.sh` — still green (no regression in host_native or mmbasic_stdio).
 4. `tools/check_hal_purity.sh` — green.
 5. `qemu -kernel build/mmbasic.elf -serial stdio -display none` boots into the REPL prompt manually, accepts `PRINT 1+1` and prints `2`.
 
@@ -116,7 +116,7 @@ A stage-3 close requires all of:
 Each lands as its own commit so a regression bisects cleanly.
 
 - **3a ✅ — HAL skeleton.** 10 pc386 HAL files in place; every entry that has no boot-safe semantics calls `pc386_panic("...not yet implemented")`. Boot-safe entries (audio_init, watchdog, vm_framebuffer service/shutdown, keyboard_service, etc.) no-op so unconditional boot calls don't fault. Kernel still does Stage 2's mount-and-list. Builds clean (mmbasic.elf 206 KB), boots, Stage 2 functionality verified intact. Adds `ports/pc386/sys/types.h` shim for `off_t`/`ssize_t` (i686-elf has no `<sys/types.h>`).
-- **3b ✅ — `hal/generic/` extraction.** Watchdog no-op moved to `hal/generic/hal_watchdog_noop.c`. host_native, mmbasic_stdio, esp32_s3_metro, pc386 all compile the shared file; per-port copies deleted. `host/run_tests.sh` 243/243 (no regression).
+- **3b ✅ — `hal/generic/` extraction.** Watchdog no-op moved to `hal/generic/hal_watchdog_noop.c`. host_native, mmbasic_stdio, esp32_s3_metro, pc386 all compile the shared file; per-port copies deleted. `ports/host_native/run_tests.sh` 243/243 (no regression).
 - **3c.0 ✅ — Real `hal_time` + `hal_random`.** TSC for monotonic µs, calibrated at first-call against PIT channel 2 via the speaker-control port (0x61) status bit. xorshift32 seeded from RDTSC. Both standalone — no MMBasic include surface needed.
 - **3c.1 ✅ — Freestanding libc + MMBasic core in the link.** 11 shim headers in `ports/pc386/include_shim/` (`stdio.h`, `string.h`, `math.h`, `setjmp.h`, `errno.h`, `complex.h`, `time.h`, `ctype.h`, `stdlib.h`, `inttypes.h`, `assert.h`, `limits.h`, `sys/stat.h`). `pc386_libc.c` (~700 LOC) hand-rolled: full string/ctype, errno, atoi/strtol family, qsort/bsearch, x87-asm-backed math (sin/cos/tan/log/exp/sqrt/pow/floor/ceil/fmod/etc.), minimal vsnprintf with `%c %s %d %u %x %g` covering MMBasic's grepped uses, FILE*-stub stdio routed to MMPrintString. `setjmp.S` is ~30 lines of i686 asm (callee-saved + esp + return-addr save/restore). `boot.S` brings up the x87 FPU before kmain. `Operators.c` compiles clean; the rest of CORE_SRCS lands in 3c.2.
 - **3c.2 ✅ — `pc386_runtime.c` (state + lifecycle).** Three new TUs: `pc386_state.c` owns the BSS state arrays MMBasic core declares `extern` (~225 LOC mirroring host_runtime.c's BSS block); `pc386_runtime.c` (~310 LOC) provides the runtime hooks (`host_runtime_begin/finish`, console I/O routed through `serial_16550`, all the `port_*` no-ops); `pc386_peripheral_stubs.c` (~315 LOC) provides cmd_/fun_ no-ops + GPS/lfs/Serial/AES/web/TCP stubs. Full mmbasic.elf (3 MB) links cleanly under i686-elf-gcc.

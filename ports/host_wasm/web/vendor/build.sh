@@ -1,5 +1,5 @@
 #!/bin/bash
-# Rebuild host/web/vendor/codemirror.js from the pinned CodeMirror 6
+# Rebuild ports/host_wasm/web/vendor/codemirror.js from the pinned CodeMirror 6
 # packages.  Run after bumping versions; otherwise the bundle is
 # checked in and no rebuild is needed.
 #

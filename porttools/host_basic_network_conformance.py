@@ -679,7 +679,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     root = args.repo.resolve()
-    binary = args.binary or (root / "host" / "mmbasic_test")
+    binary = args.binary or (root / "ports" / "host_native" / "build" / "mmbasic_test")
     if not args.no_build:
         rc = subprocess.call([args.make, "-C", str(root / "ports" / "host_native")], cwd=root)
         if rc != 0:

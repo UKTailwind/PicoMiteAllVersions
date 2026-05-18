@@ -25,7 +25,7 @@ This is the current GitHub Pages-compatible mode.
   endpoint.
 - Raw TCP stream/server, UDP, TFTP, Telnet, and non-CORS HTTP fail with clear
   unsupported errors.
-- This mode remains the default for `host/web/` when no proxy is detected.
+- This mode remains the default for `ports/host_wasm/web/` when no proxy is detected.
 
 ### Proxy Mode
 
@@ -74,7 +74,7 @@ used by browser smoke tests, but the server users run should be C.
 BASIC command surface
   -> shared/net command parsers + lifecycle policy
   -> ports/host_wasm/host_wasm_web.c
-  -> JS proxy transport in host/web/app runtime
+  -> JS proxy transport in ports/host_wasm/web/app runtime
   -> same-origin WebSocket/HTTP C proxy server
   -> host OS sockets/filesystem/network
 ```
@@ -96,10 +96,10 @@ already has a C HTTP/WebSocket server stack for `mmbasic_sim`.
 Preferred shape:
 
 - New target in `ports/host_native/Makefile`: `wasm-proxy`.
-- Output binary: `host/wasm_network_proxy`.
+- Output binary: `ports/host_native/build/wasm_network_proxy`.
 - Reuse `ports/host_native/vendor/mongoose.{c,h}` for HTTP/WebSocket serving.
-- Serve static files from `host/web/` with the same COOP/COEP headers that
-  `host/web/serve.py` adds today.
+- Serve static files from `ports/host_wasm/web/` with the same COOP/COEP headers that
+  `ports/host_wasm/web/serve.py` adds today.
 - Add a proxy WebSocket endpoint and capability endpoint in the same process.
 - Keep the proxy independent from `mmbasic_test` / `mmbasic_sim`; it is a
   companion service for the WASM page, not another interpreter process.
@@ -116,8 +116,8 @@ testable without a browser:
 - Optional `ports/host_native/wasm_proxy_http.{c,h}` if arbitrary HTTP/HTTPS
   proxying needs separate parsing/TLS handling.
 
-`host/web/serve.py` may remain as a tiny static fallback for developers, but
-proxy compliance work should use `host/wasm_network_proxy`.
+`ports/host_wasm/web/serve.py` may remain as a tiny static fallback for developers, but
+proxy compliance work should use `ports/host_native/build/wasm_network_proxy`.
 
 ## Proxy Transport
 
@@ -280,8 +280,8 @@ Likely new files:
 - `ports/host_native/wasm_proxy_net.c`
 - optional `ports/host_native/wasm_proxy_http.h`
 - optional `ports/host_native/wasm_proxy_http.c`
-- `host/web/proxy_client.mjs`
-- `host/web/smoke_network_proxy.mjs`
+- `ports/host_wasm/web/proxy_client.mjs`
+- `ports/host_wasm/web/smoke_network_proxy.mjs`
 - `porttools/wasm_proxy_network_conformance.py`
 - `docs/real-hal/wasm-network-proxy-plan.md`
 
@@ -289,9 +289,9 @@ Likely changed files:
 
 - `ports/host_native/Makefile`: add the `wasm-proxy` target and build rules
   for the standalone C proxy binary.
-- `host/web/serve.py`: keep as static fallback only; do not embed the proxy
+- `ports/host_wasm/web/serve.py`: keep as static fallback only; do not embed the proxy
   there.
-- `host/web/app.mjs`: detect proxy caps and publish proxy state to the WASM
+- `ports/host_wasm/web/app.mjs`: detect proxy caps and publish proxy state to the WASM
   bridge.
 - `ports/host_wasm/host_wasm_web.c`: select proxy-backed operations when proxy
   capabilities are present.
@@ -305,8 +305,8 @@ Likely changed files:
 
 - Define proxy capability JSON and WebSocket message envelope.
 - Add the native C proxy skeleton:
-  - CLI: `host/wasm_network_proxy [--bind 127.0.0.1] [--port 8000]
-    [--web-root host/web]`.
+  - CLI: `ports/host_native/build/wasm_network_proxy [--bind 127.0.0.1] [--port 8000]
+    [--web-root ports/host_wasm/web]`.
   - Static serving with COOP/COEP headers.
   - `/__picomite_proxy/caps` returning a fixed initial capability set.
   - `/__picomite_proxy/ws` accepting a versioned no-op WebSocket handshake.
@@ -319,8 +319,8 @@ Likely changed files:
 
 Exit gates:
 
-- `make -C ports/host_native wasm-proxy` builds `host/wasm_network_proxy`.
-- `host/wasm_network_proxy --port 8000 --web-root host/web` serves the WASM
+- `make -C ports/host_native wasm-proxy` builds `ports/host_native/build/wasm_network_proxy`.
+- `ports/host_native/build/wasm_network_proxy --port 8000 --web-root ports/host_wasm/web` serves the WASM
   app with COOP/COEP headers.
 - Existing static WASM smokes still pass.
 - A no-op proxy can be detected and reported without changing BASIC semantics.
@@ -338,7 +338,7 @@ Exit gates:
 
 - Same-origin fetch smoke still passes in static mode.
 - Proxy smoke fetches a non-CORS HTTP URL and returns response bytes to BASIC.
-- Demo works when served by `host/wasm_network_proxy`.
+- Demo works when served by `ports/host_native/build/wasm_network_proxy`.
 
 ### Phase 2 - TCP Client Stream
 
@@ -412,7 +412,7 @@ Exit gates:
 - Add `porttools/wasm_proxy_network_conformance.py` or extend the existing
   browser smokes to run all suites through the page.
 - The harness should start:
-  - `host/wasm_network_proxy`
+  - `ports/host_native/build/wasm_network_proxy`
   - any local peer endpoints needed for tests
   - headless Chromium
 - It should drive BASIC through the browser app and collect output through the

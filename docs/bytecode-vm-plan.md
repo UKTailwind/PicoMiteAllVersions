@@ -26,7 +26,7 @@
 - Math: SIN, COS, TAN, ATN, ASIN, ACOS, ATAN2, SQR, LOG, EXP, ABS, SGN, INT, FIX, CINT, RAD, DEG, PI, MAX, MIN, RND
 - Everything else: bridged to interpreter's cmd_*/fun_* functions
 
-**Test Suite** (host/tests/):
+**Test Suite** (ports/host_native/tests/):
 - 49 compare-mode tests -- all PASS (interpreter output == VM output)
 - Covers: arithmetic, strings, control flow, recursion, arrays, type coercion, DATA/READ, bridge functions, edge cases, INC/CONST, RANDOMIZE/RND/SPACE$/STRING$/INKEY$
 
@@ -137,7 +137,6 @@ runtime/vm/bc_source.c             -- Raw-source frontend
 runtime/vm/bc_vm.c                 -- VM dispatch loop
 runtime/vm/bc_runtime.c            -- FRUN/runtime entry points
 runtime/vm/bc_bridge.c             -- Bridge to interpreter's cmd_*/fun_* functions
-host/                   -- Native macOS build for off-device testing
-host/tests/t*.bas       -- 49 test programs
-host/bench_*.bas        -- Benchmark programs (fibonacci, mandelbrot, matrix, sieve)
+ports/host_native/                 -- Native macOS build for off-device testing
+ports/host_native/tests/t*.bas     -- host-native BASIC test programs
 ```

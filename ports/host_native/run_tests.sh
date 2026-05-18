@@ -12,7 +12,7 @@
 
 set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$SCRIPT_DIR"
 
 # Pin DATE$ / TIME$ to deterministic values so interpreter vs VM oracle
@@ -21,7 +21,7 @@ cd "$SCRIPT_DIR"
 export MMBASIC_HOST_DATE=${MMBASIC_HOST_DATE:-02-01-2024}
 export MMBASIC_HOST_TIME=${MMBASIC_HOST_TIME:-03:04:05}
 
-BINARY=${BINARY:-./mmbasic_test}
+BINARY=${BINARY:-./build/mmbasic_test}
 if [ ! -x "$BINARY" ]; then
     echo "Binary not found. Building..."
     ./build.sh

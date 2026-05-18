@@ -4,8 +4,8 @@
  * Number- and string-formatting helpers used by PRINT, compiled output,
  * and the VM runtime. All of them are just thin wrappers over
  * MMPrintString / SSPrintString / IntToStr / FloatToStr, so they port
- * verbatim to any platform that supplies those primitives — the host
- * stubs in host_stubs_legacy.c route them to stdout.
+ * verbatim to any platform that supplies those primitives; the host port
+ * routes them to stdout.
  */
 
 #include "MMBasic_Includes.h"

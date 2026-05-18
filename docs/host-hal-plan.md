@@ -9,7 +9,7 @@ Collapse the host port into a clean hardware-abstraction layer so the host build
 
 1. **Device runtime path is identical after this work.** Source layout may change (code moved between files, new shared headers, `#ifdef MMBASIC_HOST` guards); the device firmware's instruction stream for any given BASIC line must match today. The gate is behavioral, not textual.
 2. **The VM path is mostly untouched.** `vm_sys_graphics_*_execute`, `bc_vm.c` dispatch, and peephole optimizations stay as-is. Native-opcode file I/O (`OP_OPEN`, `OP_PRINT_NUM_FILE`, `OP_LINE_INPUT_FILE`, etc. via `vm_sys_file_*`) stays too. Commands whose output format differs between the VM's simple native syscall and FileIO.c's full implementation (FILES is the first case, flagged in Phase 3) get moved from a native opcode to the `OP_BRIDGE_CMD` fallback, so interp and VM both land in the same FileIO.c handler. That's a narrow, per-command decision — the VM doesn't become a generic `cmd_*` dispatcher.
-3. **Host test suite stays green at every phase boundary.** No phase lands until `cd host/ && ./build.sh && ./run_tests.sh` passes in default (compare), `--interp`, and `--vm` modes.
+3. **Host test suite stays green at every phase boundary.** No phase lands until `cd ports/host_native/ && ./build.sh && ./run_tests.sh` passes in default (compare), `--interp`, and `--vm` modes.
 4. **Device build stays green at every phase boundary.** `CMakeLists.txt` / `CMakeLists 2350.txt` must still build. Manual smoke-boot of RP2040 firmware after any phase that touches `Draw.c` / `FileIO.c`.
 
 ## Problem statement
@@ -468,7 +468,7 @@ and bc_vm.c cases are now dead — Phase 7 cleanup.
 - VS1053 support on host. Host has no SPI IC to drive.
 
 **Exit gate results:**
-- `cd host && ./build.sh` — clean, 3 pre-existing warnings only (the
+- `cd ports/host_native && ./build.sh` — clean, 3 pre-existing warnings only (the
   `__attribute__((optimize))` unknown-attribute warning on MIPS16 —
   already present for other core files).
 - `./run_tests.sh` (default compare) — **197/197** green.
@@ -617,7 +617,7 @@ The residual got named `host_runtime.c` instead of the plan's `host_noop_stubs.c
 
 ## Validation gates (applied after every phase)
 
-1. **Host build:** `cd host/ && ./build.sh` — zero warnings, zero errors.
+1. **Host build:** `cd ports/host_native/ && ./build.sh` — zero warnings, zero errors.
 2. **Host tests, default compare:** `cd host/ && ./run_tests.sh` — all PASS.
 3. **Host tests, interp only:** `./run_tests.sh --interp`.
 4. **Host tests, VM only:** `./run_tests.sh --vm`.

@@ -18,8 +18,8 @@
  *     the 4-bit framebuffer-mode draw primitives
  *
  * Linked into every target except PICOMITEVGA (VGA has its own
- * framebuffer subsystem in drivers/vga_pio/) and host (which
- * simulates framebuffer in host_stubs_legacy.c).
+ * framebuffer subsystem in drivers/vga_pio/) and host-style ports
+ * (which simulate framebuffer through ports/host_native/host_fb.c).
  */
 
 #include "MMBasic_Includes.h"
@@ -34,10 +34,8 @@
 extern int map[16];
 extern int SSD1963data;
 
-/* Host build: restorepanel / closeframebuffer / setframebuffer /
- * copyframetoscreen / blitmerge / merge / cmd_framebuffer all live in
- * host_stubs_legacy.c (write into host_framebuffer directly instead of
- * DMAing bytes to a physical LCD controller). This block closes at the
+/* Host builds provide their framebuffer path in the host port instead of
+ * DMAing bytes to a physical LCD controller. This block closes at the
  * original PICOMITEVGA #endif further down. */
 void restorepanel(void){
     if(Option.DISPLAY_TYPE>I2C_PANEL && Option.DISPLAY_TYPE < BufferedPanel){

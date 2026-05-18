@@ -1,14 +1,8 @@
 build*/
 __pycache__/
 */__pycache__/
-host/*.o
-host/*.d
-host/mmbasic_test
-host/mmbasic_legacy_test
-host/mmbasic_sim
-host/wasm_network_proxy
-host/sim_obj/
-host/wasm_obj/
+ports/host_native/build/
+ports/host_wasm/wasm_obj/
 *.uf2
 .DS_Store
 .claude/

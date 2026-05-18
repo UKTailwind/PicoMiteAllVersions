@@ -1,8 +1,7 @@
 /*
  * host_keys.c -- Test-harness scripted-key injection.
  *
- * Moved out of host_stubs_legacy.c as part of the Host HAL refactor
- * (Phase 1). No behavior change — same env-var names, same escape
+ * Host HAL key injection helper. Same env-var names, same escape
  * syntax, same semantics for host_keydown.
  */
 
@@ -114,7 +113,7 @@ int host_runtime_keys_consume(void) {
 /* host_keydown backs MMBasic's KEYDOWN function — n=0 asks "is a key
  * ready?", n=1..6 returns the scripted key (no consume). Kept as a
  * separate entry point because it's part of the MMBasic runtime API
- * and is referenced by host_stubs_legacy.c via its extern. */
+ * and is referenced via its extern. */
 int host_keydown(int n) {
     if (n == 0) return host_runtime_keys_ready() ? 1 : 0;
     if (n >= 1 && n <= 6) return host_runtime_keys_peek_char();

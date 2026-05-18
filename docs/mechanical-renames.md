@@ -41,7 +41,7 @@ Workflow per entry:
 - Rebucketing miscategorized call sites (`cmd_null` in RAM, `cmd_inc` tagged `SUBFUN`). That's a semantic fix, not a rename — separate work.
 - Deleting the orphan `/** @endcond */` near `cmd_null`. Doc cleanup, separate.
 
-**Smoke gate.** `host/build.sh && host/run_tests.sh` + at least one Pico build (`pico` or `pico_rp2350` via `buildall.sh`) to confirm `__not_in_flash_func` still resolves.
+**Smoke gate.** `ports/host_native/build.sh && ports/host_native/run_tests.sh` + at least one Pico build (`pico` or `pico_rp2350` via `buildall.sh`) to confirm `__not_in_flash_func` still resolves.
 
 ---
 

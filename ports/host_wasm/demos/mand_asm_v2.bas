@@ -1,8 +1,21 @@
-' Mandelbrot renderer with menu (PicoMite MMBasic) — '!ASM inner loop.
-' Same shell as host/demos/mand.bas (the SD-card res-independent
+' Mandelbrot renderer with menu (PicoMite MMBasic) — '!ASM inner loop, v2.
+' Same shell as ports/host_wasm/demos/mand.bas (the SD-card res-independent
 ' version) but the iteration kernel is hand-written VM assembly using
 ' the bytecode VM's mulshr / sqrshr fixed-point intrinsics. Requires
 ' FRUN (the bytecode VM); the interpreter doesn't grok '!ASM blocks.
+'
+' v2 vs v1 (ports/host_wasm/demos/mand_asm.bas):
+'   - drop `checkint` from the inner loop. '!FAST never emits it
+'     (bc_source.c's DO/LOOP compiler doesn't emit OP_CHECKINT at
+'     backward jumps), so v1 was paying one CheckAbort + check_interrupt
+'     pair per Mandelbrot iteration that the reference mand.bas never
+'     pays. Ctrl-C / Esc responsiveness still comes from
+'     RenderViewport's `ConsumeKeyIfAny()` poll every 10 lines.
+'   - replace the top-of-loop `addi iter,1; jge iter,max,.escaped` +
+'     the bottom-of-loop unconditional `jmp .loop` with a single
+'     conditional back-jump at the bottom (`addi iter,1;
+'     jlt iter,max,.loop` then fall through to .interior). One fewer
+'     op per iter, semantics preserved.
 OPTION EXPLICIT
 OPTION CONTINUATION LINES ON
 
@@ -78,12 +91,15 @@ Dim PALETTE_NAME$
 '   2. Period-2 bulb test       (rejects the disc at -1)
 '   3. Periodicity detection    (catches everything else interior)
 '
-' Inner loop: 11 ops in the common path via three tricks from
+' Inner loop: 12 ops on the common path via four tricks from
 ' docs/asm-syntax.md —
 '   * mulshradd to fuse zy = (zx*zy)>>29 + cy into one op
 '   * carry zx² / zy² across iterations so each iter only squares once
 '   * write new zy/zx in place (no temp + mov, since after squaring,
 '     mulshradd captures old zx/zy as inputs before writing zy)
+'   * conditional back-jump at the bottom: `addi iter,1;
+'     jlt iter,max,.loop` then fall through to .interior. Avoids both
+'     a top-of-loop max-test branch and an unconditional `jmp .loop`.
 ' Iteration count matches the BASIC reference exactly.
 Sub Mandelbrot(block%(), startX%, startY%, delta%, bCount%, maxIter%)
   Local i%, iter%
@@ -143,12 +159,10 @@ Sub Mandelbrot(block%(), startX%, startY%, delta%, bCount%, maxIter%)
         sqrshr    zy2, zy, BITS30
         addi      mag, zx2, zy2
         jgt       mag, ESC_FP, .escaped       ; escape: exit WITHOUT bumping iter
-        addi      iter, iter, ONE
-        jge       iter, maxIter, .escaped
         ; periodicity check: did z return to a snapshot?
         jne       zx, periodZX, .periodNoMatch
         jne       zy, periodZY, .periodNoMatch
-        jmp       .interior
+        jmp       .interior                   ; both match → interior point
     .periodNoMatch:
         addi      periodCount, periodCount, ONE
         jlt       periodCount, PERIOD_INT, .periodNoSnap
@@ -156,8 +170,9 @@ Sub Mandelbrot(block%(), startX%, startY%, delta%, bCount%, maxIter%)
         mov       periodZX, zx
         mov       periodZY, zy
     .periodNoSnap:
-        checkint
-        jmp       .loop
+        addi      iter, iter, ONE
+        jlt       iter, maxIter, .loop        ; loop back if still under cap
+        ; fall through to .interior when iter has reached maxIter
     .interior:
         mov       iter, maxIter
     .escaped:

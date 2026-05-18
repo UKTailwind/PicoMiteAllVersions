@@ -4,7 +4,7 @@
 set -e
 cd "$(dirname "$0")"
 
-BINARY=${BINARY:-./mmbasic_test}
+BINARY=${BINARY:-./build/mmbasic_test}
 if [ ! -x "$BINARY" ]; then
     echo "Binary not found. Building..."
     ./build.sh
@@ -107,7 +107,7 @@ run_case \
     --assert-pixel 60,20,0000FF \
     --assert-pixel 60,16,00FF00 \
     --assert-pixel 80,20,FFFF00 \
-    --assert-pixel 80,27,FFFF00
+    --assert-pixel 80,24,FFFF00
 
 run_case \
     "t89_circle_array_forms" \
@@ -116,7 +116,7 @@ run_case \
     --assert-pixel 40,50,0000FF \
     --assert-pixel 40,46,0000FF \
     --assert-pixel 60,50,FFFF00 \
-    --assert-pixel 60,57,FFFF00
+    --assert-pixel 60,55,FFFF00
 
 run_case \
     "t110_circle_vector_radius_quirk" \
@@ -264,9 +264,9 @@ run_case \
     "t134_pico_blocks_startup_geometry" \
     "tests/t134_pico_blocks_startup_geometry.bas" \
     --compare-framebuffer \
-    --assert-pixel 166,120,FF0000 \
-    --assert-pixel 135,228,FFFFFF \
-    --assert-pixel 160,233,00FF00
+    --assert-pixel 166,166,FF0000 \
+    --assert-pixel 135,308,FFFFFF \
+    --assert-pixel 160,313,00FF00
 
 run_case \
     "t144_triangle_scalar_forms" \

@@ -12,7 +12,7 @@ CLS
 PRINT "FrogFind text browser"
 IF MM.INFO(TCPIP STATUS)<>1 THEN
   PRINT "Network proxy is not available."
-  PRINT "Serve this app with host/wasm_network_proxy."
+  PRINT "Serve this app with ports/host_native/build/wasm_network_proxy."
   END
 ENDIF
 

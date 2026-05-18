@@ -126,7 +126,7 @@ Concrete extension work:
 
 1. Add a `STRICT_DIRS=("ports/host_native")` array next to `STRICT_FILES`. Glob-expand `*.c *.h` at script start, append to `STRICT_FILES`.
 2. Add `MMBASIC_SIM` to `TARGET_MACROS` so the gate catches future `host_native/*` regressions covering both `MMBASIC_WASM` and the sim-vs-real distinction.
-3. Add a WASM artefact symbol-uniqueness check after the WASM build: `nm host/web/picomite.wasm | grep ' T host_sim_apply_slowdown\| T bc_fastgfx_resync_check\| T bc_fastgfx_post_swap'` must return exactly one line per symbol. This catches the `--allow-multiple-definition` masking risk from Step 1.
+3. Add a WASM artefact symbol-uniqueness check after the WASM build: `nm ports/host_wasm/web/picomite.wasm | grep ' T host_sim_apply_slowdown\| T bc_fastgfx_resync_check\| T bc_fastgfx_post_swap'` must return exactly one line per symbol. This catches the `--allow-multiple-definition` masking risk from Step 1.
 
 The `ffconf.h:109` host-union gate stays as-is — it's outside `host_native/` and has a legitimate cross-host use, so no whitelist needed.
 
@@ -142,9 +142,9 @@ The `ffconf.h:109` host-union gate stays as-is — it's outside `host_native/` a
 - Zero `MMBASIC_SIM` in `ports/host_native/host_fastgfx.c`.
 - Zero `MMBASIC_ANSI` in `configuration.h`.
 - One `MMBASIC_WASM` reference remaining repo-wide outside `ports/host_wasm/`: `ffconf.h:109` (host-union gate).
-- `host/run_tests.sh` 239/239 (native).
-- WASM build via `host/build_wasm.sh` clean.
-- Manual browser sanity-check (`host/web/serve.sh && open http://localhost:8000/`) is on the developer for now. Existing `host/web/smoke_*.mjs` Playwright scripts are dev-machine-only (hardcoded module path) and intentionally not wired into CI.
+- `ports/host_native/run_tests.sh` 239/239 (native).
+- WASM build via `ports/host_wasm/build.sh` clean.
+- Manual browser sanity-check (`ports/host_wasm/web/serve.sh && open http://localhost:8000/`) is on the developer for now. Existing `ports/host_wasm/web/smoke_*.mjs` Playwright scripts are dev-machine-only (hardcoded module path) and intentionally not wired into CI.
 - `tools/check_hal_purity.sh` green, including `STRICT_DIRS` expansion and the WASM symbol-uniqueness check.
 - `buildall.sh` 12 device variants unchanged.
 

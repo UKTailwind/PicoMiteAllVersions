@@ -131,8 +131,8 @@ That decision controls what is irrelevant.
 After each phase, run the smallest relevant gate first, then broaden:
 
 ```sh
-./host/build.sh
-./host/run_tests.sh
+./ports/host_native/build.sh
+./ports/host_native/run_tests.sh
 ./build_firmware.sh rp2040
 ./build_firmware.sh rp2350
 ```

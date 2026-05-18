@@ -1,6 +1,6 @@
 /*
- * host/hal_vm_framebuffer_host.c — host impl of the VM framebuffer
- * command HAL. Thin wrapper around host/host_fb.c's
+ * ports/host_native/hal_vm_framebuffer_host.c — host impl of the VM framebuffer
+ * command HAL. Thin wrapper around host_fb.c's
  * `host_framebuffer_*` software-simulation surface.
  */
 

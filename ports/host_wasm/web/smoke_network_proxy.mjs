@@ -1,7 +1,7 @@
 // Headless smoke for host-WASM proxy-mode HTTP client requests.
 //
 // Starts a local HTTP peer on a different port with no CORS headers, serves the
-// app through host/wasm_network_proxy, then verifies WEB TCP CLIENT REQUEST
+// app through ports/host_native/build/wasm_network_proxy, then verifies WEB TCP CLIENT REQUEST
 // returns the peer's raw HTTP response through the BASIC long-string buffer.
 
 import { chromium } from '/Users/joshv/.local/state/yolobox/instances/pico-gamer-main/checkout/web/node_modules/playwright/index.mjs';

@@ -1,5 +1,5 @@
 /*
- * host/hal_pin_inlines.h — host-build stub for the Tier-B hal_pin
+ * ports/host_native/hal_pin_inlines.h — host-build stub for the Tier-B hal_pin
  * inline surface.
  *
  * There are no hot-path GPIO operations on the native / WASM host — no

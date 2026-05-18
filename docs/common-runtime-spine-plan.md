@@ -313,15 +313,15 @@ passed through `./ports/host_wasm/build.sh`.
 
 | Phase | Status | Agent | Validation | Notes |
 |---|---|---|---|---|
-| 0. Runtime contract docs | Complete | Einstein | Passed | Created `docs/runtime-contract.md`; no runtime code moved for the phase. Gate feedback found two baseline harness/build issues and they were addressed before Phase 1: host `FILES` now strips MMBasic drive prefixes before the host FatFS RAM-disk walker, and `host/run_tests.sh` resolves repo tools correctly when invoked as `./host/run_tests.sh`. `./host/build.sh`, `./host/run_tests.sh`, clean `./build_firmware.sh rp2040`, and `./build_firmware.sh rp2350` passed. |
-| 1. Promote names/wrappers | Complete | Mill | Passed with caveats | Added `runtime/runtime.h`; introduced `mmbasic_runtime_port_begin()` as the current port-local lifecycle entry while retaining `host_runtime_begin()` wrappers for compatibility. Native host, WASM, stdio, ANSI, and PC386 owned call sites now use the common name. Validation: `./host/build.sh`, `./host/run_tests.sh` (243 passed, 0 failed), `make -C ports/pc386`, `make -C ports/mmbasic_stdio`, and stdio `PRINT 1+1` smoke passed. `make -C ports/mmbasic_ansi` was attempted but is blocked by the pre-existing missing `ports/host_native/hal_watchdog_host.c` Makefile entry; `emcc` was not on PATH, so WASM smoke was unavailable locally. |
-| 2. Service/interrupt/LOAD boundaries | Complete | Bernoulli | Passed with caveats | Added header-only boundary helpers for service polling, interrupt save/restore/IRETURN state, SUB interrupt return tokens, abort checks, and post-LOAD prompt bounces. Kept source loaders, console, and boot sequencing in place. Validation: `./host/build.sh`, `./host/run_tests.sh` (243 passed, 0 failed), `make -C ports/pc386`, `PC386_BOOT=kernel python3 ports/pc386/tests/repl_expect.py arith`, `./build_firmware.sh rp2040`, and `./build_firmware.sh rp2350` passed. WASM smoke was unavailable because `emcc` was not on PATH. |
-| 3. Source loading | Complete | Sagan | Passed with caveats | Added `runtime/runtime_program.c` with `mmbasic_tokenise_source_to_progmem()` and `mmbasic_save_loaded_source()` plus host/batch source flags. Non-Pico loaders now call the common implementation while retaining `load_basic_source`, `load_source`, `pc386_load_source`, and non-Pico `SaveProgramToFlash` compatibility wrappers. Fixed ANSI build-list gaps uncovered by the smoke gate (`hal_watchdog_noop`, `host_web_stubs`, `host_tcp_interrupt_pending`). Validation: `git diff --check`, `./host/build.sh`, `./host/run_tests.sh` (243 passed, 0 failed), targeted continuation/FRUN tests via host suite, `make -C ports/mmbasic_stdio`, stdio `PRINT 1+1` smoke, `make -C ports/mmbasic_ansi`, ANSI script smoke under a PTY, `make -C ports/pc386`, `./build_firmware.sh rp2040`, and `./build_firmware.sh rp2350` passed. WASM smoke unavailable because `emcc` is not on PATH. |
-| 4. Console | Complete | Anscombe | Passed with caveats | Added `runtime/runtime_console.c` and `mm_runtime_console_adapter` for host-derived console services. Common code now owns `MMInkey`, `MMgetchar`, `putConsole`, `MMputchar`, `MMPrintString`, `SSPrintString`, `MMgetline`, and VT escape decoding for native host/WASM/stdio/ANSI builds. Host-local code keeps raw terminal reads, scripted keys, sim key queue, capture/stdout serial routing, telnet, display byte output, and the stdio-only LF policy flag. Pico, ESP32, and PC386 console bodies remain port-local. Validation: `./host/build.sh`, `./host/run_tests.sh` (243 passed, 0 failed, including `t113_keydown_native`), `make -C ports/mmbasic_stdio`, `ports/mmbasic_stdio/tests/run_tests.sh` (8 passed, 0 failed), stdio `INPUT`/`PRINT` smoke (`? Hello Ada`), `make -C ports/mmbasic_ansi`, `make -C ports/pc386`, `./build_firmware.sh rp2040`, and `./build_firmware.sh rp2350` passed. WASM smoke was unavailable because `emcc` is not on PATH. |
-| 5. Abort/background/interrupt helpers | Complete | Ohm | Passed with caveats | Added `runtime/runtime_abort.c` and `runtime/runtime_interrupt.c`; `runtime/runtime.h` now exposes linked service, abort-adapter, and interrupt-state APIs instead of header-only bodies. Host, stdio, ANSI, ESP32, PC386, and Pico build lists include the new runtime modules. Host-derived ports poll timeout/network/background through a common abort adapter and preserve timeout exit status (`124` for `--interp --timeout-ms`); ESP32 keeps FreeRTOS yield and opt-in `MMAbort` longjmp; PC386 remains no-op through a null adapter; Pico calls the common abort helper from `CheckAbort()` while keeping device background work in the Pico hook. Validation: `git diff --check`, `./host/build.sh`, `./host/run_tests.sh` (243 passed, 0 failed), host timeout smoke, `make -C ports/mmbasic_stdio` plus stdio `PRINT 1+1` smoke, `make -C ports/mmbasic_ansi` plus PTY smoke, `make -C ports/pc386`, `PC386_BOOT=kernel python3 ports/pc386/tests/repl_expect.py arith`, `./build_firmware.sh rp2040`, and `./build_firmware.sh rp2350` passed. WASM smoke unavailable because `emcc` is not on PATH. |
-| 6. Boot/run sequencing | Complete | Hubble | Passed | Added `runtime/runtime_boot.c` with common init, run-source, and REPL-entry helpers. Host, WASM, stdio, ANSI, ESP32, and PC386 use the helpers only where their existing sequencing matched; firmware entry ordering remains intact. Validation: `git diff --check`, `./host/build.sh`, `./host/run_tests.sh` (243 passed, 0 failed; VM pin-mode and HAL purity clean), `./ports/host_wasm/build.sh` using `/Users/joshv/emsdk/emsdk_env.sh`, `make -C ports/mmbasic_stdio` plus `PRINT 2+2` smoke, `make -C ports/mmbasic_ansi` plus PTY smoke, `make -C ports/pc386`, `PC386_BOOT=kernel python3 ports/pc386/tests/repl_expect.py arith`, `./build_firmware.sh rp2040`, and `./build_firmware.sh rp2350` passed. |
+| 0. Runtime contract docs | Complete | Einstein | Passed | Created `docs/runtime-contract.md`; no runtime code moved for the phase. Gate feedback found two baseline harness/build issues and they were addressed before Phase 1: host `FILES` now strips MMBasic drive prefixes before the host FatFS RAM-disk walker, and `ports/host_native/run_tests.sh` resolves repo tools correctly when invoked as `./ports/host_native/run_tests.sh`. `./ports/host_native/build.sh`, `./ports/host_native/run_tests.sh`, clean `./build_firmware.sh rp2040`, and `./build_firmware.sh rp2350` passed. |
+| 1. Promote names/wrappers | Complete | Mill | Passed with caveats | Added `runtime/runtime.h`; introduced `mmbasic_runtime_port_begin()` as the current port-local lifecycle entry while retaining `host_runtime_begin()` wrappers for compatibility. Native host, WASM, stdio, ANSI, and PC386 owned call sites now use the common name. Validation: `./ports/host_native/build.sh`, `./ports/host_native/run_tests.sh` (243 passed, 0 failed), `make -C ports/pc386`, `make -C ports/mmbasic_stdio`, and stdio `PRINT 1+1` smoke passed. `make -C ports/mmbasic_ansi` was attempted but is blocked by the pre-existing missing `ports/host_native/hal_watchdog_host.c` Makefile entry; `emcc` was not on PATH, so WASM smoke was unavailable locally. |
+| 2. Service/interrupt/LOAD boundaries | Complete | Bernoulli | Passed with caveats | Added header-only boundary helpers for service polling, interrupt save/restore/IRETURN state, SUB interrupt return tokens, abort checks, and post-LOAD prompt bounces. Kept source loaders, console, and boot sequencing in place. Validation: `./ports/host_native/build.sh`, `./ports/host_native/run_tests.sh` (243 passed, 0 failed), `make -C ports/pc386`, `PC386_BOOT=kernel python3 ports/pc386/tests/repl_expect.py arith`, `./build_firmware.sh rp2040`, and `./build_firmware.sh rp2350` passed. WASM smoke was unavailable because `emcc` was not on PATH. |
+| 3. Source loading | Complete | Sagan | Passed with caveats | Added `runtime/runtime_program.c` with `mmbasic_tokenise_source_to_progmem()` and `mmbasic_save_loaded_source()` plus host/batch source flags. Non-Pico loaders now call the common implementation while retaining `load_basic_source`, `load_source`, `pc386_load_source`, and non-Pico `SaveProgramToFlash` compatibility wrappers. Fixed ANSI build-list gaps uncovered by the smoke gate (`hal_watchdog_noop`, `host_web_stubs`, `host_tcp_interrupt_pending`). Validation: `git diff --check`, `./ports/host_native/build.sh`, `./ports/host_native/run_tests.sh` (243 passed, 0 failed), targeted continuation/FRUN tests via host suite, `make -C ports/mmbasic_stdio`, stdio `PRINT 1+1` smoke, `make -C ports/mmbasic_ansi`, ANSI script smoke under a PTY, `make -C ports/pc386`, `./build_firmware.sh rp2040`, and `./build_firmware.sh rp2350` passed. WASM smoke unavailable because `emcc` is not on PATH. |
+| 4. Console | Complete | Anscombe | Passed with caveats | Added `runtime/runtime_console.c` and `mm_runtime_console_adapter` for host-derived console services. Common code now owns `MMInkey`, `MMgetchar`, `putConsole`, `MMputchar`, `MMPrintString`, `SSPrintString`, `MMgetline`, and VT escape decoding for native host/WASM/stdio/ANSI builds. Host-local code keeps raw terminal reads, scripted keys, sim key queue, capture/stdout serial routing, telnet, display byte output, and the stdio-only LF policy flag. Pico, ESP32, and PC386 console bodies remain port-local. Validation: `./ports/host_native/build.sh`, `./ports/host_native/run_tests.sh` (243 passed, 0 failed, including `t113_keydown_native`), `make -C ports/mmbasic_stdio`, `ports/mmbasic_stdio/tests/run_tests.sh` (8 passed, 0 failed), stdio `INPUT`/`PRINT` smoke (`? Hello Ada`), `make -C ports/mmbasic_ansi`, `make -C ports/pc386`, `./build_firmware.sh rp2040`, and `./build_firmware.sh rp2350` passed. WASM smoke was unavailable because `emcc` is not on PATH. |
+| 5. Abort/background/interrupt helpers | Complete | Ohm | Passed with caveats | Added `runtime/runtime_abort.c` and `runtime/runtime_interrupt.c`; `runtime/runtime.h` now exposes linked service, abort-adapter, and interrupt-state APIs instead of header-only bodies. Host, stdio, ANSI, ESP32, PC386, and Pico build lists include the new runtime modules. Host-derived ports poll timeout/network/background through a common abort adapter and preserve timeout exit status (`124` for `--interp --timeout-ms`); ESP32 keeps FreeRTOS yield and opt-in `MMAbort` longjmp; PC386 remains no-op through a null adapter; Pico calls the common abort helper from `CheckAbort()` while keeping device background work in the Pico hook. Validation: `git diff --check`, `./ports/host_native/build.sh`, `./ports/host_native/run_tests.sh` (243 passed, 0 failed), host timeout smoke, `make -C ports/mmbasic_stdio` plus stdio `PRINT 1+1` smoke, `make -C ports/mmbasic_ansi` plus PTY smoke, `make -C ports/pc386`, `PC386_BOOT=kernel python3 ports/pc386/tests/repl_expect.py arith`, `./build_firmware.sh rp2040`, and `./build_firmware.sh rp2350` passed. WASM smoke unavailable because `emcc` is not on PATH. |
+| 6. Boot/run sequencing | Complete | Hubble | Passed | Added `runtime/runtime_boot.c` with common init, run-source, and REPL-entry helpers. Host, WASM, stdio, ANSI, ESP32, and PC386 use the helpers only where their existing sequencing matched; firmware entry ordering remains intact. Validation: `git diff --check`, `./ports/host_native/build.sh`, `./ports/host_native/run_tests.sh` (243 passed, 0 failed; VM pin-mode and HAL purity clean), `./ports/host_wasm/build.sh` using `/Users/joshv/emsdk/emsdk_env.sh`, `make -C ports/mmbasic_stdio` plus `PRINT 2+2` smoke, `make -C ports/mmbasic_ansi` plus PTY smoke, `make -C ports/pc386`, `PC386_BOOT=kernel python3 ports/pc386/tests/repl_expect.py arith`, `./build_firmware.sh rp2040`, and `./build_firmware.sh rp2350` passed. |
 | 7. Split `PicoMite.c` | Complete | Linnaeus | Passed | Split Pico-only boot, timer, console, fault/abort, program-flash, CFunction bridge, and RP2040 flash-clock helper into `ports/pico_sdk_common/` with `PicoMite.c` reduced to Pico global storage. Validation: `git diff --check`, `./build_firmware.sh rp2040`, and `./build_firmware.sh rp2350` passed. Host gates were not run because this phase only touched Pico firmware sources, the Pico target source list, and Pico-local headers. Caveat: `pico_clock.c` currently owns the RP2040 `modclock()` helper; the broader boot clock sequence remains in `pico_boot.c` to avoid refactoring boot ordering. |
-| 8. Retire shims | Complete | Archimedes | Passed | Removed the retired `host_runtime_begin()` compatibility symbol, deleted unused `load_basic_source` / `load_source` / `pc386_load_source` wrappers now that supported call sites use `mmbasic_runtime_port_begin()` and the common source loader, and updated runtime/port docs including WASM toolchain lookup through `$HOME/emsdk/emsdk_env.sh` (`/Users/joshv/emsdk/emsdk_env.sh` here). Kept Pico, ESP32, and PC386 port-local console/abort bodies where they remain intentional. Root-level global movement was skipped as too risky for this retirement pass. Added the missing `WEBRP2350` PicoCalc heap override so the final RAM baseline remains under threshold. Validation: `git diff --check`, `./host/build.sh`, `./host/run_tests.sh` (243 passed, 0 failed; VM pin-mode and HAL purity clean), `./ports/host_wasm/build.sh`, `make -C ports/mmbasic_stdio` plus `PRINT 1+1` smoke, `make -C ports/mmbasic_ansi` plus PTY smoke, `make -C ports/pc386`, `PC386_BOOT=kernel python3 ports/pc386/tests/repl_expect.py arith`, `./build_firmware.sh rp2040`, `./build_firmware.sh rp2350`, and `./buildall.sh` passed. RAM baseline deltas after the heap fix: `WEBRP2350` bss `+4`, `DVIWIFIRP2350` bss `+4`, all other retained targets `+0`. |
+| 8. Retire shims | Complete | Archimedes | Passed | Removed the retired `host_runtime_begin()` compatibility symbol, deleted unused `load_basic_source` / `load_source` / `pc386_load_source` wrappers now that supported call sites use `mmbasic_runtime_port_begin()` and the common source loader, and updated runtime/port docs including WASM toolchain lookup through `$HOME/emsdk/emsdk_env.sh` (`/Users/joshv/emsdk/emsdk_env.sh` here). Kept Pico, ESP32, and PC386 port-local console/abort bodies where they remain intentional. Root-level global movement was skipped as too risky for this retirement pass. Added the missing `WEBRP2350` PicoCalc heap override so the final RAM baseline remains under threshold. Validation: `git diff --check`, `./ports/host_native/build.sh`, `./ports/host_native/run_tests.sh` (243 passed, 0 failed; VM pin-mode and HAL purity clean), `./ports/host_wasm/build.sh`, `make -C ports/mmbasic_stdio` plus `PRINT 1+1` smoke, `make -C ports/mmbasic_ansi` plus PTY smoke, `make -C ports/pc386`, `PC386_BOOT=kernel python3 ports/pc386/tests/repl_expect.py arith`, `./build_firmware.sh rp2040`, `./build_firmware.sh rp2350`, and `./buildall.sh` passed. RAM baseline deltas after the heap fix: `WEBRP2350` bss `+4`, `DVIWIFIRP2350` bss `+4`, all other retained targets `+0`. |
 
 ## Test Gate Policy
 
@@ -350,8 +350,8 @@ Device validation can wait until final integration.
 Default fast gate:
 
 ```sh
-./host/build.sh
-./host/run_tests.sh
+./ports/host_native/build.sh
+./ports/host_native/run_tests.sh
 ```
 
 Default firmware gate:
@@ -430,19 +430,19 @@ because they run quickly and catch most interpreter-runtime regressions.
 
 Suggested additions:
 
-- `host/tests/runtime_load_shorter.bas`: create/load/run one program, then
+- `ports/host_native/tests/runtime_load_shorter.bas`: create/load/run one program, then
   load/run a shorter program and verify the first program's tail never
   executes.
-- `host/tests/runtime_load_during_run.bas`: a BASIC program that performs
+- `ports/host_native/tests/runtime_load_during_run.bas`: a BASIC program that performs
   `LOAD` from inside execution and verifies the post-load cleanup path does
   not continue using clobbered `inpbuf`/`tknbuf`.
-- `host/tests/runtime_continuation_load.bas`: source loading with
+- `ports/host_native/tests/runtime_continuation_load.bas`: source loading with
   `OPTION CONTINUATION ON`, verifying logical-line tokenization matches the
   current host behavior.
-- `host/tests/runtime_options_after_error.bas`: configure console/display
+- `ports/host_native/tests/runtime_options_after_error.bas`: configure console/display
   defaults, intentionally trigger an error, then verify the reset/error path
   keeps the expected defaults.
-- `host/tests/runtime_timeout_abort.bas`: a tight loop run with the host
+- `ports/host_native/tests/runtime_timeout_abort.bas`: a tight loop run with the host
   timeout setting, verifying timeout still exits cleanly.
 - `ports/mmbasic_stdio/tests/runtime_stdin_input.bas`: stdio-only INPUT /
   PRINT smoke to catch console API regressions.
@@ -496,8 +496,8 @@ Do not move code in this phase.
 Validation:
 
 ```sh
-./host/build.sh
-./host/run_tests.sh
+./ports/host_native/build.sh
+./ports/host_native/run_tests.sh
 ./build_firmware.sh rp2040
 ./build_firmware.sh rp2350
 ```
@@ -518,8 +518,8 @@ is not the host runtime. That naming should go away early.
 Validation:
 
 ```sh
-./host/build.sh
-./host/run_tests.sh
+./ports/host_native/build.sh
+./ports/host_native/run_tests.sh
 make -C ports/pc386
 ```
 
@@ -540,8 +540,8 @@ before moving code.
 Validation:
 
 ```sh
-./host/build.sh
-./host/run_tests.sh
+./ports/host_native/build.sh
+./ports/host_native/run_tests.sh
 make -C ports/pc386
 ```
 
@@ -578,8 +578,8 @@ stop carrying private tokenization copies.
 Validation:
 
 ```sh
-./host/build.sh
-./host/run_tests.sh
+./ports/host_native/build.sh
+./ports/host_native/run_tests.sh
 cd ports/host_wasm && ./build.sh
 make -C ports/mmbasic_stdio
 make -C ports/mmbasic_ansi
@@ -617,8 +617,8 @@ polling.
 Validation:
 
 ```sh
-./host/build.sh
-./host/run_tests.sh
+./ports/host_native/build.sh
+./ports/host_native/run_tests.sh
 make -C ports/mmbasic_stdio
 make -C ports/mmbasic_ansi
 make -C ports/pc386
@@ -656,8 +656,8 @@ Do this in three steps:
 Validation:
 
 ```sh
-./host/build.sh
-./host/run_tests.sh
+./ports/host_native/build.sh
+./ports/host_native/run_tests.sh
 ./build_firmware.sh rp2040
 ./build_firmware.sh rp2350
 ```
@@ -692,8 +692,8 @@ same, while preserving port-specific order where it is not.
 Validation:
 
 ```sh
-./host/build.sh
-./host/run_tests.sh
+./ports/host_native/build.sh
+./ports/host_native/run_tests.sh
 cd ports/host_wasm && ./build.sh
 make -C ports/mmbasic_stdio
 make -C ports/mmbasic_ansi
@@ -713,8 +713,8 @@ entry ordering remains intact.
 Validation completed:
 
 - `git diff --check`
-- `./host/build.sh`
-- `./host/run_tests.sh` — 243 passed, 0 failed; VM pin-mode helper and HAL
+- `./ports/host_native/build.sh`
+- `./ports/host_native/run_tests.sh` — 243 passed, 0 failed; VM pin-mode helper and HAL
   purity gate clean
 - `make -C ports/mmbasic_stdio`; `PRINT 2+2` smoke returned `4`
 - `make -C ports/mmbasic_ansi`; PTY `PRINT 2+2` smoke returned `4`
@@ -723,7 +723,7 @@ Validation completed:
 - `./build_firmware.sh rp2040`
 - `./build_firmware.sh rp2350`
 - `./ports/host_wasm/build.sh` — sourced `/Users/joshv/emsdk/emsdk_env.sh`
-  and built `host/web/picomite.{mjs,wasm,data}` successfully
+  and built `ports/host_wasm/web/picomite.{mjs,wasm,data}` successfully
 
 ### Phase 7: Split `PicoMite.c`
 

@@ -82,17 +82,17 @@ For RP2040 targets use `--chip RP2040`.
 ### macOS / Linux native
 
 ```
-cd host && ./build.sh
+cd ports/host_native && ./build.sh
 ./run_tests.sh
 ```
 
-Produces `host/mmbasic_test`. Default mode compares the interpreter and VM outputs across the test corpus.
+Produces `ports/host_native/build/mmbasic_test`. Default mode compares the interpreter and VM outputs across the test corpus.
 
 ### Browser (WebAssembly)
 
 ```
 cd ports/host_wasm && ./build.sh
-cd ../../host/web && python3 serve.py
+cd web && python3 serve.py
 ```
 
 Open http://localhost:8000.

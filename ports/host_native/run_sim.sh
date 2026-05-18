@@ -10,7 +10,7 @@
 #   Port:          5150
 #   Listen addr:   127.0.0.1   (use --listen 0.0.0.0 to share on LAN)
 #   SD root:       repo demos/ (so `RUN "graphics/demo_gfx_shapes"` finds demos)
-#   Web root:      ../web
+#   Web root:      repo web/
 #   Resolution:    320x320     (PicoCalc-native)
 #   Slowdown:      0           (uncapped; try 5–50 for device-ish pacing)
 #
@@ -24,15 +24,16 @@
 set -e
 cd "$(dirname "$0")"
 
-if [ ! -x ./mmbasic_sim ]; then
+SIM_BINARY="./build/mmbasic_sim"
+if [ ! -x "$SIM_BINARY" ]; then
     echo "Simulator binary not found. Building..."
-    ./build_sim.sh
+    make sim
 fi
 
-REPO_ROOT="$(cd .. && pwd)"
+REPO_ROOT="$(cd ../.. && pwd)"
 WEB_ROOT="$REPO_ROOT/web"
 
-exec ./mmbasic_sim \
+exec "$SIM_BINARY" \
     --sim \
     --port 5150 \
     --listen 127.0.0.1 \

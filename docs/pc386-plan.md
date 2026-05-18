@@ -58,7 +58,7 @@ A stage closes when:
 1. `ports/pc386/build.sh` produces `mmbasic.elf` cleanly with no warnings (`-Wall -Wextra -Werror`).
 2. `ports/pc386/run_tests.sh` is green for that stage's test corpus.
 3. `tools/check_hal_purity.sh` stays green — no new core ifdefs introduced by integration.
-4. `host/run_tests.sh` still 240/240 (or whatever the current number is — never lower). The pc386 port must not regress other targets.
+4. `ports/host_native/run_tests.sh` still 240/240 (or whatever the current number is — never lower). The pc386 port must not regress other targets.
 5. The interpreter's BASIC test corpus passes the subset the stage's HAL surface supports. Full 192/192 parity is the long-term goal; reached when Stage 6 lands.
 
 Smoke-boot in DOSBox-X and Bochs/86Box is desirable post-merge verification, not a stage-close blocker. Real-hardware boot (Stage 8) is its own gate.

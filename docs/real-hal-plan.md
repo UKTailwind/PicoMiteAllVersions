@@ -86,7 +86,7 @@ The strict purity gate (`tools/check_hal_purity.sh`) currently catches rules 1, 
 | [12 — host + WASM relocation](real-hal/phases-8-to-13.md#phase-12--host--wasm-relocation) | ✅ | source-code retirement closed (steps 1–13); every host/*.c + host/*.h relocated under ports/host_{native,wasm}/; canonical builds are ports/host_native/Makefile + ports/host_wasm/Makefile |
 | 12.5 — mmbasic_stdio | ✅ | `ports/mmbasic_stdio/` runs BASIC via stdin/stdout; link-line audit clean (no Editor/REPL/Prompt/display objects); 8-test corpus at `ports/mmbasic_stdio/tests/` passes 8/8; stripped binary is 601 KB on arm64 macOS at `-O2`. |
 | 12.6 — host/ full retirement | ❌ skipped | cosmetic move of remaining user-facing tooling (run_tests.sh, demos/, web/, README.md). Architectural goal already met by Phase 12; churn (CI, buildall.sh, serve.py, ~20 doc URLs) outweighs benefit. Do opportunistically if a third native port ever lands. |
-| [13 — lock contract](real-hal/phases-8-to-13.md#phase-13--lock-the-contract) | 🔧 | `check_hal_purity.sh` wired into both `host/run_tests.sh` and `buildall.sh` ✓. `docs/adding-a-new-port.md` ✓. `drivers/CONTRIBUTING.md` ✓. Predecessor plans superseded (commit `a92f4f0`). Remaining: wire `tools/check_ram_baseline.sh` into the gate, land `tools/perf_microbench/` (currently empty), and resolve the CFunctions / wasm-ld `CallCFunction` warning. |
+| [13 — lock contract](real-hal/phases-8-to-13.md#phase-13--lock-the-contract) | 🔧 | `check_hal_purity.sh` wired into both `ports/host_native/run_tests.sh` and `buildall.sh` ✓. `docs/adding-a-new-port.md` ✓. `drivers/CONTRIBUTING.md` ✓. Predecessor plans superseded (commit `a92f4f0`). Remaining: wire `tools/check_ram_baseline.sh` into the gate, land `tools/perf_microbench/` (currently empty), and resolve the CFunctions / wasm-ld `CallCFunction` warning. |
 | [esp32-port](real-hal/esp32-s3-port.md) | 🔧 | A+B+C done; D runtime/peripheral decouple mostly done with strict-link policy active; E flash persistence and F gate hygiene done; simulator VM syscalls moved to `ports/vm_sys_sim`; ESP32 uses shared device file syscalls and ESP32-owned BASIC-visible GPIO DOUT/DIN/ARAW. Remaining work is legacy header-shim cleanup, removal of the temporary `MMBASIC_HOST` identity, and PWM/servo/peripheral depth — see real-hal/esp32-s3-port.md |
 
 Tests 240/240 on `hal-decascade` tip (commit `1bab851`). All 12 device CMake variants green. WASM link green. mmbasic_stdio corpus 8/8.
@@ -118,7 +118,7 @@ exit gate in practice.
 
 1. Read this index + the one phase file you're touching + the fixup plan.
 2. If the phase has a 🔧 marker: the HAL surface exists, the remaining work is ifdef elimination per the fixup-plan standard. Do not ship a rename.
-3. Run `./host/build.sh && ./host/run_tests.sh` *before* your first edit. If the `Results:` line shows failures, fix them first — regardless of the task you were going to do (see tooling.md session rituals).
+3. Run `./ports/host_native/build.sh && ./ports/host_native/run_tests.sh` *before* your first edit. If the `Results:` line shows failures, fix them first — regardless of the task you were going to do (see tooling.md session rituals).
 4. When closing a phase: run `tools/check_hal_purity.sh` and the rewritten `tools/hal_scoreboard.sh` (per fixup F1). Both must be green. Update the phase file's status and the scoreboard row. Commit.
 
 ## Summary

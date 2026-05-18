@@ -1,7 +1,7 @@
 // Headless smoke for host-WASM proxy-mode plain MQTT over TCP.
 //
 // Starts an in-process TCP MQTT peer, serves the app through
-// host/wasm_network_proxy, then verifies WEB MQTT CONNECT/SUBSCRIBE,
+// ports/host_native/build/wasm_network_proxy, then verifies WEB MQTT CONNECT/SUBSCRIBE,
 // inbound PUBLISH state, outbound QoS 1 PUBLISH/PUBACK, UNSUBSCRIBE, and
 // CLOSE all flow through the C proxy TCP stream backend.
 

@@ -1,9 +1,6 @@
 /*
  * host_time.c -- Monotonic time + msec-tick synthesizer for the host build.
  *
- * Moved out of host_stubs_legacy.c as part of the Host HAL refactor (Phase 1).
- * No behavior change — same functions, same semantics.
- *
  * The msec synthesizer (host_sync_msec_timer_value) updates MMBasic's
  * millisecond-granularity counters from the monotonic clock so that code
  * which polls mSecTimer / CursorTimer / the PAUSE timer sees forward
@@ -19,9 +16,8 @@
 #include "Hardware_Includes.h"
 #include "host_time.h"
 
-/* mSecTimer / CursorTimer are defined in host_stubs_legacy.c; referenced
- * as externs via Hardware_Includes.h. CURSOR_OFF / CURSOR_ON come from
- * the same chain. */
+/* mSecTimer / CursorTimer are referenced as externs via Hardware_Includes.h.
+ * CURSOR_OFF / CURSOR_ON come from the same chain. */
 
 static void host_sync_msec_timer_value(uint64_t now_us) {
     mSecTimer = (int64_t)(now_us / 1000ULL);

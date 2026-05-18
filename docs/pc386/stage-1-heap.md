@@ -69,5 +69,5 @@ The `mmap_summarize()` data is recorded for *informational* purposes only at thi
 
 1. `./build.sh` clean (`-Wall -Wextra`, no warnings).
 2. `./run_headless.sh --timeout 2` exits 0 and prints the mmap + heap region summary.
-3. `host/run_tests.sh` still green (Stage 1 changes nothing in `host/`).
+3. `ports/host_native/run_tests.sh` still green (Stage 1 changes nothing in `host/`).
 4. `tools/check_hal_purity.sh` green (no core changes).

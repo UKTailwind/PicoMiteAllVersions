@@ -3,8 +3,8 @@
  *
  * BASIC source can do `MODE 2` to switch to the resolution the user
  * assigned to mode 2 in the config dialog.  The mapping is pushed in
- * from JS at boot via wasm_set_mode_resolution(); see host/web/app.mjs
- * and host/web/worker.mjs.  Mid-program switches reallocate the
+ * from JS at boot via wasm_set_mode_resolution(); see ports/host_wasm/web/app.mjs
+ * and ports/host_wasm/web/worker.mjs.  Mid-program switches reallocate the
  * framebuffer in place (host_fb_resize) and bump host_fb_config_generation
  * so the JS canvas can resize itself on the next rAF tick.
  *

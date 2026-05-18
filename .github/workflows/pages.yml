@@ -4,7 +4,6 @@ on:
   push:
     branches: [main]
     paths:
-      - 'host/**'
       - 'ports/host_wasm/**'
       - 'ports/host_native/**'
       - 'drivers/**'
@@ -43,27 +42,27 @@ jobs:
           actions-cache-folder: emsdk-cache
 
       - name: Build wasm
-        working-directory: host
-        run: ./build_wasm.sh
+        working-directory: ports/host_wasm
+        run: ./build.sh
 
       - name: Assemble site
         run: |
           mkdir -p _site
           # Only the browser-side artefacts. node_modules, smoke tests,
           # and serve.py stay out of the Pages build.
-          cp host/web/index.html             _site/
-          cp host/web/picomite.css           _site/
-          cp host/web/app.mjs                _site/
-          cp host/web/proxy_client.mjs       _site/
-          cp host/web/worker.mjs             _site/
-          cp host/web/coi-serviceworker.js   _site/
-          cp host/web/picomite.mjs           _site/
-          cp host/web/picomite.js            _site/ 2>/dev/null || true
-          cp host/web/picomite.wasm          _site/
-          cp host/web/picomite.data          _site/
+          cp ports/host_wasm/web/index.html             _site/
+          cp ports/host_wasm/web/picomite.css           _site/
+          cp ports/host_wasm/web/app.mjs                _site/
+          cp ports/host_wasm/web/proxy_client.mjs       _site/
+          cp ports/host_wasm/web/worker.mjs             _site/
+          cp ports/host_wasm/web/coi-serviceworker.js   _site/
+          cp ports/host_wasm/web/picomite.mjs           _site/
+          cp ports/host_wasm/web/picomite.js            _site/ 2>/dev/null || true
+          cp ports/host_wasm/web/picomite.wasm          _site/
+          cp ports/host_wasm/web/picomite.data          _site/
           mkdir -p _site/ui _site/vendor
-          cp host/web/ui/audio.js            _site/ui/
-          cp host/web/vendor/codemirror.js   _site/vendor/
+          cp ports/host_wasm/web/ui/audio.js            _site/ui/
+          cp ports/host_wasm/web/vendor/codemirror.js   _site/vendor/
           ls -la _site
 
       - uses: actions/upload-pages-artifact@v3

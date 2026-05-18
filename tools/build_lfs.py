@@ -77,7 +77,6 @@ def gather_files(root: Path) -> list[tuple[Path, str]]:
     """Returns [(source_path, target_name)].
 
     - demo_*.bas, sieve*.bas from local picocalc demos tree
-    - host/bench_*.bas → BENCH/ subdir
     - mand.bas + companion CSUB demos from github.com/jvanderberg/picocalc_csub_helpers
     - pico_blocks.bas from github.com/jvanderberg/pico_blocks
       (these GitHub versions work on stock firmware; the locally bundled
@@ -97,8 +96,6 @@ def gather_files(root: Path) -> list[tuple[Path, str]]:
         p = demos_root / "bench" / name
         if p.exists():
             sources.append((p, name))
-    for p in sorted((root / "host").glob("bench_*.bas")):
-        sources.append((p, f"BENCH/{p.name}"))
     for name in ("mand.bas", "test_mandel.bas", "slow_mand.bas",
                  "test_pow.bas", "blocks.bas"):
         p = csub / name

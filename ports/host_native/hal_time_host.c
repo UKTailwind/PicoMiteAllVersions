@@ -1,5 +1,5 @@
 /*
- * host/hal_time_host.c — hal_time over host_time.c.
+ * ports/host_native/hal_time_host.c — hal_time over host_time.c.
  *
  * host_time_us_64 uses clock_gettime(CLOCK_MONOTONIC) on native and on
  * WASM (emscripten maps it to performance.now()). host_sleep_us uses

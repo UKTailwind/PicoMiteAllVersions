@@ -7,7 +7,7 @@
 set -e
 cd "$(dirname "$0")"
 
-BINARY=${BINARY:-./mmbasic_test}
+BINARY=${BINARY:-./build/mmbasic_test}
 if [ ! -x "$BINARY" ]; then
     echo "Binary not found. Building..."
     ./build.sh

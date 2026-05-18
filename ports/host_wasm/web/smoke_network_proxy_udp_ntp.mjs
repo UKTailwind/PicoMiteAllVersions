@@ -1,6 +1,6 @@
 // Headless smoke for host-WASM proxy-mode UDP and NTP.
 //
-// Starts local UDP peers, serves the app through host/wasm_network_proxy, then
+// Starts local UDP peers, serves the app through ports/host_native/build/wasm_network_proxy, then
 // verifies WEB UDP SEND, OPTION UDP SERVER PORT receive state, UDP listener
 // preservation across RUN, and WEB NTP through a deterministic UDP responder.
 

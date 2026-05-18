@@ -11,9 +11,7 @@
 # exported C functions directly via Module.ccall, no HTTP/WS layer.
 #
 # Objects land under ports/host_wasm/wasm_obj/. Final artefacts
-# (picomite.{mjs,wasm,data}) still land at host/web/ so existing
-# serve.py + playwright smoke harnesses + docs URLs keep working
-# unchanged during retirement.
+# (picomite.{mjs,wasm,data}) land under ports/host_wasm/web/.
 
 EMCC ?= emcc
 PORT_DIR   := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
@@ -23,7 +21,7 @@ PICO_COMPAT_DIR := $(REPO_ROOT)/ports/pico_sdk_compat
 SIM_VM_DIR := $(REPO_ROOT)/ports/vm_sys_sim
 WASM_DIR   := $(PORT_DIR)
 BUILD_DIR  := $(WASM_DIR)/wasm_obj
-WEB_DIR    := $(REPO_ROOT)/host/web
+WEB_DIR    := $(REPO_ROOT)/ports/host_wasm/web
 THIRD_PARTY_CFLAGS := -I$(REPO_ROOT)/third_party/aes \
                       -I$(REPO_ROOT)/third_party/cjson \
                       -I$(REPO_ROOT)/third_party/dr_libs \
@@ -69,7 +67,7 @@ LDFLAGS = -pthread -sPTHREAD_POOL_SIZE=1 \
           -sFETCH=1 \
           -sFORCE_FILESYSTEM=1 \
           -lidbfs.js \
-          --preload-file $(REPO_ROOT)/host/demos@/bundle \
+          --preload-file $(REPO_ROOT)/ports/host_wasm/demos@/bundle \
           -Wl,--allow-multiple-definition
 
 # Core MMBasic sources — mirror ports/host_native/Makefile CORE_SRCS.
@@ -137,10 +135,10 @@ SRCS = $(HOST_PORTABLE_SRCS) $(HOST_WASM_SRCS) $(CORE_SRCS) $(BC_SRCS) $(HAL_GEN
 OBJS = $(addprefix $(BUILD_DIR)/,$(SRCS:.c=.o))
 DEPS = $(OBJS:.o=.d)
 
-# --preload-file demos@/bundle pulls every .bas from host/demos/ into
+# --preload-file demos@/bundle pulls every .bas from ports/host_wasm/demos/ into
 # picomite.data at link time. Listing them as explicit prerequisites
 # means `make` relinks when you edit or add a demo.
-DEMO_FILES := $(wildcard $(REPO_ROOT)/host/demos/*.bas)
+DEMO_FILES := $(wildcard $(REPO_ROOT)/ports/host_wasm/demos/*.bas)
 
 TARGET = $(WEB_DIR)/picomite.mjs
 

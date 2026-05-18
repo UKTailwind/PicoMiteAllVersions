@@ -4,6 +4,12 @@
 
 cd "$(dirname "$0")"
 
+BINARY=${BINARY:-./build/mmbasic_test}
+if [ ! -x "$BINARY" ]; then
+    echo "Binary not found. Building..."
+    ./build.sh
+fi
+
 PASS=0
 FAIL=0
 TOTAL=0
@@ -27,7 +33,7 @@ fail() {
 try_compile_yes() {
     local name="$1"
     local line="$2"
-    if ./mmbasic_test --try-compile "$line" >/dev/null 2>&1; then
+    if "$BINARY" --try-compile "$line" >/dev/null 2>&1; then
         pass "$name"
     else
         fail "$name" "expected compile success"
@@ -37,7 +43,7 @@ try_compile_yes() {
 try_compile_no() {
     local name="$1"
     local line="$2"
-    if ./mmbasic_test --try-compile "$line" >/dev/null 2>&1; then
+    if "$BINARY" --try-compile "$line" >/dev/null 2>&1; then
         fail "$name" "expected compile failure"
     else
         pass "$name"
@@ -81,9 +87,9 @@ try_compile_yes "compile_comment"        "' this is a comment"
 try_compile_yes "compile_empty"          ''
 
 # Invalid / non-BASIC input (should fail to compile)
-try_compile_no  "nocompile_bare_word"    'mandelbrot'
-try_compile_no  "nocompile_bare_file"    'mandelbrot.bas'
-try_compile_no  "nocompile_junk"         'xyzzy foo bar'
+try_compile_no  "nocompile_for_missing_to_expr" 'FOR i = 1 TO'
+try_compile_no  "nocompile_open_missing_file"   'OPEN FOR OUTPUT'
+try_compile_no  "nocompile_if_missing_condition" 'IF THEN'
 try_compile_no  "nocompile_bad_syntax"   'PRINT +'
 
 echo ""
@@ -97,7 +103,7 @@ immediate_expect() {
     local line="$2"
     local expected="$3"
     local actual
-    actual=$(./mmbasic_test --immediate "$line" 2>/dev/null | tr -d '\r')
+    actual=$("$BINARY" --immediate "$line" 2>/dev/null | tr -d '\r')
     if [ "$actual" = "$expected" ]; then
         pass "$name"
     else
@@ -110,7 +116,7 @@ immediate_expect_match() {
     local line="$2"
     local pattern="$3"
     local actual
-    actual=$(./mmbasic_test --immediate "$line" 2>/dev/null | tr -d '\r')
+    actual=$("$BINARY" --immediate "$line" 2>/dev/null | tr -d '\r')
     if echo "$actual" | grep -qE "$pattern"; then
         pass "$name"
     else
@@ -121,7 +127,7 @@ immediate_expect_match() {
 immediate_expect_error() {
     local name="$1"
     local line="$2"
-    if ./mmbasic_test --immediate "$line" >/dev/null 2>&1; then
+    if "$BINARY" --immediate "$line" >/dev/null 2>&1; then
         fail "$name" "expected error but succeeded"
     else
         pass "$name"

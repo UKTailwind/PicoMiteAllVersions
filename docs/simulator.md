@@ -14,8 +14,8 @@ For the design and phase-by-phase history see
 ## Quick start
 
 ```sh
-cd host
-./build_sim.sh          # builds ./mmbasic_sim
+cd ports/host_native
+make sim                # builds build/mmbasic_sim
 ./run_sim.sh            # launches server on http://localhost:5150/
 ```
 
@@ -42,7 +42,7 @@ source but live in separate object trees.
 | Target | Script | Notes |
 |---|---|---|
 | `mmbasic_test` | `./build.sh` | Test-harness / CLI driver. CI uses this. |
-| `mmbasic_sim`  | `./build_sim.sh` | Adds Mongoose HTTP+WS server. |
+| `mmbasic_sim`  | `make sim` | Adds Mongoose HTTP+WS server. |
 
 Both accept `clean` / `rebuild` arguments for from-scratch builds.
 Neither touches the device firmware build (`build_rp2040/`, `cmake`).
@@ -144,7 +144,7 @@ The test harness binary `./mmbasic_test` runs BASIC programs headlessly
 and compares interpreter vs VM output. This is what CI uses:
 
 ```sh
-./run_tests.sh                     # run every host/tests/*.bas
+./run_tests.sh                     # run every ports/host_native/tests/*.bas
 ./run_tests.sh --vm                # VM only
 ./run_tests.sh tests/t12_print.bas # single test
 ```

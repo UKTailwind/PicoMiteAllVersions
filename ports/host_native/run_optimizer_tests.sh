@@ -4,7 +4,7 @@
 set -e
 cd "$(dirname "$0")"
 
-BINARY=${BINARY:-./mmbasic_test}
+BINARY=${BINARY:-./build/mmbasic_test}
 if [ ! -x "$BINARY" ]; then
     echo "Binary not found. Building..."
     ./build.sh
@@ -32,10 +32,10 @@ run_mulshr_test() {
         return 1
     fi
 
-    if ! grep -q "MATH_MULSHR" "$tmpfile" && ! grep -q "\\?\\?\\? (0xEE)" "$tmpfile"; then
+    if ! grep -q "MATH_MULDIV" "$tmpfile"; then
         echo "FAIL"
         FAILED=$((FAILED + 1))
-        ERRORS="${ERRORS}\n--- t028_mulshr_peephole ---\nExpected fused MULSHR opcode in disassembly\n$(cat "$tmpfile")\n"
+        ERRORS="${ERRORS}\n--- t028_mulshr_peephole ---\nExpected fused MULDIV opcode in disassembly\n$(cat "$tmpfile")\n"
         rm -f "$tmpfile"
         return 1
     fi
@@ -176,10 +176,10 @@ run_sqrshr_test() {
         rm -f "$tmpfile"
         return 1
     fi
-    if ! grep -q "MATH_SQRSHR" "$tmpfile"; then
+    if ! grep -q "MATH_SQRDIV" "$tmpfile"; then
         echo "FAIL"
         FAILED=$((FAILED + 1))
-        ERRORS="${ERRORS}\n--- t032_sqrshr_peephole ---\nExpected MATH_SQRSHR in disassembly\n$(cat "$tmpfile")\n"
+        ERRORS="${ERRORS}\n--- t032_sqrshr_peephole ---\nExpected MATH_SQRDIV in disassembly\n$(cat "$tmpfile")\n"
         rm -f "$tmpfile"
         return 1
     fi
@@ -237,10 +237,17 @@ run_mulshradd_test() {
         rm -f "$tmpfile"
         return 1
     fi
-    if ! grep -q "MATH_MULSHRADD" "$tmpfile"; then
+    if ! grep -q "MATH_MULDIV" "$tmpfile"; then
         echo "FAIL"
         FAILED=$((FAILED + 1))
-        ERRORS="${ERRORS}\n--- t034_mulshradd_peephole ---\nExpected MATH_MULSHRADD in disassembly\n$(cat "$tmpfile")\n"
+        ERRORS="${ERRORS}\n--- t034_mulshradd_peephole ---\nExpected MATH_MULDIV in disassembly\n$(cat "$tmpfile")\n"
+        rm -f "$tmpfile"
+        return 1
+    fi
+    if grep -q "IDIV_I" "$tmpfile"; then
+        echo "FAIL"
+        FAILED=$((FAILED + 1))
+        ERRORS="${ERRORS}\n--- t034_mulshradd_peephole ---\nUnexpected IDIV_I in disassembly\n$(cat "$tmpfile")\n"
         rm -f "$tmpfile"
         return 1
     fi
@@ -688,7 +695,7 @@ run_inc_side_effect_equiv_test() {
 }
 
 run_mand_opt_smoke_test() {
-    local testfile="../demos/bench/mand.bas"
+    local testfile="../../demos/bench/mand.bas"
     local tmpfile
     printf "  %-30s " "mand_opt_smoke"
     tmpfile=$(mktemp)

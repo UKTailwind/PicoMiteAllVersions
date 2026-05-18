@@ -4,11 +4,14 @@
 set -e
 cd "$(dirname "$0")"
 
-BINARY=${BINARY:-./mmbasic_test}
+BINARY=${BINARY:-./build/mmbasic_test}
 if [ ! -x "$BINARY" ]; then
     echo "Binary not found. Building..."
     ./build.sh
 fi
+
+export MMBASIC_HOST_DATE=${MMBASIC_HOST_DATE:-02-01-2024}
+export MMBASIC_HOST_TIME=${MMBASIC_HOST_TIME:-03:04:05}
 
 PASSED=0
 FAILED=0

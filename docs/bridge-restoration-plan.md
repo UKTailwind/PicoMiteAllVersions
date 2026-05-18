@@ -22,7 +22,7 @@ There is no separate "VM-only device" build. `PICOMITE_VM_DEVICE_ONLY` and its a
 
 Every step that touches the VM, call structure, or memory management must pass the host build gate before proceeding:
 
-1. **Host build compiles clean:** `cd host/ && ./build.sh` — zero warnings, zero errors.
+1. **Host build compiles clean:** `cd ports/host_native/ && ./build.sh` — zero warnings, zero errors.
 2. **Full test suite passes:** `cd host/ && ./run_tests.sh` — all tests PASS in the default comparison mode (interpreter oracle vs VM).
 3. **Interpreter-only mode works:** `./run_tests.sh --interp` — interpreter path is not broken.
 4. **VM-only mode works:** `./run_tests.sh --vm` — VM path is not broken.
@@ -41,7 +41,7 @@ Revert the `bc_run_immediate()` changes in `PicoMite.c`. The main loop goes back
 
 **Scope:** Device build only (`PicoMite.c` is not in the host Makefile). No host validation needed for this step alone, but confirm the host build still compiles (no header/extern drift).
 
-**Validation:** `cd host/ && ./build.sh && ./run_tests.sh` — must still pass (this step shouldn't affect host, but verify).
+**Validation:** `cd ports/host_native/ && ./build.sh && ./run_tests.sh` — must still pass (this step shouldn't affect host, but verify).
 
 Status: done
 

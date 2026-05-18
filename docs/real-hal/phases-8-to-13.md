@@ -350,8 +350,8 @@ Now the device HAL contract is locked, observed across 12 targets.
 
 ## Phase 13 — Lock the contract 🔧
 
-- ✅ `tools/check_hal_purity.sh` wired into both `host/run_tests.sh` (line 167) and `buildall.sh` (line 33). Every commit on the branch passes the gate before the device build matrix runs.
-- ✅ `tools/check_ram_baseline.sh` wired into `buildall.sh` (post-build, after the loop succeeds). Per-target baselines under `tools/ram_baseline_<TARGET>.txt` cover all 14 device variants; gate fails on >64 bytes of BSS growth. Not wired into `host/run_tests.sh` — that script doesn't cross-compile and has no ELFs to inspect, so the gate naturally lives only in `buildall.sh`. `SKIP_RAM_BASELINE=1` escape hatch mirrors `SKIP_HAL_PURITY=1`.
+- ✅ `tools/check_hal_purity.sh` wired into both `ports/host_native/run_tests.sh` (line 167) and `buildall.sh` (line 33). Every commit on the branch passes the gate before the device build matrix runs.
+- ✅ `tools/check_ram_baseline.sh` wired into `buildall.sh` (post-build, after the loop succeeds). Per-target baselines under `tools/ram_baseline_<TARGET>.txt` cover all 14 device variants; gate fails on >64 bytes of BSS growth. Not wired into `ports/host_native/run_tests.sh` — that script doesn't cross-compile and has no ELFs to inspect, so the gate naturally lives only in `buildall.sh`. `SKIP_RAM_BASELINE=1` escape hatch mirrors `SKIP_HAL_PURITY=1`.
 - ⏳ `tools/perf_microbench/` is just a `.gitkeep` placeholder. Nothing in it yet; needs the device-side BASIC microbench corpus + a host comparison harness so a commit that regresses pixel-write or sample-output throughput fails the gate.
 - ✅ Predecessor plans superseded (`a92f4f0`): `bridge-restoration-plan.md`, `host-hal-plan.md`, `web-host-plan.md` carry the marker.
 - ✅ `docs/adding-a-new-port.md` landed (`c3fb8cc`): covers both hardware and simulation ports.

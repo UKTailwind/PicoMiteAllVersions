@@ -59,7 +59,7 @@ DOSBox-X / 86Box runs are not required at this stage — QEMU `-kernel` doesn't 
 1. `./build.sh` produces `build/mmbasic.elf` with no warnings (`-Wall -Wextra`).
 2. `./run_headless.sh --timeout 5` prints the banner to stdout and exits 0 within the timeout.
 3. `./run.sh` shows the banner in the VGA window (manual check).
-4. `host/run_tests.sh` still 240/240 — the new port mustn't regress others.
+4. `ports/host_native/run_tests.sh` still 240/240 — the new port mustn't regress others.
 5. `tools/check_hal_purity.sh` green — Stage 0 touches no core files, so this is automatic, but verify.
 
 ## Known issues / followups
