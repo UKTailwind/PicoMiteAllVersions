@@ -70,6 +70,8 @@ jobs:
           # Only the browser-side artefacts. node_modules, smoke tests,
           # and serve.py stay out of the Pages build.
           cp ports/host_wasm/web/index.html             _site/
+          cp ports/host_wasm/web/manifest.webmanifest   _site/
+          cp ports/host_wasm/web/icon.svg               _site/
           cp ports/host_wasm/web/picomite.css           _site/
           cp ports/host_wasm/web/app.mjs                _site/
           cp ports/host_wasm/web/app_version.mjs        _site/

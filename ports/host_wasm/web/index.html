@@ -4,10 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MMBasic Web</title>
+    <meta name="theme-color" content="#2f7d68">
+    <link rel="manifest" href="./manifest.webmanifest">
+    <link rel="icon" href="./icon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="./picomite.css">
     <!-- Injects COOP/COEP via a service worker when the host itself
-         doesn't set them (e.g. GitHub Pages). No-op when the page is
-         already cross-origin isolated (our local serve.py path). -->
+         doesn't set them (e.g. GitHub Pages), and provides the PWA
+         app-shell cache for install/offline use. -->
     <script src="./coi-serviceworker.js"></script>
 </head>
 <body>

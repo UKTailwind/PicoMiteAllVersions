@@ -24,6 +24,7 @@ BUILD_DIR  := $(WASM_DIR)/wasm_obj
 WEB_DIR    := $(REPO_ROOT)/ports/host_wasm/web
 VERSION_FILE := $(REPO_ROOT)/VERSION
 APP_VERSION_JS := $(WEB_DIR)/app_version.mjs
+PWA_MANIFEST := $(WEB_DIR)/manifest.webmanifest
 MMBA_RELEASE_VERSION ?= $(shell sed -n '1p;q;' $(VERSION_FILE) 2>/dev/null)
 MMBA_RELEASE_VERSION := $(strip $(MMBA_RELEASE_VERSION))
 ifeq ($(MMBA_RELEASE_VERSION),)
@@ -153,7 +154,7 @@ DEMO_FILES := $(wildcard $(REPO_ROOT)/ports/host_wasm/demos/*.bas)
 
 TARGET = $(WEB_DIR)/picomite.mjs
 
-all: $(TARGET) $(APP_VERSION_JS)
+all: $(TARGET) $(APP_VERSION_JS) $(PWA_MANIFEST)
 
 $(APP_VERSION_JS): FORCE
 	@mkdir -p $(dir $@)
@@ -165,6 +166,27 @@ $(APP_VERSION_JS): FORCE
 		printf "export const APP_RELEASE_VERSION = '%s';\n" "$$release"; \
 		printf "export const APP_DISPLAY_VERSION = 'v%s';\n" "$$release"; \
 		printf "export const APP_CACHE_VERSION = 'mmba-%s';\n" "$$release"; \
+	} > "$@"
+
+$(PWA_MANIFEST): FORCE
+	@mkdir -p $(dir $@)
+	@release="$(MMBA_RELEASE_VERSION)"; \
+	{ \
+		printf "{\n"; \
+		printf "  \"name\": \"MMBasic Web\",\n"; \
+		printf "  \"short_name\": \"MMBasic\",\n"; \
+		printf "  \"description\": \"Installable MMBasic Anywhere for the browser.\",\n"; \
+		printf "  \"id\": \"./\",\n"; \
+		printf "  \"start_url\": \"./\",\n"; \
+		printf "  \"scope\": \"./\",\n"; \
+		printf "  \"display\": \"standalone\",\n"; \
+		printf "  \"background_color\": \"#111418\",\n"; \
+		printf "  \"theme_color\": \"#2f7d68\",\n"; \
+		printf "  \"version\": \"%s\",\n" "$$release"; \
+		printf "  \"icons\": [\n"; \
+		printf "    { \"src\": \"./icon.svg\", \"sizes\": \"any\", \"type\": \"image/svg+xml\", \"purpose\": \"any maskable\" }\n"; \
+		printf "  ]\n"; \
+		printf "}\n"; \
 	} > "$@"
 
 $(TARGET): $(OBJS) $(DEMO_FILES)
@@ -262,7 +284,7 @@ $(BUILD_DIR)/%.o: $(REPO_ROOT)/drivers/calendar/%.c
 
 clean:
 	rm -rf $(BUILD_DIR)
-	rm -f $(WEB_DIR)/picomite.mjs $(WEB_DIR)/picomite.wasm $(WEB_DIR)/picomite.data $(APP_VERSION_JS)
+	rm -f $(WEB_DIR)/picomite.mjs $(WEB_DIR)/picomite.wasm $(WEB_DIR)/picomite.data $(APP_VERSION_JS) $(PWA_MANIFEST)
 	@# Transitional multi-profile artefacts from an earlier attempt:
 	rm -f $(WEB_DIR)/picomite-*.mjs $(WEB_DIR)/picomite-*.wasm $(WEB_DIR)/picomite-*.data
 

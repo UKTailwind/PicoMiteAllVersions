@@ -13,7 +13,7 @@
 // from the bundled /bundle/ snapshot.
 
 import { detectPicomiteProxy } from './proxy_client.mjs';
-import { APP_DISPLAY_VERSION, APP_RELEASE_VERSION, MMBASIC_VERSION } from './app_version.mjs';
+import { APP_CACHE_VERSION, APP_DISPLAY_VERSION, APP_RELEASE_VERSION, MMBASIC_VERSION } from './app_version.mjs';
 
 const statusEl = document.getElementById('status');
 const canvas = document.getElementById('screen');
@@ -39,6 +39,7 @@ const filesListEl = document.getElementById('files-list');
 window.picomiteAppVersion = {
     release: APP_RELEASE_VERSION,
     display: APP_DISPLAY_VERSION,
+    cache: APP_CACHE_VERSION,
     mmbasic: MMBASIC_VERSION,
 };
 if (appVersionLabel) {

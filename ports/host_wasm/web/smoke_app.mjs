@@ -49,12 +49,35 @@ try {
         if (!isolated) fail('crossOriginIsolated = false');
         console.log('OK — crossOriginIsolated.');
 
-        // Check 2: worker has booted — window.picomite hook is installed
+        // Check 2: PWA manifest + versioned service-worker cache are wired.
+        const pwa = await page.evaluate(async () => {
+            const reg = await navigator.serviceWorker.ready;
+            const manifest = await fetch('./manifest.webmanifest', { cache: 'no-store' }).then((r) => r.json());
+            const cacheKeys = 'caches' in window ? await caches.keys() : [];
+            return {
+                appVersion: window.picomiteAppVersion,
+                cacheKeys,
+                manifestVersion: manifest.version,
+                serviceWorkerUrl: reg.active?.scriptURL || '',
+            };
+        });
+        if (pwa.manifestVersion !== pwa.appVersion.release) {
+            fail(`manifest version ${pwa.manifestVersion} != app release ${pwa.appVersion.release}`);
+        }
+        if (!pwa.serviceWorkerUrl.includes(`version=${encodeURIComponent(pwa.appVersion.cache)}`)) {
+            fail(`service worker URL missing cache version: ${pwa.serviceWorkerUrl}`);
+        }
+        if (!pwa.cacheKeys.includes(`${pwa.appVersion.cache}-app-shell`)) {
+            fail(`missing app-shell cache for ${pwa.appVersion.cache}; caches=${pwa.cacheKeys.join(',')}`);
+        }
+        console.log(`OK — PWA manifest/service worker cache ${pwa.appVersion.cache}.`);
+
+        // Check 3: worker has booted — window.picomite hook is installed
         // by onWorkerReady after it receives 'ready' from the worker.
         await page.waitForFunction(() => !!window.picomite?.memoryBytes, { timeout: 25000 });
         console.log('OK — worker booted, window.picomite populated.');
 
-        // Check 3: worker hook and shared memory populated
+        // Check 4: worker hook and shared memory populated
         const state = await page.evaluate(() => {
             const p = window.picomite;
             if (!p || !p.memoryBytes) return null;
@@ -67,7 +90,7 @@ try {
         if (state.nonZero === 0) fail('shared framebuffer empty');
         console.log(`OK — framebuffer ${state.fbWidth}×${state.fbHeight}, ${state.nonZero} non-zero bytes.`);
 
-        // Check 4: demos are listed (worker copied bundle → /sd/)
+        // Check 5: demos are listed (worker copied bundle → /sd/)
         const demos = await page.evaluate(async () => {
             // Use the same round-trip the UI uses.
             return new Promise((resolve) => {
@@ -85,7 +108,7 @@ try {
         if (!demos.length) fail('no demos found in /sd/');
         console.log(`OK — /sd/ has ${demos.length} files (e.g. ${demos.slice(0, 3).join(', ')}).`);
 
-        // Check 5: audio proxy — wrap picomiteAudio, type PLAY TONE, observe.
+        // Check 6: audio proxy — wrap picomiteAudio, type PLAY TONE, observe.
         await page.evaluate(() => {
             window.__audioCalls = [];
             const orig = window.picomiteAudio;
