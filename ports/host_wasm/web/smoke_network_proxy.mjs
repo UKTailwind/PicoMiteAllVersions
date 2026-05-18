@@ -38,7 +38,7 @@ async function startPeer() {
 }
 
 function startProxy() {
-    const proxyPath = new URL('../wasm_network_proxy', import.meta.url).pathname;
+    const proxyPath = new URL('../../host_native/build/wasm_network_proxy', import.meta.url).pathname;
     const webRoot = new URL('.', import.meta.url).pathname;
     const child = spawn(proxyPath, ['--port', String(PROXY_PORT), '--web-root', webRoot], {
         cwd: new URL('../..', import.meta.url).pathname,
