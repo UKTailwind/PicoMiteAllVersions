@@ -53,9 +53,12 @@ try {
         const pwa = await page.evaluate(async () => {
             const reg = await navigator.serviceWorker.ready;
             const manifest = await fetch('./manifest.webmanifest', { cache: 'no-store' }).then((r) => r.json());
+            const appleIcon = await fetch('./apple-touch-icon.png', { cache: 'no-store' });
             const cacheKeys = 'caches' in window ? await caches.keys() : [];
             return {
                 appVersion: window.picomiteAppVersion,
+                appleCapable: document.querySelector('meta[name="apple-mobile-web-app-capable"]')?.content || '',
+                appleIconOk: appleIcon.ok && appleIcon.headers.get('content-type')?.includes('image/png'),
                 cacheKeys,
                 manifestVersion: manifest.version,
                 serviceWorkerUrl: reg.active?.scriptURL || '',
@@ -69,6 +72,9 @@ try {
         }
         if (!pwa.cacheKeys.includes(`${pwa.appVersion.cache}-app-shell`)) {
             fail(`missing app-shell cache for ${pwa.appVersion.cache}; caches=${pwa.cacheKeys.join(',')}`);
+        }
+        if (pwa.appleCapable !== 'yes' || !pwa.appleIconOk) {
+            fail(`Safari install metadata incomplete; appleCapable=${pwa.appleCapable} appleIconOk=${pwa.appleIconOk}`);
         }
         console.log(`OK — PWA manifest/service worker cache ${pwa.appVersion.cache}.`);
 
