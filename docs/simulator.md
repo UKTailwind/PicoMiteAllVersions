@@ -27,9 +27,9 @@ the interpreter.
 Try a demo:
 
 ```
-> RUN "demo_gfx_plasma"      ' interpreter (slow per-pixel trig)
-> FRUN "demo_gfx_plasma"     ' VM — watchably fast
-> RUN "demo_sound_sfx"       ' click the canvas first to unlock audio
+> RUN "graphics/demo_gfx_plasma"      ' interpreter (slow per-pixel trig)
+> FRUN "graphics/demo_gfx_plasma"     ' VM - watchably fast
+> RUN "sound/demo_sound_sfx"          ' click the canvas first to unlock audio
 ```
 
 Press **Ctrl-D** in the terminal to exit the simulator.
@@ -53,7 +53,7 @@ Neither touches the device firmware build (`build_rp2040/`, `cmake`).
 
 - Port **5150**, listen on **127.0.0.1**
 - `--web-root` → `../web/` (served statically)
-- `--sd-root`  → repo root (so `RUN "demo_gfx_shapes"` finds demos)
+- `--sd-root`  -> `../demos/` (so `RUN "graphics/demo_gfx_shapes"` finds demos)
 - `--resolution 320x320`
 
 Any extra flags are forwarded to the binary. Common overrides:
@@ -153,26 +153,27 @@ See [`host-build.md`](host-build.md) for the full test-harness story.
 
 ## Demos bundled in the repo
 
-All at repo root; run with `RUN "name"` (or `FRUN` where noted).
+All under `demos/`; `./run_sim.sh` mounts that directory as the SD root. Run
+with `RUN "category/name"` (or `FRUN` where noted).
 
 **Graphics (framebuffer-based):**
-- `demo_gfx_shapes` — static primitives showcase
-- `demo_gfx_bounce` — 8 bouncing balls, FASTGFX
-- `demo_gfx_stars` — perspective starfield warp
-- `demo_gfx_plasma` — classic sine plasma (`FRUN` for speed)
-- `demo_gfx_mandel` — Mandelbrot, per-pixel plot
+- `graphics/demo_gfx_shapes` - static primitives showcase
+- `graphics/demo_gfx_bounce` - 8 bouncing balls, FASTGFX
+- `graphics/demo_gfx_stars` - perspective starfield warp
+- `graphics/demo_gfx_plasma` - classic sine plasma (`FRUN` for speed)
+- `graphics/demo_gfx_mandel` - Mandelbrot, per-pixel plot
 
 **Graphics (direct-draw, no framebuffer):**
-- `demo_draw_bounce` — erase-old / draw-new bouncing balls
-- `demo_draw_clock` — analog clock
-- `demo_draw_paint` — phyllotaxis rosette
+- `graphics/demo_draw_bounce` - erase-old / draw-new bouncing balls
+- `graphics/demo_draw_clock` - analog clock
+- `graphics/demo_draw_paint` - phyllotaxis rosette
 
 **Audio:**
-- `demo_sound_tones` — `PLAY TONE` sweeps, stereo splits
-- `demo_sound_waves` — all six waveforms (S/Q/T/W/P/N)
-- `demo_sound_chord` — 4-slot polyphony + volume fade
-- `demo_melody` — "Ode to Joy" opening phrase
-- `demo_sound_sfx` — laser / coin / explosion / alarm
+- `sound/demo_sound_tones` - `PLAY TONE` sweeps, stereo splits
+- `sound/demo_sound_waves` - all six waveforms (S/Q/T/W/P/N)
+- `sound/demo_sound_chord` - 4-slot polyphony + volume fade
+- `sound/demo_melody` - "Ode to Joy" opening phrase
+- `sound/demo_sound_sfx` - laser / coin / explosion / alarm
 
 **Game:**
-- `pico_blocks` — breakout clone (FASTGFX-based)
+- `apps/pico_blocks` - breakout clone (FASTGFX-based)

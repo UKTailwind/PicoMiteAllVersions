@@ -61,7 +61,7 @@ Completed or materially advanced:
   WEB-family builds and has been removed from the tree.
 - Pico WEB-family WiFi connect, scan, status, TCP/IP status, and IP address
   reporting now route through `hal_net_wifi_*` on the lwIP raw HAL. Option
-  persistence and user-facing startup messages remain in `MMsetwifi.c`.
+  persistence and user-facing startup messages remain in `shared/net/MMsetwifi.c`.
 - Host-native conformance covers the BASIC WEB surface without board hardware,
   including interrupt-driven TCP server behavior, TCP client request/stream,
   UDP send/receive, fake NTP, plain MQTT, shared HTTP transmit helpers, and
@@ -149,13 +149,13 @@ User-visible commands and functions:
 
 | Surface | BASIC entry points | Current owners |
 |---|---|---|
-| WiFi setup | `OPTION WIFI`, `WEB CONNECT`, `WEB SCAN [array%()]`, `OPTION SSID$`, `MM.INFO(WIFI STATUS)`, `MM.INFO(TCPIP STATUS)`, `MM.INFO(IP ADDRESS)` | Pico: `MMsetwifi.c` + CYW43. ESP32: `esp32_wifi.c` + ESP-IDF. |
-| TCP server | `OPTION TCP SERVER PORT`, `WEB TCP INTERRUPT`, `WEB TCP READ`, `WEB TCP SEND`, `WEB TCP CLOSE`, `MM.INFO(TCP REQUEST n)`, `MM.INFO(TCP PORT)`, `MM.INFO(MAX CONNECTIONS)`, currently ESP32-only `MM.INFO(TCP PATH n)` | Pico: `MMtcpserver.c`. ESP32: `esp32_tcp_server.c`. |
-| HTTP helpers | `WEB TRANSMIT CODE`, `FILE`, `PAGE`, ESP32-only aliases `CSS`, `JS`/`JAVASCRIPT`, `IMAGE` | Pico: `MMtcpserver.c`. ESP32: `esp32_tcp_server.c` plus shared HTTP helpers. |
-| TCP client | `WEB OPEN TCP CLIENT`, `WEB TCP CLIENT REQUEST`, `WEB OPEN TCP STREAM`, `WEB TCP CLIENT STREAM`, `WEB CLOSE TCP CLIENT` | Pico: `MMTCPclient.c`. ESP32: `esp32_tcp_client.c`. |
-| UDP | `OPTION UDP SERVER PORT`, `WEB UDP INTERRUPT`, `WEB UDP SEND`, `MM.INFO(UDP PORT)`, `MM.MESSAGE$`, `MM.ADDRESS$` | Pico: `MMudp.c`. ESP32: `esp32_udp.c`. |
-| NTP | `WEB NTP [offset [, server [, timeout]]]` updates `DATE$` / `TIME$` through `TimeOffsetToUptime` | Pico: `MMntp.c`. ESP32: `esp32_ntp.c`. |
-| MQTT | `WEB MQTT CONNECT`, `PUBLISH`, `SUBSCRIBE`, `UNSUBSCRIBE`, `CLOSE`, `MM.TOPIC$`, `MM.MESSAGE$` | Pico: `MMMqtt.c` adapter + lwIP MQTT HAL. ESP32: `esp32_mqtt.c` + ESP-IDF MQTT HAL. |
+| WiFi setup | `OPTION WIFI`, `WEB CONNECT`, `WEB SCAN [array%()]`, `OPTION SSID$`, `MM.INFO(WIFI STATUS)`, `MM.INFO(TCPIP STATUS)`, `MM.INFO(IP ADDRESS)` | Pico: `shared/net/MMsetwifi.c` + CYW43. ESP32: `esp32_wifi.c` + ESP-IDF. |
+| TCP server | `OPTION TCP SERVER PORT`, `WEB TCP INTERRUPT`, `WEB TCP READ`, `WEB TCP SEND`, `WEB TCP CLOSE`, `MM.INFO(TCP REQUEST n)`, `MM.INFO(TCP PORT)`, `MM.INFO(MAX CONNECTIONS)`, currently ESP32-only `MM.INFO(TCP PATH n)` | Pico: `shared/net/MMtcpserver.c`. ESP32: `esp32_tcp_server.c`. |
+| HTTP helpers | `WEB TRANSMIT CODE`, `FILE`, `PAGE`, ESP32-only aliases `CSS`, `JS`/`JAVASCRIPT`, `IMAGE` | Pico: `shared/net/MMtcpserver.c`. ESP32: `esp32_tcp_server.c` plus shared HTTP helpers. |
+| TCP client | `WEB OPEN TCP CLIENT`, `WEB TCP CLIENT REQUEST`, `WEB OPEN TCP STREAM`, `WEB TCP CLIENT STREAM`, `WEB CLOSE TCP CLIENT` | Pico: `shared/net/MMTCPclient.c`. ESP32: `esp32_tcp_client.c`. |
+| UDP | `OPTION UDP SERVER PORT`, `WEB UDP INTERRUPT`, `WEB UDP SEND`, `MM.INFO(UDP PORT)`, `MM.MESSAGE$`, `MM.ADDRESS$` | Pico: `shared/net/MMudp.c`. ESP32: `esp32_udp.c`. |
+| NTP | `WEB NTP [offset [, server [, timeout]]]` updates `DATE$` / `TIME$` through `TimeOffsetToUptime` | Pico: `shared/net/MMntp.c`. ESP32: `esp32_ntp.c`. |
+| MQTT | `WEB MQTT CONNECT`, `PUBLISH`, `SUBSCRIBE`, `UNSUBSCRIBE`, `CLOSE`, `MM.TOPIC$`, `MM.MESSAGE$` | Pico: `shared/net/MMMqtt.c` adapter + lwIP MQTT HAL. ESP32: `esp32_mqtt.c` + ESP-IDF MQTT HAL. |
 | Adjacent WEB features | `OPTION WEB MESSAGES`, `OPTION TELNET CONSOLE`, `OPTION TFTP`, TFTP/Telnet server paths | Pico, ESP32, and host-native now implement TFTP/Telnet service paths; host-native uses override ports for non-privileged loopback tests. |
 
 State currently shared through globals:
@@ -173,14 +173,14 @@ State currently shared through globals:
 
 Pico WEB ports link this source set:
 
-- `MMsetwifi.c`: option parsing, `cmd_web`, WiFi scan/connect, print options,
+- `shared/net/MMsetwifi.c`: option parsing, `cmd_web`, WiFi scan/connect, print options,
   `MM.INFO(...)` network dispatch.
-- `MMtcpserver.c`: TCP listener slots, HTTP transmit helpers, TCP interrupt,
+- `shared/net/MMtcpserver.c`: TCP listener slots, HTTP transmit helpers, TCP interrupt,
   read/send/close.
-- `MMTCPclient.c`: TCP client connect/request/stream/close.
-- `MMudp.c`: UDP listener/send and `MM.MESSAGE$` / `MM.ADDRESS$` updates.
-- `MMntp.c`: NTP request/response over UDP.
-- `MMMqtt.c` + `mqtt.c`: thin MQTT command adapter and lwIP MQTT backend.
+- `shared/net/MMTCPclient.c`: TCP client connect/request/stream/close.
+- `shared/net/MMudp.c`: UDP listener/send and `MM.MESSAGE$` / `MM.ADDRESS$` updates.
+- `shared/net/MMntp.c`: NTP request/response over UDP.
+- `shared/net/MMMqtt.c` + `shared/net/mqtt.c`: thin MQTT command adapter and lwIP MQTT backend.
 
 ESP32 started with one monolithic port file, but that is no longer the current
 shape:
@@ -580,21 +580,21 @@ Started:
   user-facing messages in their port adapters.
 - Added the first Pico `drivers/net_lwip_raw/hal_net_lwip.c` slice. It
   implements HAL UDP send, UDP bind, UDP receive event queueing, DNS resolution
-  through lwIP, and capability reporting for Pico WEB-family builds. `MMudp.c`
+  through lwIP, and capability reporting for Pico WEB-family builds. `shared/net/MMudp.c`
   is now a BASIC-facing wrapper over `hal_net_udp_send()` and the shared UDP
   service poller instead of owning lwIP UDP pcbs directly.
 - Pico WEB-family `WEB NTP` now uses `shared/net/mm_net_ntp_hal.c` over the
   lwIP HAL UDP backend instead of owning DNS, UDP pcb setup, receive callbacks,
-  and packet parsing in `MMntp.c`. The shared NTP helper now calls
+  and packet parsing in `shared/net/MMntp.c`. The shared NTP helper now calls
   `hal_net_poll()` while waiting so the Pico CYW43 polled stack can make
   progress.
 - Pico WEB-family TCP client and TCP stream commands now use the lwIP HAL TCP
-  client backend. `MMTCPclient.c` is now a BASIC-facing adapter over
+  client backend. `shared/net/MMTCPclient.c` is now a BASIC-facing adapter over
   `hal_net_tcp_client_open/send/recv/close`, with stream receive progress
   pumped from `ProcessWeb()`. The lwIP backend owns DNS, `tcp_connect`,
   send/backpressure handling, close/abort cleanup, and a dynamic receive queue.
 - Pico WEB-family HTTP/TCP server commands now use `mm_net_tcp_service_t` over
-  the lwIP HAL TCP server backend. `MMtcpserver.c` keeps the BASIC-facing
+  the lwIP HAL TCP server backend. `shared/net/MMtcpserver.c` keeps the BASIC-facing
   command adapter and HTTP transmit integration, while accept/read/send/close
   and request-path state flow through `hal_net_tcp_server_*`,
   `hal_net_tcp_conn_*`, and `shared/net/mm_net_service.c`. Receive buffers are
@@ -603,11 +603,11 @@ Started:
   address reporting now use `hal_net_wifi_set_credentials`,
   `hal_net_wifi_connect`, `hal_net_wifi_scan`, `hal_net_wifi_status`,
   `hal_net_tcpip_status`, and `hal_net_ip_address` on the lwIP HAL backend.
-  `MMsetwifi.c` remains the option/message/startup adapter.
+  `shared/net/MMsetwifi.c` remains the option/message/startup adapter.
 - Pico WEB-family MQTT commands now use the shared HAL-backed MQTT command
-  executor over `hal_net_mqtt_*` in the lwIP HAL backend. `MMMqtt.c` is now a
+  executor over `hal_net_mqtt_*` in the lwIP HAL backend. `shared/net/MMMqtt.c` is now a
   small adapter that drains incoming MQTT events into shared
-  `MM.TOPIC$`/`MM.MESSAGE$` state from `ProcessWeb()`, while `mqtt.c` remains
+  `MM.TOPIC$`/`MM.MESSAGE$` state from `ProcessWeb()`, while `shared/net/mqtt.c` remains
   the lwIP protocol implementation.
 - Added `host/web/smoke_network_unsupported.mjs` for the host-wasm capability
   smoke. It verifies the browser build's no-raw-socket contract and
@@ -670,7 +670,7 @@ Backends supply only:
 - close a connection.
 
 This should delete the duplicated HTTP/file/template code in `esp32_wifi.c`
-and the older copy in `MMtcpserver.c`.
+and the older copy in `shared/net/MMtcpserver.c`.
 
 Exit gate: full website demo still works on ESP32; Pico WEB server smoke still
 works or is explicitly marked pending until hardware is available.
@@ -724,8 +724,8 @@ tables unless the port explicitly opts in.
 Port adapters:
 
 - `drivers/net_lwip_raw/hal_net_lwip.c`: lifts CYW43/lwIP raw callback code
-  out of `MMsetwifi.c`, `MMtcpserver.c`, `MMTCPclient.c`, `MMudp.c`,
-  `MMntp.c`, and `MMMqtt.c`.
+  out of `shared/net/MMsetwifi.c`, `shared/net/MMtcpserver.c`, `shared/net/MMTCPclient.c`, `shared/net/MMudp.c`,
+  `shared/net/MMntp.c`, and `shared/net/MMMqtt.c`.
 - `ports/esp32_s3_metro/main/hal_net_esp32.c`: moves sockets, FreeRTOS tasks,
   WiFi, and ESP-IDF MQTT out of `esp32_wifi.c`.
 - `ports/host_native/hal_net_posix.c`: POSIX sockets for native conformance
@@ -806,7 +806,7 @@ Move NTP request/parse/update logic into `shared/net/mm_net_ntp.c`:
 - validate mode/stratum/length;
 - update `TimeOffsetToUptime` and `day_of_week`.
 
-Delete ESP32's private NTP command body and Pico's `MMntp.c` command body once
+Delete ESP32's private NTP command body and Pico's `shared/net/MMntp.c` command body once
 the shared version passes the fake-NTP conformance test.
 
 Started:
@@ -936,8 +936,8 @@ TCP/UDP/MQTT behavior is shared:
 - `OPTION TFTP OFF|ON|ENABLE|DISABLE`.
 - TFTP read/write server over the same file HAL used by A:.
 
-Pico originally owned the reference behavior in `MMtelnet.c`, `tftp.c`, and
-`MMtftp.c`. Pico Telnet now runs over the lwIP raw HAL generic TCP
+Pico originally owned the reference behavior in `shared/net/MMtelnet.c`, `tftp.c`, and
+`shared/net/MMtftp.c`. Pico Telnet now runs over the lwIP raw HAL generic TCP
 accept/receive/send path, and Pico TFTP now runs through the shared TFTP core
 over the lwIP raw HAL UDP socket API. ESP32 should implement the Telnet service
 backend with ESP-IDF sockets or the existing ESP32 TCP HAL. Host-native should
@@ -964,7 +964,7 @@ Started:
 - `shared/net/mm_net_tftp.c` now owns the TFTP RRQ/WRQ/DATA/ACK state machine
   behind small file/send callbacks. Host-native and ESP32 both use this common
   protocol core; backends provide only UDP send/receive and `hal_fs` file I/O.
-- Pico WEB-family builds now also use `shared/net/mm_net_tftp.c`; `MMtftp.c`
+- Pico WEB-family builds now also use `shared/net/mm_net_tftp.c`; `shared/net/MMtftp.c`
   is a small file/send adapter and poll hook, and the old lwIP `tftp.c` server
   is no longer linked or kept as dead source.
 - ESP32 now implements `OPTION TFTP ON|OFF|ENABLE|DISABLE` with a UDP/69
@@ -1060,8 +1060,8 @@ shared/net/mm_net_mqtt_cmd.c
 <one hal_net backend>
 ```
 
-Pico WEB ports should stop listing `MMsetwifi.c`, `MMtcpserver.c`,
-`MMTCPclient.c`, `MMudp.c`, `MMntp.c`, and `MMMqtt.c` as BASIC command bodies.
+Pico WEB ports should stop listing `shared/net/MMsetwifi.c`, `shared/net/MMtcpserver.c`,
+`shared/net/MMTCPclient.c`, `shared/net/MMudp.c`, `shared/net/MMntp.c`, and `shared/net/MMMqtt.c` as BASIC command bodies.
 Pieces that remain useful should move under `drivers/net_lwip_raw/`.
 
 ESP32 should shrink `esp32_wifi.c` into either:

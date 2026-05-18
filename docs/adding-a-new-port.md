@@ -38,7 +38,7 @@ Start from `ports/pico/port_config.h` (the simplest). Key knobs, grouped:
 - **Chip identity:** `HAL_PORT_PWM_SLICE_COUNT`, `HAL_PORT_GPIO_COUNT`, `HAL_PORT_PIO_COUNT`, `HAL_PORT_HAS_PIO2`, `HAL_PORT_HAS_FAST_TIMER`, `HAL_PORT_HAS_INT5`.
 - **Chip features present:** `HAL_PORT_HAS_PSRAM`, `HAL_PORT_HAS_UPNG`, `HAL_PORT_HAS_DEFINES`, `HAL_PORT_HAS_MP3`.
 - **Board features:** `HAL_PORT_HAS_HEARTBEAT`, `HAL_PORT_HAS_SSD1963`, `HAL_PORT_HAS_HDMI`, `HAL_PORT_HAS_NEXTGEN_DISPLAY`, `HAL_PORT_IS_VGA`.
-- **Decascade palette flags:** `HAL_PORT_HAS_WIFI`, `HAL_PORT_HAS_VGA_PIO`, `HAL_PORT_HAS_GUICONTROLS`. Drive WiFi-stack inclusion, VGA-PIO scanout family, and the GUI widget command set (Touch.c + Option.MaxCtrls). Pick 0 / 1 per your board's hardware and feature set.
+- **Decascade palette flags:** `HAL_PORT_HAS_WIFI`, `HAL_PORT_HAS_VGA_PIO`, `HAL_PORT_HAS_GUICONTROLS`. Drive WiFi-stack inclusion, VGA-PIO scanout family, and the GUI widget command set (drivers/gui_touch/Touch.c + Option.MaxCtrls). Pick 0 / 1 per your board's hardware and feature set.
 - **Numeric caps:** `HAL_PORT_ADC_CHANNEL_MAX`, `HAL_PORT_FILES_MAX`, `HAL_PORT_AUDIO_FLAC_MAX_BASE_HZ`, `HAL_PORT_AUDIO_MOD_BUFFER_SIZE`.
 - **Memory + clock + MMBasic-table:** `HAL_PORT_HEAP_MEMORY_SIZE`, `HAL_PORT_MAX_CPU`, `HAL_PORT_MIN_CPU`, `HAL_PORT_MAX_VARS`, `HAL_PORT_MAX_SUBFUN`, `HAL_PORT_MAX_MODES` (VGA-family ports only), `HAL_PORT_FLASH_TARGET_OFFSET[_USB]`, `HAL_PORT_MAGIC_KEY[_USB]`, `HAL_PORT_HEAP_TOP[_USB]`, `HAL_PORT_CONSOLE_RX_BUF_SIZE` (non-WiFi ports), `HAL_PORT_PIOMAX`, `HAL_PORT_NBR_PINS`, `HAL_PORT_PSRAM_BASE` + `HAL_PORT_PSRAM_BLOCK_SIZE` (rp2350 non-WEB ports). The `_USB` siblings let configuration.h pick the USB-keyboard variant via a single USBKEYBOARD ifdef.
 - **Memory layout:** `HAL_PORT_FRAMEBUFFER_TRAILER_BYTES`, `HAL_PORT_ALLMEMORY_ALIGN`, `HAL_PORT_CORE1_STACK_WORDS` (size of the shared core1 stack — 512 for ports running the SPI-LCD merge pipeline, 128 for VGA/HDMI scanout, 1 for WEB ports that never launch core1).
@@ -50,7 +50,7 @@ If a macro doesn't apply to your board, define it to `0` (or the null form). The
 
 ### `HAL_PORT_FLASH_TARGET_OFFSET` — must beat `binary_end`
 
-This is the most common bring-up trap on rp2350. `HAL_PORT_FLASH_TARGET_OFFSET` is where MMBasic writes saved Options on first boot. It **must** be larger than the firmware's actual `binary_end`, plus a guard band (≥30 KB recommended) to absorb future toolchain / SDK growth. If the saved-options sector overlaps the firmware image, the first `SaveOptions()` call stomps the bootrom's `IMAGE_DEF` Block 2 marker — the device then drops to BOOTSEL on every reboot, looking like a bad flash. `picotool info <flashed device>` reports `Block loop is not valid`. After verifying the offset, re-flash and the next first-boot succeeds. See `FLASH_LAYOUT_NOTE.md` for the full mechanics.
+This is the most common bring-up trap on rp2350. `HAL_PORT_FLASH_TARGET_OFFSET` is where MMBasic writes saved Options on first boot. It **must** be larger than the firmware's actual `binary_end`, plus a guard band (≥30 KB recommended) to absorb future toolchain / SDK growth. If the saved-options sector overlaps the firmware image, the first `SaveOptions()` call stomps the bootrom's `IMAGE_DEF` Block 2 marker — the device then drops to BOOTSEL on every reboot, looking like a bad flash. `picotool info <flashed device>` reports `Block loop is not valid`. After verifying the offset, re-flash and the next first-boot succeeds. See [flash-layout-note.md](flash-layout-note.md) for the full mechanics.
 
 How to check before first flash:
 
@@ -194,7 +194,7 @@ console-colour helper.
 
 | Function | What it does |
 |---|---|
-| `void port_set_default_options(void)` | First-boot factory defaults. Set `Option.*` fields that differ from the shared `ResetOptions()` baseline (display type, CPU speed, keyboard config, board-specific pin assignments). Called by `FileIO.c::ResetOptions()` after the shared defaults run. |
+| `void port_set_default_options(void)` | First-boot factory defaults. Set `Option.*` fields that differ from the shared `ResetOptions()` baseline (display type, CPU speed, keyboard config, board-specific pin assignments). Called by `core/mmbasic/FileIO.c::ResetOptions()` after the shared defaults run. |
 | `void port_print_supported_boards(void)` | What `CONFIGURE LIST` prints. One `MMPrintString("YourBoard\r\n")` per board profile this port ships. |
 | `int port_factory_reset_board(unsigned char *p)` | Body of `OPTION RESET <BOARD>`. Match `p` against each board name your port supports; on match, set `Option.*` fields, `SaveOptions()`, `SoftReset()`, return 1. Return 0 if no board name matched. |
 | `int port_display_option_setter(unsigned char *cmdline)` | Per-port `OPTION` setters for display config. SPI-LCD ports handle `OPTION CPUSPEED`, `OPTION LCDPANEL`, `OPTION TOUCH`. VGA/HDMI ports handle `OPTION RESOLUTION`, `OPTION VGA PINS`, `OPTION DEFAULT MODE`. Return 1 if `cmdline` matched a setter, 0 otherwise. |
@@ -292,9 +292,9 @@ WiFi-family board) and adjust two sections:
    vs `vm_framebuffer_stub`, `audio_mp3_real` vs `audio_mp3_stub`,
    `psram_heap_real` vs `psram_heap_stub`, `upng_sprite` vs
    `upng_sprite_stub`, `gui_touch` vs `gui_touch_stub`, `spi_lcd_fastgfx`
-   vs `spi_lcd_fastgfx_stub`. Add `MMweb_stubs.c` if your port doesn't
+   vs `spi_lcd_fastgfx_stub`. Add `shared/net/MMweb_stubs.c` if your port doesn't
    link the WiFi stack, `gfx_3d.c` if it does link the 3D family
-   (everyone except WiFi), `SSD1963.c` + `Touch.c` if you have an
+   (everyone except WiFi), `drivers/ssd1963/SSD1963.c` + `drivers/gui_touch/Touch.c` if you have an
    SPI-LCD touch panel, the `drivers/vga_pio/*` family if your port has
    `HAL_PORT_HAS_VGA_PIO=1`, the `drivers/hdmi/*` files if HDMI=1, etc.
 
@@ -401,8 +401,8 @@ and copy in:
   `port_pin_reserved_label` mapping `GP23/24/25/29` → 41-44)
 - `Option.ServerResponceTime = 5000;` in `port_set_default_options`
 - `HAL_PORT_HAS_WIFI 1` in `port_config.h`
-- Drop `MMweb_stubs.c` and `SSD1963.c`/`Touch.c` from the source list
-  (Touch.c references `Option.TOUCH_XSCALE` which doesn't exist on
+- Drop `shared/net/MMweb_stubs.c` and `drivers/ssd1963/SSD1963.c`/`drivers/gui_touch/Touch.c` from the source list
+  (drivers/gui_touch/Touch.c references `Option.TOUCH_XSCALE` which doesn't exist on
   PICOMITEVGA's `struct option_s` layout)
 - Trim `HAL_PORT_HEAP_MEMORY_SIZE` by ~30-60 KB to make room for
   CYW43 + lwIP buffers (HDMI alone uses 184 KB; with WiFi added,
@@ -770,16 +770,16 @@ Three `-D` flags are non-negotiable:
 Then define four source-file groups:
 
 ```make
-CORE_SRCS = MMBasic.c Commands.c Functions.c Operators.c ...
-BC_SRCS   = bc_source.c bc_vm.c bc_runtime.c ...
+CORE_SRCS = core/mmbasic/MMBasic.c core/mmbasic/Commands.c core/mmbasic/Functions.c core/mmbasic/Operators.c ...
+BC_SRCS   = runtime/vm/bc_source.c runtime/vm/bc_vm.c runtime/vm/bc_runtime.c ...
 NATIVE_SRCS = host_runtime.c host_fs_shims.c ...  # reused from host_native
 PORT_SRCS = main.c <port>_*.c                      # your code
 ```
 
 Start by copying the lists from `mmbasic_stdio` or `mmbasic_ansi`, then trim:
 
-- **Always include** `MMBasic.c Commands.c Functions.c Operators.c MATHS.c Memory.c MMBasic_Print.c`, the shared graphics (`gfx_*_shared.c`), the state (`display_state.c pin_state.c option_state.c audio_state.c`), `Draw.c RGB121.c FileIO.c`, the bytecode VM (`bc_*.c`), and the filesystem (`ff.c ffunicode.c ffsystem.c`).
-- **Omit** `Editor.c MMBasic_REPL.c MMBasic_Prompt.c` if your port has no interactive REPL (like `mmbasic_stdio`).
+- **Always include** `core/mmbasic/MMBasic.c core/mmbasic/Commands.c core/mmbasic/Functions.c core/mmbasic/Operators.c core/mmbasic/MATHS.c core/mmbasic/Memory.c core/mmbasic/MMBasic_Print.c`, the shared graphics (`gfx_*_shared.c`), the state (`display_state.c pin_state.c option_state.c audio_state.c`), `core/mmbasic/Draw.c RGB121.c core/mmbasic/FileIO.c`, the bytecode VM (`bc_*.c`), and the filesystem (`ff.c ffunicode.c ffsystem.c`).
+- **Omit** `core/mmbasic/Editor.c core/mmbasic/MMBasic_REPL.c core/mmbasic/MMBasic_Prompt.c` if your port has no interactive REPL (like `mmbasic_stdio`).
 - **Omit** `host_fb.c host_terminal.c host_main.c host_fastgfx.c` if you're replacing them. mmbasic_ansi keeps `host_fb.c` (reuses the framebuffer) + `host_fastgfx.c` (reuses the VM syscalls) but replaces `host_main.c` (own entry) and omits `host_terminal.c` (own alt-screen handling).
 - **Always include the HAL host impls:** `hal_flash_host.c hal_time_host.c hal_pin_host.c hal_storage_host.c hal_filesystem_host.c hal_keyboard_host.c hal_audio_host.c hal_vm_framebuffer_host.c`.
 
@@ -822,7 +822,7 @@ The test harness uses the same hook to capture output; mmbasic_ansi uses it to d
 
 `ffconf.h` automatically sets `FF_MAX_LFN=255` for any build that defines `MMBASIC_HOST` or `MMBASIC_WASM`; `HOST_PATH_MAX=4096` in `host_fs_shims.c` is unconditional. You get the right path sizing for free as long as your Makefile includes `-DMMBASIC_HOST`, which every simulation port does.
 
-Background: the default `FF_MAX_LFN=63` was chosen for 8.3 FAT. POSIX cwds on macOS/Linux routinely exceed that (e.g. `/Users/joshv/picocalc/PicoMiteAllVersions` is 44 chars before any filename), and core MMBasic path buffers in `FileIO.c` / `Editor.c` are sized by `FF_MAX_LFN`. At 63, deep cwds silently truncate `LOAD` / `SAVE` / `RUN`.
+Background: the default `FF_MAX_LFN=63` was chosen for 8.3 FAT. POSIX cwds on macOS/Linux routinely exceed that (e.g. `/Users/joshv/picocalc/PicoMiteAllVersions` is 44 chars before any filename), and core MMBasic path buffers in `core/mmbasic/FileIO.c` / `core/mmbasic/Editor.c` are sized by `FF_MAX_LFN`. At 63, deep cwds silently truncate `LOAD` / `SAVE` / `RUN`.
 
 Cost of the 255-byte cap: `flist[]` (allocated transiently by `cmd_files`) is sized `HAL_PORT_FILES_MAX × sizeof(s_flist{fn[FF_MAX_LFN+1]; …})`. `ports/host_native/port_config.h` caps `HAL_PORT_FILES_MAX=128` so the peak allocation (~36 KB) fits the test harness's 128 KB heap. If your port provides its own `port_config.h` on a tighter heap, keep this cap similar or lower.
 
@@ -857,7 +857,7 @@ Short version of the rules: one peripheral per driver, no cross-driver includes,
 ## PSRAM HAL contract
 
 If your board has external PSRAM (or any SoC-managed SPIRAM region) and
-you want MMBasic's `RAM` command, `MM.INFO(PSRAM SIZE)`, and Memory.c
+you want MMBasic's `RAM` command, `MM.INFO(PSRAM SIZE)`, and core/mmbasic/Memory.c
 large-allocation routing to light up, implement `hal/hal_psram.h` in a
 port-owned TU (e.g. `ports/<your_board>/hal_psram_<chip>.c`) and link
 `drivers/psram_heap/psram_heap_real.c`. The four entry points are:
@@ -879,7 +879,7 @@ port-owned TU (e.g. `ports/<your_board>/hal_psram_<chip>.c`) and link
 
 Ports without PSRAM link `drivers/psram_heap/psram_heap_stub.c` and
 `drivers/psram_heap/hal_psram_stub.c` — both leave `PSRAMsize = 0`, and
-every `if (!PSRAMsize)` guard in the shared `RAM` / Memory.c paths
+every `if (!PSRAMsize)` guard in the shared `RAM` / core/mmbasic/Memory.c paths
 short-circuits cleanly. See `hal/hal_psram.h` for the full contract
 text and `ports/pico_sdk_common/hal_psram_pico.c` /
 `ports/esp32_s3_metro/main/hal_psram_esp32.c` for working impls.

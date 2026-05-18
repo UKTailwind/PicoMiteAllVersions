@@ -41,7 +41,7 @@ grep -rE '^[[:space:]]*#[[:space:]]*(if|ifdef|ifndef|elif).*\bHDMI\b' \
   half-done.
 - No `HAL_PORT_HAS_WIFI` yet.
 - Both macros also drive **CMake source-list inclusion** (not just
-  `#ifdef`s). `MMtcpserver.c`, `drivers/hdmi/*`, etc. are exclusive to
+  `#ifdef`s). `shared/net/MMtcpserver.c`, `drivers/hdmi/*`, etc. are exclusive to
   certain `COMPILE=` targets in `CMakeLists.txt`.
 - `configuration.h` has a mutually-exclusive `#ifdef PICOMITEVGA` /
   `#ifdef PICOMITE` / `#ifdef PICOMITEWEB` ladder defining
@@ -95,8 +95,8 @@ A0.2. Audit all files that contain `#ifdef PICOMITEWEB` or `#ifdef
       A0.1. The list to verify includes (non-exhaustive — the survey
       grep produces the authoritative list):
       - `Custom.c`, `Custom.h`, `Editor.c`, `PicoMite.c`,
-        `MMBasic_REPL.c`, `MM_Misc.c`, `Touch.c`, `XModem.c`,
-        `MMtcpserver.c`, `Hardware_Includes.h`, `Include.h`,
+        `MMBasic_REPL.c`, `MM_Misc.c`, `drivers/gui_touch/Touch.c`, `XModem.c`,
+        `shared/net/MMtcpserver.c`, `Hardware_Includes.h`, `Include.h`,
         `PicoCFunctions.h`, `FileIO.h`, `AllCommands.h`,
         `configuration.h`, `drivers/sd_spi/mmc_stm32.c`,
         `drivers/hdmi/hdmi_modes.c`, `drivers/hdmi/hdmi_scanout.c`,
@@ -134,7 +134,7 @@ A1. Add `HAL_PORT_HAS_WIFI` to every `ports/*/port_config.h`:
     - `web`, `web_rp2350` → `1`.
     - All other ports → `0`.
     - Doc comment: drives CYW43 init, lwIP/mongoose stack, WEB
-      commands. Stub paths (existing `MMweb_stubs.c` pattern) cover
+      commands. Stub paths (existing `shared/net/MMweb_stubs.c` pattern) cover
       `HAS_WIFI=0`.
 
 A2. Add the additional palette flags the conversion will need. The
@@ -148,14 +148,14 @@ A2. Add the additional palette flags the conversion will need. The
       Currently linked into `PICORP2350`, `PICOUSBRP2350`, and
       `WEBRP2350` builds via cmake. Note: this is a real ~25-site
       conversion (External.c, MMBasic.c, MM_Misc.c, bc_vm.c, Editor.c,
-      FileIO.h, AllCommands.h, Touch.c, Memory.c, Draw.c, PicoMite.c,
+      FileIO.h, AllCommands.h, drivers/gui_touch/Touch.c, Memory.c, Draw.c, PicoMite.c,
       drivers/gui_touch/gui_touch.c), not a trivial rename. Stage B
       handles GUICONTROLS sites alongside HDMI.
     - `HAL_PORT_HAS_TCP_SERVER` is **deferred**. The earlier draft
       proposed splitting it from `HAL_PORT_HAS_WIFI`, but
-      `MMtcpserver.c` is the only TCP server consumer and it travels
+      `shared/net/MMtcpserver.c` is the only TCP server consumer and it travels
       with WiFi. Splitting requires a corresponding stub-file split
-      (the 14 stubs in `MMweb_stubs.c` need to be partitioned into
+      (the 14 stubs in `shared/net/MMweb_stubs.c` need to be partitioned into
       WiFi-only vs TCP-only sets), which doesn't simplify anything.
       One flag suffices.
 
@@ -189,12 +189,12 @@ The lists below are illustrative, not canonical:
 
 B1. **WiFi conversion**:
     - Core C files: `PicoMite.c`, `MMBasic_REPL.c`, `MM_Misc.c`,
-      `Editor.c`, `Custom.c`, `Touch.c`, `XModem.c`.
+      `Editor.c`, `Custom.c`, `drivers/gui_touch/Touch.c`, `XModem.c`.
     - Driver/port files: `cmd_psram.c`, `misc_option_setters.c`,
       `ports/pico/port_defaults.c`, `mmc_stm32.c`.
     - Headers: `Custom.h`, `PicoCFunctions.h`, `Hardware_Includes.h`,
       `FileIO.h`, `AllCommands.h`.
-    - `MMtcpserver.c` — file-level CMake gate, no in-source
+    - `shared/net/MMtcpserver.c` — file-level CMake gate, no in-source
       `#ifdef PICOMITEWEB`. Do **not** wrap the body in `#if
       HAL_PORT_HAS_WIFI`; let CMake source-list inclusion handle it
       (see Stage C). The earlier plan draft was wrong on this point.
@@ -233,7 +233,7 @@ B4. Sanity gate at end of Stage B: every existing `COMPILE=` target
 
 ### Stage C — CMake source-list decoupling
 
-Today, files like `MMtcpserver.c` and `drivers/hdmi/*` are pulled in
+Today, files like `shared/net/MMtcpserver.c` and `drivers/hdmi/*` are pulled in
 by `if (COMPILE STREQUAL "WEBRP2350") ... target_sources(...)` blocks.
 Make source-list inclusion driven by per-port composition.
 
@@ -244,7 +244,7 @@ C1. New convention: `ports/<port>/port_sources.cmake`. Each port's
         drivers/hdmi/hdmi_scanout.c
         drivers/hdmi/hdmi_modes.c
         drivers/cyw43_glue/...
-        MMtcpserver.c
+        shared/net/MMtcpserver.c
     )
     ```
     Top-level `CMakeLists.txt` `include()`s the snippet for the
@@ -265,7 +265,7 @@ C3. **`core1stack` arbitration** (was previously misclassified as
     - `drivers/hdmi/hdmi_scanout.c` (size 128)
     - `drivers/vga_pio/vga_qvga_modes.c` (size 128)
     - `drivers/display_merge/display_merge_pico.c` (size 512)
-    - `MMtcpserver.c` (size 1, canary backstop)
+    - `shared/net/MMtcpserver.c` (size 1, canary backstop)
     - `ports/host_native/host_runtime.c` (size 256)
 
     A combined HDMI+WiFi port pulls in *two* definitions → multiple
@@ -278,7 +278,7 @@ C3. **`core1stack` arbitration** (was previously misclassified as
     1-word array is taken over by the shared definition (canary at
     `core1stack[0]` regardless of size).
 
-C4. Stub-pair pattern: existing `MMweb_stubs.c` proves the model for
+C4. Stub-pair pattern: existing `shared/net/MMweb_stubs.c` proves the model for
     *callable functions*. For every WiFi-gated function, build pulls
     either the real impl or the stub — driven by the port's
     `port_sources.cmake`. Apply the same pattern to HDMI symbols. Do
@@ -421,7 +421,7 @@ F2. **Validation port — `ports/vga_wifi_rp2350/`**: VGA-PIO + WiFi.
 F3. **Validation port — `ports/spi_lcd_wifi_rp2350/`**: SPI LCD +
     WiFi. Exercises `HAS_HDMI=0, HAS_VGA_PIO=0, HAS_WIFI=1` with a
     real display backend that the existing `web` ports lack. Catches
-    whether `Touch.c`, `SSD1963.c`, and the SPI-LCD scanout family
+    whether `drivers/gui_touch/Touch.c`, `drivers/ssd1963/SSD1963.c`, and the SPI-LCD scanout family
     link cleanly when the port mixes WiFi with a non-WEB display
     family.
 

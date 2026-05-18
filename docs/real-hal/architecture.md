@@ -7,9 +7,10 @@ Target layout and composition rules. See `../real-hal-plan.md` for the index and
 ```
 core/                              ← BASIC interpreter + compiler + VM
    MMBasic.c, Operators.c, Functions.c, Commands.c (interp parts)
-   bc_source.c, bc_vm.c, bc_runtime.c, bc_alloc.c
+   runtime/vm/bc_source.c, runtime/vm/bc_vm.c, runtime/vm/bc_runtime.c,
+   runtime/vm/bc_alloc.c
    gfx_*_shared.c                  ← target-agnostic graphics primitives
-   mm_misc_shared.c                ← target-agnostic command bodies
+   shared/mmbasic/mm_misc_shared.c                ← target-agnostic command bodies
    state/                          ← hoisted cross-cutting globals (see port-config.md)
        display_state.c             (HRes, VRes, FontTable, layer_in_use, ...)
        pin_state.c                 (PinDef[], pin mode arrays)
@@ -132,7 +133,7 @@ Hardware-related #ifdefs in core files (Phase 0 baseline):
   Commands.c     46
   Memory.c       37
   Functions.c    17
-  Audio.c        14
+  shared/audio/Audio.c        14
   Operators.c     0   ← already clean
 
 Per-macro totals across the scored files:

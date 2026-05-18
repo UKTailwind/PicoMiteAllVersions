@@ -51,6 +51,32 @@ cc=${CC:-cc}
 "$cc" -std=gnu11 \
     -DMMBASIC_HOST -DFF_MAX_LFN_LARGE -DBC_SIM_RP2040 \
     -include "$root/ports/host_native/host_platform.h" \
-    -I"$root/ports/host_native" -I"$root/ports/pico_sdk_compat" -I"$root" \
+    -I"$root/ports/host_native" -I"$root/ports/pico_sdk_compat" \
+    -I"$root/core/mmbasic" \
+    -I"$root/runtime/vm" \
+    -I"$root/shared/gfx" \
+    -I"$root/shared/audio" \
+    -I"$root/shared/mmbasic" \
+    -I"$root/drivers/bmp_decoder" \
+    -I"$root/drivers/gps" \
+    -I"$root/drivers/gui_controls" \
+    -I"$root/drivers/gui_touch" \
+    -I"$root/drivers/i2c_bus" \
+    -I"$root/drivers/onewire" \
+    -I"$root/drivers/psram_heap" \
+    -I"$root/drivers/serial" \
+    -I"$root/drivers/spi_bus" \
+    -I"$root/drivers/spi_lcd" \
+    -I"$root/drivers/ssd1963" \
+    -I"$root/third_party/aes" \
+    -I"$root/third_party/cjson" \
+    -I"$root/third_party/dr_libs" \
+    -I"$root/third_party/fatfs" \
+    -I"$root/third_party/hxcmod" \
+    -I"$root/third_party/littlefs" \
+    -I"$root/third_party/picojpeg" \
+    -I"$root/third_party/regex" \
+    -I"$root/third_party/upng" \
+    -I"$root" \
     "$src" -o "$bin"
 "$bin"

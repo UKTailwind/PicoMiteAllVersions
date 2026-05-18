@@ -7,8 +7,8 @@ limitation* or *missing feature that needs work*.
 
 The Pico ports (`pico_rp2350`, `dvi_wifi_rp2350`, `hdmi_rp2350`, `vga_rp2350`,
 `vga_wifi_rp2350`, `web_rp2350`, and the rp2040 builds via `pico_sdk_common`) are
-the **reference**: they link the canonical command bodies in `I2C.c`, `SPI.c`,
-`External.c`, `MM_Misc.c`, `Audio.c`, etc. directly. The four ports audited here —
+the **reference**: they link the canonical command bodies in `drivers/i2c_bus/I2C.c`, `drivers/spi_bus/SPI.c`,
+`External.c`, `MM_Misc.c`, `shared/audio/Audio.c`, etc. directly. The four ports audited here —
 `host_native`, `host_wasm`, `esp32_s3_metro`, `pc386` — each replace some subset of
 those bodies with stubs.
 
@@ -110,7 +110,7 @@ reaches a wire.
 | ------------------------------------------------------ | ------------- | -------------------------------------------------------------------------------------------------------- |
 | I2C, SPI, PIO, IR, OneWire, DHT22, DS18B20, WS2812, RTC, mouse, keypad, Nunchuck, Wii Classic, LCD, camera, backlight, ADC | **Justified** | No physical pins on a desktop host. Silent no-op is the correct posture so that BASIC programs that touch peripherals don't hard-fail under the sim. |
 | `cmd_pin` is a no-op while `fun_pin` is real           | **Bug**       | Inconsistent: `fun_pin` routes through `vm_sys_pin_read`, but `cmd_pin = {}` drops writes. ESP32 and pc386 both implement `cmd_pin` against the same virtual HAL. Programs that do `PIN(GP3) = 1` silently lose the write. |
-| `cmd_WS2812` no-op                                     | **Gap**       | Shared `cmd_ws2812_shared.c` exists and only needs a working `hal_ws2812_write`; host could provide a virtual-pixel-buffer backend for tests and the sim server. |
+| `cmd_WS2812` no-op                                     | **Gap**       | Shared `shared/cmd_ws2812_shared.c` exists and only needs a working `hal_ws2812_write`; host could provide a virtual-pixel-buffer backend for tests and the sim server. |
 | AES, xregex stubs                                      | **Gap**       | These libraries are pure C with no hardware dependency. There is no reason for the host to lack them; the Pico ports build them. Vendor `tiny-AES-c` and `xregex` into host_native and host_wasm. |
 | GPS, settick, IRQ commands                             | **Justified** | No peripherals; IRQs in particular have no analogue on a desktop process. |
 | `cmd_xmodem`                                           | **Gap (small)** | Could work over a host UART or stdin, but value is low. Leave as is. |
@@ -179,7 +179,7 @@ Same shape as host_native, plus a few omissions:
 | Filesystem (LittleFS)| `hal_filesystem_esp32.c`                                              |
 | Flash + PSRAM        | `hal_flash_esp32.c`, `hal_psram_esp32.c`                              |
 | Digital GPIO + ADC   | `hal_pin_esp32.c` + `vm_sys_pin_esp32.c` (real, including raw ADC)    |
-| WS2812               | `cmd_ws2812_shared.c` → `hal_ws2812_esp32.c` (real)                   |
+| WS2812               | `shared/cmd_ws2812_shared.c` → `hal_ws2812_esp32.c` (real)                   |
 | `cmd_pin` / `fun_pin`| Real — drives ESP32 GPIO via the HAL                                  |
 | `cmd_setpin` modes OFF/DIN/DOUT/ARAW | Real — including PULLUP/PULLDOWN for DIN          |
 | Web console display  | `hal_vm_framebuffer_esp32_stub.c` — name is misleading; this is a real 320×240 virtual framebuffer wired into the web-console transport. DrawPixel/DrawRectangle/DrawBitmap/ScrollLCD/DrawBuffer/ReadBuffer are all real. Only the FRAMEBUFFER N/F/L *commands* (the off-screen-layer model) are no-op. |
@@ -209,11 +209,11 @@ Same shape as host_native, plus a few omissions:
 | **PWM**                | **Gap**      | ESP32-S3 has the LEDC peripheral specifically for PWM. Wire LEDC into `vm_sys_pwm_configure` / `_sync` / `_off`. The framework, the syscall surface, and the BASIC parser are all already in place. |
 | **Servo**              | **Gap**      | Falls out of PWM — `vm_sys_servo_configure` is a thin wrapper over `vm_sys_pwm_configure(slice, 50Hz, ...)`. Free with the PWM work. |
 | **Audio (PLAY/SOUND/TONE)** | **Gap** | The board has an I2S DAC. `hal_audio_esp32_stub.c` is a deliberate placeholder. Implement against ESP-IDF's `i2s_std` driver. host_native's audio architecture (sound queue + DMA-style pumping) is reusable. |
-| **I2C / I2C2**         | **Gap**      | ESP32-S3 has two I2C controllers. The `cmd_i2c` / `cmd_i2c2` no-ops are placeholders. Wire ESP-IDF `i2c_master` driver into the canonical bodies in `I2C.c` (gate the existing implementation, or provide an `hal_i2c_*` backend). |
+| **I2C / I2C2**         | **Gap**      | ESP32-S3 has two I2C controllers. The `cmd_i2c` / `cmd_i2c2` no-ops are placeholders. Wire ESP-IDF `i2c_master` driver into the canonical bodies in `drivers/i2c_bus/I2C.c` (gate the existing implementation, or provide an `hal_i2c_*` backend). |
 | **SPI / SPI2**         | **Gap**      | Same as I2C. ESP32-S3 has multiple SPI peripherals. |
 | **OneWire**            | **Gap**      | Bit-banged over a single GPIO — works on any pin that has a real `hal_pin_write` / `hal_pin_read`, which ESP32 has. The Pico implementation is portable. |
 | **DHT22 / DS18B20**    | **Gap**      | Layer over OneWire / direct GPIO timing. Free once OneWire works. |
-| **WS2812**             | **Already done** | `cmd_WS2812` is *not* in the stubs file — it's in `cmd_ws2812_shared.c` and dispatches to `hal_ws2812_esp32.c`. (Initial audit had this wrong.) |
+| **WS2812**             | **Already done** | `cmd_WS2812` is *not* in the stubs file — it's in `shared/cmd_ws2812_shared.c` and dispatches to `hal_ws2812_esp32.c`. (Initial audit had this wrong.) |
 | **IR**                 | **Gap**      | ESP32-S3 has the RMT peripheral, which is ideal for IR remote-control encode/decode. Worth wiring. |
 | **Keypad / Mouse / Nunchuck / Wii Classic** | **Mixed** | Keypad and matrix scanning need GPIO + maybe I2C — viable once I2C lands. Nunchuck and Classic Controller speak I2C — same gate. PS/2 mouse is bit-banged GPIO. All implementable; whether they're worth the effort depends on demand. |
 | **PIO**                | **Justified** | ESP32 has no PIO state machines. (RMT and I2S DMA cover the use cases differently.) Stub is correct. |
@@ -436,4 +436,4 @@ applicable.
 - `/Users/joshv/picocalc/PicoMiteAllVersions/ports/esp32_s3_metro/main/hal_vm_framebuffer_esp32_stub.c`
 - `/Users/joshv/picocalc/PicoMiteAllVersions/ports/pc386/pc386_peripheral_stubs.c`
 - `/Users/joshv/picocalc/PicoMiteAllVersions/ports/pc386/hal_audio_pc386_sb16.c`
-- `/Users/joshv/picocalc/PicoMiteAllVersions/cmd_ws2812_shared.c` (shared `cmd_WS2812` body, dispatches to `hal_ws2812_*`)
+- `/Users/joshv/picocalc/PicoMiteAllVersions/shared/cmd_ws2812_shared.c` (shared `cmd_WS2812` body, dispatches to `hal_ws2812_*`)

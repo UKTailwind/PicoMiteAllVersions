@@ -3,7 +3,7 @@
  *
  * Simulates SETPIN / PIN-read / PIN-write / PWM / SERVO with plain C
  * arrays — no hardware access. vm_sys_pin_reset wipes state on VM
- * runtime reset. Paired with vm_sys_pin.c (device-side impl); the
+ * runtime reset. Paired with runtime/vm/vm_sys_pin.c (device-side impl); the
  * build links exactly one implementation body per target.
  *
  * Shared helpers (vm_pin_mode_is_pwm, vm_pin_pwm_mode_to_slice_chan,

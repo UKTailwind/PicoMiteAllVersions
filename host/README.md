@@ -133,14 +133,14 @@ host/
 └── mmbasic_test
 ```
 
-The host build is a HAL target using the shared interpreter source. `Draw.c`, `FileIO.c`, `Audio.c`, and `MM_Misc.c` (portions) compile on both host and device; device-only branches are gated behind `#ifdef MMBASIC_HOST`/`#else`. The HAL surface is the `host_*_hal.h` / `host_*.h` headers listed below; host implementations live in the `host_*.c` files.
+The host build is a HAL target using the shared interpreter source. `core/mmbasic/Draw.c`, `core/mmbasic/FileIO.c`, `shared/audio/Audio.c`, and `shared/mmbasic/mm_misc_shared.c` compile on both host and device; device-only branches are gated behind `#ifdef MMBASIC_HOST`/`#else`. The HAL surface is the `host_*_hal.h` / `host_*.h` headers listed below; host implementations live in the `host_*.c` files.
 
 Important compiled sources:
 
 | Source | Purpose |
 |--------|---------|
-| `MMBasic.c`, `Commands.c`, `Functions.c`, `Operators.c`, `MATHS.c`, `Memory.c`, `Editor.c`, `MMBasic_REPL.c`, `MMBasic_Prompt.c`, `MMBasic_Print.c` | Shared language runtime — compiled by host and device alike. |
-| `Draw.c`, `FileIO.c`, `Audio.c`, `mm_misc_shared.c` | Shared interpreter command handlers. `Draw.c` / `FileIO.c` use `#ifdef MMBASIC_HOST` to gate device-only peripheral touchpoints. `Audio.c` file-splits at MMBASIC_HOST: device gets the full decoder/PWM body, host gets a thin `cmd_play` that re-uses `host_sim_audio_*`. `mm_misc_shared.c` holds the portable `MM_Misc.c` subset (SORT, LongString, FORMAT$, DATE/TIME/TIMER/EPOCH, PAUSE). |
+| `core/mmbasic/MMBasic.c`, `core/mmbasic/Commands.c`, `core/mmbasic/Functions.c`, `core/mmbasic/Operators.c`, `core/mmbasic/MATHS.c`, `core/mmbasic/Memory.c`, `core/mmbasic/Editor.c`, `core/mmbasic/MMBasic_REPL.c`, `core/mmbasic/MMBasic_Prompt.c`, `core/mmbasic/MMBasic_Print.c` | Shared language runtime — compiled by host and device alike. |
+| `core/mmbasic/Draw.c`, `core/mmbasic/FileIO.c`, `shared/audio/Audio.c`, `shared/mmbasic/mm_misc_shared.c` | Shared interpreter command handlers. `core/mmbasic/Draw.c` / `core/mmbasic/FileIO.c` use `#ifdef MMBASIC_HOST` to gate device-only peripheral touchpoints. `shared/audio/Audio.c` file-splits at MMBASIC_HOST: device gets the full decoder/PWM body, host gets a thin `cmd_play` that re-uses `host_sim_audio_*`. `shared/mmbasic/mm_misc_shared.c` holds the portable `core/mmbasic/MM_Misc.c` subset (SORT, LongString, FORMAT$, DATE/TIME/TIMER/EPOCH, PAUSE). |
 | `gfx_*_shared.c` | Shared host/device graphics primitives used by native VM graphics ops and by Draw.c. |
 | `bc_source.c`, `bc_vm.c`, `bc_runtime.c`, `bc_debug.c`, `bc_compiler_core.c` | Bytecode source frontend, VM dispatch, runtime entry points, disassembler. |
 | `vm_sys_*.c` | VM syscall implementations (graphics, file, time, pin, input). |
@@ -150,9 +150,9 @@ Important compiled sources:
 | `host_fs_shims.c` | FatFS directory-walker wrappers (`host_f_findfirst`/`findnext`/`closedir`/`unlink`/`rename`/`mkdir`/`chdir`/`getcwd`), POSIX per-fnbr file table (`host_fs_posix_*`), `ExistsFile`/`ExistsDir`, simulated `flash_range_*` + LFS stubs, `SaveProgramToFlash`, `host_options_snapshot`. |
 | `host_peripheral_stubs.c` | No-op `cmd_XXX` / `fun_XXX` stubs for hardware the host doesn't carry (I2C, SPI, PIO, PWM pins, PWM/Servo command parsing routed through the VM pin HAL, IR, keypad, GPS globals, AES, xregex, display_details, BDEC/BMP decoder stubs). |
 | `host_fb.{c,h}` | Framebuffer plane + colour conversion + BMP screenshot; backs `DrawPixel`/`DrawRectangle`/`DrawBitmap`/`ScrollLCD`/`ReadBuffer` function pointers. |
-| `host_fs.{c,h}`, `host_fs_hal.h` | Opaque POSIX directory walker + whole-path helpers (`host_fs_unlink`/`rename`/`mkdir`/`chdir`/`getcwd`). HAL header declares the `host_fs_posix_*` surface consumed by `FileIO.c` preambles. |
+| `host_fs.{c,h}`, `host_fs_hal.h` | Opaque POSIX directory walker + whole-path helpers (`host_fs_unlink`/`rename`/`mkdir`/`chdir`/`getcwd`). HAL header declares the `host_fs_posix_*` surface consumed by `core/mmbasic/FileIO.c` preambles. |
 | `host_keys.{c,h}` | Scripted-key injection (`--keys`, `--keys-after-ms`) and `host_keydown` polling. |
-| `host_sim_audio.{c,h}` | WebAudio JSON emitter — shared by `Audio.c` host body for `cmd_play` tone/stop/volume/pause/resume. |
+| `host_sim_audio.{c,h}` | WebAudio JSON emitter — shared by `shared/audio/Audio.c` host body for `cmd_play` tone/stop/volume/pause/resume. |
 | `host_sim_server.{c,h}` | `--sim` Mongoose HTTP/WebSocket server: tick thread, cmd stream, key queue, WS-frame emitters. |
 | `host_terminal.{c,h}` | stdin raw-mode management. |
 | `host_time.{c,h}` | Monotonic microsecond timer, sleep. |

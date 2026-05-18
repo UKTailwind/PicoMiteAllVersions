@@ -3,7 +3,7 @@
 
 target_include_directories(PicoMite PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}
-    ${CMAKE_SOURCE_DIR}     # for our common lwipopts
+    ${CMAKE_SOURCE_DIR}/ports/pico_sdk_common
 )
 
 target_sources(PicoMite PRIVATE
@@ -13,10 +13,10 @@ target_sources(PicoMite PRIVATE
     ${CMAKE_SOURCE_DIR}/ports/pico_sdk_common/mmbasic_port_pico.c
 
     # WiFi stack (CYW43 + lwIP + MQTT/UDP/TFTP/Telnet/NTP/HTTPD).
-    ${CMAKE_SOURCE_DIR}/SSD1963.c
-    ${CMAKE_SOURCE_DIR}/Touch.c
-    ${CMAKE_SOURCE_DIR}/cJSON.c
-    ${CMAKE_SOURCE_DIR}/mqtt.c
+    ${CMAKE_SOURCE_DIR}/drivers/ssd1963/SSD1963.c
+    ${CMAKE_SOURCE_DIR}/drivers/gui_touch/Touch.c
+    ${CMAKE_SOURCE_DIR}/third_party/cjson/cJSON.c
+    ${CMAKE_SOURCE_DIR}/shared/net/mqtt.c
     ${CMAKE_SOURCE_DIR}/shared/net/mm_net_http_file.c
     ${CMAKE_SOURCE_DIR}/shared/net/mm_net_http_page.c
     ${CMAKE_SOURCE_DIR}/shared/net/mm_net_mqtt_cmd.c
@@ -34,14 +34,14 @@ target_sources(PicoMite PRIVATE
     ${CMAKE_SOURCE_DIR}/shared/net/mm_net_web_cmd.c
     ${CMAKE_SOURCE_DIR}/shared/net/mm_net_wifi_cmd.c
     ${CMAKE_SOURCE_DIR}/drivers/net_lwip_raw/hal_net_lwip.c
-    ${CMAKE_SOURCE_DIR}/MMMqtt.c
-    ${CMAKE_SOURCE_DIR}/MMTCPclient.c
-    ${CMAKE_SOURCE_DIR}/MMtelnet.c
-    ${CMAKE_SOURCE_DIR}/MMntp.c
-    ${CMAKE_SOURCE_DIR}/MMtcpserver.c
-    ${CMAKE_SOURCE_DIR}/MMtftp.c
-    ${CMAKE_SOURCE_DIR}/MMudp.c
-    ${CMAKE_SOURCE_DIR}/MMsetwifi.c
+    ${CMAKE_SOURCE_DIR}/shared/net/MMMqtt.c
+    ${CMAKE_SOURCE_DIR}/shared/net/MMTCPclient.c
+    ${CMAKE_SOURCE_DIR}/shared/net/MMtelnet.c
+    ${CMAKE_SOURCE_DIR}/shared/net/MMntp.c
+    ${CMAKE_SOURCE_DIR}/shared/net/MMtcpserver.c
+    ${CMAKE_SOURCE_DIR}/shared/net/MMtftp.c
+    ${CMAKE_SOURCE_DIR}/shared/net/MMudp.c
+    ${CMAKE_SOURCE_DIR}/shared/net/MMsetwifi.c
 
     # SPI-LCD framebuffer + nextgen stub (WEB has SPI-LCD support but no
     # rp2350 nextgen displays).
@@ -69,7 +69,7 @@ target_sources(PicoMite PRIVATE
     ${CMAKE_SOURCE_DIR}/drivers/vga_pio/vga_ops_stub.c
 
     # WEB has gui_touch (needed for SSD1963 + Touch flows). gfx_3d is
-    # excluded — closeall3d stub already in MMtcpserver.c.
+    # excluded — closeall3d stub already in shared/net/MMtcpserver.c.
     ${CMAKE_SOURCE_DIR}/drivers/gui_touch/gui_touch.c
     # WEB rp2040 has no GUICONTROLS (no headroom for the widget family).
     ${CMAKE_SOURCE_DIR}/drivers/gui_controls/gui_controls_stub.c
@@ -78,10 +78,10 @@ target_sources(PicoMite PRIVATE
     ${CMAKE_SOURCE_DIR}/drivers/ps2_matrix/Keyboard.c
         ${CMAKE_SOURCE_DIR}/drivers/ps2_matrix/hal_keyboard_ps2.c
         ${CMAKE_SOURCE_DIR}/drivers/console_cdc/console_cdc.c
-    ${CMAKE_SOURCE_DIR}/mouse.c
+    ${CMAKE_SOURCE_DIR}/drivers/ps2_mouse/mouse.c
 )
 
-set_source_files_properties(${CMAKE_SOURCE_DIR}/cJSON.c PROPERTIES COMPILE_FLAGS -Os)
+set_source_files_properties(${CMAKE_SOURCE_DIR}/third_party/cjson/cJSON.c PROPERTIES COMPILE_FLAGS -Os)
 
 # --- Per-port build config (Stage E2) -------------------------------------
 # WEB rp2040 — CYW43 polled stack, larger heap, no PICOMITE/PICOMITEVGA flag.

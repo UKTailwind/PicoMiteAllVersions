@@ -1,12 +1,12 @@
 #ifndef __VM_SYS_GRAPHICS_H
 #define __VM_SYS_GRAPHICS_H
 
-#include "gfx_box_shared.h"
-#include "gfx_circle_shared.h"
-#include "gfx_cls_shared.h"
-#include "gfx_line_shared.h"
-#include "gfx_pixel_shared.h"
-#include "gfx_text_shared.h"
+#include "shared/gfx/gfx_box_shared.h"
+#include "shared/gfx/gfx_circle_shared.h"
+#include "shared/gfx/gfx_cls_shared.h"
+#include "shared/gfx/gfx_line_shared.h"
+#include "shared/gfx/gfx_pixel_shared.h"
+#include "shared/gfx/gfx_text_shared.h"
 
 void vm_sys_graphics_reset(void);
 void vm_sys_graphics_service(void);

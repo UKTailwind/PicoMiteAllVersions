@@ -15,6 +15,15 @@ HOST_DIR  := $(REPO_ROOT)/ports/host_native
 PICO_COMPAT_DIR := $(REPO_ROOT)/ports/pico_sdk_compat
 SIM_VM_DIR := $(REPO_ROOT)/ports/vm_sys_sim
 BUILD_DIR := $(PORT_DIR)/build
+THIRD_PARTY_CFLAGS := -I$(REPO_ROOT)/third_party/aes \
+                      -I$(REPO_ROOT)/third_party/cjson \
+                      -I$(REPO_ROOT)/third_party/dr_libs \
+                      -I$(REPO_ROOT)/third_party/fatfs \
+                      -I$(REPO_ROOT)/third_party/hxcmod \
+                      -I$(REPO_ROOT)/third_party/littlefs \
+                      -I$(REPO_ROOT)/third_party/picojpeg \
+                      -I$(REPO_ROOT)/third_party/regex \
+                      -I$(REPO_ROOT)/third_party/upng
 
 # Compiler-table sizes come from ports/mmbasic_ansi/port_config.h
 # (which pulls in ports/bc_tables_rp2350.h).  No build-flag dispatch.
@@ -24,31 +33,32 @@ CFLAGS = -std=gnu11 -g -O2 -Wall -Wno-unused-variable -Wno-unused-function \
          -Wno-missing-braces -funsigned-char \
          -DMMBASIC_HOST -DMMBASIC_ANSI -DFF_MAX_LFN_LARGE \
          -include host_platform.h \
-         -I$(PORT_DIR) -I$(HOST_DIR) -I$(PICO_COMPAT_DIR) -I$(REPO_ROOT) \
+         $(THIRD_PARTY_CFLAGS) \
+         -I$(PORT_DIR) -I$(HOST_DIR) -I$(PICO_COMPAT_DIR) -I$(REPO_ROOT)/core/mmbasic -I$(REPO_ROOT)/runtime/vm -I$(REPO_ROOT)/shared/gfx -I$(REPO_ROOT)/shared/audio -I$(REPO_ROOT)/shared/mmbasic -I$(REPO_ROOT)/drivers/bmp_decoder -I$(REPO_ROOT)/drivers/gps -I$(REPO_ROOT)/drivers/gui_controls -I$(REPO_ROOT)/drivers/gui_touch -I$(REPO_ROOT)/drivers/i2c_bus -I$(REPO_ROOT)/drivers/onewire -I$(REPO_ROOT)/drivers/psram_heap -I$(REPO_ROOT)/drivers/serial -I$(REPO_ROOT)/drivers/spi_bus -I$(REPO_ROOT)/drivers/spi_lcd -I$(REPO_ROOT)/drivers/ssd1963 -I$(REPO_ROOT) \
          -MMD -MP
 
 LDFLAGS = -lm -lpthread
 
-# Core MMBasic (same list as host_native — keeps Editor.c + REPL + Prompt
+# Core MMBasic (same list as host_native — keeps core/mmbasic/Editor.c + REPL + Prompt
 # so the interactive REPL and EDIT both work).
-CORE_SRCS = MMBasic.c Commands.c Functions.c Operators.c MATHS.c Memory.c Editor.c MMBasic_Prompt.c MMBasic_Print.c MMBasic_REPL.c
-CORE_SRCS += gfx_box_shared.c gfx_circle_shared.c gfx_line_shared.c gfx_pixel_shared.c gfx_cls_shared.c gfx_text_shared.c gfx_console_shared.c
-CORE_SRCS += mm_misc_shared.c OptionCommands.c
+CORE_SRCS = core/mmbasic/MMBasic.c core/mmbasic/Commands.c core/mmbasic/Functions.c core/mmbasic/Operators.c core/mmbasic/MATHS.c core/mmbasic/Memory.c core/mmbasic/Editor.c core/mmbasic/MMBasic_Prompt.c core/mmbasic/MMBasic_Print.c core/mmbasic/MMBasic_REPL.c
+CORE_SRCS += shared/gfx/gfx_box_shared.c shared/gfx/gfx_circle_shared.c shared/gfx/gfx_line_shared.c shared/gfx/gfx_pixel_shared.c shared/gfx/gfx_cls_shared.c shared/gfx/gfx_text_shared.c shared/gfx/gfx_console_shared.c
+CORE_SRCS += shared/mmbasic/mm_misc_shared.c core/mmbasic/OptionCommands.c
 CORE_SRCS += display_state.c pin_state.c option_state.c audio_state.c
 CORE_SRCS += mm_net_interrupts.c
 CORE_SRCS += mm_net_http.c
 CORE_SRCS += mm_net_ntp.c
 CORE_SRCS += mm_net_telnet_rx.c
 CORE_SRCS += mm_net_state.c
-CORE_SRCS += Draw.c RGB121.c Tilemap.c FileIO.c Audio.c BmpDecoder.c re.c picojpeg.c
+CORE_SRCS += core/mmbasic/Draw.c shared/gfx/RGB121.c shared/gfx/Tilemap.c core/mmbasic/FileIO.c shared/audio/Audio.c drivers/bmp_decoder/BmpDecoder.c third_party/regex/re.c third_party/picojpeg/picojpeg.c
 CORE_SRCS += audio_mp3_stub.c spi_lcd_mem332_stub.c display_merge_stub.c vga_ops_stub.c
 CORE_SRCS += gfx_3d.c upng_sprite_stub.c gui_touch_stub.c gui_controls_stub.c psram_heap_stub.c hal_psram_stub.c i2c_keypad_stub.c heartbeat_stub.c
 CORE_SRCS += editor_console_stub.c
 CORE_SRCS += display_pixel_host.c
 
-BC_SRCS = bc_alloc.c bc_bridge.c vm_host_fat.c ff.c ffunicode.c ffsystem.c \
-          vm_sys_input.c vm_sys_graphics.c vm_sys_time.c vm_sys_pin_sim.c vm_sys_file_sim.c \
-          bc_source.c bc_compiler_core.c bc_vm.c bc_runtime.c bc_debug.c
+BC_SRCS = runtime/vm/bc_alloc.c runtime/vm/bc_bridge.c runtime/vm/vm_host_fat.c third_party/fatfs/ff.c third_party/fatfs/ffunicode.c third_party/fatfs/ffsystem.c \
+          runtime/vm/vm_sys_input.c runtime/vm/vm_sys_graphics.c runtime/vm/vm_sys_time.c vm_sys_pin_sim.c vm_sys_file_sim.c \
+          runtime/vm/bc_source.c runtime/vm/bc_compiler_core.c runtime/vm/bc_vm.c runtime/vm/bc_runtime.c runtime/vm/bc_debug.c
 
 # host_native sources reused wholesale. Omit host_main.c (we supply our
 # own entry); host_fastgfx.c ships the cmd_fastgfx / cmd_framebuffer /
@@ -88,6 +98,10 @@ $(BUILD_DIR)/%.o: $(SIM_VM_DIR)/%.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 $(BUILD_DIR)/%.o: $(REPO_ROOT)/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/third_party/%.o: $(REPO_ROOT)/third_party/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c -o $@ $<
 

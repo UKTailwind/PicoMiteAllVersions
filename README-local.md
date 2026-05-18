@@ -13,6 +13,11 @@ The script rewrites `CMakeLists.txt`'s active `set(COMPILE …)` line in-place p
 
 Flashing: with the device in BOOTSEL mode, `cp build/PicoMite.uf2 /Volumes/RPI-RP2/` (macOS). The board auto-reboots once the copy completes.
 
+## Local helper scripts
+- `./tools/validate_all.sh` — full local pre-commit gate.
+- `./tools/flash.sh` — build and flash the default RP2350 firmware with `picotool`.
+- `./tools/bisect_tilemap.sh` — helper for bisecting the WASM tilemap regression.
+
 ## Host oracle / VM harness
 - `make -C host`
 - `./host/run_tests.sh` — primary gate, runs every test through both interpreter and VM and compares output.
@@ -33,4 +38,3 @@ Host binary: `host/mmbasic_test`. If the host build links against stale command-
 - Symptom: linking failed with `.heap` not fitting in `RAM` (`region 'RAM' overflowed by 20 bytes`) on rp2040 variants.
 - Cause: rp2040 builds used `-DPICO_HEAP_SIZE=0x1000`, and the final layout exceeded the 256 KB RAM window by 20 bytes.
 - Fix: `CMakeLists.txt` sets `PICOMITE_HEAP_SIZE` to `0x0fe0` for rp2040 (keeps `0x1000` elsewhere) and passes it via `-DPICO_HEAP_SIZE=${PICOMITE_HEAP_SIZE}`.
-

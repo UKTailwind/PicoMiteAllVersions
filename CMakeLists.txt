@@ -75,90 +75,90 @@ else()
         set(PICO_BOARD pico)
     endif()
 endif()
-include(pico_sdk_import.cmake)
+include(cmake/pico_sdk_import.cmake)
 project(PicoMite C CXX ASM)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 #set(PICO_NO_COPRO_DIS 1)
 pico_sdk_init()
 set(PICOMITE_BASE_COMMON_SOURCES
-	regex.c
-	re.c
-	ff.c
-	ffsystem.c
-	ffunicode.c
+	third_party/regex/regex.c
+	third_party/regex/re.c
+	third_party/fatfs/ff.c
+	third_party/fatfs/ffsystem.c
+	third_party/fatfs/ffunicode.c
 	drivers/sd_spi/mmc_stm32.c
-	picojpeg.c
-	lfs.c
-	lfs_util.c
-	hxcmod.c
-	aes.c
+	third_party/picojpeg/picojpeg.c
+	third_party/littlefs/lfs.c
+	third_party/littlefs/lfs_util.c
+	third_party/hxcmod/hxcmod.c
+	third_party/aes/aes.c
 )
 
 set(PICOMITE_BASE_SOURCES
 	${PICOMITE_BASE_COMMON_SOURCES}
-	PicoMite.c
-	MMBasic_Prompt.c
-	MMBasic_Print.c
-	MMBasic_REPL.c
+	ports/pico_sdk_common/PicoMite.c
+	core/mmbasic/MMBasic_Prompt.c
+	core/mmbasic/MMBasic_Print.c
+	core/mmbasic/MMBasic_REPL.c
 	drivers/vs1053/VS1053.c
-	Memory.c
+	core/mmbasic/Memory.c
 )
 
 set(PICOMITE_VM_DEVICE_SOURCES
-	vm_device_runtime.c
-	vm_device_main.c
-	vm_device_fileio.c
+	runtime/vm/vm_device_runtime.c
+	runtime/vm/vm_device_main.c
+	runtime/vm/vm_device_fileio.c
 )
 
 set(PICOMITE_LEGACY_CORE_SOURCES
-	MMBasic.c
-	Operators.c
-	Custom.c
-	Functions.c
-	Commands.c
-	FileIO.c
-	Draw.c
-	RGB121.c
-	Tilemap.c
-	Editor.c
-	XModem.c
-	MM_Misc.c
-	mm_misc_shared.c
+	core/mmbasic/MMBasic.c
+	core/mmbasic/Operators.c
+	core/mmbasic/Custom.c
+	core/mmbasic/Functions.c
+	core/mmbasic/Commands.c
+	core/mmbasic/FileIO.c
+	core/mmbasic/Draw.c
+	shared/gfx/RGB121.c
+	shared/gfx/Tilemap.c
+	core/mmbasic/Editor.c
+	core/mmbasic/XModem.c
+	core/mmbasic/MM_Misc.c
+	shared/mmbasic/mm_misc_shared.c
 	drivers/fs_lfs_fatfs/fs_lfs_fatfs_helpers.c
-	OptionCommands.c
-	cmd_ws2812_shared.c
-	External.c
-	MATHS.c
-	Onewire.c
-	I2C.c
-	SPI.c
-	Serial.c
+	core/mmbasic/OptionCommands.c
+	shared/cmd_ws2812_shared.c
+	core/mmbasic/External.c
+	core/mmbasic/MATHS.c
+	drivers/onewire/Onewire.c
+	drivers/i2c_bus/I2C.c
+	drivers/spi_bus/SPI.c
+	drivers/serial/Serial.c
 	drivers/spi_lcd/spi_lcd.c
-	BmpDecoder.c
-	GPS.c
-	CFunction.c
+	drivers/bmp_decoder/BmpDecoder.c
+	drivers/gps/GPS.c
+	core/mmbasic/CFunction.c
 )
 
 # Audio: device body lives in drivers/pwm_synth/pwm_synth.c (PWM/PIO
-# tones, WAV/FLAC/MP3/MOD decoders, VS1053 glue). Audio.c itself holds
+# tones, WAV/FLAC/MP3/MOD decoders, VS1053 glue). shared/audio/Audio.c itself holds
 # only the host cmd_play and compiles on host builds via host/Makefile.
 set(PICOMITE_AUDIO_DEVICE_SOURCES
 	drivers/pwm_synth/pwm_synth.c
 )
 
 set(PICOMITE_VM_SHARED_GFX_SOURCES
-	gfx_box_shared.c
-	gfx_circle_shared.c
-	gfx_line_shared.c
-	gfx_pixel_shared.c
-	gfx_cls_shared.c
-	gfx_text_shared.c
-	gfx_console_shared.c
+	shared/gfx/gfx_box_shared.c
+	shared/gfx/gfx_circle_shared.c
+	shared/gfx/gfx_line_shared.c
+	shared/gfx/gfx_pixel_shared.c
+	shared/gfx/gfx_cls_shared.c
+	shared/gfx/gfx_text_shared.c
+	shared/gfx/gfx_console_shared.c
 )
 
 # Cross-cutting state (display, pin, Option, audio globals) shared across
-# Draw.c / External.c / FileIO.c / Audio.c. Consolidating storage here lets
+# core/mmbasic/Draw.c / core/mmbasic/External.c / core/mmbasic/FileIO.c / shared/audio/Audio.c. Consolidating storage here lets
 # per-driver source files coexist without multiple-definition link errors.
 set(PICOMITE_CORE_STATE_SOURCES
 	core/state/display_state.c
@@ -219,18 +219,18 @@ set(PICOMITE_PICO_SDK_HAL_SOURCES
 )
 
 set(PICOMITE_VM_SOURCES
-	bc_alloc.c
-	bc_bridge.c
-	bc_source.c
-	bc_compiler_core.c
-	bc_vm.c
-	bc_runtime.c
-	bc_debug.c
-	vm_sys_input.c
-	vm_sys_graphics.c
-	vm_sys_time.c
-	vm_sys_pin.c
-	vm_sys_file.c
+	runtime/vm/bc_alloc.c
+	runtime/vm/bc_bridge.c
+	runtime/vm/bc_source.c
+	runtime/vm/bc_compiler_core.c
+	runtime/vm/bc_vm.c
+	runtime/vm/bc_runtime.c
+	runtime/vm/bc_debug.c
+	runtime/vm/vm_sys_input.c
+	runtime/vm/vm_sys_graphics.c
+	runtime/vm/vm_sys_time.c
+	runtime/vm/vm_sys_pin.c
+	runtime/vm/vm_sys_file.c
 	${PICOMITE_VM_SHARED_GFX_SOURCES}
 )
 
@@ -254,10 +254,39 @@ target_sources(PicoMite PRIVATE
 	runtime/runtime_filesystem_defaults.c
 	drivers/calendar/calendar_bare.c
 )
-# The project's headers (MMBasic_Includes.h, Draw.h, etc.) live in the
-# repo root. Sources in subdirectories (core/state/, future hal/ + drivers/
-# + ports/) need the root on the include path so their #includes resolve.
+# Project headers are split across core/mmbasic, runtime, shared,
+# drivers, third_party, and port directories. Keep the repository root
+# available for prefixed includes such as "hal/..." and "drivers/...".
 target_include_directories(PicoMite PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(PicoMite PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/core/mmbasic)
+target_include_directories(PicoMite PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/runtime/vm)
+target_include_directories(PicoMite PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/shared/gfx)
+target_include_directories(PicoMite PRIVATE
+	${CMAKE_CURRENT_SOURCE_DIR}/shared/audio
+	${CMAKE_CURRENT_SOURCE_DIR}/shared/mmbasic
+	${CMAKE_CURRENT_SOURCE_DIR}/drivers/bmp_decoder
+	${CMAKE_CURRENT_SOURCE_DIR}/drivers/gps
+	${CMAKE_CURRENT_SOURCE_DIR}/drivers/gui_controls
+	${CMAKE_CURRENT_SOURCE_DIR}/drivers/gui_touch
+	${CMAKE_CURRENT_SOURCE_DIR}/drivers/i2c_bus
+	${CMAKE_CURRENT_SOURCE_DIR}/drivers/onewire
+	${CMAKE_CURRENT_SOURCE_DIR}/drivers/psram_heap
+	${CMAKE_CURRENT_SOURCE_DIR}/drivers/serial
+	${CMAKE_CURRENT_SOURCE_DIR}/drivers/spi_bus
+	${CMAKE_CURRENT_SOURCE_DIR}/drivers/spi_lcd
+	${CMAKE_CURRENT_SOURCE_DIR}/drivers/ssd1963
+)
+target_include_directories(PicoMite PRIVATE
+	${CMAKE_CURRENT_SOURCE_DIR}/third_party/aes
+	${CMAKE_CURRENT_SOURCE_DIR}/third_party/cjson
+	${CMAKE_CURRENT_SOURCE_DIR}/third_party/dr_libs
+	${CMAKE_CURRENT_SOURCE_DIR}/third_party/fatfs
+	${CMAKE_CURRENT_SOURCE_DIR}/third_party/hxcmod
+	${CMAKE_CURRENT_SOURCE_DIR}/third_party/littlefs
+	${CMAKE_CURRENT_SOURCE_DIR}/third_party/picojpeg
+	${CMAKE_CURRENT_SOURCE_DIR}/third_party/regex
+	${CMAKE_CURRENT_SOURCE_DIR}/third_party/upng
+)
 # ports/pico_sdk_common/ supplies port-specific Tier-B inline headers
 # (hal_pin_inlines.h) that hal/*.h pulls in via a plain "" include.
 target_include_directories(PicoMite PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/ports/pico_sdk_common)
@@ -296,19 +325,19 @@ else()
 endif()
 
 set_source_files_properties(drivers/sd_spi/mmc_stm32.c PROPERTIES COMPILE_FLAGS -O2)
-set_source_files_properties(ff.c PROPERTIES COMPILE_FLAGS -Os)
-set_source_files_properties(GUI.c PROPERTIES COMPILE_FLAGS -Os)
-set_source_files_properties(BmpDecoder.c PROPERTIES COMPILE_FLAGS -Os)
-set_source_files_properties(GPS.c PROPERTIES COMPILE_FLAGS -Os)
-set_source_files_properties(I2C.c PROPERTIES COMPILE_FLAGS -Os)
-set_source_files_properties(lfs.c PROPERTIES COMPILE_FLAGS -Os)
-set_source_files_properties(picojpeg.c PROPERTIES COMPILE_FLAGS -Os)
-set_source_files_properties(regex.c PROPERTIES COMPILE_FLAGS -Os)
-set_source_files_properties(hxcmod.c PROPERTIES COMPILE_FLAGS -Os)
-set_source_files_properties(MATHS.c PROPERTIES COMPILE_FLAGS -Os)
-set_source_files_properties(Editor.c PROPERTIES COMPILE_FLAGS -Os)
-set_source_files_properties(aes.c PROPERTIES COMPILE_FLAGS -Os)
-pico_generate_pio_header(PicoMite ${CMAKE_CURRENT_LIST_DIR}/PicoMiteI2S.pio)
+set_source_files_properties(third_party/fatfs/ff.c PROPERTIES COMPILE_FLAGS -Os)
+set_source_files_properties(${CMAKE_SOURCE_DIR}/drivers/gui_controls/GUI.c PROPERTIES COMPILE_FLAGS -Os)
+set_source_files_properties(${CMAKE_SOURCE_DIR}/drivers/bmp_decoder/BmpDecoder.c PROPERTIES COMPILE_FLAGS -Os)
+set_source_files_properties(${CMAKE_SOURCE_DIR}/drivers/gps/GPS.c PROPERTIES COMPILE_FLAGS -Os)
+set_source_files_properties(${CMAKE_SOURCE_DIR}/drivers/i2c_bus/I2C.c PROPERTIES COMPILE_FLAGS -Os)
+set_source_files_properties(third_party/littlefs/lfs.c PROPERTIES COMPILE_FLAGS -Os)
+set_source_files_properties(third_party/picojpeg/picojpeg.c PROPERTIES COMPILE_FLAGS -Os)
+set_source_files_properties(third_party/regex/regex.c PROPERTIES COMPILE_FLAGS -Os)
+set_source_files_properties(third_party/hxcmod/hxcmod.c PROPERTIES COMPILE_FLAGS -Os)
+set_source_files_properties(core/mmbasic/MATHS.c PROPERTIES COMPILE_FLAGS -Os)
+set_source_files_properties(core/mmbasic/Editor.c PROPERTIES COMPILE_FLAGS -Os)
+set_source_files_properties(third_party/aes/aes.c PROPERTIES COMPILE_FLAGS -Os)
+pico_generate_pio_header(PicoMite ${CMAKE_CURRENT_LIST_DIR}/drivers/pio/PicoMiteI2S.pio)
 
 pico_enable_stdio_uart(PicoMite 0)
 pico_add_extra_outputs(PicoMite)
@@ -341,7 +370,7 @@ target_compile_options(PicoMite PRIVATE -DNDEBUG
 #                                           register instead of driving
 #                                           a PWM slice.
 #   drivers/i2c_picocalc_kbd/i2ckbd.c    — linked above when PICOCALC=true.
-# configuration.h still consults the CMake-level PICOCALC name for the
+# core/mmbasic/configuration.h still consults the CMake-level PICOCALC name for the
 # heap-size override (HAL_PORT_HEAP_MEMORY_SIZE_PICOCALC) — that's a
 # legacy port-impl shim, kept for the dual-shipping ports/pico/.
 if(PICOCALC STREQUAL "true")

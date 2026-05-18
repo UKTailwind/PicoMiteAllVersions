@@ -54,7 +54,7 @@
 #include "hardware/pio_instructions.h"
 #include "dr_flac.h"
 #include "hxcmod.h"
-#include "VS1053.h"
+#include "drivers/vs1053/VS1053.h"
 extern BYTE MDD_SDSPI_CardDetectState(void);
 #define MAXALBUM 20
 extern int InitSDCard(void);

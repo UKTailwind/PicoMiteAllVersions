@@ -25,7 +25,7 @@ See [References](#references) for where things live.
 
 **Architecture / philosophy**
 - Reframed `host/` as **its own MMBasic port**, peer to PicoMite / Maximite / MMBasic-DOS / STM32H743, not "Pico for x86". See `memory/project_host_is_its_own_port.md`. When host/device diverge, the question isn't "make them match" — it's "is this the HAL (legitimate) or the core leaking into host-only code (extract to shared)?"
-- Extracted `DisplayPutC` / `GUIPrintChar` / `ShowCursor` from `Draw.c` → `gfx_console_shared.c`, shared by host and device. Driven by "why aren't we running device code as-is?"
+- Extracted `DisplayPutC` / `GUIPrintChar` / `ShowCursor` from `core/mmbasic/Draw.c` → `gfx_console_shared.c`, shared by host and device. Driven by "why aren't we running device code as-is?"
 - Confirmed **PicoMite is resolution-independent**: set `HRes`/`VRes` + framebuffer dims before first draw and everything else (Option.Width, clipping, console geometry) follows. See `memory/project_resolution_independent.md`.
 
 **Wire protocol v3 — command stream**
@@ -39,7 +39,7 @@ See [References](#references) for where things live.
 - `--resolution WxH` CLI option (default 320×320). Clamped to `[80×60, 2048×2048]`. Sets `HRes`/`VRes` + `host_fb_width`/`host_fb_height` before framebuffer allocation.
 - **1 ms tick thread** (`host_sim_tick_start`) mirrors device `timer_callback` (PicoMite.c:826): bumps `mSecTimer`, `CursorTimer`, `PauseTimer`, `Timer1..5`, `TickTimer[]`, `ScrewUpTimer`, etc. Makes PAUSE, TIMER, ON INTERRUPT TICK, and cursor blink work without per-hook patching.
 - `MMputchar` / `putConsole` / `SerialConsolePutC` now match device dispatch exactly. `SSPrintString` is serial-only (never hits `DisplayPutC`), so VT100 escapes stop polluting the framebuffer console.
-- `MMfputs` / `MMfputc` for `filenbr=0` route through `MMputchar` (matches `FileIO.c:3254/3386`), so PRINT output reaches both stdout *and* the framebuffer console.
+- `MMfputs` / `MMfputc` for `filenbr=0` route through `MMputchar` (matches `core/mmbasic/FileIO.c:3254/3386`), so PRINT output reaches both stdout *and* the framebuffer console.
 - `MMInkey` sleeps 1 ms when empty in `--sim` mode so the Editor poll loop doesn't pin a CPU.
 
 **Banner + terminal hygiene**
@@ -57,7 +57,7 @@ Browser-based desktop simulator for the PicoCalc/PicoMite. Same interpreter and 
 
 Design principles:
 - The interpreter and VM stay untouched. Even the device's main interactive loop stays where it is — we only redirect its inputs and outputs.
-- **Prefer wrapping over modifying existing MMBasic sources.** New behavior lives in `host/` as thin shims, hooks, and function overrides. Touch `MMBasic.c`, `PicoMite.c`, `Commands.c`, etc. only when there is no reasonable wrapper alternative, and keep any change minimal and local.
+- **Prefer wrapping over modifying existing MMBasic sources.** New behavior lives in `host/` as thin shims, hooks, and function overrides. Touch `core/mmbasic/MMBasic.c`, `PicoMite.c`, `core/mmbasic/Commands.c`, etc. only when there is no reasonable wrapper alternative, and keep any change minimal and local.
 - The framebuffer is the source of truth. Pixels stream out, key events stream in, audio is sent as commands.
 - The web frontend is a thin shell: receive pixels, draw to canvas, send keys back. No business logic in the browser.
 
@@ -104,7 +104,7 @@ The REPL renders into the framebuffer using the existing on-screen text renderer
 Delivered:
 
 - `./host/mmbasic_test --repl [--sd-root DIR]` enters an interactive MMBasic session. Default `sd-root` is cwd.
-- Uses the device's real `EditInputLine` (moved to `MMBasic_Prompt.c` — see below). UP/DOWN history, LEFT/RIGHT cursor edit, HOME/END, INSERT, F1–F12, TAB, backspace — all working on a real terminal via VT100 escape codes.
+- Uses the device's real `EditInputLine` (moved to `core/mmbasic/MMBasic_Prompt.c` — see below). UP/DOWN history, LEFT/RIGHT cursor edit, HOME/END, INSERT, F1–F12, TAB, backspace — all working on a real terminal via VT100 escape codes.
 - Terminal raw mode and escape-sequence decoding in `host/host_terminal.{c,h}`. Terminal size auto-detected via `TIOCGWINSZ`. Cooked-mode fallback when stdin is piped (CI / scripts still work).
 - `EDIT` runs over VT100 and calls through to the full device editor. F1 saves edits back to ProgMemory.
 - `LOAD "foo.bas"`, `SAVE "foo.bas"`, `FILES`, `RUN "foo.bas"`, `FRUN "foo.bas"` route through the host filesystem at `host_sd_root`. `cmd_save` detokenises via `llist()`. `cmd_files` uses POSIX `opendir`/`readdir` in `host/host_fs.{c,h}` (isolated because POSIX `DIR` collides with FatFS `DIR`).
@@ -116,9 +116,9 @@ Delivered:
 
 | New file | Contents | Notes |
 |---|---|---|
-| `MMBasic_Prompt.c` | `EditInputLine`, `InsertLastcmd`, `lastcmd[]`, `MMPromptPos` | Host + device share the same line editor |
-| `MMBasic_Print.c` | `PRet`/`PInt`/`PFlt`/`SRet`/`SInt`/`SIntComma`/… (12 print formatters) | Deleted 11 duplicate host stubs |
-| `MMBasic_REPL.c` | `MMBasic_RunPromptLoop()`, `commandtbl_decode`, `transform_star_command` | Host's `run_repl()` calls the same loop device's `main()` calls |
+| `core/mmbasic/MMBasic_Prompt.c` | `EditInputLine`, `InsertLastcmd`, `lastcmd[]`, `MMPromptPos` | Host + device share the same line editor |
+| `core/mmbasic/MMBasic_Print.c` | `PRet`/`PInt`/`PFlt`/`SRet`/`SInt`/`SIntComma`/… (12 print formatters) | Deleted 11 duplicate host stubs |
+| `core/mmbasic/MMBasic_REPL.c` | `MMBasic_RunPromptLoop()`, `commandtbl_decode`, `transform_star_command` | Host's `run_repl()` calls the same loop device's `main()` calls |
 
 PicoMite.c: 5065 → 4131 lines (−934). Both `CMakeLists.txt` and `CMakeLists 2350.txt` updated.
 
@@ -153,7 +153,7 @@ PicoMite.c: 5065 → 4131 lines (−934). Both `CMakeLists.txt` and `CMakeLists 
 ### Phase 2 — Keyboard input ✅ DONE
 
 Delivered:
-- `web/app.js` attaches `keydown`/`keyup` listeners, translates to PicoMite keycodes (device codes from `Editor.h`: `BKSP=0x08`, `ENTER=0x0d`, `ESC=0x1b`, `UP=0x80`, `DOWN=0x81`, `LEFT=0x82`, `RIGHT=0x83`, `HOME=0x86`, `END=0x87`, `INSERT=0x84`, `PGUP=0x88`, `PGDN=0x89`, `F1..F12=0x91..0x9c`, `Ctrl-<letter>` = 1..26), and sends `{op:"key", code}` as JSON over WS.
+- `web/app.js` attaches `keydown`/`keyup` listeners, translates to PicoMite keycodes (device codes from `core/mmbasic/Editor.h`: `BKSP=0x08`, `ENTER=0x0d`, `ESC=0x1b`, `UP=0x80`, `DOWN=0x81`, `LEFT=0x82`, `RIGHT=0x83`, `HOME=0x86`, `END=0x87`, `INSERT=0x84`, `PGUP=0x88`, `PGDN=0x89`, `F1..F12=0x91..0x9c`, `Ctrl-<letter>` = 1..26), and sends `{op:"key", code}` as JSON over WS.
 - Server parses JSON, drops byte into a pthread-mutex-protected key queue; `MMInkey` drains it in `--sim` mode.
 - **Held-key tracking by `ev.code` (physical key)** rather than `ev.key` (character) — fixes Shift+char sticky-key bug where `keydown` fires with `'"'` but `keyup` arrives with `"'"` (shift released first).
 - **Paced auto-repeat**: browser keydown auto-repeat (~30/s on macOS) is faster than device keyboard (~6/s). Simulator uses 150 ms initial delay, 70 ms interval (~14/s) via `setTimeout` chain. Games like `pico_blocks` paddle no longer overshoot.
@@ -165,7 +165,7 @@ Delivered:
 Delivered:
 
 - **`host/host_sim_audio.{c,h}`** — JSON event emitter. One thread-safe queue of JSON strings; producers are `cmd_play` (interpreter path) and `vm_sys_audio_play_tone/stop` (VM path); consumer is the Mongoose poll loop in `host_sim_server.c`, which pushes each string as a WebSocket TEXT frame to every client. In non-sim host builds all emitters compile as no-ops so `mmbasic_test` links unchanged.
-- **Real `cmd_play` on host** (replaces the Phase 0 stub in `host_stubs_legacy.c`). Handles `STOP / PAUSE / RESUME / CLOSE / VOLUME / TONE / SOUND`. Shares argument validation shape with `Audio.c` (same error messages for ranges / counts). `NEXT / PREVIOUS / LOAD SOUND` silently no-op; file-based forms (`WAV / FLAC / MP3 / MODFILE / …`) error out with "Unsupported on host".
+- **Real `cmd_play` on host** (replaces the Phase 0 stub in `host_stubs_legacy.c`). Handles `STOP / PAUSE / RESUME / CLOSE / VOLUME / TONE / SOUND`. Shares argument validation shape with `shared/audio/Audio.c` (same error messages for ranges / counts). `NEXT / PREVIOUS / LOAD SOUND` silently no-op; file-based forms (`WAV / FLAC / MP3 / MODFILE / …`) error out with "Unsupported on host".
 - **Wire protocol (server → client)** — JSON TEXT frames on the same `/ws` socket as the graphics CMDS:
   - `{op:"tone", l, r, ms?}` — ms omitted = play forever until next STOP/TONE; ms=0 is a no-op (matches device).
   - `{op:"sound", slot:1..4, ch:"L"|"R"|"B", type:"S|Q|T|W|O|P|N", f, vol:0..25}`.
@@ -263,9 +263,9 @@ gfx_pixel_shared.c           # DONE: shared with device
 gfx_cls_shared.c             # DONE: shared with device
 gfx_text_shared.c            # DONE: shared with device
 gfx_console_shared.c         # DONE: DisplayPutC / GUIPrintChar / ShowCursor, shared with device
-MMBasic_Prompt.c             # DONE: EditInputLine + lastcmd + MMPromptPos
-MMBasic_Print.c              # DONE: PRet/PInt/PFlt/...
-MMBasic_REPL.c               # DONE: MMBasic_RunPromptLoop() + helpers
+core/mmbasic/MMBasic_Prompt.c             # DONE: EditInputLine + lastcmd + MMPromptPos
+core/mmbasic/MMBasic_Print.c              # DONE: PRet/PInt/PFlt/...
+core/mmbasic/MMBasic_REPL.c               # DONE: MMBasic_RunPromptLoop() + helpers
 docs/
   simulator-plan.md          # this doc
   bridge-restoration-plan.md # separate (FRUN bridge work)
@@ -290,7 +290,7 @@ Notes from building Phase 0 that a fresh conversation should know before touchin
 - **`Option.DISPLAY_CONSOLE`** is currently 0 in the REPL (console text goes to terminal, not framebuffer). Phase 1 should decide: keep as-is (browser shows only graphics, terminal shows text), or set to 1 (browser shows a PicoCalc-faithful combined console+graphics). The plan says "framebuffer is source of truth" — argues for setting it to 1 in `--sim` mode.
 - **Piped-input mode** is handled separately from raw-mode in `host/host_terminal.c`. Phase 1's server is a third input source. Keep them orthogonal — the server path shouldn't go through `host_terminal.c` at all.
 - **Simulated flash is 256 KB** (`flash_prog_buf`); first half is program area, second half is CFunction/Font area (0xFF-filled). `load_basic_source` now erases the program area before writing; Phase 1 doesn't need to worry about this.
-- **`editactive` flag** is defined in `Editor.c` only under `#ifdef PICOMITEVGA`; host redefines it in `host_stubs_legacy.c`. Used by the REPL to gate Ctrl-D-exit. Phase 1's server may want to check it too if it intercepts keys.
+- **`editactive` flag** is defined in `core/mmbasic/Editor.c` only under `#ifdef PICOMITEVGA`; host redefines it in `host_stubs_legacy.c`. Used by the REPL to gate Ctrl-D-exit. Phase 1's server may want to check it too if it intercepts keys.
 - **`.claude/` and `build_rp2040/`** are gitignored-adjacent (the former is this session's local state, the latter is a build artifact). Don't commit either.
 
 ## Risks and unknowns (for Phase 1+)

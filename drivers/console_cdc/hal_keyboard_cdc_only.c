@@ -17,7 +17,7 @@
 #include "Hardware_Includes.h"
 #include "hal/hal_keyboard.h"
 #include "console_cdc.h"
-#include "PS2Keyboard.h"
+#include "drivers/ps2_matrix/PS2Keyboard.h"
 
 void hal_keyboard_service(void) { }
 

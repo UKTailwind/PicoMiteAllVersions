@@ -19,11 +19,11 @@
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 #include "bytecode.h"
-#include "gfx_pixel_shared.h"
+#include "shared/gfx/gfx_pixel_shared.h"
 #include "vm_sys_pin.h"
 #include "vm_sys_file.h"
 #include "vm_host_fat.h"
-/* font1.h defines `font1[]` inline — pulled in exclusively by Draw.c
+/* assets/fonts/font1.h defines `font1[]` inline — pulled in exclusively by Draw.c
  * now that FontTable initialisation lives there. */
 #include <ctype.h>
 #include <errno.h>
@@ -702,7 +702,7 @@ extern volatile BYTE SDCardStat;
 
 int port_mount_sd_drive(void)
 {
-    /* Host FatFS is vm_host_fat.c's in-memory disk (or the POSIX dir
+    /* Host FatFS is runtime/vm/vm_host_fat.c's in-memory disk (or the POSIX dir
      * walker when host_sd_root is set). No SPI/SD pins to validate —
      * just make sure the RAM disk is mounted. Also clear SDCardStat's
      * "no disk / not initialised" bits: they block fun_dir and other

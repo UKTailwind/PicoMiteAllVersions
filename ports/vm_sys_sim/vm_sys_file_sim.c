@@ -2,8 +2,8 @@
  * ports/vm_sys_sim/vm_sys_file_sim.c — simulator impl of the VM's file syscalls.
  *
  * Backs OPEN / CLOSE / INPUT / PRINT / LINE INPUT / EOF / CHR$ etc.
- * with the in-memory FAT simulator from ports/host_native/vm_host_fat.c.
- * Paired with vm_sys_file.c (device-side FatFS/LFS impl); the build
+ * with the in-memory FAT simulator from runtime/vm/vm_host_fat.c.
+ * Paired with runtime/vm/vm_sys_file.c (device-side FatFS/LFS impl); the build
  * links exactly one implementation body per target.
  *
  * Shared helpers (vm_file_line_append, vm_file_is_drive_spec,

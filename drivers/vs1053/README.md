@@ -21,15 +21,14 @@ conditionally at runtime based on `Option.AUDIO_MISO_PIN`. A Web build
 that sets the pin enables VS1053 playback; other builds leave it
 dormant.
 
-Header `VS1053.h` stays at repo root because it's the interface header
-read by `Audio.c`; same pattern as `drivers/sd_spi/` leaving `diskio.h`
-and `drivers/ps2_matrix/` leaving `PS2Keyboard.h` at repo root.
+Header `VS1053.h` now lives with this driver and is included through the
+explicit `drivers/vs1053/` path where audio and SD-SPI glue need it.
 
 ## Lifted from
 
 `VS1053.c` + `vs1053b-patches.h` (repo root, pre-Phase-6 refactor).
 No behavioural change — source relocated and the CMake reference
-updated. `VS1053.h` stayed at root.
+updated. `VS1053.h` has since moved into this driver directory.
 
 ## Future work
 

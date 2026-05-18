@@ -310,7 +310,7 @@ volume, DOS A:/B:/C: drive-letter routing).
 | `ports/esp32_s3_metro/main/esp32_cmd_files_hooks.c` | per-port copies removed; pointer comment only |
 | `ports/pc386/pc386_runtime.c:295-297, 326-331` | real DOS A:/B:/C: routing — deliberate override; doesn't link the shared TU |
 
-Gate: `validate_all.sh` green (host 244/244, mmbasic_stdio 8/8,
+Gate: `tools/validate_all.sh` green (host 244/244, mmbasic_stdio 8/8,
 mmbasic_ansi build clean, 14/14 device variants, RAM baseline holds);
 ESP32 build clean; `porttools/pico_console_smoke.py` 23/23 on both
 boards (PicoCalc + ESP32) plus `pico_fs_vm_smoke.py fs errors` /
@@ -344,19 +344,19 @@ What dissolved:
   `host_runtime.c`, `esp32_compat.c`, `pc386_runtime.c` — all retired.
 - `GPS.h`'s `extern time_t timegm(...)` / `extern struct tm *gmtime(...)`
   declarations — gone (they were the original const-trap).
-- `GPS.c`'s Pico-only hand-rolled `timegm` / `gmtime` / `gmtime_r`
+- `drivers/gps/GPS.c`'s Pico-only hand-rolled `timegm` / `gmtime` / `gmtime_r`
   bodies plus their supporting constants — moved into
   `drivers/calendar/calendar_bare.c` with int64-clean math.
 - ESP32's `esp32_compat.c::timegm` body — retired (it used `long`
   internally, overflowed past year 2038, **fixed as a free side effect
   of the unified bare driver**).
 
-Caller migration: 22 sites across `mm_misc_shared.c` (13),
-`GPS.c` (2), `MMntp.c` (1), `vm_sys_time_pico.c`,
+Caller migration: 22 sites across `shared/mmbasic/mm_misc_shared.c` (13),
+`drivers/gps/GPS.c` (2), `shared/net/MMntp.c` (1), `vm_sys_time_pico.c`,
 `esp32_default_hooks.c`, `esp32_ntp.c`, `host_web.c`,
 `host_wasm_web.c` — all now call `hal_calendar_*`.
 
-Gate: `validate_all.sh` green (host 244/244, mmbasic_stdio **9/9**
+Gate: `tools/validate_all.sh` green (host 244/244, mmbasic_stdio **9/9**
 including the new `09_datetime.bas` regression test, mmbasic_ansi
 build clean, 14/14 device variants, RAM baseline holds); ESP32 build
 clean; **WASM build clean** (emcc); both boards pass the new
@@ -446,7 +446,7 @@ declarations in `Hardware_Includes.h`.
 | `ports/host_native/host_runtime.c:626, :655` | per-port copies removed; pointer comments only |
 | `ports/pc386/pc386_runtime.c:243-244` | per-port copies removed; pointer comment only |
 
-Gate: `validate_all.sh` green (host 244/244, mmbasic_stdio 8/8,
+Gate: `tools/validate_all.sh` green (host 244/244, mmbasic_stdio 8/8,
 mmbasic_ansi build clean, 14/14 device variants, RAM baseline holds);
 ESP32 build clean; `porttools/pico_console_smoke.py` 23/23 +
 `porttools/pico_input_smoke.py` 21/21 on both PicoCalc (WebMite
@@ -480,11 +480,11 @@ Status: **done** · Risk: **HIGH (resolved — buggy Pico parser replaced
 with canonical 5-state machine)**
 
 The three RFC 854 inbound parsers
-(`MMtelnet.c:pico_telnet_receive_bytes`,
+(`shared/net/MMtelnet.c:pico_telnet_receive_bytes`,
 `esp32_telnet.c:esp32_telnet_receive_bytes`,
 `host_web.c:host_telnet_receive_bytes`) handle the same protocol with
 different code. Pico is buggy — drops the entire TCP segment if it
-starts with IAC (`MMtelnet.c:115`), losing keystrokes that arrive in
+starts with IAC (`shared/net/MMtelnet.c:115`), losing keystrokes that arrive in
 the same segment as a negotiation reply. ESP32 and host both
 implement the correct 5-state machine (DATA / IAC / OPT / SB / SB_IAC).
 

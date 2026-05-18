@@ -550,10 +550,10 @@ void cmd_frun(void) {
     fname_buf[STRINGSIZE - 5] = '\0';
     if (!strchr(fname_buf, '.')) strcat(fname_buf, ".bas");
 
-    /* Clear variables left over from a previous run.  Bridged DIMs go
-     * through cmd_dim which errors "already declared" on a re-run if
-     * the prior g_vartbl entries persist. */
-    ClearVars(0, true);
+    /* Match RUN's clean execution state.  FRUN compiles source through
+     * the interpreter bridge, so stale prompt/program options such as
+     * OPTION EXPLICIT must not leak into the next file. */
+    ClearRuntime(true);
 
     char *source = bc_load_source_via_hal(fname_buf);
     bc_run_source_string(source, fname_buf);

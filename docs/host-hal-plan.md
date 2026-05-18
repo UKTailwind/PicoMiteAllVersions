@@ -1,6 +1,6 @@
 # Host HAL Plan
 
-Collapse the host port into a clean hardware-abstraction layer so the host build re-uses the original MMBasic source (`Draw.c`, `FileIO.c`, `Audio.c`, `MM_Misc.c`, REPL) instead of re-implementing command handlers in `host/host_stubs_legacy.c`.
+Collapse the host port into a clean hardware-abstraction layer so the host build re-uses the original MMBasic source (`Draw.c`, `FileIO.c`, `shared/audio/Audio.c`, `MM_Misc.c`, REPL) instead of re-implementing command handlers in `host/host_stubs_legacy.c`.
 
 - **Branch:** `host-hal-refactor` (off `bridge-restoration`).
 - **Predecessor plan:** [`bridge-restoration-plan.md`](bridge-restoration-plan.md). The bridge restoration landed the invariant that the interpreter is the primary runtime and the VM is a performance backend behind `FRUN`. This plan builds on that invariant — it does not revisit the VM/interpreter split.
@@ -14,13 +14,13 @@ Collapse the host port into a clean hardware-abstraction layer so the host build
 
 ## Problem statement
 
-The host Makefile excludes `Draw.c`, `FileIO.c`, `Audio.c`, `MM_Misc.c`, `GUI.c`, `PicoMite.c`, and all peripheral drivers from `CORE_SRCS`. To plug the gap, `host/host_stubs_legacy.c` (3,549 lines) defines 105 `cmd_*` and 37 `fun_*` entries. Roughly 90 of those are legitimate no-op stubs for hardware-only commands (`cmd_adc`, `cmd_i2c`, `cmd_pwm`, ...). The remainder are **divergent re-implementations** of interpreter command handlers:
+The host Makefile excludes `Draw.c`, `FileIO.c`, `shared/audio/Audio.c`, `MM_Misc.c`, `drivers/gui_controls/GUI.c`, `PicoMite.c`, and all peripheral drivers from `CORE_SRCS`. To plug the gap, `host/host_stubs_legacy.c` (3,549 lines) defines 105 `cmd_*` and 37 `fun_*` entries. Roughly 90 of those are legitimate no-op stubs for hardware-only commands (`cmd_adc`, `cmd_i2c`, `cmd_pwm`, ...). The remainder are **divergent re-implementations** of interpreter command handlers:
 
 | Area | Duplicated host entries | Shared equivalent |
 |---|---|---|
 | Graphics | `cmd_box`, `cmd_circle`, `cmd_line`, `cmd_pixel`, `cmd_text`, `cmd_triangle`, `cmd_polygon` | `Draw.c` (via `gfx_*_shared.c`) |
 | File I/O | `cmd_load`, `cmd_save`, `cmd_open`, `cmd_copy`, `cmd_seek`, `FileLoadProgram` | `FileIO.c` |
-| Audio | `cmd_play` | `Audio.c` |
+| Audio | `cmd_play` | `shared/audio/Audio.c` |
 
 These duplicates skip the vector/array paths, differ in error-reporting, and must be hand-mirrored every time the shared version changes. They exist purely because the core files won't compile on host today.
 
@@ -33,11 +33,12 @@ The VM is **not** the reason. `cmd_box` is never reached from VM dispatch — `O
 │                   Shared core (unchanged)                   │
 │  MMBasic.c, Commands.c, Functions.c, Operators.c, …         │
 │  MMBasic_REPL.c, MMBasic_Prompt.c, Editor.c                 │
-│  bc_source.c, bc_vm.c, bc_runtime.c, vm_sys_*.c             │
+│  runtime/vm/bc_source.c, runtime/vm/bc_vm.c,                │
+│  runtime/vm/bc_runtime.c, runtime/vm/vm_sys_*.c             │
 │  gfx_*_shared.c                                             │
 ├─────────────────────────────────────────────────────────────┤
 │     Shared interpreter commands (compile on both)           │
-│  Draw.c  │ FileIO.c │ Audio.c │ MM_Misc.c  (portions)       │
+│  Draw.c  │ FileIO.c │ shared/audio/Audio.c │ MM_Misc.c  (portions)       │
 │     — hardware touchpoints gated by #ifdef MMBASIC_HOST     │
 │     — gated branches call into HAL                          │
 ├─────────────────────────────────────────────────────────────┤
@@ -102,7 +103,7 @@ Each phase ends with a green host build, green device build, and a commit. No ph
   - `Draw.c` — 73 hits on `frameBufferMutex|mutex_enter|mutex_exit|dma_channel|...`
   - `FileIO.c` — 1 hit (frameBufferMutex extern at line 58)
   - `MM_Misc.c` — 18 hits
-  - `Audio.c` — 0 direct peripheral hits (Audio uses DMA indirectly through helpers)
+  - `shared/audio/Audio.c` — 0 direct peripheral hits (Audio uses DMA indirectly through helpers)
 - Produce a dependency map: each shared file → list of device-only symbols it references.
 - Decide per-symbol: (a) stub in `host/hardware/*.h` (done already for most pico-sdk headers), (b) HAL call, (c) leave behind `#ifdef`.
 
@@ -127,7 +128,7 @@ Host stubs already defined in `host_stubs_legacy.c` for every `cmd_*`/`fun_*` th
 - `rp2350` mmap/psmap page-table blocks (5+) — device-only.
 - Per-handler: `cmd_open`, `cmd_close`, `cmd_seek`, `cmd_flush`, `fun_loc`/`lof`/`eof`/`inputstr`, `cmd_chdir`, `fun_cwd`, `fun_dir` all portable as-is; `cmd_autosave` has a dual path (flash save + file — gate flash branch); `cmd_LoadImage` / `cmd_LoadJPGImage` need device display output wrapped.
 
-**Audio.c (2,177 lines).** Hardware-bound — minimal portable surface. `cmd_play` (1037-1900) is the only command and it depends end-to-end on PWM (21 calls) / PIO (1) / flash. Strategy: HAL wraps `StartAudio`/`StopAudio`/DMA-buffer fill; on host, route to existing `host_sim_audio.c` PCM API. `iconvert`/`i2sconvert` are `__not_in_flash_func` but pure compute — portable.
+**shared/audio/Audio.c (2,177 lines).** Hardware-bound — minimal portable surface. `cmd_play` (1037-1900) is the only command and it depends end-to-end on PWM (21 calls) / PIO (1) / flash. Strategy: HAL wraps `StartAudio`/`StopAudio`/DMA-buffer fill; on host, route to existing `host_sim_audio.c` PCM API. `iconvert`/`i2sconvert` are `__not_in_flash_func` but pure compute — portable.
 
 **MM_Misc.c (6,474 lines).** Mix of portable + hardware-bound. Portable: `cmd_sort`, `cmd_longString` + friends (`fun_LGetStr`, `fun_LGetByte`, etc.), `fun_format`, date/time (`cmd_date`/`fun_date`/`cmd_time`/`fun_time`/`fun_day`/`fun_datetime`/`fun_epoch` — all once `time_us_64()` is HAL-routed), `cmd_pause` (busy loop → host sleep), `cmd_poke`/`fun_peek` (host: restricted address range). Device-only: `cmd_settick`, `cmd_watchdog`, `fun_restart`, `cmd_csubinterrupt`, `cmd_ireturn`, INT1-INT4 GPIO setup (`gpio_set_irq_enabled` ×8 at 4602-4619), `cmd_cpu`, `fun_device`. Preprocessor: `PICOMITEVGA` (VGA recovery), `rp2350` (PRNG/mmap), `PICOCALC` (I2C keyboard), `USBKEYBOARD`.
 
@@ -174,7 +175,7 @@ Draw.c now compiles, links, and runs on host. Commits: `2749d38` (shim infrastru
 
 **Stubs added** (for symbols Draw.c references that aren't in the host build):
 - `display_details[1]` — one zero-filled entry so the `InitDisplayVirtual` static init links; host never indexes past DISP_USER.
-- `BDEC_bReadHeader`, `BMP_bDecode_memory` — BMP decoder error stubs; BmpDecoder.c isn't in the host build yet.
+- `BDEC_bReadHeader`, `BMP_bDecode_memory` — BMP decoder error stubs; drivers/bmp_decoder/BmpDecoder.c isn't in the host build yet.
 
 **Correctness fixes that fell out of running real graphics programs through Draw.c:**
 - `host_fb_draw_rectangle` was decrementing x2/y2 with a (wrong) comment claiming device `DrawRectangle` has exclusive `[x1,x2)` semantics. Device `DrawRectangle16` / `DrawRectangleSPISCR` / etc. use `for (y=y1; y<=y2; y++)` (inclusive). The bogus decrement caused RUN-vs-FRUN pixel drift on `BOX` / `RBOX` and a 1-pixel-L ghost behind destroyed bricks in pico_blocks (the erase rect missed the right+bottom pixels that the outline rect had drawn). Removed the decrement; interp and VM now render byte-identical for `demo_gfx_shapes.bas`.
@@ -399,22 +400,22 @@ bridging):
 - Device build: not re-verified here (all new host regions use `#ifdef
   MMBASIC_HOST`; the device `#else` / default paths are unchanged).
 
-### Phase 4 — `Audio.c` compiles on host — ✅ DONE (2026-04-17)
+### Phase 4 — `shared/audio/Audio.c` compiles on host — ✅ DONE (2026-04-17)
 
-Scope correction from the original plan: `Audio.c` is *not* HAL-clean.
+Scope correction from the original plan: `shared/audio/Audio.c` is *not* HAL-clean.
 Grep turned up 31 direct hardware calls (PWM×21, flash×2, PIO×1) plus
 heavy dependencies on single-header decoder libs (`dr_wav`, `dr_flac`,
 `dr_mp3`, `hxcmod`) and the VS1053 driver. Making all of that compile on
 host would be a multi-week refactor with no runtime value — the sim's
 audio backend is WebAudio, not a DMA ring buffer.
 
-**Approach taken: file-level split inside `Audio.c` instead of per-function
+**Approach taken: file-level split inside `shared/audio/Audio.c` instead of per-function
 gating.** Device body stays 100% textually unchanged; host gets a short
 tail section that re-uses the existing `host_sim_audio_*` JSON emitter.
 
 **Shape:**
 ```c
-/* Audio.c */
+/* shared/audio/Audio.c */
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 
@@ -443,7 +444,7 @@ void audio_checks(void)  {}
 - `CloseAudio` stub.
 - Duplicate globals: `CurrentlyPlaying`, `WAVcomplete`, `WAVInterrupt`.
 
-**Makefile** — added `Audio.c` to `CORE_SRCS`.
+**Makefile** — added `shared/audio/Audio.c` to `CORE_SRCS`.
 
 **PLAY unification via OP_BRIDGE_CMD** (same pattern as FILES in
 Phase 3). The VM source compiler's `source_compile_play` only emitted
@@ -456,7 +457,7 @@ rejected 20 of 22 subcommands at compile time.
 Fix: delete `source_compile_play` and the PLAY dispatch block in
 `source_compile_statement`. PLAY now falls through to `OP_BRIDGE_CMD`,
 which pre-tokenises the statement and at runtime dispatches to
-`commandtbl[cmdPLAY].fptr()` → Audio.c's `cmd_play`. Interpreter and
+`commandtbl[cmdPLAY].fptr()` → shared/audio/Audio.c's `cmd_play`. Interpreter and
 VM share one parser. `BC_SYS_PLAY_STOP` / `BC_SYS_PLAY_TONE` enums
 and bc_vm.c cases are now dead — Phase 7 cleanup.
 
@@ -486,7 +487,7 @@ device-world types before any function body). Instead, extracted the
 portable subset into a new shared file — same pattern as the existing
 `gfx_*_shared.c` layer.
 
-**New file:** `mm_misc_shared.c` (~1,300 lines, compiled by both host
+**New file:** `shared/mmbasic/mm_misc_shared.c` (~1,300 lines, compiled by both host
 Makefile and device CMakeLists). Contents:
 - sort helpers + `cmd_sort`
 - `cmd_pause`, `cmd_timer` / `fun_timer`
@@ -542,7 +543,7 @@ with externs where other MM_Misc.c code still references them.
 - `./run_tests.sh` — **201/201** green.
 - `make sim` — clean.
 - Device CMakeLists additions are textually correct; not re-verified
-  on hardware. `mm_misc_shared.c` contains only portable code (no
+  on hardware. `shared/mmbasic/mm_misc_shared.c` contains only portable code (no
   `#ifdef` for device-specific features), so device build should
   succeed.
 
@@ -611,7 +612,7 @@ The residual got named `host_runtime.c` instead of the plan's `host_noop_stubs.c
 - `bc_vm.c`, `bc_source.c`, `bc_runtime.c`, `bc_alloc.c` — bytecode compiler/VM stay as-is.
 - `gfx_*_shared.c` — already shared, no change.
 - `MMBasic.c`, `MMBasic_REPL.c`, `MMBasic_Prompt.c`, `Editor.c`, `Commands.c`, `Functions.c` — already shared, stay shared.
-- Device peripheral drivers (`SPI.c`, `I2C.c`, `Keyboard.c`, display drivers) — remain device-only, not linked on host.
+- Device peripheral drivers (`drivers/spi_bus/SPI.c`, `drivers/i2c_bus/I2C.c`, `Keyboard.c`, display drivers) — remain device-only, not linked on host.
 - The "no `VM-only device` build" constraint from the bridge plan — still holds.
 
 ## Validation gates (applied after every phase)
@@ -627,7 +628,7 @@ The residual got named `host_runtime.c` instead of the plan's `host_noop_stubs.c
 ## Open questions
 
 - **Does `PICOMITEVGA` dual-core rendering need a host story?** Probably not — host renders single-threaded. Leave `#ifdef PICOMITEVGA` blocks as device-only; the corresponding commands remain host no-ops. Decide in Phase 2 discovery.
-- **What about `Custom.c`, `GUI.c`?** Out of scope for now. They have zero commands shared between host and device currently, so there's no duplication to unwind. Revisit after Phase 7 if we want full parity.
+- **What about `Custom.c`, `drivers/gui_controls/GUI.c`?** Out of scope for now. They have zero commands shared between host and device currently, so there's no duplication to unwind. Revisit after Phase 7 if we want full parity.
 - **Does the VM need its own host HAL entry point?** The VM already uses `host_put_pixel` indirectly via `DrawBox` / `DrawLine`. Once those route through the `host_fb_hal.h` API, the VM also benefits — no additional work.
 
 ## Rollback
@@ -642,4 +643,4 @@ Phase 3 and 4 can be parallelized if desired (independent files). Phase 5 is opt
 
 ---
 
-**Superseded by [real-hal-plan.md](real-hal-plan.md) (Phase 13 in progress, 2026-04-24).** The host-HAL refactor demonstrated the technique on a single non-device axis; the real-HAL plan generalises it to every device target. Patterns established here (shared Draw.c / FileIO.c / Audio.c / mm_misc_shared.c behind `#ifdef MMBASIC_HOST`) are the direct ancestors of the current `hal/*.h` + `drivers/*/` + `ports/*/` layout.
+**Superseded by [real-hal-plan.md](real-hal-plan.md) (Phase 13 in progress, 2026-04-24).** The host-HAL refactor demonstrated the technique on a single non-device axis; the real-HAL plan generalises it to every device target. Patterns established here (shared Draw.c / FileIO.c / shared/audio/Audio.c / shared/mmbasic/mm_misc_shared.c behind `#ifdef MMBASIC_HOST`) are the direct ancestors of the current `hal/*.h` + `drivers/*/` + `ports/*/` layout.

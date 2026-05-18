@@ -35,14 +35,14 @@ cd "$REPO_ROOT"
 
 # Columns shown in the scoreboard, in the same order as docs/real-hal/scoreboard.md.
 FILES=(
-  Draw.c
-  MM_Misc.c
-  External.c
-  FileIO.c
-  Commands.c
-  Memory.c
-  Functions.c
-  Audio.c
+  core/mmbasic/Draw.c
+  core/mmbasic/MM_Misc.c
+  core/mmbasic/External.c
+  core/mmbasic/FileIO.c
+  core/mmbasic/Commands.c
+  core/mmbasic/Memory.c
+  core/mmbasic/Functions.c
+  shared/audio/Audio.c
 )
 
 # Any conditional-compilation directive. This is the primary metric.

@@ -130,15 +130,13 @@ Key insight: Compiler and VM **code** lives in flash, executes via XIP, costs ze
 ## Files
 
 ```
-bytecode.h              -- Opcode definitions, compiler/VM structs, platform limits
-bc_compiler.c           -- Two-pass compilation orchestration
-bc_compiler_core.c      -- Bytecode emission helpers, slot/constant management, alloc/free
-bc_compiler_expr.c      -- Expression compiler (shunting-yard + native functions)
-bc_compiler_stmt.c      -- Statement compiler (control flow, PRINT, DIM, etc.)
-bc_compiler_internal.h  -- Internal compiler API
-bc_vm.c                 -- VM dispatch loop (~148 opcodes), vm alloc/free
-bc_bridge.c             -- Bridge to interpreter's cmd_*/fun_* functions, cmd_frun/cmd_ftest
-bc_test.c               -- Embedded test harness (FTEST command, 40 inline tests)
+runtime/vm/bytecode.h              -- Opcode definitions, compiler/VM structs, platform limits
+runtime/vm/bc_compiler_core.c      -- Bytecode emission helpers, slot/constant management, alloc/free
+runtime/vm/bc_compiler_internal.h  -- Internal compiler API
+runtime/vm/bc_source.c             -- Raw-source frontend
+runtime/vm/bc_vm.c                 -- VM dispatch loop
+runtime/vm/bc_runtime.c            -- FRUN/runtime entry points
+runtime/vm/bc_bridge.c             -- Bridge to interpreter's cmd_*/fun_* functions
 host/                   -- Native macOS build for off-device testing
 host/tests/t*.bas       -- 49 test programs
 host/bench_*.bas        -- Benchmark programs (fibonacci, mandelbrot, matrix, sieve)

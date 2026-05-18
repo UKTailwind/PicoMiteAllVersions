@@ -22,8 +22,8 @@ target_sources(PicoMite PRIVATE
     ${CMAKE_SOURCE_DIR}/drivers/hdmi/hdmi_scanout.c
 
     # rp2350 features.
-    ${CMAKE_SOURCE_DIR}/psram.c
-    ${CMAKE_SOURCE_DIR}/upng.c
+    ${CMAKE_SOURCE_DIR}/drivers/psram_heap/psram.c
+    ${CMAKE_SOURCE_DIR}/third_party/upng/upng.c
     ${CMAKE_SOURCE_DIR}/drivers/audio_mp3/audio_mp3_real.c
     ${CMAKE_SOURCE_DIR}/drivers/heartbeat/heartbeat_real.c
     ${CMAKE_SOURCE_DIR}/drivers/psram_heap/psram_heap_real.c
@@ -43,7 +43,7 @@ target_sources(PicoMite PRIVATE
 
     # Non-WEB feature backends.
     ${CMAKE_SOURCE_DIR}/drivers/gfx_3d/gfx_3d.c
-    ${CMAKE_SOURCE_DIR}/MMweb_stubs.c
+    ${CMAKE_SOURCE_DIR}/shared/net/MMweb_stubs.c
 )
 
 if (COMPILE STREQUAL "HDMIUSB")
@@ -56,7 +56,7 @@ else()
         ${CMAKE_SOURCE_DIR}/drivers/ps2_matrix/Keyboard.c
         ${CMAKE_SOURCE_DIR}/drivers/ps2_matrix/hal_keyboard_ps2.c
         ${CMAKE_SOURCE_DIR}/drivers/console_cdc/console_cdc.c
-        ${CMAKE_SOURCE_DIR}/mouse.c
+        ${CMAKE_SOURCE_DIR}/drivers/ps2_mouse/mouse.c
     )
 endif()
 

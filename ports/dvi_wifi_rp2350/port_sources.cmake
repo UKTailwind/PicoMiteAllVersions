@@ -14,7 +14,7 @@
 
 target_include_directories(PicoMite PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}
-    ${CMAKE_SOURCE_DIR}     # for our common lwipopts
+    ${CMAKE_SOURCE_DIR}/ports/pico_sdk_common
 )
 
 target_sources(PicoMite PRIVATE
@@ -36,12 +36,12 @@ target_sources(PicoMite PRIVATE
     ${CMAKE_SOURCE_DIR}/drivers/hdmi/hdmi_scanout.c
 
     # WiFi stack (CYW43 + lwIP + MQTT/UDP/TFTP/Telnet/NTP). NOTE:
-    # SSD1963.c and Touch.c are intentionally omitted — they live in
-    # the SPI-LCD path and Touch.c references PICOMITEVGA-incompatible
+    # drivers/ssd1963/SSD1963.c and drivers/gui_touch/Touch.c are intentionally omitted — they live in
+    # the SPI-LCD path and drivers/gui_touch/Touch.c references PICOMITEVGA-incompatible
     # Option fields. AllCommands.h only dispatches fun_touch on
-    # non-VGA ports so the linker is happy without Touch.c here.
-    ${CMAKE_SOURCE_DIR}/cJSON.c
-    ${CMAKE_SOURCE_DIR}/mqtt.c
+    # non-VGA ports so the linker is happy without drivers/gui_touch/Touch.c here.
+    ${CMAKE_SOURCE_DIR}/third_party/cjson/cJSON.c
+    ${CMAKE_SOURCE_DIR}/shared/net/mqtt.c
     ${CMAKE_SOURCE_DIR}/shared/net/mm_net_http_file.c
     ${CMAKE_SOURCE_DIR}/shared/net/mm_net_http_page.c
     ${CMAKE_SOURCE_DIR}/shared/net/mm_net_mqtt_cmd.c
@@ -59,19 +59,19 @@ target_sources(PicoMite PRIVATE
     ${CMAKE_SOURCE_DIR}/shared/net/mm_net_web_cmd.c
     ${CMAKE_SOURCE_DIR}/shared/net/mm_net_wifi_cmd.c
     ${CMAKE_SOURCE_DIR}/drivers/net_lwip_raw/hal_net_lwip.c
-    ${CMAKE_SOURCE_DIR}/MMMqtt.c
-    ${CMAKE_SOURCE_DIR}/MMTCPclient.c
-    ${CMAKE_SOURCE_DIR}/MMtelnet.c
-    ${CMAKE_SOURCE_DIR}/MMntp.c
-    ${CMAKE_SOURCE_DIR}/MMtcpserver.c
-    ${CMAKE_SOURCE_DIR}/MMtftp.c
-    ${CMAKE_SOURCE_DIR}/MMudp.c
-    ${CMAKE_SOURCE_DIR}/MMsetwifi.c
+    ${CMAKE_SOURCE_DIR}/shared/net/MMMqtt.c
+    ${CMAKE_SOURCE_DIR}/shared/net/MMTCPclient.c
+    ${CMAKE_SOURCE_DIR}/shared/net/MMtelnet.c
+    ${CMAKE_SOURCE_DIR}/shared/net/MMntp.c
+    ${CMAKE_SOURCE_DIR}/shared/net/MMtcpserver.c
+    ${CMAKE_SOURCE_DIR}/shared/net/MMtftp.c
+    ${CMAKE_SOURCE_DIR}/shared/net/MMudp.c
+    ${CMAKE_SOURCE_DIR}/shared/net/MMsetwifi.c
 
     # rp2350 features. The pico_stretch RP2350B board has PSRAM on
     # board, so link the real psram_heap impl.
-    ${CMAKE_SOURCE_DIR}/psram.c
-    ${CMAKE_SOURCE_DIR}/upng.c
+    ${CMAKE_SOURCE_DIR}/drivers/psram_heap/psram.c
+    ${CMAKE_SOURCE_DIR}/third_party/upng/upng.c
     ${CMAKE_SOURCE_DIR}/drivers/audio_mp3/audio_mp3_real.c
     ${CMAKE_SOURCE_DIR}/drivers/heartbeat/heartbeat_stub.c
     ${CMAKE_SOURCE_DIR}/drivers/psram_heap/psram_heap_real.c
@@ -90,7 +90,7 @@ target_sources(PicoMite PRIVATE
     ${CMAKE_SOURCE_DIR}/drivers/gui_controls/gui_controls_stub.c
 
     # PICOMITEVGA needs fun_3D / fun_map / fun_getscanline (gated on
-    # #ifdef PICOMITEVGA in AllCommands.h). MMtcpserver.c's closeall3d
+    # #ifdef PICOMITEVGA in AllCommands.h). shared/net/MMtcpserver.c's closeall3d
     # stub is gated out on PICOMITEVGA so the real closeall3d from
     # gfx_3d.c provides it.
     ${CMAKE_SOURCE_DIR}/drivers/gfx_3d/gfx_3d.c
@@ -105,7 +105,7 @@ target_sources(PicoMite PRIVATE
     ${CMAKE_SOURCE_DIR}/drivers/usb_host_kbd/hal_keyboard_usb.c
 )
 
-set_source_files_properties(${CMAKE_SOURCE_DIR}/cJSON.c PROPERTIES COMPILE_FLAGS -Os)
+set_source_files_properties(${CMAKE_SOURCE_DIR}/third_party/cjson/cJSON.c PROPERTIES COMPILE_FLAGS -Os)
 
 # --- Per-port build config -------------------------------------------------
 # PICOMITEVGA — VGA-family core branches.
@@ -122,7 +122,7 @@ target_compile_options(PicoMite PRIVATE                                         
 # Use the SDK's runtime-tunable divider mode (CYW43_PIO_CLOCK_DIV_DYNAMIC)
 # and pick the smallest int divider that keeps gSPI ≤ 45 MHz at boot
 # based on the actual clock_get_hz(clk_sys) value (see
-# MMsetwifi.c::cyw43_pio_divider_for_clk_sys).  This adapts to whatever
+# shared/net/MMsetwifi.c::cyw43_pio_divider_for_clk_sys).  This adapts to whatever
 # OPTION CPUSPEED the user has set without leaving headroom on the
 # table at low CPU speeds — at 252 MHz we now run gSPI at 42 MHz
 # instead of the previous fixed 31 MHz.

@@ -40,13 +40,13 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "hal/hal_display_merge.h"
 #include "hal/hal_vga_ops.h"
 #include "hal/hal_gui_controls.h"
-#include "gfx_box_shared.h"
-#include "gfx_circle_shared.h"
-#include "gfx_line_shared.h"
-#include "gfx_pixel_shared.h"
-#include "gfx_cls_shared.h"
-#include "gfx_text_shared.h"
-#include "gfx_console_shared.h"
+#include "shared/gfx/gfx_box_shared.h"
+#include "shared/gfx/gfx_circle_shared.h"
+#include "shared/gfx/gfx_line_shared.h"
+#include "shared/gfx/gfx_pixel_shared.h"
+#include "shared/gfx/gfx_cls_shared.h"
+#include "shared/gfx/gfx_text_shared.h"
+#include "shared/gfx/gfx_console_shared.h"
 #include "bc_alloc.h"
 #include "Memory.h"
 /* pico/multicore.h and the frameBufferMutex extern moved to the
@@ -81,16 +81,16 @@ typedef struct _BMPDECODER
 /***************************************************************************/
 // define the fonts
 
-    #include "font1.h"
-    #include "Misc_12x20_LE.h"
-    #include "Hom_16x24_LE.h"
-    #include "Fnt_10x16.h"
-    #include "Inconsola.h"
-    #include "ArialNumFontPlus.h"
-    #include "Font_8x6.h"
-    #include "arial_bold.h"
-    #include "smallfont.h"
-    #include "font-8x10.h"
+    #include "assets/fonts/font1.h"
+    #include "assets/fonts/Misc_12x20_LE.h"
+    #include "assets/fonts/Hom_16x24_LE.h"
+    #include "assets/fonts/Fnt_10x16.h"
+    #include "assets/fonts/Inconsola.h"
+    #include "assets/fonts/ArialNumFontPlus.h"
+    #include "assets/fonts/Font_8x6.h"
+    #include "assets/fonts/arial_bold.h"
+    #include "assets/fonts/smallfont.h"
+    #include "assets/fonts/font-8x10.h"
 
     unsigned char *FontTable[FONT_TABLE_SIZE] = {   (unsigned char *)font1,
                                                     (unsigned char *)Misc_12x20_LE,

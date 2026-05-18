@@ -53,7 +53,7 @@ The strict purity gate (`tools/check_hal_purity.sh`) currently catches rules 1, 
 ## Goals (unchanged from the original plan)
 
 1. **Hardware-clean core.** `MMBasic.c`, `Operators.c`, `Functions.c`, `Commands.c`, `bc_*.c`, and the VM syscall layer reference no target macros.
-2. **HAL-clean device files.** `Draw.c`, `FileIO.c`, `Audio.c`, `MM_Misc.c`, `External.c`, `Memory.c` call HAL entry points instead of branching on target macros. Algorithmic dispatch moves into `gfx_*_shared.c` or driver files; what's left in the core file is BASIC dialect logic.
+2. **HAL-clean device files.** `Draw.c`, `FileIO.c`, `shared/audio/Audio.c`, `MM_Misc.c`, `External.c`, `Memory.c` call HAL entry points instead of branching on target macros. Algorithmic dispatch moves into `gfx_*_shared.c` or driver files; what's left in the core file is BASIC dialect logic.
 3. **Composable directory layout.** A device target = a port directory + a list of HAL implementations to link.
 4. **No performance regression.** HAL is **compile-time-bound** (link-time symbol selection, `static inline` in headers where hot). No vtables, no function pointers in pixel-write or sample-output paths. RAM-resident hot-path placement is treated as a load-bearing contract, not a hint.
 5. **Incremental and safe.** Every commit: `./run_tests.sh` full-pass green, every device target in `buildall.sh` builds clean, host build passes, WASM build links. Performance gates run on phases that touch hot paths.
@@ -77,7 +77,7 @@ The strict purity gate (`tools/check_hal_purity.sh`) currently catches rules 1, 
 | [3 — hal_pin](real-hal/phase-3-pin.md) | ✅ | 3a + F2 done; External.c is in STRICT_FILES (zero target/port-config ifdefs) |
 | [4 — hal_storage + hal_filesystem](real-hal/phase-4-filesystem.md) | ✅ | 4a + F3 done; FileIO.c is in STRICT_FILES (zero target/port-config ifdefs) |
 | [5 — hal_keyboard](real-hal/phase-5-keyboard.md) | ✅ | 5a + F4 done; MM_Misc.c is in STRICT_FILES (zero target/port-config ifdefs) |
-| [6 — hal_audio](real-hal/phase-6-audio.md) | ✅ | 6a + 6b done; Audio.c in STRICT_FILES; device body in drivers/pwm_synth/ |
+| [6 — hal_audio](real-hal/phase-6-audio.md) | ✅ | 6a + 6b done; shared/audio/Audio.c in STRICT_FILES; device body in drivers/pwm_synth/ |
 | [7 — hal_display](real-hal/phase-7-display.md) | ✅ | 7a + 7b + 7c closed — Draw.c 164 → 3, STRICT_FILES; `drivers/hdmi/` owns modes + scanout; 7d (SSD1963) optional refinement remains |
 | [8 — hal_multicore](real-hal/phases-8-to-13.md#phase-8--hal_multicoreh) | ✅ | 8 steps 1–3 done; no direct multicore_fifo_* outside drivers; driver-owned pattern (no generic HAL contract) |
 | [9 — hal_net](real-hal/phases-8-to-13.md#phase-9--hal_neth) | ✅ | PICOMITEWEB references across core files 30 → 0 (5 steps); routed through port hooks / runtime PSRAMsize / port-config macros; no `hal/hal_net.h` contract introduced |

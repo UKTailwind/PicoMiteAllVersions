@@ -30,7 +30,7 @@ Workflow per entry:
 
 **Scope.** ~85 sites total:
 
-- `.c` call sites (~70): `Commands.c`, `Functions.c`, `Operators.c`, `MMBasic.c`, `Memory.c`, `MM_Misc.c`, `mm_misc_shared.c`, `Draw.c`, `FileIO.c`, `runtime/runtime_abort.c`, `runtime/runtime_interrupt.c`.
+- `.c` call sites (~70): `Commands.c`, `Functions.c`, `Operators.c`, `MMBasic.c`, `Memory.c`, `MM_Misc.c`, `shared/mmbasic/mm_misc_shared.c`, `Draw.c`, `FileIO.c`, `runtime/runtime_abort.c`, `runtime/runtime_interrupt.c`.
 - Port definitions (12): `ports/*/port_config.h` — one pair each in `pico`, `vga`, `web`, `pico_rp2350`, `vga_rp2350`, `vga_wifi_rp2350`, `hdmi_rp2350`, `dvi_wifi_rp2350`, `web_rp2350`, `host_native`, `esp32_s3_metro`. (`host_wasm`, `mmbasic_ansi`, `pc386` don't define the macros today.)
 - Runtime fallback `#ifndef` guards (2): `runtime/runtime_abort.c`, `runtime/runtime_interrupt.c`.
 - Docs (3): `docs/adding-a-new-port.md`, `docs/real-hal/phases-8-to-13.md`, `docs/real-hal/scoreboard.md`.

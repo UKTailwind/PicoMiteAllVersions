@@ -7,9 +7,9 @@ on:
       - '*.h'
       - '*.bas'
       - 'CMakeLists.txt'
-      - 'pico_sdk_import.cmake'
       - 'buildall.sh'
-      - 'validate_all.sh'
+      - 'tools/validate_all.sh'
+      - 'cmake/**'
       - 'core/**'
       - 'drivers/**'
       - 'hal/**'
@@ -18,6 +18,7 @@ on:
       - 'porttools/**'
       - 'runtime/**'
       - 'shared/**'
+      - 'third_party/**'
       - 'tools/**'
       - '.github/workflows/linux-host.yml'
   push:
@@ -27,9 +28,9 @@ on:
       - '*.h'
       - '*.bas'
       - 'CMakeLists.txt'
-      - 'pico_sdk_import.cmake'
       - 'buildall.sh'
-      - 'validate_all.sh'
+      - 'tools/validate_all.sh'
+      - 'cmake/**'
       - 'core/**'
       - 'drivers/**'
       - 'hal/**'
@@ -38,6 +39,7 @@ on:
       - 'porttools/**'
       - 'runtime/**'
       - 'shared/**'
+      - 'third_party/**'
       - 'tools/**'
       - '.github/workflows/linux-host.yml'
   workflow_dispatch:
@@ -82,4 +84,4 @@ jobs:
       - name: Run full validation
         env:
           PICO_SDK_PATH: ${{ github.workspace }}/pico-sdk
-        run: ./validate_all.sh
+        run: ./tools/validate_all.sh
