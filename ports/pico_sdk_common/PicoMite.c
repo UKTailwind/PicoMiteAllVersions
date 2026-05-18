@@ -131,7 +131,7 @@ extern int  wifi_serial_telnet_configured(void);
  * "WebMite" / "PicoMiteUSB" / etc.) so a single template covers every
  * port shape — including novel WiFi+display combinations that the old
  * per-target #define cascade couldn't represent without conflicts. */
-#define MES_SIGNON  "\r" HAL_PORT_DEVICE_NAME " MMBasic " CHIP " Edition V" VERSION "\r\n"
+#define MES_SIGNON  "\r" HAL_PORT_DEVICE_NAME " MMBasic Anywhere v" VERSION "\r\n"
 #define KEYCHECKTIME 16
 int ListCnt;
 int MMCharPos;

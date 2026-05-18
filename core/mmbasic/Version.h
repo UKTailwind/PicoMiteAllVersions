@@ -32,7 +32,7 @@ list all
 #ifndef MMBA_RELEASE_VERSION
 #define MMBA_RELEASE_VERSION "0.0.0-local"
 #endif
-#define VERSION         "MMBA " MMBA_RELEASE_VERSION // MMBasic Anywhere release
+#define VERSION         MMBA_RELEASE_VERSION         // MMBasic Anywhere release
 #define YEAR            "2011-2026"                 // Geoff Graham — original MMBasic
 #define YEAR2           "2016-2026"                 // Peter Mather — PicoMite port
 #define YEAR3           "2025-2026"                 // Josh Vanderberg — MMBasic Anywhere
