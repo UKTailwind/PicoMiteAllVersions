@@ -32,7 +32,7 @@ if [ "$BUILD" -eq 1 ]; then
     rm -rf "$BUILD_DIR"
     mkdir "$BUILD_DIR"
     cd "$BUILD_DIR"
-    cmake -DPICO_SDK_PATH="$PICO_SDK_PATH" ..
+    cmake -DPICO_SDK_PATH="$PICO_SDK_PATH" -DCOMPILE=PICORP2350 ..
     make -j$(sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 4)
     cd ..
     echo ""
