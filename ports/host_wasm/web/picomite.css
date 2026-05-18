@@ -613,3 +613,33 @@ html, body {
     }
     #status { left: 0; }
 }
+
+/* ---- Soft-keyboard helper input -----------------------------------
+ * Visually hidden but still focusable, so a canvas tap on touch
+ * devices can focus it and raise the OS keyboard. font-size:16px keeps
+ * iOS from auto-zooming when focus moves into a text input. */
+#kbd-helper {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    border: 0;
+    padding: 0;
+    margin: 0;
+    background: transparent;
+    color: transparent;
+    caret-color: transparent;
+    font-size: 16px;
+    z-index: -1;
+    pointer-events: none;
+}
+
+/* When the soft keyboard is up, shrink #stage from 100vh to the
+ * visible viewport so the canvas + sidebar stay above the keyboard
+ * instead of being hidden behind it. JS sets --app-vh inline from
+ * visualViewport.height while the helper input is focused. */
+body.keyboard-active #stage {
+    height: var(--app-vh, 100vh);
+}

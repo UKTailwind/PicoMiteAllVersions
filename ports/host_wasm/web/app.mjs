@@ -1133,6 +1133,60 @@ function pushKeyToRing(code) {
     Atomics.store(memoryU32, keyHeadIdx, next);
 }
 
+// Soft-keyboard support runs at page load — independent of the WASM
+// worker — so tapping the canvas raises the OS keyboard immediately,
+// and the layout adapts to visualViewport changes even before the
+// interpreter is live. Ring-pushing handlers (the hot path) wait for
+// wireKeyboard() once the ring memory is mapped.
+function wireSoftKeyboardShell() {
+    const kbdInput = document.getElementById('kbd-helper');
+    if (!kbdInput) return;
+
+    // Tap on the canvas: focus the hidden input on touch (summons the
+    // soft keyboard) or the canvas itself on mouse (preserves the
+    // existing hardware-key flow).
+    canvas.addEventListener('pointerdown', (ev) => {
+        if (ev.pointerType === 'touch' || ev.pointerType === 'pen') {
+            kbdInput.value = '';
+            kbdInput.focus({ preventScroll: true });
+        } else {
+            canvas.focus();
+        }
+    });
+    canvas.addEventListener('touchend', (ev) => {
+        ev.preventDefault();
+        kbdInput.value = '';
+        kbdInput.focus({ preventScroll: true });
+    }, { passive: false });
+
+    // Shrink #stage to the visible viewport while the soft keyboard is
+    // up so the canvas + sidebar stay above the keyboard instead of
+    // behind it. --app-vh is consumed by `body.keyboard-active #stage`.
+    const vv = window.visualViewport;
+    const syncViewport = () => {
+        if (!vv) return;
+        const focused = document.activeElement === kbdInput;
+        const occluded = window.innerHeight - vv.height - vv.offsetTop;
+        if (focused && occluded > 80) {
+            document.documentElement.style.setProperty('--app-vh', vv.height + 'px');
+            document.body.classList.add('keyboard-active');
+        } else {
+            document.documentElement.style.removeProperty('--app-vh');
+            document.body.classList.remove('keyboard-active');
+        }
+    };
+    if (vv) {
+        vv.addEventListener('resize', syncViewport);
+        vv.addEventListener('scroll', syncViewport);
+    }
+    kbdInput.addEventListener('focus', syncViewport);
+    kbdInput.addEventListener('blur', () => {
+        document.documentElement.style.removeProperty('--app-vh');
+        document.body.classList.remove('keyboard-active');
+    });
+}
+wireSoftKeyboardShell();
+
 function wireKeyboard() {
     const held = new Map();  // event.code -> {delayTimer, intervalTimer, mmCode}
     const releaseAll = () => {
@@ -1143,7 +1197,9 @@ function wireKeyboard() {
         held.clear();
     };
 
-    canvas.addEventListener('keydown', (event) => {
+    const kbdInput = document.getElementById('kbd-helper');
+
+    const onKeyDown = (event) => {
         const mm = mapKeyEvent(event);
         if (mm < 0) return;
         if (event.repeat) return;
@@ -1160,19 +1216,62 @@ function wireKeyboard() {
             }, KEY_REPEAT_INTERVAL_MS);
         }, KEY_REPEAT_DELAY_MS);
         held.set(event.code, s);
-    }, { passive: true });
-
-    canvas.addEventListener('keyup', (event) => {
+    };
+    const onKeyUp = (event) => {
         const s = held.get(event.code);
         if (!s) return;
         if (s.delayTimer)    clearTimeout(s.delayTimer);
         if (s.intervalTimer) clearInterval(s.intervalTimer);
         held.delete(event.code);
-    }, { passive: true });
+    };
 
+    // Hardware keyboards focus the canvas; soft keyboards focus the hidden
+    // helper input. Listening on both keeps the same throttled push path
+    // regardless of which element holds focus.
+    for (const el of [canvas, kbdInput]) {
+        if (!el) continue;
+        el.addEventListener('keydown', onKeyDown, { passive: true });
+        el.addEventListener('keyup',   onKeyUp,   { passive: true });
+        el.addEventListener('blur',    releaseAll);
+    }
     window.addEventListener('blur', releaseAll);
-    canvas.addEventListener('blur', releaseAll);
-    canvas.addEventListener('click', () => canvas.focus());
+
+    // Mobile soft keyboards typically skip keydown/keyup and only fire
+    // `input` / `beforeinput`. Translate those into ring pushes so
+    // typed characters reach MMBasic the same way.
+    if (kbdInput) {
+        kbdInput.addEventListener('beforeinput', (ev) => {
+            if (ev.inputType === 'deleteContentBackward') {
+                ev.preventDefault();
+                pushKeyToRing(0x08);
+            } else if (ev.inputType === 'deleteContentForward') {
+                ev.preventDefault();
+                pushKeyToRing(0x7f);
+            } else if (ev.inputType === 'insertLineBreak' ||
+                       ev.inputType === 'insertParagraph') {
+                ev.preventDefault();
+                pushKeyToRing(0x0d);
+            }
+        });
+        kbdInput.addEventListener('input', (ev) => {
+            const data = ev.data;
+            kbdInput.value = '';
+            if (!data) return;
+            for (let i = 0; i < data.length; i++) {
+                const c = data.charCodeAt(i);
+                if (c < 256) pushKeyToRing(c);
+            }
+        });
+        kbdInput.addEventListener('compositionend', (ev) => {
+            kbdInput.value = '';
+            const data = ev.data || '';
+            for (let i = 0; i < data.length; i++) {
+                const c = data.charCodeAt(i);
+                if (c < 256) pushKeyToRing(c);
+            }
+        });
+    }
+
     canvas.focus();
 }
 

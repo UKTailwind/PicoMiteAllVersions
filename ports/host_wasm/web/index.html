@@ -157,6 +157,13 @@
     </section>
 </main>
 
+<!-- Off-screen input used to summon the soft keyboard on touch devices
+     when the user taps the canvas. Hardware-keyboard input still flows
+     through the listeners attached to the canvas itself. -->
+<input id="kbd-helper" type="text" inputmode="text"
+       autocomplete="off" autocorrect="off" autocapitalize="off"
+       spellcheck="false" aria-hidden="true" tabindex="-1">
+
 <div id="status">Loading WASM module…</div>
 
 <div id="drop-overlay" hidden>
