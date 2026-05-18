@@ -56,7 +56,7 @@
 #include "hal/hal_keyboard.h"
 #include "hal/hal_main_init.h"
 
-#define MES_SIGNON "\r" HAL_PORT_DEVICE_NAME " MMBasic " CHIP " Edition V" VERSION "\r\n"
+#define MES_SIGNON "\r" HAL_PORT_DEVICE_NAME " MMBasic Anywhere v" VERSION "\r\n"
 
 extern void start_i2s(int pio, int sm);
 extern void ProcessWeb(int mode);

@@ -14,6 +14,12 @@ REPO_ROOT := $(abspath $(PORT_DIR)/../..)
 PICO_COMPAT_DIR := $(REPO_ROOT)/ports/pico_sdk_compat
 BUILD_DIR := $(PORT_DIR)/build
 PC386_AUDIO ?= sb16
+VERSION_FILE := $(REPO_ROOT)/VERSION
+MMBA_RELEASE_VERSION ?= $(shell sed -n '1p;q;' $(VERSION_FILE) 2>/dev/null)
+MMBA_RELEASE_VERSION := $(strip $(MMBA_RELEASE_VERSION))
+ifeq ($(MMBA_RELEASE_VERSION),)
+$(error MMBA_RELEASE_VERSION is empty; set it in the environment or create $(VERSION_FILE))
+endif
 THIRD_PARTY_CFLAGS := -I$(REPO_ROOT)/third_party/aes \
                       -I$(REPO_ROOT)/third_party/cjson \
                       -I$(REPO_ROOT)/third_party/dr_libs \
@@ -46,6 +52,7 @@ CFLAGS = -std=gnu11 -ffreestanding -O2 -g \
          -mno-red-zone -mno-mmx -mno-sse -mno-sse2 \
          -funsigned-char \
          -DMMBASIC_HOST -DPORT_PC386 \
+         -DMMBA_RELEASE_VERSION=\"$(MMBA_RELEASE_VERSION)\" \
          -DFF_VOLUMES=3 -DFF_STR_VOLUME_ID=1 -DFF_VOLUME_STRS='"A","B","C"' \
          -include pc386_platform.h \
          $(THIRD_PARTY_CFLAGS) \
@@ -191,6 +198,8 @@ all: $(KERNEL) $(KERNEL_STRIPPED) floppy_bootloader
 
 $(KERNEL): $(OBJS) $(PORT_DIR)/linker.ld $(CONFIG_STAMP) | $(BUILD_DIR)
 	$(CC) $(LDFLAGS) -o $@ $(OBJS) -lgcc
+
+$(OBJS): $(VERSION_FILE)
 
 $(CONFIG_STAMP): FORCE | $(BUILD_DIR)
 	@cfg='PC386_AUDIO=$(PC386_AUDIO)'; \
