@@ -3,3 +3,4 @@ picomite.mjs
 picomite.wasm
 picomite.data
 picomite.wasm.map
+app_version.mjs

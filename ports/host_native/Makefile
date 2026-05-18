@@ -10,6 +10,15 @@ REPO_ROOT := $(abspath $(PORT_DIR)/../..)
 SIM_VM_DIR := $(REPO_ROOT)/ports/vm_sys_sim
 PICO_COMPAT_DIR := $(REPO_ROOT)/ports/pico_sdk_compat
 BUILD_DIR := $(PORT_DIR)/build
+VERSION_FILE := $(REPO_ROOT)/VERSION
+MMBA_RELEASE_VERSION ?= $(shell sed -n '1p;q;' $(VERSION_FILE) 2>/dev/null)
+MMBA_RELEASE_VERSION := $(strip $(MMBA_RELEASE_VERSION))
+ifeq ($(MMBA_RELEASE_VERSION),)
+$(error MMBA_RELEASE_VERSION is empty; set it in the environment or create $(VERSION_FILE))
+endif
+ifneq ($(filter v%,$(MMBA_RELEASE_VERSION)),)
+$(error MMBA_RELEASE_VERSION must not start with v; use e.g. 1.0.1)
+endif
 THIRD_PARTY_CFLAGS := -I$(REPO_ROOT)/third_party/aes \
                       -I$(REPO_ROOT)/third_party/cjson \
                       -I$(REPO_ROOT)/third_party/dr_libs \
@@ -27,6 +36,7 @@ CFLAGS = -std=gnu11 -g -O0 -Wall -Wno-unused-variable -Wno-unused-function \
          -Wno-unused-but-set-variable -Wno-misleading-indentation \
          -Wno-missing-braces -funsigned-char \
          -DMMBASIC_HOST -DFF_MAX_LFN_LARGE \
+         -DMMBA_RELEASE_VERSION=\"$(MMBA_RELEASE_VERSION)\" \
          -include host_platform.h \
          $(THIRD_PARTY_CFLAGS) \
          -I$(PORT_DIR) -I$(PICO_COMPAT_DIR) -I$(REPO_ROOT)/core/mmbasic -I$(REPO_ROOT)/runtime/vm -I$(REPO_ROOT)/shared/gfx -I$(REPO_ROOT)/shared/audio -I$(REPO_ROOT)/shared/mmbasic -I$(REPO_ROOT)/drivers/bmp_decoder -I$(REPO_ROOT)/drivers/gps -I$(REPO_ROOT)/drivers/gui_controls -I$(REPO_ROOT)/drivers/gui_touch -I$(REPO_ROOT)/drivers/i2c_bus -I$(REPO_ROOT)/drivers/onewire -I$(REPO_ROOT)/drivers/psram_heap -I$(REPO_ROOT)/drivers/serial -I$(REPO_ROOT)/drivers/spi_bus -I$(REPO_ROOT)/drivers/spi_lcd -I$(REPO_ROOT)/drivers/ssd1963 -I$(REPO_ROOT) \
@@ -113,6 +123,8 @@ WASM_PROXY_OBJS = $(addprefix $(BUILD_DIR)/wasm_proxy/,$(WASM_PROXY_SRCS:.c=.o))
 WASM_PROXY_DEPS = $(WASM_PROXY_OBJS:.o=.d)
 WASM_PROXY_CFLAGS = $(CFLAGS) -pthread
 WASM_PROXY_LDFLAGS = $(LDFLAGS) -pthread
+
+$(OBJS) $(SIM_OBJS) $(WASM_PROXY_OBJS): $(VERSION_FILE)
 
 all: $(TARGET)
 

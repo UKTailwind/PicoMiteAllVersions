@@ -13,6 +13,7 @@
 // from the bundled /bundle/ snapshot.
 
 import { detectPicomiteProxy } from './proxy_client.mjs';
+import { APP_DISPLAY_VERSION, APP_RELEASE_VERSION, MMBASIC_VERSION } from './app_version.mjs';
 
 const statusEl = document.getElementById('status');
 const canvas = document.getElementById('screen');
@@ -23,6 +24,7 @@ const openConfigBtn = document.getElementById('open-config');
 const openHelpBtn = document.getElementById('open-help');
 const helpDialog = document.getElementById('help-dialog');
 const helpCloseBtn = document.getElementById('help-close');
+const appVersionLabel = document.getElementById('app-version-label');
 const configDialog = document.getElementById('config-dialog');
 const configCloseBtn = document.getElementById('config-close');
 const resolutionSelect = document.getElementById('resolution');
@@ -33,6 +35,15 @@ const keyRepeatDelayInput    = document.getElementById('key-repeat-delay');
 const keyRepeatIntervalInput = document.getElementById('key-repeat-interval');
 const dropOverlay = document.getElementById('drop-overlay');
 const filesListEl = document.getElementById('files-list');
+
+window.picomiteAppVersion = {
+    release: APP_RELEASE_VERSION,
+    display: APP_DISPLAY_VERSION,
+    mmbasic: MMBASIC_VERSION,
+};
+if (appVersionLabel) {
+    appVersionLabel.textContent = `Version ${APP_DISPLAY_VERSION}`;
+}
 
 if (typeof SharedArrayBuffer === 'undefined') {
     statusEl.textContent = 'SharedArrayBuffer not available — page must be served with COOP/COEP headers (see serve.py).';
