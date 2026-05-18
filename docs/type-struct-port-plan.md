@@ -3,10 +3,10 @@
 Sub-plan for Phase A item 5 of `docs/upstream-catchup-plan.md`. TYPE/STRUCT is the centerpiece of upstream 6.02 and its full surface is larger than a single-commit port can carry; the parent plan mandates a sub-plan.
 
 - **Upstream reference:** UKTailwind/PicoMiteAllVersions `@04f81d0`, version 6.02.02B0. Feature is guarded upstream by `#ifdef STRUCTENABLED`; we plan to drop the guard (see "Decisions").
-- **Acceptance spec:** `host/tests/acceptance/struct_full.bas` — the upstream `StructTest.bas`, 2188 lines, 86 numbered tests. When this passes under `./mmbasic_test ... --vm` and `--interp`, the port is done.
+- **Acceptance spec:** `ports/host_native/tests/acceptance/struct_full.bas` — the upstream `StructTest.bas`, 2188 lines, 86 numbered tests. When this passes under `./mmbasic_test ... --vm` and `--interp`, the port is done.
 - **Our branch:** `catchup/type-struct` (off `catchup-integration`, lands per the standard catch-up workflow — **never directly to `main`**; see the "Merge target" section of `docs/upstream-catchup-plan.md`).
 - **Prerequisite:** bridge-rebinding fix in `bc_bridge.c` (lands as its own commit; unlocks REDIM-in-VM at the same time, and is what lets struct memory live in `g_vartbl` without breaking VM reads after a bridged allocation).
-- **Gate per phase:** host `./run_tests.sh` default compare mode green, `./build_firmware.sh rp2040 && ./build_firmware.sh rp2350` green, `./host/build_wasm.sh` green.
+- **Gate per phase:** host `./run_tests.sh` default compare mode green, `./build_firmware.sh rp2040 && ./build_firmware.sh rp2350` green, `./ports/host_wasm/build.sh` green.
 
 ## Architecture: single storage, shared by both engines
 
@@ -130,10 +130,10 @@ These are the code coordinates — the porter reads upstream first per the paren
 
 ## Test cadence
 
-Each phase adds one focused test in `host/tests/frontend/t0NN_struct_*.bas` covering exactly that phase's slice. The phase lands when:
+Each phase adds one focused test in `ports/host_native/tests/frontend/t0NN_struct_*.bas` covering exactly that phase's slice. The phase lands when:
 
 1. Focused test passes under the default gate (compare mode).
-2. The corresponding test numbers in `host/tests/acceptance/struct_full.bas` pass when that file is run manually with `./mmbasic_test tests/acceptance/struct_full.bas`. (We check the numbered sections listed in the phase table above; later phases may cause earlier numbered tests to regress if scaffolding assumptions change — running the full acceptance file catches that.)
+2. The corresponding test numbers in `ports/host_native/tests/acceptance/struct_full.bas` pass when that file is run manually with `./mmbasic_test tests/acceptance/struct_full.bas`. (We check the numbered sections listed in the phase table above; later phases may cause earlier numbered tests to regress if scaffolding assumptions change — running the full acceptance file catches that.)
 3. All firmware + wasm builds green.
 
 Focused-test filenames reserved up front (adjust numbers if other tests land first):
@@ -160,7 +160,7 @@ Focused-test filenames reserved up front (adjust numbers if other tests land fir
 
 ## Exit criteria
 
-- `host/tests/acceptance/struct_full.bas` passes end-to-end under both `--interp` and `--vm` modes, i.e. `./mmbasic_test tests/acceptance/struct_full.bas` reports no `FAIL` lines in either engine.
+- `ports/host_native/tests/acceptance/struct_full.bas` passes end-to-end under both `--interp` and `--vm` modes, i.e. `./mmbasic_test tests/acceptance/struct_full.bas` reports no `FAIL` lines in either engine.
 - All focused-test counterparts in `tests/frontend/` pass in the default compare gate.
 - Firmware (rp2040, rp2350) produces `.uf2` without new warnings.
 - WASM build produces `picomite.{mjs,wasm}` without new warnings.

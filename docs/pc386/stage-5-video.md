@@ -89,7 +89,7 @@ Interactive run:
 Follow-on regression checks:
 
 1. `tools/check_hal_purity.sh`
-2. `host/run_tests.sh`
+2. `ports/host_native/run_tests.sh`
 
 ## Open questions
 

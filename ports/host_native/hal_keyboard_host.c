@@ -1,5 +1,5 @@
 /*
- * host/hal_keyboard_host.c — hal_keyboard on the native host build.
+ * ports/host_native/hal_keyboard_host.c — hal_keyboard on the host build.
  *
  * The host port does not use MMBasic's ConsoleRxBuf pump model. Its
  * MMInkey() (host_runtime.c) reads directly from either the scripted-key
@@ -7,7 +7,7 @@
  * (host_sim_pop_key), or raw stdin. There is no hardware to drive
  * forward on a 1 kHz tick, so service() and init() are no-ops.
  *
- * fun_keydown backs through host_keydown (host/host_keys.c), which
+ * fun_keydown backs through host_keydown (host_keys.c), which
  * inspects the scripted-key queue. Lock state is not modelled on host —
  * host_keydown returns 0 for n=8 today; we preserve that.
  *

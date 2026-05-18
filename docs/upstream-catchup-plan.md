@@ -16,12 +16,12 @@ The workflow is therefore:
 
 1. Every feature port and supporting infrastructure (bridge fixes, plan rewrites, test imports) commits to `catchup-integration`, not `main`. Per-feature working branches (`catchup/<feature>`) fast-forward into `catchup-integration` when their own gate is green.
 2. `catchup-integration` accumulates commits until the plan's exit criteria (Phase A complete, Phase B complete — whatever the current milestone is) are met.
-3. A `.uf2` from `catchup-integration` is flashed onto physical PicoCalc hardware (both rp2040 and rp2350) and the acceptance test programs are run end-to-end on device — not just `host/tests/acceptance/struct_full.bas` through the simulator, but the actual programs on real glass. Anything that looks wrong gets fixed on `catchup-integration` before main sees a single commit.
+3. A `.uf2` from `catchup-integration` is flashed onto physical PicoCalc hardware (both rp2040 and rp2350) and the acceptance test programs are run end-to-end on device — not just `ports/host_native/tests/acceptance/struct_full.bas` through the simulator, but the actual programs on real glass. Anything that looks wrong gets fixed on `catchup-integration` before main sees a single commit.
 4. Only after device validation does `catchup-integration` merge (or rebase-and-fast-forward) into `main` as a single coherent set.
 
 Corollaries:
 
-- The simulator gates (host `./run_tests.sh`, firmware `.uf2` builds, `./host/build_wasm.sh`) remain required at every per-feature boundary — they catch regressions early — but they are necessary, not sufficient.
+- The simulator gates (host `./run_tests.sh`, firmware `.uf2` builds, `./ports/host_wasm/build.sh`) remain required at every per-feature boundary — they catch regressions early — but they are necessary, not sufficient.
 - Sub-plans (e.g. `docs/type-struct-port-plan.md`) follow the same rule. Their phases commit to `catchup-integration` (or to feature branches that fast-forward into it).
 - Docs-only updates to the catch-up plan itself (clarifications, status, scope notes) also land on `catchup-integration` so `main` doesn't see "catch-up is happening" until the work is actually validated.
 - The earlier catch-up commits on `main` (TRIM$ `291d525`, initial plan doc `55548fb`) predate this policy. They stay where they are rather than get force-rewritten out of published history; the policy applies from the next commit forward.
@@ -36,9 +36,9 @@ Corollaries:
 
 ## Invariants
 
-1. **Host test gate** — `cd host && ./build.sh && ./run_tests.sh` (default compare mode, interp vs VM) must pass at every feature-boundary commit. `--interp` and `--vm` modes are diagnostic only.
+1. **Host test gate** — `cd ports/host_native && ./build.sh && ./run_tests.sh` (default compare mode, interp vs VM) must pass at every feature-boundary commit. `--interp` and `--vm` modes are diagnostic only.
 2. **Firmware gate** — `./build_firmware.sh` (both rp2040 and rp2350) must produce `.uf2` artifacts at every feature boundary. The script mirrors `.github/workflows/firmware.yml` exactly; if it passes locally, CI passes on push.
-3. **Web gate** — `./host/build_wasm.sh` must produce `host/web/picomite.{mjs,wasm}` cleanly. Pages deploy on main must stay green.
+3. **Web gate** — `./ports/host_wasm/build.sh` must produce `ports/host_wasm/web/picomite.{mjs,wasm}` cleanly. Pages deploy on main must stay green.
 4. **No new hardware `#ifdef` gates** added to core interpreter files (`MMBasic.c`, `Commands.c`, `Functions.c`, `Operators.c`). If an upstream feature requires a gate, the gate goes behind a HAL entry point, not into the core.
 5. **Bridge-first for new commands.** New `cmd_*` entries go to the interpreter path via `AllCommands.h`; VM gets a native opcode only when profiling shows it matters. Pattern per `docs/bridge-restoration-plan.md`.
 6. **No SDK mutation.** The Pico SDK at `$PICO_SDK_PATH` must stay stock. The historical `gpio.c`/`gpio.h` patches were eliminated on the `sdk-patch-removal` branch (GPIO IRQ dispatcher now lives in `picomite_gpio_irq.c`). Any future change that would require patching SDK sources is a signal to refactor the dependency out, not to reintroduce the patch.
@@ -54,7 +54,7 @@ These are interpreter-core changes that benefit every target (device, host, web)
 
 | feature | upstream anchor | size | notes |
 |---|---|---|---|
-| `CONST` declaration | `Commands.c:cmd_const` (~6610) | small | Pure interpreter. Adds to variable table with immutable flag. **Already present at fork point — `Commands.c:cmd_const` line 3516, registered in `AllCommands.h`, covered by `host/tests/frontend/t009_const_assign.bas`. Confirmed matches upstream logic; no port needed.** |
+| `CONST` declaration | `Commands.c:cmd_const` (~6610) | small | Pure interpreter. Adds to variable table with immutable flag. **Already present at fork point — `Commands.c:cmd_const` line 3516, registered in `AllCommands.h`, covered by `ports/host_native/tests/frontend/t009_const_assign.bas`. Confirmed matches upstream logic; no port needed.** |
 | `TYPE` / `END TYPE` / `STRUCT` | `Commands.c:cmd_type` (~6663), `cmd_struct` (~6704), `cmd_endtype` | medium | User-defined record types. Structure definition happens in `PrepareProgramExt`; runtime `cmd_type` just skips to `END TYPE`. Check variable-table and DIM machinery. |
 | `REDIM` | `Commands.c:cmd_redim` (~5613) | small | Runtime array resize. **DONE 2026-04-20. Works in both engines via bridged `cmd_redim` + a post-bridge array-pointer rebinding loop in `bc_bridge.c` (commit `ef9fc5d` + follow-up `catchup/bridge-rebind`). One known limitation: string-array REDIM (`REDIM s$(n)`) is still interp-only until `bc_source.c` compiles the `DIM s$(n) LENGTH n` clause natively. Covered by `t205_redim.bas` (compare mode) and `t206_redim_string.bas` (interp only).** |
 | `EXECUTE` | `Commands.c:cmd_execute` | small | Runs a BASIC statement from a string. Essentially `tokenise(string) → ExecuteProgram`. Check stack/recursion safety. **Already present at fork point — `Commands.c:execute()` line 3755 + `cmd_execute()` line 3814. Matches upstream behavior; no port needed.** |
@@ -76,7 +76,7 @@ Pure compute or pure graphics primitives, so they run identically on device + ho
 
 ### Tier 3 — platform-dependent (defer or selectively adapt)
 
-These touch hardware or peripheral bus code. They make sense for device builds only and won't improve host/web at all.
+These touch hardware or peripheral bus code. They make sense for device builds only and won't improve ports/host_wasm/web at all.
 
 | feature | upstream file | notes |
 |---|---|---|
@@ -108,11 +108,11 @@ For every feature ported, follow this loop exactly:
 4. **Port source changes.** Apply the minimum diff to our files (`Commands.c`, `Functions.c`, `AllCommands.h`, `MMBasic.h` as needed). Keep our surrounding code untouched.
 5. **Update HAL split if needed.** If the feature touches `Draw.c` / `FileIO.c` / `shared/audio/Audio.c` / `MM_Misc.c`, mirror the split pattern already established there (device body vs. shared body). Do NOT introduce bare `#ifdef PICOMITE` gates into logic — route through the existing HAL entry points or add a new one.
 6. **Bridge, don't native-VM.** New commands land as interpreter entries + `OP_BRIDGE_CMD` bridging so `FRUN` still reaches them. Native VM opcodes only after profiling.
-7. **Write a test.** Every ported feature gets at least one `host/tests/*.bas` that exercises it. Regressions in tier-1 features bite hardest, so cover edge cases (empty string, negative index, nested TYPE, etc.).
+7. **Write a test.** Every ported feature gets at least one `ports/host_native/tests/*.bas` that exercises it. Regressions in tier-1 features bite hardest, so cover edge cases (empty string, negative index, nested TYPE, etc.).
 8. **Run the simulator gate — all three must pass:**
-   - Host: `cd host && ./build.sh && ./run_tests.sh` (default compare mode).
+   - Host: `cd ports/host_native && ./build.sh && ./run_tests.sh` (default compare mode).
    - Firmware: `./build_firmware.sh` — both rp2040 and rp2350 must produce a `.uf2`. Mirrors CI exactly; if this passes locally, `firmware.yml` will pass on push.
-   - Web: `cd host && ./build_wasm.sh` — `host/web/picomite.{mjs,wasm}` must produce cleanly.
+   - Web: `cd ports/host_wasm && ./build.sh` — `ports/host_wasm/web/picomite.{mjs,wasm}` must produce cleanly.
 
    If any gate fails, the port is not done — do not commit. These are necessary but **not** sufficient; see "Merge target" above.
 9. **Commit with reference.** Commit message cites upstream: *"Upstream 6.02 parity: TYPE/STRUCT — ported from UKTailwind/PicoMiteAllVersions Commands.c cmd_type (@04f81d0)"*.
@@ -150,7 +150,7 @@ Gate at end of Phase A: host test suite green, device build green, web build gre
    - 6a. **`FLASH LOAD IMAGE slot, file$ [,O/OVERWRITE]`** (~90 lines, upstream FileIO.c:947). Missing prerequisite — our `cmd_flash` has ERASE/OVERWRITE/LIST/DISK LOAD but not LOAD IMAGE. Reuses existing `decodeBMP` + `writetoflashcallback`. Output writes into `flash_target_contents` (RAM-backed on host/wasm, real flash on device) with an 8-byte `[width uint32][height uint32]` header followed by RGB121-packed pixels. Host note: the `LOAD IMAGE` we already have (`cmd_LoadImage` in FileIO.c:984) is the *screen-blit* variant — decodes BMP and draws to the framebuffer. FLASH LOAD IMAGE is a different command that writes to a flash slot for later reuse. Don't conflate the two.
    - 6b. **`blit121` + `blit121_self`** (~200 lines, upstream `RGB121.c` — a file we don't currently carry). Pure byte-array C, no hardware dependencies, compiles unchanged on host + wasm. Extended with a 16 bpp destination mode that expands RGB121 nibbles to RGB565 via `RGB121map[]`. Gated by `DISPLAY_TYPE` (or equivalent) to pick nibble-write vs RGB565-expand at runtime. Unit-testable in isolation — blit a known source into a host framebuffer and compare bytes.
    - 6c. **`cmd_tilemap` + `fun_tilemap` + `TILEMAP SPRITE` subsystem** (~600 lines, upstream Draw.c:14980-15850). Includes the DATA-statement walker (`tilemap_read_data`), the four tilemap-slot array, the 64-sprite actor array, and the embedded sprite sub-dispatch. Subcommands: `CREATE / ATTR / DESTROY / SET / DRAW / SCROLL / VIEW / CLOSE / SPRITE {CREATE,MOVE,SET,DRAW,DESTROY,CLOSE}`. Function queries: `TILEMAP(TILE / COLLISION / ATTR / VIEWX / VIEWY / COLS / ROWS / SPRITE {X,Y,TILE,HIT,W,H}, …)`. Bridged via `OP_BRIDGE_CMD` — no VM opcodes. Acceptance tests: compute-only (`TILEMAP(COLLISION …)`, `TILEMAP(TILE …)`) needs no display; render test framebuffer-compares a known output.
-   - 6d. **Demo: rework `host/demos/pico_blocks.bas`** to use `TILEMAP SPRITE` for ball + explosion, plus a tilemap backdrop. Ship as a `/sd/` bundled web-host demo so the feature is visible on page load.
+   - 6d. **Demo: rework `ports/host_wasm/demos/pico_blocks.bas`** to use `TILEMAP SPRITE` for ball + explosion, plus a tilemap backdrop. Ship as a `/sd/` bundled web-host demo so the feature is visible on page load.
    - Feature branch: `catchup/tilemap-sprite` off `catchup-integration`. No direct commits to `main` — device validation on real rp2040 + rp2350 hardware is required before `catchup-integration` merges (see "Merge target" at top).
 7. `Mandelbrot` command (if we want it — the bundled `mand.bas` already demonstrates the capability, this is the built-in form).
 8. `planet.c` / `Astro` — small, pure math.

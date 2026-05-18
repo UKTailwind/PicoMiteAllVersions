@@ -1,6 +1,5 @@
 /*
- * host/hal_storage_host.c — hal_storage null impl for the native + WASM
- * host.
+ * ports/host_native/hal_storage_host.c — hal_storage null impl for host-style ports.
  *
  * The host has no block device. The shared file-I/O layer goes through
  * hal_filesystem (POSIX), not hal_storage. These stubs exist so the

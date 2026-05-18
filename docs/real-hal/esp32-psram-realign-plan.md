@@ -63,7 +63,7 @@ links on RP2350 and ESP32.
   uses the same 6 MB heap region + slot region layout inside its slab.
 - Verify rp2350 builds still pass (no functional change for them).
 
-**Exit:** `./buildall.sh` green; `host/run_tests.sh` 239/239; the
+**Exit:** `./buildall.sh` green; `ports/host_native/run_tests.sh` 239/239; the
 `psmap` extern in `Memory.c` / `Commands.c` resolves against the
 renamed TU on RP2350.
 
@@ -310,7 +310,7 @@ ESP32 and Pico from a BASIC program's perspective.
 ## Test plan
 
 After each phase:
-1. `./host/run_tests.sh` (host tests still 239/239).
+1. `./ports/host_native/run_tests.sh` (host tests still 239/239).
 2. `./buildall.sh` (all 12+ device variants build).
 3. `./buildesp32.sh build` (ESP32 image links).
 4. On hardware: `RAM LIST`, `RAM TEST 1`, `RAM SAVE 1`, run a

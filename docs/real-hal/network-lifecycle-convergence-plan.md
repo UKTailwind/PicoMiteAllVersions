@@ -321,8 +321,8 @@ Status - May 11, 2026:
 - Also verified locally after sourcing toolchains through repo helpers:
   `ports/host_wasm/build.sh` and `./buildesp32.sh`.
 - Browser WASM network smokes pass against the rebuilt artifacts:
-  `node host/web/smoke_network_unsupported.mjs` and
-  `node host/web/smoke_network_mqtt_ws.mjs`.
+  `node ports/host_wasm/web/smoke_network_unsupported.mjs` and
+  `node ports/host_wasm/web/smoke_network_mqtt_ws.mjs`.
 - Toolchain note: do not treat direct `emcc`/`idf.py` lookup failures as
   missing tools. Use `ports/host_wasm/build.sh` for WASM; it sources
   `$HOME/emsdk/emsdk_env.sh`. Use `./buildesp32.sh` for ESP32; it sources
@@ -525,8 +525,8 @@ Verified gates from this status update:
   MQTT, TFTP, Telnet console, transmit helpers, and option listing.
 - Host WASM build: passed with existing Emscripten/WASM warnings only.
 - WASM browser smokes passed:
-  `node host/web/smoke_network_unsupported.mjs` and
-  `node host/web/smoke_network_mqtt_ws.mjs`.
+  `node ports/host_wasm/web/smoke_network_unsupported.mjs` and
+  `node ports/host_wasm/web/smoke_network_mqtt_ws.mjs`.
 - ESP32-S3 build: passed through `./buildesp32.sh`; only the existing
   `External.h:GetPinStatus` qualifier warning appeared.
 - Pico WEBRP2350/PicoCalc build: passed through
@@ -663,8 +663,8 @@ Additional parent verification after accepting Phase 7:
   `host_basic_udp_preserved_after_run`.
 - `python3.11 porttools/host_network_conformance.py`: passed, including the
   host net HAL conformance binary and BASIC network conformance.
-- `node host/web/smoke_network_unsupported.mjs`: passed.
-- `node host/web/smoke_network_mqtt_ws.mjs`: passed.
+- `node ports/host_wasm/web/smoke_network_unsupported.mjs`: passed.
+- `node ports/host_wasm/web/smoke_network_mqtt_ws.mjs`: passed.
 - Focused host-native probe for `OPTION TCP SERVER PORT 0`: passed; the
   listener is released after disabling the option.
 

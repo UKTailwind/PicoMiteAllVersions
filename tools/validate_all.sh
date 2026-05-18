@@ -3,7 +3,7 @@
 #
 # Runs every build + every test suite the repository ships:
 #   1. HAL purity check (tools/check_hal_purity.sh)
-#   2. host_native build + host/run_tests.sh (239 BASIC tests)
+#   2. host_native build + ports/host_native/run_tests.sh (239 BASIC tests)
 #   3. mmbasic_stdio build + tests/run_tests.sh (smoke corpus)
 #   4. mmbasic_ansi build (no test suite exists for ansi)
 #   5. host_wasm build, IF emcc is on PATH; otherwise skipped with a
@@ -42,10 +42,10 @@ run_section() {
 run_section "HAL purity" "$ROOT/tools/check_hal_purity.sh" || true
 
 # ---- 2. host_native build + tests --------------------------------------
-run_section "host_native build" bash -c "cd '$ROOT/host' && ./build.sh" || true
-if [ -x "$ROOT/host/mmbasic_test" ]; then
+run_section "host_native build" bash -c "cd '$ROOT/ports/host_native' && ./build.sh" || true
+if [ -x "$ROOT/ports/host_native/build/mmbasic_test" ]; then
     run_section "host_native tests (run_tests.sh)" \
-        bash -c "cd '$ROOT/host' && SKIP_HAL_PURITY=1 ./run_tests.sh" || true
+        bash -c "cd '$ROOT/ports/host_native' && SKIP_HAL_PURITY=1 ./run_tests.sh" || true
     run_section "host_native NEW smoke (porttools)" \
         python3 "$ROOT/porttools/host_new_smoke.py" --no-build || true
 else

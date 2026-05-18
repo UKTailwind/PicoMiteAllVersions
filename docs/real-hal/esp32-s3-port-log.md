@@ -509,7 +509,7 @@ accepted. `&HFFFFFF` is very bright.
 The full build gate was run after the Pico migration:
 - `./buildall.sh`: all 14 device variants built clean; RAM baseline
   passed.
-- `host/run_tests.sh`: 243/243 passed; VM pin-mode helper clean; HAL
+- `ports/host_native/run_tests.sh`: 243/243 passed; VM pin-mode helper clean; HAL
   purity clean.
 - `./buildesp32.sh`: ESP32 IDF build green.
 

@@ -1,5 +1,5 @@
 /*
- * host/hal_flash_host.c — hal_flash over the host's RAM-backed flash shim.
+ * ports/host_native/hal_flash_host.c — hal_flash over the host's RAM-backed flash shim.
  *
  * The native-host build has no real flash; it simulates one with the
  * backing buffers in host_fs_shims.c (flash_prog_buf, host_flash_target_buf,

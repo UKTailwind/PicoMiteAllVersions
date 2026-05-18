@@ -86,7 +86,7 @@ static void send_bootstrap_frame(struct mg_connection *c, struct sim_server *s,
  *   bytes 0..3 : magic "CMDS"
  *   bytes 4..5 : canvas width  (LE u16)
  *   bytes 6..7 : canvas height (LE u16)
- *   bytes 8..  : opaque opcode stream (see host_stubs_legacy.c for format)
+ *   bytes 8..  : opaque opcode stream (see host_sim_emit_* emitters for format)
  *
  * Fresh clients get one FRMB snapshot first so their canvas starts with
  * whatever's already been drawn.
@@ -238,9 +238,9 @@ void host_sim_server_stop(void) {
  * 1ms tick thread — synthesizes the device's timer_callback (PicoMite.c:826)
  * ------------------------------------------------------------------------ */
 
-/* These MMBasic globals are defined in host_stubs_legacy.c. Declared here
- * rather than pulled from MMBasic_Includes.h to keep this file free of the
- * full interpreter header tree. */
+/* These MMBasic globals are declared here rather than pulled from
+ * MMBasic_Includes.h to keep this file free of the full interpreter
+ * header tree. */
 extern volatile int64_t mSecTimer;
 extern volatile unsigned int AHRSTimer;
 extern volatile unsigned int InkeyTimer;

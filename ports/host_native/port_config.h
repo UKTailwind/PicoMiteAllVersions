@@ -1,9 +1,9 @@
 /*
- * host/port_config.h — port-config constants for the host build
+ * ports/host_native/port_config.h — port-config constants for the host build
  * (mmbasic_test, mmbasic_sim, picomite.wasm).
  *
  * Same shape as ports/<board>/port_config.h: plain #defines, no #ifdef
- * gates inside. The host Makefile/build script puts host/ on the include
+ * gates inside. The host port Makefiles put this directory on the include
  * path so FileIO.c / External.c / etc. pick this up alongside their other
  * headers.
  *

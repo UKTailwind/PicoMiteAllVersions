@@ -4,13 +4,13 @@ Compile the macOS host build of PicoMite to WebAssembly so the interpreter + VM 
 
 - **Branch:** `web-host` (off `host-hal-refactor`).
 - **Predecessor plan:** [`host-hal-plan.md`](host-hal-plan.md). That refactor turned the host into a proper HAL consumer (shared `core/mmbasic/Draw.c`, `core/mmbasic/FileIO.c`, `shared/audio/Audio.c`, `core/mmbasic/MM_Misc.c`) with focused HAL modules (`host_runtime.c`, `host_fastgfx.c`, `host_fs_shims.c`, `host_peripheral_stubs.c`, `host_fb.c`, `host_time.c`, `host_terminal.c`). The web host is the third HAL target — macOS native, `--sim` (Mongoose + WebSocket), and now WASM (emscripten + direct JS bridge).
-- **Native host is frozen for this work.** `mmbasic_test` and `mmbasic_sim` keep their current termios TTY REPL path, test harness behavior, and build flags. The web-host branch touches only new files (`host_wasm_*.c`, `host/web/*`, `host/build_wasm.sh`, `host/Makefile.wasm`) and a small set of additive `#ifdef MMBASIC_WASM` gates where a narrow WASM-specific behavior is unavoidable. If a change to a shared or native-host file is tempting, that's a signal the abstraction is wrong — fix the WASM HAL instead.
+- **Native host is frozen for this work.** `mmbasic_test` and `mmbasic_sim` keep their current termios TTY REPL path, test harness behavior, and build flags. The web-host branch touches only new files (`host_wasm_*.c`, `ports/host_wasm/web/*`, `ports/host_wasm/build.sh`, `host/Makefile.wasm`) and a small set of additive `#ifdef MMBASIC_WASM` gates where a narrow WASM-specific behavior is unavoidable. If a change to a shared or native-host file is tempting, that's a signal the abstraction is wrong — fix the WASM HAL instead.
 - **No TTY. No terminal emulator.** The web host behaves like the hardware PicoMite, not like the native macOS host. Character output goes through the existing raster console (`gfx_console_shared.c` → `host_fb.c` framebuffer → canvas blit). `host_terminal.c` is simply not linked in the WASM build; there is no xterm.js, no `<pre>` pane, no VT100 parser. Keyboard input arrives via `wasm_push_key(code)` → ring buffer → `MMInkey`, where "code" is an MMBasic key code (ordinary ASCII plus the same F-key/arrow codes the device expects).
 
 ## Invariants
 
 1. **Shared source is untouched.** `core/mmbasic/MMBasic.c`, `core/mmbasic/Commands.c`, `core/mmbasic/Functions.c`, `core/mmbasic/Draw.c`, `core/mmbasic/FileIO.c`, `shared/audio/Audio.c`, `core/mmbasic/MM_Misc.c`, the VM (`bc_*.c`, `vm_sys_*.c`), `gfx_*_shared.c`, and `shared/mmbasic/mm_misc_shared.c` compile as-is. The web port is purely a HAL backend swap — anything that required editing a shared file is a bug in the port.
-2. **The native host test harness (`mmbasic_test`) stays green.** The WASM target is additive. `cd host/ && ./build.sh && ./run_tests.sh` must pass 201/201 at every phase boundary.
+2. **The native host test harness (`mmbasic_test`) stays green.** The WASM target is additive. `cd ports/host_native/ && ./build.sh && ./run_tests.sh` must pass 201/201 at every phase boundary.
 3. **The device build stays green.** No changes to `CMakeLists.txt` / `CMakeLists 2350.txt` or anything under `#ifndef MMBASIC_HOST`.
 4. **No server.** The deployable artifact is `index.html` + `picomite.wasm` + `picomite.js` + a preloaded data image. It runs from `file://`, GitHub Pages, or any static host. No COOP/COEP headers required for the MVP (rules out SharedArrayBuffer + pthreads until Phase 7+).
 5. **Behavioral parity with the native host's screenshot path.** The native `mmbasic_test` renders `PRINT`, graphics, and the console into an RGB framebuffer via `gfx_console_shared.c` + `host_fb.c` and writes it out as a PPM. The web host displays that same framebuffer on a `<canvas>` in real time. A `.bas` program's canvas should be pixel-identical to the native host's PPM screenshot. The only legitimate divergences are timing-sensitive ones (cooperative scheduling may change `TIMER` resolution) and peripherals that are no-ops on both ports anyway.
@@ -79,7 +79,7 @@ Compile the macOS host build of PicoMite to WebAssembly so the interpreter + VM 
 
 The WASM port is a new make target alongside `mmbasic_test` and `mmbasic_sim`. All three share `CORE_SRCS`; they diverge only in the HAL modules linked.
 
-- **Toolchain:** emscripten 3.1.x or later (`emcc`, `emmake`, `emrun`). Pinned in `host/build_wasm.sh` and CI.
+- **Toolchain:** emscripten 3.1.x or later (`emcc`, `emmake`, `emrun`). Pinned in `ports/host_wasm/build.sh` and CI.
 - **Command shape:**
   ```sh
   emcc -O2 \
@@ -120,14 +120,14 @@ Each phase ends with a green native host build, a green device build, a green WA
 
 **Goal:** `emcc hello.c` builds and serves; the native build still passes.
 
-- Add `host/build_wasm.sh` that installs/activates emscripten (or assumes `EMSDK` env) and invokes `emmake make -f Makefile.wasm`.
+- Add `ports/host_wasm/build.sh` that installs/activates emscripten (or assumes `EMSDK` env) and invokes `emmake make -f Makefile.wasm`.
 - Add `host/Makefile.wasm` — mirrors `host/Makefile` but with the `CORE_SRCS` pared to just enough to prove linking (REPL + interpreter, no graphics, no audio).
-- Add `host/web/` with `index.html`, `picomite.css`, and a placeholder `app.mjs` that imports the compiled module and writes "Hello from PicoMite WASM" to a `<pre>`.
-- Add a `host/web/serve.sh` that runs `python3 -m http.server 8000 --directory web/` (or equivalent) for local smoke testing.
+- Add `ports/host_wasm/web/` with `index.html`, `picomite.css`, and a placeholder `app.mjs` that imports the compiled module and writes "Hello from PicoMite WASM" to a `<pre>`.
+- Add a `ports/host_wasm/web/serve.sh` that runs `python3 -m http.server 8000 --directory web/` (or equivalent) for local smoke testing.
 
 **Exit gate:** `./build_wasm.sh && ./serve.sh` → opening `http://localhost:8000` shows the banner. Native `./build.sh && ./run_tests.sh` still green.
 
-**Landed:** `host/hello_wasm.c` (trivial `printf` main), `host/Makefile.wasm` (MODULARIZE+ES6, ALLOW_MEMORY_GROWTH, INITIAL_MEMORY=32 MiB, SRCS is just `hello_wasm.c` for now), `host/build_wasm.sh` (sources `~/emsdk/emsdk_env.sh` if emcc isn't already on PATH), `host/web/{index.html,picomite.css,app.mjs,serve.sh,.gitignore}`. Loading the page in headless Chromium renders `Hello from PicoMite WASM` in `#out` with zero console/page errors. Native `./run_tests.sh` stays at 201/201.
+**Landed:** `host/hello_wasm.c` (trivial `printf` main), `host/Makefile.wasm` (MODULARIZE+ES6, ALLOW_MEMORY_GROWTH, INITIAL_MEMORY=32 MiB, SRCS is just `hello_wasm.c` for now), `ports/host_wasm/build.sh` (sources `~/emsdk/emsdk_env.sh` if emcc isn't already on PATH), `ports/host_wasm/web/{index.html,picomite.css,app.mjs,serve.sh,.gitignore}`. Loading the page in headless Chromium renders `Hello from PicoMite WASM` in `#out` with zero console/page errors. Native `./run_tests.sh` stays at 201/201.
 
 ### Phase 1 — Canvas + raster REPL ✅ (2026-04-18)
 
@@ -150,12 +150,12 @@ The key insight: MMBasic's `PRINT` path on device already lands on `DrawPixel`/`
   - Exports `wasm_boot()` — wraps the native host `main()` body: `InitialiseAll()` → loop of `MMBasic_REPL()` iterations (or `MMBasic_REPL()` directly if its loop already never returns cleanly).
   - Under ASYNCIFY, the blocking reads in `MMBasic_REPL` yield via the `host_wasm_console.c` path.
   - Exports `wasm_break()` that sets `MMAbort = 1` so Ctrl-C from JS can interrupt a running program (full key-polish deferred to Phase 5).
-- Rewrite `host/web/app.mjs`:
+- Rewrite `ports/host_wasm/web/app.mjs`:
   - Discards the Phase 0 `<pre>` placeholder.
   - Attaches canvas element. On `Module` resolve, calls `_wasm_framebuffer_*` once to size the canvas, then starts a `requestAnimationFrame` loop that calls `_wasm_dirty_rect` and blits dirty pixels via `ctx.putImageData`.
   - `keydown` listener on `window` (or the canvas with `tabindex`) maps the event to an MMBasic key code (simple pass-through for printable ASCII; minimal arrow/enter/backspace/ctrl-C mapping for MVP — full table is Phase 5) and calls `_wasm_push_key`.
   - Calls `Module._wasm_boot()` once setup is done.
-- Rewrite `host/web/index.html`: replace `<pre id="out">` with `<canvas id="screen">` plus a minimal status strip.
+- Rewrite `ports/host_wasm/web/index.html`: replace `<pre id="out">` with `<canvas id="screen">` plus a minimal status strip.
 
 **Exit gate:** Browser canvas renders the PicoMite boot banner and `> ` prompt using the device font, as rendered pixels. Typing `PRINT 2+3` ENTER scrolls the console and shows `5` on the next line. `LIST`, `NEW`, a short `FOR I=1 TO 5: PRINT I: NEXT` all produce the expected raster output. `PAUSE 100` → the tab stays responsive throughout. Native `./run_tests.sh` still 201/201. Device build still green (CMakeLists untouched).
 
@@ -166,7 +166,7 @@ The key insight: MMBasic's `PRINT` path on device already lands on `DrawPixel`/`
 - `host_time.c` — narrow `#ifdef MMBASIC_WASM` swapping `nanosleep` for `emscripten_sleep` in `host_sleep_us` (the only such gate in a shared HAL file for Phase 1).
 - `core/mmbasic/MMBasic_REPL.c` — `MMBasic_PrintBanner` gains a `#if defined(MMBASIC_WASM)` banner variant ("MMBasic Web V…"); native host and device branches unchanged.
 - `Makefile.wasm` — full shared/VM/HAL source list, `-sASYNCIFY=1 -sASYNCIFY_STACK_SIZE=65536`, `-sINITIAL_MEMORY=32MiB`, `-sEXPORTED_FUNCTIONS` for the wasm_* entry points. Passes `-Wl,--allow-multiple-definition` so wasm-ld accepts MMBasic's gcc-style tentative-def merging idiom (core/mmbasic/Draw.c / core/mmbasic/FileIO.c declare storage that host_runtime.c also initialises — gcc merges, clang refuses without this flag; `-fcommon` doesn't help because wasm-ld doesn't support common linkage).
-- `host/web/` — rewritten `index.html` (one `<canvas id="screen">`), `picomite.css` (pixelated CSS scale), `app.mjs` (keydown → `wasm_push_key` via `cwrap`; `requestAnimationFrame` loop reads `HEAPU32` and writes `putImageData`; MMBasic key-code mapping table for arrows/F-keys/editing keys). Phase 0 `<pre id="out">` placeholder dropped.
+- `ports/host_wasm/web/` — rewritten `index.html` (one `<canvas id="screen">`), `picomite.css` (pixelated CSS scale), `app.mjs` (keydown → `wasm_push_key` via `cwrap`; `requestAnimationFrame` loop reads `HEAPU32` and writes `putImageData`; MMBasic key-code mapping table for arrows/F-keys/editing keys). Phase 0 `<pre id="out">` placeholder dropped.
 
 **Verified:** Headless Chromium renders the PicoMite boot banner and `> ` prompt as green-phosphor pixels on the canvas. `PRINT 2+3` → ` 5` rendered correctly. `PAUSE 500 : PRINT "AWOKE"` took ~720 ms round-trip (ASYNCIFY sleeping, not busy-looping). Native `./run_tests.sh` still 201/201 (core/mmbasic/MMBasic_REPL.c banner change is WASM-only via `#if defined(MMBASIC_WASM)`). Final `picomite.wasm` = 1.1 MB uncompressed, well under the 1.5 MB budget.
 
@@ -184,7 +184,7 @@ File access is deliberately transient MEMFS-only. No IDBFS, no OPFS, no File Sys
 
 - Add `--preload-file demos@/sd` to the emscripten command line. The `demos/` directory holds a curated set of bundled examples (Mandelbrot, graphics demos, small games) — read-only from the user's perspective, always present at `/sd/` on boot. Not the full test corpus; we pick maybe 10–20 representative programs.
 - `host_sd_root = "/sd"` at boot so `host_fs_shims.c` routes POSIX through emscripten's MEMFS. No C code change — already wired.
-- `host/web/ui/fs.js` — three small surfaces:
+- `ports/host_wasm/web/ui/fs.js` — three small surfaces:
   - **Drop zone:** the whole page is a `dragover`/`drop` target. Dropped files are read via `FileReader.readAsArrayBuffer`, then `FS.writeFile('/sd/' + file.name, new Uint8Array(buf))`. Multiple files OK. On completion, a toast says "Loaded foo.bas — type `FILES` to list".
   - **Download current program:** a "⬇ Download" button grabs the current program via an exported `wasm_current_program()` (or reads the last-`SAVE`-d file from `/sd/`) and triggers a browser download via `new Blob([bytes]); URL.createObjectURL; <a download>`. Also: any `SAVE "name.bas"` can optionally auto-trigger the download if a "Save also downloads" checkbox is ticked, so power users don't have to click twice.
   - **Download all:** a "⬇ All as .zip" button packs the contents of `/sd/` (minus the preloaded demos, if we track that) into a zip via a tiny zip library (e.g. `fflate`, ~8 KB) and downloads it. Useful for bulk export.
@@ -197,7 +197,7 @@ File access is deliberately transient MEMFS-only. No IDBFS, no OPFS, no File Sys
 - If persistence becomes desirable later, it slots in as a post-MVP phase: mount OPFS at `/home/` and add a "Copy to persistent storage" action. The `host_fs_shims.c` routing doesn't care which MEMFS-equivalent backend is at a given path.
 - Upload from a `<input type="file" multiple>` picker is a nice addition alongside drag-drop for mobile / touch where drag-drop is awkward. Same underlying path (`FS.writeFile`). Trivial to add; mention in the Phase 2 follow-on list.
 
-**Landed:** `host/Makefile.wasm` adds `--preload-file demos@/sd`, `-sFORCE_FILESYSTEM=1`, and `"FS"` to `EXPORTED_RUNTIME_METHODS`; emscripten packs `host/demos/` (8 curated `.bas` files, 6.8 KB) into `picomite.data` and mounts it at `/sd/` on boot. `host/web/app.mjs` grew three surfaces: an `<input type="file">` upload button, whole-window drag-drop with a visible overlay, and a "Download all" button that packs `/sd/` into a ZIP via a tiny in-line store-only ZIP writer (no compression library dep). The host C side needed zero changes — `host_fs_shims.c`'s existing POSIX routing talks to emscripten MEMFS unchanged.
+**Landed:** `host/Makefile.wasm` adds `--preload-file demos@/sd`, `-sFORCE_FILESYSTEM=1`, and `"FS"` to `EXPORTED_RUNTIME_METHODS`; emscripten packs `ports/host_wasm/demos/` (8 curated `.bas` files, 6.8 KB) into `picomite.data` and mounts it at `/sd/` on boot. `ports/host_wasm/web/app.mjs` grew three surfaces: an `<input type="file">` upload button, whole-window drag-drop with a visible overlay, and a "Download all" button that packs `/sd/` into a ZIP via a tiny in-line store-only ZIP writer (no compression library dep). The host C side needed zero changes — `host_fs_shims.c`'s existing POSIX routing talks to emscripten MEMFS unchanged.
 
 **Verified:** Headless Chromium sees `FILES` list the 8 preloaded demos, `RUN "demo_hello.bas"` produces the expected FRUN output pixel-on-canvas, drag-drop injects `mine.bas` which `RUN` executes, and `SAVE "saved.bas"` followed by the download button delivers a ZIP containing both bundled + user-added files. Native `./run_tests.sh` still 201/201.
 
@@ -221,11 +221,11 @@ Not originally scoped as a phase; a cluster of fixes and quality-of-life feature
 
 **Terminal cleanup on signal death.** `host_terminal.c` installed `atexit` to restore termios, but `atexit` only fires on normal `exit()` — a SIGTERM / SIGINT / SIGHUP / SIGQUIT / SIGPIPE / SIGABRT left stdin in raw mode, which stair-stepped the shell's prompt. Added signal handlers that call the restore hook, then re-raise with the default disposition so the exit status still reflects the signal. Native-host only; WASM doesn't link `host_terminal.c`.
 
-**Persistent /sd/ via IDBFS.** Files the user SAVEs (or the Editor's F1-save path) now survive reloads. `host/demos/` moves from `/sd/` preload to `/bundle/` preload and gets copied into `/sd/` on first boot (gated by a `localStorage` flag, with an "empty /sd/ triggers repopulate" self-heal for stale flags). New **⟲ Reset /sd/** toolbar button wipes every user file and repopulates from the bundle. Flush strategy: `visibilitychange` + `beforeunload` + a 2 s `setInterval`.
+**Persistent /sd/ via IDBFS.** Files the user SAVEs (or the Editor's F1-save path) now survive reloads. `ports/host_wasm/demos/` moves from `/sd/` preload to `/bundle/` preload and gets copied into `/sd/` on first boot (gated by a `localStorage` flag, with an "empty /sd/ triggers repopulate" self-heal for stale flags). New **⟲ Reset /sd/** toolbar button wipes every user file and repopulates from the bundle. Flush strategy: `visibilitychange` + `beforeunload` + a 2 s `setInterval`.
 
 **Editor file-load on IDBFS.** `host_fs_posix_try_open` used `fstat(fileno(fp))` to cache the file size that `core/mmbasic/Editor.c::f_size(FileTable[fnbr].fptr)` reads back. On emscripten's MEMFS/IDBFS the fd-backed fstat returns `size=0` for freshly-opened read FILE*s until the first read touches data — only path-backed `stat()` sees the real size. Result: EDIT loaded an empty buffer and the backup copy came out 0 bytes. Fix: `stat(path, ...)` before `fopen()`, regardless of mode. Now FILES and Editor agree on sizes immediately after SAVE.
 
-**Makefile.wasm demo dependency tracking.** `--preload-file demos@/bundle` is a linker flag, not a compile input, so `make` didn't notice when `host/demos/*.bas` changed — `picomite.data` stayed frozen on the previous bundle. Added `$(wildcard demos/*.bas)` as a link prerequisite so touching or adding a demo triggers a relink.
+**Makefile.wasm demo dependency tracking.** `--preload-file demos@/bundle` is a linker flag, not a compile input, so `make` didn't notice when `ports/host_wasm/demos/*.bas` changed — `picomite.data` stayed frozen on the previous bundle. Added `$(wildcard demos/*.bas)` as a link prerequisite so touching or adding a demo triggers a relink.
 
 **Bundled `mand.bas` mandelbrot explorer.** Rewrote the interactive mandelbrot renderer (fixed-point inner loop, 16-ply BLINDS interlacing, zoom history stack, palette switcher) to pull `SCREEN_W`/`SCREEN_H` from `MM.HRES`/`MM.VRES` and pick a uniform complex-units-per-pixel scale so both the initial view *and* every zoom stay aspect-correct on any viewport. Zoom cursor is a W×H rectangle matching the viewport ratio, so zooming preserves square pixels through arbitrary depth.
 
@@ -236,7 +236,7 @@ Not originally scoped as a phase; a cluster of fixes and quality-of-life feature
 - Write `host/host_wasm_audio.c` (parallel to `host_sim_audio.c`):
   - Replace each JSON-emit call with an `EM_ASM` invocation that calls into a JS audio bus (`window.picomiteAudio.tone(freq, ms)`, `.sound(waveform, freq, duration, volume)`, etc.).
   - `PLAY STOP`, `PLAY PAUSE`, `PLAY RESUME` map to matching JS methods.
-- Write `host/web/ui/audio.js`:
+- Write `ports/host_wasm/web/ui/audio.js`:
   - Lazy-create `AudioContext` on first user gesture (otherwise browser blocks).
   - `tone(freq, ms)` → `OscillatorNode` with ramped envelope, scheduled via `audioCtx.currentTime`.
   - `sound(waveform, freq, duration, volume)` → 4 channels multiplexed (matching `PLAY SOUND` semantics).
@@ -247,16 +247,16 @@ Not originally scoped as a phase; a cluster of fixes and quality-of-life feature
 
 **Landed:**
 - `host/host_wasm_audio.c` — new TU, `#ifdef MMBASIC_WASM`-gated, exports the same `host_sim_audio_*` symbols `shared/audio/Audio.c`'s host body calls. Each entry drops through `EM_ASM` into `window.picomiteAudio.{tone,sound,stop,volume,pause,resume}`. The drain API (used by `host_sim_server.c` on the native `--sim` target) is kept as a zero-queue stub for symbol completeness.
-- `host/web/ui/audio.js` — WebAudio engine ported from `web/audio.js` (the `--sim` module), stripped of the JSON/WebSocket layer. Exposes `window.picomiteAudio` directly. Keeps the independent `PLAY TONE` graph and 4-slot × {L,R} `PLAY SOUND` voices; "logarithmic" volume map `(v/100)²`; gesture-armed `AudioContext` resume on capture-phase `keydown`/`mousedown`/`touchstart`/`pointerdown`.
-- `host/web/index.html` — loads `./ui/audio.js` via plain `<script>` **before** `app.mjs` so `window.picomiteAudio` is installed before the WASM module boots. Adds a small `#audio-hint` banner ("Click or press a key to enable audio") that `ui/audio.js` auto-hides once the context transitions to `running`.
-- `host/web/picomite.css` — `#audio-hint` styles (centered bottom pill, hidden by default; `hidden` attribute hides entirely).
+- `ports/host_wasm/web/ui/audio.js` — WebAudio engine ported from `web/audio.js` (the `--sim` module), stripped of the JSON/WebSocket layer. Exposes `window.picomiteAudio` directly. Keeps the independent `PLAY TONE` graph and 4-slot × {L,R} `PLAY SOUND` voices; "logarithmic" volume map `(v/100)²`; gesture-armed `AudioContext` resume on capture-phase `keydown`/`mousedown`/`touchstart`/`pointerdown`.
+- `ports/host_wasm/web/index.html` — loads `./ui/audio.js` via plain `<script>` **before** `app.mjs` so `window.picomiteAudio` is installed before the WASM module boots. Adds a small `#audio-hint` banner ("Click or press a key to enable audio") that `ui/audio.js` auto-hides once the context transitions to `running`.
+- `ports/host_wasm/web/picomite.css` — `#audio-hint` styles (centered bottom pill, hidden by default; `hidden` attribute hides entirely).
 - `host/Makefile.wasm` — drops `host_sim_audio.c` from `HOST_PORTABLE_SRCS`, adds `host_wasm_audio.c` to `HOST_WASM_SRCS`. Native `mmbasic_test` / `mmbasic_sim` Makefiles are untouched; they still link `host_sim_audio.c` so the WebSocket JSON path is entirely unchanged.
 
 **Verified:**
 - `./build_wasm.sh` clean build, no new warnings (only the pre-existing `CallCFunction` signature mismatch).
 - Native `./build.sh && ./run_tests.sh` → 210/210 passed.
 - `./build_sim.sh` → `mmbasic_sim` links; `host_sim_audio.o` still present in the link line, so the JSON/WebSocket audio bus is untouched.
-- `host/web/smoke_audio.mjs` — headless Chromium boots the page, types `PLAY TONE 440,440,500` / `PLAY SOUND 1,B,Q,220,20` / `PLAY STOP` into the raster REPL, and confirms `window.picomiteAudio` receives each call with the expected args. Exit 0 = pass.
+- `ports/host_wasm/web/smoke_audio.mjs` — headless Chromium boots the page, types `PLAY TONE 440,440,500` / `PLAY SOUND 1,B,Q,220,20` / `PLAY STOP` into the raster REPL, and confirms `window.picomiteAudio` receives each call with the expected args. Exit 0 = pass.
 
 **Deferred (Phase 9 post-MVP):** `PLAY WAV/FLAC/MP3/MOD/MIDI` — need JS-side `decodeAudioData` + a buffering strategy compatible with PAUSE/RESUME, plus C-side wiring since `cmd_play` on host currently rejects these at parse time.
 
@@ -272,9 +272,9 @@ The Phase 2.5 work already handled the groundwork — `host_sleep_us` → `emscr
 - **Framebuffer generation counter.** `host_fb.c` exposes `volatile uint32_t host_fb_generation` bumped by every path that mutates the visible front plane (`host_fb_put_pixel`, `host_fb_fill_rect`, `host_fb_scroll_lcd`, `bc_fastgfx_swap`, `host_framebuffer_merge`/`copy`/`clear_target`/`reset_runtime`). JS reads the counter via `_wasm_framebuffer_generation()` per rAF and skips `putImageData` entirely when the counter hasn't moved — idle REPL, long `PAUSE`s, and `INKEY$` spin-waits cost zero blit time. FASTGFX back-buffer writes deliberately don't bump; only the SWAP memcpy does, so each visible frame is exactly one blit.
 - **Faster blit path.** The per-pixel four-byte-store loop is replaced with a `Uint32Array` view over `imageData.data` and one `0xFF000000 | R | (G<<8) | (B<<16)` store per pixel. Roughly 3× faster on V8 and drops a chunk of main-thread time per rAF on the larger resolutions.
 - **Dirty-aware IDBFS flush via `requestIdleCallback`.** The 2 s `setInterval(syncfs…)` from Phase 2.5 was the biggest hidden hitch — walking MEMFS and running an IndexedDB transaction on the main thread every 2 s, regardless of whether anything changed. Now `FS.trackingDelegate` hooks (`onWriteToFile`, `onDeletePath`, `onMovePath`) flip a `sdDirty` flag whenever `/sd/` changes. A poll checks the flag every 2 s and, if dirty, queues a flush via `requestIdleCallback` so it runs between rAFs instead of stepping on one. `visibilitychange` and `beforeunload` still force-flush unconditionally (last-chance boundaries). Net: idle sessions pay nothing; SAVE from BASIC still commits; FASTGFX games no longer see 5–30 ms hitches every 2 s.
-- **Dev/test hook.** `host/web/app.mjs` now stashes the WASM instance on `window.picomite = { instance }` so headless smoke tests can peek at `HEAPU32`, `FS.readFile`, etc.
+- **Dev/test hook.** `ports/host_wasm/web/app.mjs` now stashes the WASM instance on `window.picomite = { instance }` so headless smoke tests can peek at `HEAPU32`, `FS.readFile`, etc.
 
-**Verified:** Headless Chromium via `host/web/smoke_phase4.mjs`:
+**Verified:** Headless Chromium via `ports/host_wasm/web/smoke_phase4.mjs`:
 - rAF-driven vsync counter advancing @ ~120 Hz (headless is 120 Hz, real hardware commonly 60 Hz; either works).
 - `PAUSE 1000` round-trips in ~1085 ms (ASYNCIFY unwound, not busy-waiting).
 - Framebuffer generation counter advances monotonically on every draw path.
@@ -294,7 +294,7 @@ The Phase 2.5 work already handled the groundwork — `host_sleep_us` → `emscr
 
 **Goal:** Every key MMBasic cares about arrives with the right code; Ctrl-C breaks programs; optional mouse support.
 
-- `host/web/ui/keys.js` — translation table from JS `KeyboardEvent.key` / `.code` to MMBasic key codes. Cover arrows, F1–F12, Home/End/PgUp/PgDn, Ins/Del, Esc, Tab, Backspace, Enter, Ctrl-letter combinations. (Phase 1 ships a minimal table; this phase finishes it.)
+- `ports/host_wasm/web/ui/keys.js` — translation table from JS `KeyboardEvent.key` / `.code` to MMBasic key codes. Cover arrows, F1–F12, Home/End/PgUp/PgDn, Ins/Del, Esc, Tab, Backspace, Enter, Ctrl-letter combinations. (Phase 1 ships a minimal table; this phase finishes it.)
 - Capture Ctrl-C at the JS level and set an exported `wasm_break_flag = 1` that the interpreter polls during `CheckAbort`. No terminal to compete for it — the canvas has focus, Ctrl-C is unambiguously break.
 - Optional: hook `mousemove` / `mousedown` on the canvas to a `host_wasm_mouse_x/y/buttons` global read by a future `MOUSE` function (out of scope for MVP).
 
@@ -319,10 +319,10 @@ The Phase 2.5 work already handled the groundwork — `host_sleep_us` → `emscr
 - Split `build_wasm.sh` into debug (`-O1 -g -s ASSERTIONS=2`) and release (`-O2 -s ASSERTIONS=0 --closure 1`) variants. Release is what ships.
 - Add a GitHub Actions workflow `.github/workflows/wasm.yml`:
   - Sets up emscripten (`mymindstorm/setup-emsdk@v14` or equivalent pinned action).
-  - Runs `host/build_wasm.sh release`.
-  - Uploads `host/web/` as a Pages artifact.
+  - Runs `ports/host_wasm/build.sh release`.
+  - Uploads `ports/host_wasm/web/` as a Pages artifact.
   - On `main` merges of the eventual feature branch, publishes to GitHub Pages.
-- Add a `host/web/README.md` explaining local dev flow (`./build_wasm.sh debug && ./serve.sh`).
+- Add a `ports/host_wasm/web/README.md` explaining local dev flow (`./build_wasm.sh debug && ./serve.sh`).
 - Size budget: gzipped `.wasm` must stay under 1 MB; CI fails if it exceeds.
 
 **Exit gate:** `picomite.github.io/web` (or whatever the URL turns out to be) loads the REPL, runs `tests/t001.bas` successfully, renders a graphics demo, and plays a tone, all from a fresh browser cache.

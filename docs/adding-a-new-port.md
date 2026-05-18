@@ -353,7 +353,7 @@ Finally add your port's directory name to `buildall.sh` under
 A hardware port is done when **all** of these pass:
 
 1. `tools/check_hal_purity.sh` is green (no regression in core/ or hal/).
-2. `./host/run_tests.sh` is 239/239 passed + `HAL purity gate: clean`.
+2. `./ports/host_native/run_tests.sh` is 239/239 passed + `HAL purity gate: clean`.
 3. `./buildall.sh` builds every target including yours, clean.
 4. Your target boots to the MMBasic prompt on real hardware.
 
@@ -680,7 +680,7 @@ and `checkstring()`'s case-sensitivity (it's case-insensitive).
 From the repo root:
 
 ```bash
-./host/run_tests.sh                   # 239/239 expected
+./ports/host_native/run_tests.sh                   # 239/239 expected
 SKIP_HAL_PURITY=1 ./buildall.sh       # all 14 targets clean
 ```
 
@@ -840,7 +840,7 @@ Keep each override gated by your `MMBASIC_<YOURPORT>` flag. Don't touch device o
 A simulation port is done when:
 
 1. `make` under your port directory produces a binary.
-2. `./host/run_tests.sh` remains 239/239 + `HAL purity gate: clean` (you didn't break host_native or the core).
+2. `./ports/host_native/run_tests.sh` remains 239/239 + `HAL purity gate: clean` (you didn't break host_native or the core).
 3. `tools/check_hal_purity.sh` remains green (you didn't add `#ifdef` to a core or HAL file).
 4. Your binary runs a representative BASIC program to completion.
 

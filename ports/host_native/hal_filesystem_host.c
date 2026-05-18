@@ -1,7 +1,7 @@
 /*
- * host/hal_filesystem_host.c — hal_filesystem on host.
+ * ports/host_native/hal_filesystem_host.c — hal_filesystem on host.
  *
- * The host port already has a dispatch layer (host/host_fs_shims.c)
+ * The host port already has a dispatch layer (host_fs_shims.c)
  * that routes FatFS-style f_* and host_f_* calls to either real POSIX
  * (when host_sd_root is set for REPL / --sim) or to the vendored
  * FatFS running on vm_host_fat's RAM disk (test-harness mode).
@@ -34,7 +34,7 @@
 
 #include "hal/hal_filesystem.h"
 
-/* Existing host FatFS adapters (host/host_fs_shims.c). */
+/* Existing host FatFS adapters (host_fs_shims.c). */
 extern FRESULT host_f_unlink (const TCHAR *path);
 extern FRESULT host_f_rename (const TCHAR *from, const TCHAR *to);
 extern FRESULT host_f_mkdir  (const TCHAR *path);

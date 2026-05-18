@@ -4,7 +4,7 @@
  * Provides the same host_sim_audio_* symbol set that Audio.c's host body
  * calls into, but instead of queuing JSON for a WebSocket drain (the
  * native --sim path in host_sim_audio.c), each call drops straight into
- * JS via EM_ASM. The JS side (host/web/ui/audio.js) owns the actual
+ * JS via EM_ASM. The JS side (ports/host_wasm/web/ui/audio.js) owns the actual
  * WebAudio graph.
  *
  * This file is only linked into the WASM build. The native host

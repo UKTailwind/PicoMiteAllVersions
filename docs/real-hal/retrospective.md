@@ -157,10 +157,10 @@ should land alongside the Phase 13 CI gates.
 ### Prevention items for Phase 13
 
 1. `buildall.sh` runs native + WASM builds + purity check.
-2. A Playwright smoke suite (`host/web/smoke_*.mjs`) runs on **both**
+2. A Playwright smoke suite (`ports/host_wasm/web/smoke_*.mjs`) runs on **both**
    Chromium and Firefox — Chrome-only regressions should fail CI the
    moment they're introduced, not months later from user reports.
-3. `host/web/smoke_tilemap.mjs` (added this session) covers
+3. `ports/host_wasm/web/smoke_tilemap.mjs` (added this session) covers
    TILEMAP SPRITE + FASTGFX + rAF in one run; treat it as the canary
    for any canvas/shared-memory regression.
 4. Stamp the `.wasm` URL with its SHA so stale-browser-cache debugging

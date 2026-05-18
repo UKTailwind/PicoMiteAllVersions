@@ -1,8 +1,7 @@
 #!/bin/bash
 # build.sh — Build the MMBasic WASM host target via emscripten.
 #
-# Output: host/web/picomite.{mjs,wasm,data} (legacy location, kept
-# stable while retirement completes).
+# Output: ports/host_wasm/web/picomite.{mjs,wasm,data}
 #
 # Assumes emscripten is on PATH. If not, sources ~/emsdk/emsdk_env.sh
 # when present. Otherwise fails with an install hint.
@@ -36,4 +35,4 @@ case "${1:-}" in
 esac
 
 echo ""
-echo "Build complete: host/web/picomite.{mjs,wasm,data}"
+echo "Build complete: ports/host_wasm/web/picomite.{mjs,wasm,data}"

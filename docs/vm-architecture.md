@@ -14,10 +14,11 @@ This document describes the current VM-oriented prototype architecture as it exi
 
 ### Host
 
-- `host/mmbasic_test --interp`
+- `ports/host_native/build/mmbasic_test --interp`
   - runs the legacy interpreter path
-  - uses `host/host_stubs_legacy.c` as the host hardware/environment shim boundary
-- `host/mmbasic_test --vm`
+  - uses the host HAL/runtime files under `ports/host_native/` as the host
+    hardware/environment shim boundary
+- `ports/host_native/build/mmbasic_test --vm`
   - runs the VM-owned source frontend and VM runtime
 - default compare mode
   - runs interpreter first, then VM
@@ -45,7 +46,9 @@ One firmware target:
   - `core/mmbasic/MATHS.c`
   - `core/mmbasic/Memory.c`
 - Host boundary:
-  - `host/host_stubs_legacy.c`
+  - `ports/host_native/host_runtime.c`
+  - `ports/host_native/host_peripheral_stubs.c`
+  - `ports/host_native/host_fb.c`
 - Purpose:
   - semantic oracle for language behavior
   - oracle for host-safe syscalls where the host shim is independent
@@ -289,7 +292,7 @@ Implemented primitive families:
 
 The `FRAMEBUFFER` implementation covers the LCD-style dual-buffer model: `CREATE` allocates a frame buffer, `LAYER [colour]` allocates a layer buffer with optional transparent color, `WRITE N/F/L` switches the drawing target, `MERGE` composites the layer onto the frame (NOW/B/R/A modes), `COPY` transfers between buffers with optional background mode, and `SYNC`/`WAIT` handle synchronization.
 
-The host framebuffer backend (`host/host_framebuffer_backend.h`) provides a full 32-bit-per-pixel simulation of the dual-buffer model for deterministic oracle comparison.
+The host framebuffer backend (`ports/host_native/host_fb.c`) provides a full 32-bit-per-pixel simulation of the dual-buffer model for deterministic oracle comparison.
 
 Host framebuffer comparison is useful for deterministic regressions, but device validation is still required for:
 
@@ -313,7 +316,7 @@ Current state:
 
 Current baseline at the time of this document update:
 
-- `./host/run_tests.sh`: `188 passed, 0 failed`
+- `./ports/host_native/run_tests.sh`: `188 passed, 0 failed`
 
 ## Remaining Architectural Risks
 
@@ -327,4 +330,4 @@ Highest-priority current risks:
 
 - [VM Cutover Plan](./vm-cutover-plan.md)
 - [VM Command Coverage](./vm-command-coverage.md)
-- [Host Harness README](../host/README.md)
+- [Local Build Notes](../README-local.md)

@@ -98,7 +98,7 @@ mformat -i c.img ::
 1. `./build.sh && ./build_disks.sh` produces the storage images.
 2. `qemu-system-i386 -drive a.img,if=ide -drive c.img,if=ide -boot a -serial stdio -display none` boots through Limine and prints the FS listing within ~3 seconds.
 3. `tools/check_hal_purity.sh` green — Stage 2 only adds drivers + port glue, no core changes.
-4. `host/run_tests.sh` still green.
+4. `ports/host_native/run_tests.sh` still green.
 
 ## Why not just multiboot modules
 

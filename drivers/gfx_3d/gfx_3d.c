@@ -4,7 +4,7 @@
  * Lifted verbatim from Draw.c's `#ifndef PICOMITEWEB` block.
  * Linked into every device variant except PICOMITEWEB / WEBRP2350
  * (where MMtcpserver.c provides the `closeall3d` stub) and host
- * (which gets the real impl via host/Makefile).
+ * (which gets the real impl via ports/host_native/Makefile).
  *
  * Command-table references live in AllCommands.h under `#else` of
  * the PICOMITEWEB gate: Draw3D → cmd_3D, DRAW3D( → fun_3D.

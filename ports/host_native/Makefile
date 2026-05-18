@@ -1,11 +1,8 @@
 # ports/host_native/Makefile — native host build (mmbasic_test + mmbasic_sim).
 #
 # This is the canonical build for the native host port. Objects land
-# under ports/host_native/build/. Binaries still land in the legacy
-# host/ location (mmbasic_test, mmbasic_sim) so run_tests.sh,
-# buildall.sh, and every existing doc-referenced workflow keeps
-# working unchanged during retirement. host/Makefile is now a thin
-# delegator that forwards here.
+# under ports/host_native/build/, alongside the native test binary,
+# simulator binary, and WASM network proxy helper.
 
 CC = gcc
 PORT_DIR  := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
@@ -91,17 +88,17 @@ SRCS = $(HOST_SRCS) $(WEB_CONSOLE_SRCS) $(CORE_SRCS) $(BC_SRCS) $(HAL_GENERIC_SR
 OBJS = $(addprefix $(BUILD_DIR)/,$(SRCS:.c=.o))
 DEPS = $(OBJS:.o=.d)
 
-TARGET = $(REPO_ROOT)/host/mmbasic_test
+TARGET = $(REPO_ROOT)/ports/host_native/build/mmbasic_test
 NET_HAL_TEST = $(BUILD_DIR)/host_net_hal_test
 WEB_CONSOLE_PROTOCOL_TEST = $(BUILD_DIR)/web_console_protocol_test
 WEB_CONSOLE_DISPLAY_TEST = $(BUILD_DIR)/web_console_display_test
 WEB_CONSOLE_INPUT_TEST = $(BUILD_DIR)/web_console_input_test
 MM_NET_WEBSOCKET_TEST = $(BUILD_DIR)/mm_net_websocket_test
 MM_NET_WEBSOCKET_LOOPBACK_TEST = $(BUILD_DIR)/mm_net_websocket_loopback_test
-WASM_PROXY_TARGET = $(REPO_ROOT)/host/wasm_network_proxy
+WASM_PROXY_TARGET = $(REPO_ROOT)/ports/host_native/build/wasm_network_proxy
 
 # --- Simulator target ---------------------------------------------------
-SIM_TARGET  = $(REPO_ROOT)/host/mmbasic_sim
+SIM_TARGET  = $(REPO_ROOT)/ports/host_native/build/mmbasic_sim
 SIM_EXTRA_SRCS = host_sim_server.c vendor/mongoose.c
 SIM_OBJS = $(OBJS) $(addprefix $(BUILD_DIR)/sim/,$(SIM_EXTRA_SRCS:.c=.o)) \
            $(addprefix $(BUILD_DIR)/sim/,$(SRCS:.c=.o))
@@ -400,7 +397,7 @@ $(BUILD_DIR)/sim/%.o: $(REPO_ROOT)/drivers/calendar/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(SIM_CFLAGS) -c -o $@ $<
 
-# Mongoose (sim-only). Still in host/vendor/ until that dir retires.
+# Mongoose (sim-only).
 $(BUILD_DIR)/sim/vendor/mongoose.o: $(MONGOOSE_DIR)/mongoose.c $(MONGOOSE_DIR)/mongoose.h
 	@mkdir -p $(dir $@)
 	$(CC) $(SIM_CFLAGS) -I$(MONGOOSE_DIR) -Wno-unused-parameter -Wno-sign-compare -c -o $@ $<

@@ -1,13 +1,13 @@
 /*
- * host/hal_audio_host.c — hal_audio on the native host / WASM host.
+ * ports/host_native/hal_audio_host.c — hal_audio on host-style ports.
  *
  * Forwards every HAL entry to the existing host_sim_audio_* family.
  * That family is already shared between the mmbasic_sim WebSocket
- * JSON emitter (host/host_sim_audio.c) and the WASM Web Audio bridge
- * (host/host_wasm_audio.c) — picking between them is a link-time
- * choice in host/Makefile vs host/Makefile.wasm, so hal_audio_host.c
- * compiles identically against either and just forwards. No behaviour
- * change: Audio.c's host arm used to call these symbols directly;
+ * JSON emitter (host_sim_audio.c) and the WASM Web Audio bridge
+ * (ports/host_wasm/host_wasm_audio.c) — picking between them is a
+ * link-time choice in the port Makefile, so hal_audio_host.c compiles
+ * identically against either and just forwards. No behaviour change:
+ * Audio.c's host arm used to call these symbols directly;
  * it now routes through hal_audio and this file bridges back.
  */
 

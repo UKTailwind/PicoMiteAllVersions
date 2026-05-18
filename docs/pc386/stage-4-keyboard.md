@@ -6,7 +6,7 @@
 
 1. **No HAL purity regression.** New code is in `drivers/i8259_pic/`, `drivers/i8042_kbd/`, `ports/pc386/idt.{c,S}`, `ports/pc386/irq.{c,S}`. Zero new `#if PORT_PC386` in MMBasic core.
 2. **Test harness stays green.** Stage 3's `repl_expect.py` 12 tests must continue to pass; once 4f lands, the boot-race char-drop documented in the 3e commit is gone (test harness can drop the 2-second `sleep` it currently injects before the first command).
-3. **`host/run_tests.sh` 243/243.** Same constraint as every prior stage.
+3. **`ports/host_native/run_tests.sh` 243/243.** Same constraint as every prior stage.
 
 ## Sub-stages
 
@@ -30,7 +30,7 @@ A stage-4 close requires:
 
 1. `make -C ports/pc386` clean.
 2. `python3 ports/pc386/tests/repl_expect.py` — 12/12 tests pass × 5 sequential runs (same baseline as stage 3 close).
-3. `host/run_tests.sh` — 243/243.
+3. `ports/host_native/run_tests.sh` — 243/243.
 4. Manual smoke test in QEMU: keyboard input via `qemu -display gtk` (real PS/2 emulation) works for typing BASIC commands. Backspace, Enter, arrow keys (history), Tab in editor.
 5. The `repl_expect.py` `sleep(2)` workaround for the boot-race char drop is removed and the suite still passes.
 

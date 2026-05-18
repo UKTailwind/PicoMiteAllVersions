@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ports/pc386/run_tests.sh — golden-output test harness for the pc386 port.
 #
-# Mirrors host/run_tests.sh UX: discovers tests/<stage>/*.bas, boots
+# Mirrors ports/host_native/run_tests.sh UX: discovers tests/<stage>/*.bas, boots
 # the kernel headless in QEMU with the BASIC program loaded, captures
 # COM1 output, and compares against the matching .ok file.
 #

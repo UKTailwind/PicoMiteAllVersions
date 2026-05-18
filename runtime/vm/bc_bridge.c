@@ -19,7 +19,7 @@
  * O(1). On rp2040 and host the hooks are no-ops (linear subfun[] scan
  * is fine at the smaller program sizes those targets run). Device
  * impl: ports/pico_sdk_common/bc_bridge_pico.c; host stub:
- * host/host_runtime.c. */
+ * ports/host_native/host_runtime.c. */
 extern void port_bc_bridge_clear_subfun_hash(void);
 extern void port_bc_bridge_rehash_subfun(unsigned char **subfun_arr);
 

@@ -12,7 +12,7 @@
 
 #define DEFAULT_BIND "127.0.0.1"
 #define DEFAULT_PORT 8000
-#define DEFAULT_WEB_ROOT "host/web"
+#define DEFAULT_WEB_ROOT "ports/host_wasm/web"
 
 static const char *k_extra_headers =
     "Cross-Origin-Opener-Policy: same-origin\r\n"
@@ -55,7 +55,7 @@ static bool is_loopback_bind(const char *bind_addr) {
 static void usage(FILE *out, const char *argv0) {
     fprintf(out,
             "Usage: %s [--bind 127.0.0.1] [--port 8000] "
-            "[--web-root host/web] [--allow-public-bind]\n",
+            "[--web-root ports/host_wasm/web] [--allow-public-bind]\n",
             argv0 ? argv0 : "wasm_network_proxy");
 }
 

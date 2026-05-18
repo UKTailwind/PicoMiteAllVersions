@@ -13,4 +13,4 @@ Build from the repository root:
 The script first uses `emcc` already on `PATH`. If it is missing, it sources
 `$HOME/emsdk/emsdk_env.sh` and retries. On this workspace that resolves to
 `/Users/joshv/emsdk/emsdk_env.sh`. The output is
-`host/web/picomite.{mjs,wasm,data}`.
+`ports/host_wasm/web/picomite.{mjs,wasm,data}`.

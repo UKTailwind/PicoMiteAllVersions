@@ -10,20 +10,18 @@
  * The test-harness host has a single 24-bit RGB pixel plane that stands
  * in for the PicoCalc's 4-bit-packed LCD. When MMBasic's FRAMEBUFFER
  * CREATE / LAYER / FASTGFX commands allocate back buffers, they live
- * here; the drawing primitives in host_stubs_legacy.c (until Phase 2
- * moves them to the shared Draw.c) route pixels through the WriteBuf
- * dispatch implemented below.
+ * here; drawing routes pixels through the WriteBuf dispatch implemented
+ * below.
  *
  * State lives in host_fb.c; this header exposes just the surface needed
- * by host_stubs_legacy.c (drawing primitives, runtime lifecycle),
- * host_main.c (test harness, pixel assert), and host_sim_server.c
- * (framebuffer snapshot for the WebSocket bootstrap frame).
+ * by host_main.c (test harness, pixel assert), host_sim_server.c
+ * (framebuffer snapshot for the WebSocket bootstrap frame), and the
+ * host/WASM drawing paths.
  */
 
 /* Front (visible) framebuffer — the pixel plane broadcast by the sim
  * server and captured by test-harness pixel asserts. Non-static so the
- * FASTGFX swap / screenshot helpers in host_stubs_legacy.c can memcpy
- * into/out of it. */
+ * FASTGFX swap / screenshot helpers can memcpy into/out of it. */
 extern uint32_t *host_framebuffer;
 
 /* FASTGFX back buffer — non-static so drawing primitives and cmd_fastgfx

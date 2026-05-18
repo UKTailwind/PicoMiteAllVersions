@@ -142,7 +142,7 @@ set(PICOMITE_LEGACY_CORE_SOURCES
 
 # Audio: device body lives in drivers/pwm_synth/pwm_synth.c (PWM/PIO
 # tones, WAV/FLAC/MP3/MOD decoders, VS1053 glue). shared/audio/Audio.c itself holds
-# only the host cmd_play and compiles on host builds via host/Makefile.
+# only the host cmd_play and compiles on host builds via the host port Makefiles.
 set(PICOMITE_AUDIO_DEVICE_SOURCES
 	drivers/pwm_synth/pwm_synth.c
 )

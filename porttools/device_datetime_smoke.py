@@ -11,7 +11,7 @@ ultimately calls `timegm` or `gmtime` (or both) under the hood:
     DAY$("dd-mm-yyyy")            →  timegm → gmtime (tm_wday)
 
 The fixed-input checks here use known oracles taken from the host
-test suite (host/tests/t194_datetime_funs.bas) so any algorithmic
+test suite (ports/host_native/tests/t194_datetime_funs.bas) so any algorithmic
 drift between the bare hand-rolled body (Pico's GPS.c) and a libc
 backing (host/wasm/ESP32) shows up as a single failing check.
 
@@ -42,7 +42,7 @@ class Check:
     expected: str
 
 
-# Oracles cross-checked against host/tests/t194_datetime_funs.bas plus
+# Oracles cross-checked against ports/host_native/tests/t194_datetime_funs.bas plus
 # standard Unix epoch reference values.
 CHECKS: tuple[Check, ...] = (
     # EPOCH: dd-mm-yyyy hh:mm:ss → seconds since 1970-01-01 UTC

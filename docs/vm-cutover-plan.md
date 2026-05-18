@@ -80,7 +80,7 @@ Status: in progress.
 - Keep the existing shared host backends for framebuffer, files, timers, input, and screenshots.
 - Do not let VM/syscall refactors modify this oracle path.
 - Use it as the correctness reference for language features and host-safe syscalls.
-- Current implementation uses `host/mmbasic_test` with `--interp` as the oracle path and `--vm` as the implementation path.
+- Current implementation uses `ports/host_native/build/mmbasic_test` with `--interp` as the oracle path and `--vm` as the implementation path.
 - The active host shim is `host/host_stubs_legacy.c`.
 - Remaining gap: some host legacy shims still route through VM-owned syscall helpers. This breaks oracle independence and must be removed before the oracle can be treated as trustworthy for those families.
 
@@ -198,7 +198,7 @@ Testing methodology:
 - **Peephole assertion tests** (`tests/frontend/t0XX_*_peephole.bas`): run `--vm-disasm` and verify the fused opcode appears / unfused form is absent.
 - **Equivalence tests** (`tests/frontend/t0XX_*_opt_equiv.bas`): compare `-O0` vs `-O1` output byte-for-byte to verify behavioral correctness across sign combinations, boundary values, and type edge cases.
 - **Smoke test**: mandelbrot with `-O1` as a full-program integration check.
-- Runner: `./host/run_optimizer_tests.sh` (22 tests).
+- Runner: `./ports/host_native/run_optimizer_tests.sh` (22 tests).
 
 Remaining optimizer work:
 - profile on device to measure actual cycle savings for each superinstruction
@@ -274,7 +274,7 @@ Status: complete for the VM compiler/runtime path.
 - `OP_BUILTIN_*` bridge opcodes and VM handlers have been removed.
 - The old `bc_bridge.c` implementation has been removed and the remaining VM runtime entrypoints live in `bc_runtime.c`.
 - Unsupported commands/functions now fail at compile time with `Unsupported VM command: ...` or `Unsupported VM function: ...`.
-- Negative tests live under `host/tests/unsupported/` and are run by `host/run_unsupported_tests.sh`.
+- Negative tests live under `ports/host_native/tests/unsupported/` and are run by `ports/host_native/run_unsupported_tests.sh`.
 - Current graphics VM syscalls dispatch through the VM-owned `vm_sys_graphics.c` module: `BOX`, `RBOX`, `ARC`, `TRIANGLE`, `POLYGON`, `CIRCLE`, `CLS`, `LINE`, `PIXEL`, `TEXT`, `FONT`, and `COLOUR`/`COLOR`.
 - The RP2350 `CIRCLE` path no longer calls the legacy `DrawCircle()` implementation that allocates scratch storage through `GetTempMemory()`.
 - `DATE$` and `TIME$` now dispatch through `vm_sys_time.c`; `KEYDOWN()` dispatches through `vm_sys_input.c`.
@@ -294,13 +294,13 @@ Status: active.
 - Use device tests mainly for hardware-facing behavior, timing, and memory/resource validation.
 - Remaining gap: the host oracle is currently not fully independent for some file/pin/PWM paths because parts of the host legacy shim call VM-owned helpers. That must be corrected.
 - Current baseline:
-  - `./host/run_tests.sh`: `168 passed, 0 failed`.
-  - `./host/run_pixel_tests.sh`: passing framebuffer assertions.
-  - `./host/run_host_shim_tests.sh`: `4 passed, 0 failed`.
-  - `./host/run_frontend_tests.sh`: `48 passed, 0 failed`.
-  - `./host/run_optimizer_tests.sh`: `22 passed, 0 failed`.
-  - `bash host/run_unsupported_tests.sh`: `0 passed, 0 failed`.
-  - `./host/run_missing_syscall_tests.sh`: `0 passed, 0 failed`.
+  - `./ports/host_native/run_tests.sh`: `168 passed, 0 failed`.
+  - `./ports/host_native/run_pixel_tests.sh`: passing framebuffer assertions.
+  - `./ports/host_native/run_host_shim_tests.sh`: `4 passed, 0 failed`.
+  - `./ports/host_native/run_frontend_tests.sh`: `48 passed, 0 failed`.
+  - `./ports/host_native/run_optimizer_tests.sh`: `22 passed, 0 failed`.
+  - `bash ports/host_native/run_unsupported_tests.sh`: `0 passed, 0 failed`.
+  - `./ports/host_native/run_missing_syscall_tests.sh`: `0 passed, 0 failed`.
 
 ### 7. Separate language correctness from hardware validation
 
@@ -322,14 +322,14 @@ Status: deferred.
 ## Current Build And Test Commands
 
 ```bash
-make -C host
-./host/run_tests.sh
-./host/run_pixel_tests.sh
-./host/run_host_shim_tests.sh
-./host/run_frontend_tests.sh
-./host/run_optimizer_tests.sh
-bash host/run_unsupported_tests.sh
-./host/run_missing_syscall_tests.sh
+make -C ports/host_native
+./ports/host_native/run_tests.sh
+./ports/host_native/run_pixel_tests.sh
+./ports/host_native/run_host_shim_tests.sh
+./ports/host_native/run_frontend_tests.sh
+./ports/host_native/run_optimizer_tests.sh
+bash ports/host_native/run_unsupported_tests.sh
+./ports/host_native/run_missing_syscall_tests.sh
 make -C build2350 -j8
 arm-none-eabi-size build2350/PicoMite.elf
 ```
@@ -360,7 +360,7 @@ bc_heap=232 KiB
 - Graphics is the highest-priority command-family backlog.
 - **!!! GRAPHICS CONVERSIONS MUST COPY/ADAPT LEGACY DRAWING CODE INTO VM-OWNED HELPERS AND SYSCALLS !!!**
 - **!!! GRAPHICS CONVERSIONS MUST NOT LINK, WRAP, OR DISPATCH THROUGH OLD DRAWING HANDLERS OR COMMAND ENTRYPOINTS !!!**
-- Use `host/tests/missing_syscalls/` for fail-first syscall work; move or delete entries when native VM support lands.
+- Use `ports/host_native/tests/missing_syscalls/` for fail-first syscall work; move or delete entries when native VM support lands.
 - Deferred syscall extraction target is `vm_sys_file.c` for `OPEN`/`CLOSE`/file print-input/`FILES`.
 - Expand `vm_sys_pin.c` beyond digital `OFF`/`DIN`/`DOUT` only by copying/adapting each supported legacy mode into the VM-owned module with fail-first oracle/device coverage.
 - Replace the temporary PicoCalc/RP2350 allocator compatibility layer by migrating surviving prompt/device services onto explicit VM/system allocation APIs or removing the legacy modules that still require it.

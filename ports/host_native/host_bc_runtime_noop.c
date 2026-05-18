@@ -11,7 +11,7 @@
  * releases it itself.
  *
  * This file is linked into:
- *   - host/build.sh test target
+ *   - ports/host_native/build.sh test target
  *   - ports/mmbasic_stdio/Makefile
  *   - ports/mmbasic_ansi/Makefile
  *

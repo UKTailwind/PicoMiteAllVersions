@@ -43,7 +43,7 @@ void host_fs_walk_close(host_fs_walker_t *w);
 
 /* Whole-path operations. Each returns 0 on success, -1 on error. Used by
  * the host f_unlink / f_rename / f_mkdir / f_chdir / f_getcwd wrappers
- * in host_stubs_legacy.c when host_sd_root is set. Paths are absolute
+ * when host_sd_root is set. Paths are absolute
  * or relative-to-cwd — the caller has already joined host_sd_root. */
 int host_fs_unlink(const char *path);
 int host_fs_rename(const char *from, const char *to);

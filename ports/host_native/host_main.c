@@ -46,8 +46,8 @@ int host_runtime_width(void);
 int host_runtime_height(void);
 
 /* flash_progmemory is NULL on host -- we need to allocate backing storage.
- * flash_prog_buf is non-static so host_stubs_legacy.c's simulated flash
- * routines can write through to it. */
+ * flash_prog_buf is non-static so the simulated flash routines can write
+ * through to it. */
 extern const uint8_t *flash_progmemory;
 /* Sized to mirror device program-flash region — MAX_PROG_SIZE for the
  * program area + same for the CFunction tail. Tracks the variant
@@ -477,7 +477,7 @@ int main(int argc, char **argv) {
     int listen_port = 8080;
     const char *resolution_arg = NULL;
     /* `../web` is the sim UI's canonical home (repo-root `web/`). The
-     * `host/web/` directory now holds the WASM bundle (picomite.wasm,
+     * `ports/host_wasm/web/` directory now holds the WASM bundle (picomite.wasm,
      * app.mjs for the browser-native port) — if we default to `web`
      * here, the sim serves the WASM UI instead of its own WebSocket-
      * backed page. Keep --web-root as an escape hatch. */
@@ -665,7 +665,7 @@ int main(int argc, char **argv) {
         /* Candidate order: explicit --web-root first, then the sim UI
          * (../web, repo-root), then the WASM bundle as a last resort
          * (mostly so the sim still boots inside a pruned checkout that
-         * only has host/web/). */
+         * only has ports/host_wasm/web/). */
         const char *candidates[] = { web_root, "../web", "web", NULL };
         for (int ci = 0; candidates[ci]; ++ci) {
             char probe[PATH_MAX];

@@ -19,20 +19,20 @@ Flashing: with the device in BOOTSEL mode, `cp build/PicoMite.uf2 /Volumes/RPI-R
 - `./tools/bisect_tilemap.sh` — helper for bisecting the WASM tilemap regression.
 
 ## Host oracle / VM harness
-- `make -C host`
-- `./host/run_tests.sh` — primary gate, runs every test through both interpreter and VM and compares output.
-- `./host/run_pixel_tests.sh`
-- `./host/run_host_shim_tests.sh`
-- `./host/run_frontend_tests.sh`
-- `./host/run_optimizer_tests.sh`
-- `bash host/run_unsupported_tests.sh`
-- `./host/run_missing_syscall_tests.sh` (intentionally red syscall TODO inventory)
+- `make -C ports/host_native`
+- `./ports/host_native/run_tests.sh` — primary gate, runs every test through both interpreter and VM and compares output.
+- `./ports/host_native/run_pixel_tests.sh`
+- `./ports/host_native/run_host_shim_tests.sh`
+- `./ports/host_native/run_frontend_tests.sh`
+- `./ports/host_native/run_optimizer_tests.sh`
+- `bash ports/host_native/run_unsupported_tests.sh`
+- `./ports/host_native/run_missing_syscall_tests.sh` (intentionally red syscall TODO inventory)
 
-Host binary: `host/mmbasic_test`. If the host build links against stale command-table objects after header changes, use `make -B -C host`.
+Host binary: `ports/host_native/build/mmbasic_test`. If the host build links against stale command-table objects after header changes, use `make -B -C ports/host_native`.
 
 ## Web build
-- `./host/build_wasm.sh` → `host/web/picomite.{mjs,wasm}`.
-- `./host/web/serve.sh` and open `http://localhost:8000/` to smoke test.
+- `./ports/host_wasm/build.sh` → `ports/host_wasm/web/picomite.{mjs,wasm}`.
+- `./ports/host_wasm/web/serve.sh` and open `http://localhost:8000/` to smoke test.
 
 ## rp2040 RAM overflow fix (historical note)
 - Symptom: linking failed with `.heap` not fitting in `RAM` (`region 'RAM' overflowed by 20 bytes`) on rp2040 variants.

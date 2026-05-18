@@ -3,12 +3,10 @@
  *
  * Consolidates the pixel plane state, the WriteBuf dispatch, the
  * FRAMEBUFFER CREATE/WRITE/CLOSE/MERGE/SYNC/WAIT/COPY implementations,
- * and the DrawRectangle/DrawBitmap/ScrollLCD function-pointer backings
- * that used to live in host_stubs_legacy.c + host_framebuffer_backend.h.
+ * and the DrawRectangle/DrawBitmap/ScrollLCD function-pointer backings.
  *
- * Drawing primitives and cmd_* handlers in host_stubs_legacy.c still
- * consume host_fb_put_pixel / host_fb_fill_rect / host_fb_current_target
- * via host_fb.h until Phase 2 moves them to Draw.c.
+ * Drawing primitives and cmd_* handlers consume host_fb_put_pixel /
+ * host_fb_fill_rect / host_fb_current_target via host_fb.h.
  */
 
 #include <ctype.h>
@@ -36,10 +34,8 @@
  * WriteBuf directly at it.
  * ------------------------------------------------------------------------ */
 
-/* MMBasic's graphics-target pointers. Memory.h declares WriteBuf /
- * FrameBuf / LayerBuf / ShadowBuf in the PICOMITE (non-VGA) host path
- * but not DisplayBuf — that one is owned by host_stubs_legacy.c. Re-
- * declare here so every backend function below can see them. */
+/* MMBasic's graphics-target pointers. Re-declare DisplayBuf here so every
+ * backend function below can see the visible drawing surface. */
 extern unsigned char *DisplayBuf;
 
 uint32_t *host_framebuffer = NULL;

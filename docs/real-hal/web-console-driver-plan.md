@@ -196,7 +196,7 @@ ports/esp32_s3_metro/main/
 ports/host_native/
   host_sim_web_console_adapter.c  # later: Mongoose adapter over shared protocol
 
-host/web/ or drivers/web_console/web/
+ports/host_wasm/web/ or drivers/web_console/web/
   app.js / app.mjs
   audio.js
   style.css
@@ -429,7 +429,7 @@ Exit gate:
 - native WebSocket helper unit test passes;
 - loopback WebSocket smoke passes;
 - host simulator still uses its existing Mongoose WebSocket path unchanged;
-- `./host/run_tests.sh` passes;
+- `./ports/host_native/run_tests.sh` passes;
 - `./buildall.sh` passes.
 
 ### Phase 3 - ESP32 Static Page and Minimal WebSocket
@@ -534,7 +534,7 @@ Exit gate:
 
 - host simulator and ESP32 web console both pass their browser smokes;
 - `tools/check_hal_purity.sh` stays green;
-- `./host/run_tests.sh`, `./buildall.sh`, and `./buildesp32.sh build` pass.
+- `./ports/host_native/run_tests.sh`, `./buildall.sh`, and `./buildesp32.sh build` pass.
 
 ### Phase 8 - Performance and Resilience
 
@@ -568,7 +568,7 @@ Cheap gates during implementation:
 
 Full gate for each accepted phase:
 
-- `./host/run_tests.sh`.
+- `./ports/host_native/run_tests.sh`.
 - `./buildall.sh`.
 - `./buildesp32.sh build`.
 - flash ESP32-S3 Metro.

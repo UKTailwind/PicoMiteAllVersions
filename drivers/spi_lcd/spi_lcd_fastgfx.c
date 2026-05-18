@@ -30,9 +30,8 @@ extern unsigned char *ShadowBuf;
 extern int fb_dma_chan;
 extern mutex_t frameBufferMutex;
 
-/* Host build: bc_fastgfx_create/swap/close/reset/set_fps and cmd_fastgfx
- * live in host_stubs_legacy.c; they present/copy host_framebuffer
- * directly instead of DMA-ing dirty scanlines to an LCD controller. */
+/* Host builds provide FASTGFX in the host port; they present/copy the host
+ * framebuffer directly instead of DMA-ing dirty scanlines to an LCD controller. */
 
 static uint8_t *FastGFXBackBuf = NULL;
 static uint8_t *FastGFXFrontBuf = NULL;

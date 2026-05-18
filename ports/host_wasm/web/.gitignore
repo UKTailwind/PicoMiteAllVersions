@@ -1,0 +1,5 @@
+# emscripten build outputs — rebuilt via ports/host_wasm/build.sh
+picomite.mjs
+picomite.wasm
+picomite.data
+picomite.wasm.map

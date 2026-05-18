@@ -1,5 +1,5 @@
 /*
- * host/hal_pin_host.c — hal_pin stub for the native + WASM host.
+ * ports/host_native/hal_pin_host.c — hal_pin stub for host-style ports.
  *
  * No real GPIO. Keeps a RAM table of pin modes and output values so that
  * tests and the --sim harness can query pin state after a BASIC program
