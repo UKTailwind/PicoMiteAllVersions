@@ -69,7 +69,7 @@ CFLAGS = -O2 -std=gnu11 -funsigned-char \
 # ignore the rest — same effective behaviour as gcc's native merge.
 
 LDFLAGS = -pthread -sPTHREAD_POOL_SIZE=1 \
-          -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=33554432 -sMAXIMUM_MEMORY=268435456 \
+          -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=33554432 -sMAXIMUM_MEMORY=67108864 \
           -sMODULARIZE=1 -sEXPORT_ES6=1 -sENVIRONMENT=web,worker \
           -sEXPORTED_FUNCTIONS='["_main","_wasm_boot","_wasm_push_key","_wasm_key_ring_ptr","_wasm_key_ring_head_ptr","_wasm_key_ring_tail_ptr","_wasm_key_ring_size","_wasm_break","_wasm_framebuffer_ptr","_wasm_framebuffer_width","_wasm_framebuffer_height","_wasm_framebuffer_generation","_wasm_framebuffer_generation_ptr","_wasm_framebuffer_config_generation_ptr","_wasm_vsync_counter_ptr","_wasm_set_framebuffer_size","_wasm_set_mode_resolution","_wasm_set_heap_size","_wasm_set_slowdown_us","_wasm_set_proxy_mode","_wasm_set_proxy_http_capability","_wasm_set_proxy_tcp_stream_capability","_wasm_set_proxy_tcp_server_capability","_wasm_set_proxy_udp_capability","_wasm_set_proxy_ntp_capability","_wasm_set_proxy_tftp_capability","_wasm_set_proxy_telnet_capability","_wasm_set_proxy_mqtt_plain_capability","_wasm_set_proxy_tftp_port","_wasm_set_proxy_telnet_port","_wasm_proxy_mode","_malloc","_free"]' \
           -sEXPORTED_RUNTIME_METHODS='["ccall","cwrap","UTF8ToString","stringToUTF8","HEAPU8","HEAPU32","FS","IDBFS"]' \
