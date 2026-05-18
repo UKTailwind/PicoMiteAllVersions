@@ -279,9 +279,6 @@ endif()
 if(MMBA_RELEASE_VERSION STREQUAL "")
     message(FATAL_ERROR "MMBA_RELEASE_VERSION is empty; set it in the environment or update VERSION")
 endif()
-if(MMBA_RELEASE_VERSION MATCHES "^v")
-    message(FATAL_ERROR "MMBA_RELEASE_VERSION must not start with v; use e.g. 1.0.1")
-endif()
 
 target_compile_definitions(${COMPONENT_LIB} PUBLIC
     MMBASIC_ESP32

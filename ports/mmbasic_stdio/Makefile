@@ -17,9 +17,6 @@ MMBA_RELEASE_VERSION := $(strip $(MMBA_RELEASE_VERSION))
 ifeq ($(MMBA_RELEASE_VERSION),)
 $(error MMBA_RELEASE_VERSION is empty; set it in the environment or create $(VERSION_FILE))
 endif
-ifneq ($(filter v%,$(MMBA_RELEASE_VERSION)),)
-$(error MMBA_RELEASE_VERSION must not start with v; use e.g. 1.0.1)
-endif
 THIRD_PARTY_CFLAGS := -I$(REPO_ROOT)/third_party/aes \
                       -I$(REPO_ROOT)/third_party/cjson \
                       -I$(REPO_ROOT)/third_party/dr_libs \
