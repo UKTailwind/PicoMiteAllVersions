@@ -1,7 +1,7 @@
 # ports/mmbasic_stdio/Makefile — pure-stdio MMBasic binary.
 #
 # This is the HAL litmus test.  The link line below deliberately omits
-# Editor.c, MMBasic_REPL.c, MMBasic_Prompt.c, and every display /
+# core/mmbasic/Editor.c, core/mmbasic/MMBasic_REPL.c, core/mmbasic/MMBasic_Prompt.c, and every display /
 # audio / pin driver.  If the core is HAL-clean, we get a working
 # interpreter.  Missing symbols = HAL leak; fix in core, not here.
 
@@ -11,6 +11,15 @@ REPO_ROOT := $(abspath $(PORT_DIR)/../..)
 SIM_VM_DIR := $(REPO_ROOT)/ports/vm_sys_sim
 PICO_COMPAT_DIR := $(REPO_ROOT)/ports/pico_sdk_compat
 BUILD_DIR := $(PORT_DIR)/build
+THIRD_PARTY_CFLAGS := -I$(REPO_ROOT)/third_party/aes \
+                      -I$(REPO_ROOT)/third_party/cjson \
+                      -I$(REPO_ROOT)/third_party/dr_libs \
+                      -I$(REPO_ROOT)/third_party/fatfs \
+                      -I$(REPO_ROOT)/third_party/hxcmod \
+                      -I$(REPO_ROOT)/third_party/littlefs \
+                      -I$(REPO_ROOT)/third_party/picojpeg \
+                      -I$(REPO_ROOT)/third_party/regex \
+                      -I$(REPO_ROOT)/third_party/upng
 
 # Compiler-table sizes come from ports/host_native/port_config.h via
 # the include path.  No build-flag dispatch.
@@ -21,7 +30,8 @@ CFLAGS = -std=gnu11 -g -Os -flto -Wall -Wno-unused-variable -Wno-unused-function
          -ffunction-sections -fdata-sections \
          -DMMBASIC_HOST -DMMBASIC_STDIO -DFF_MAX_LFN_LARGE \
          -include host_platform.h \
-         -I$(PORT_DIR) -I$(REPO_ROOT)/ports/host_native -I$(PICO_COMPAT_DIR) -I$(REPO_ROOT) \
+         $(THIRD_PARTY_CFLAGS) \
+         -I$(PORT_DIR) -I$(REPO_ROOT)/ports/host_native -I$(PICO_COMPAT_DIR) -I$(REPO_ROOT)/core/mmbasic -I$(REPO_ROOT)/runtime/vm -I$(REPO_ROOT)/shared/gfx -I$(REPO_ROOT)/shared/audio -I$(REPO_ROOT)/shared/mmbasic -I$(REPO_ROOT)/drivers/bmp_decoder -I$(REPO_ROOT)/drivers/gps -I$(REPO_ROOT)/drivers/gui_controls -I$(REPO_ROOT)/drivers/gui_touch -I$(REPO_ROOT)/drivers/i2c_bus -I$(REPO_ROOT)/drivers/onewire -I$(REPO_ROOT)/drivers/psram_heap -I$(REPO_ROOT)/drivers/serial -I$(REPO_ROOT)/drivers/spi_bus -I$(REPO_ROOT)/drivers/spi_lcd -I$(REPO_ROOT)/drivers/ssd1963 -I$(REPO_ROOT) \
          -MMD -MP
 
 # Dead-code stripping: macOS ld uses -dead_strip; GNU ld uses --gc-sections.
@@ -32,19 +42,19 @@ else
   LDFLAGS = -lm -flto -Wl,--gc-sections
 endif
 
-# Core MMBasic — same list as host_native minus Editor.c,
-# MMBasic_REPL.c, MMBasic_Prompt.c.  Keep shared gfx / state so Draw.c
+# Core MMBasic — same list as host_native minus core/mmbasic/Editor.c,
+# core/mmbasic/MMBasic_REPL.c, MMBasic_Prompt.c.  Keep shared gfx / state so core/mmbasic/Draw.c
 # etc. link, but the display goes through hal_display stubs.
-CORE_SRCS = MMBasic.c Commands.c Functions.c Operators.c MATHS.c Memory.c MMBasic_Print.c
-CORE_SRCS += gfx_box_shared.c gfx_circle_shared.c gfx_line_shared.c gfx_pixel_shared.c gfx_cls_shared.c gfx_text_shared.c gfx_console_shared.c
-CORE_SRCS += mm_misc_shared.c OptionCommands.c
+CORE_SRCS = core/mmbasic/MMBasic.c core/mmbasic/Commands.c core/mmbasic/Functions.c core/mmbasic/Operators.c core/mmbasic/MATHS.c core/mmbasic/Memory.c core/mmbasic/MMBasic_Print.c
+CORE_SRCS += shared/gfx/gfx_box_shared.c shared/gfx/gfx_circle_shared.c shared/gfx/gfx_line_shared.c shared/gfx/gfx_pixel_shared.c shared/gfx/gfx_cls_shared.c shared/gfx/gfx_text_shared.c shared/gfx/gfx_console_shared.c
+CORE_SRCS += shared/mmbasic/mm_misc_shared.c core/mmbasic/OptionCommands.c
 CORE_SRCS += display_state.c pin_state.c option_state.c audio_state.c
 CORE_SRCS += mm_net_interrupts.c
 CORE_SRCS += mm_net_http.c
 CORE_SRCS += mm_net_ntp.c
 CORE_SRCS += mm_net_telnet_rx.c
 CORE_SRCS += mm_net_state.c
-CORE_SRCS += Draw.c RGB121.c Tilemap.c FileIO.c Audio.c BmpDecoder.c re.c picojpeg.c
+CORE_SRCS += core/mmbasic/Draw.c shared/gfx/RGB121.c shared/gfx/Tilemap.c core/mmbasic/FileIO.c shared/audio/Audio.c drivers/bmp_decoder/BmpDecoder.c third_party/regex/re.c third_party/picojpeg/picojpeg.c
 # Stubs inherited from host_native (dr_mp3, SPI-LCD, VGA, GUI, 3D, uPNG).
 CORE_SRCS += audio_mp3_stub.c spi_lcd_mem332_stub.c display_merge_stub.c vga_ops_stub.c
 CORE_SRCS += gfx_3d.c upng_sprite_stub.c gui_touch_stub.c gui_controls_stub.c psram_heap_stub.c hal_psram_stub.c i2c_keypad_stub.c heartbeat_stub.c
@@ -52,9 +62,9 @@ CORE_SRCS += editor_console_stub.c
 CORE_SRCS += display_pixel_host.c
 
 # Bytecode VM — the same set the native host links (so FRUN works).
-BC_SRCS = bc_alloc.c bc_bridge.c vm_host_fat.c ff.c ffunicode.c ffsystem.c \
-          vm_sys_input.c vm_sys_graphics.c vm_sys_time.c vm_sys_pin_sim.c vm_sys_file_sim.c \
-          bc_source.c bc_compiler_core.c bc_vm.c bc_runtime.c bc_debug.c
+BC_SRCS = runtime/vm/bc_alloc.c runtime/vm/bc_bridge.c runtime/vm/vm_host_fat.c third_party/fatfs/ff.c third_party/fatfs/ffunicode.c third_party/fatfs/ffsystem.c \
+          runtime/vm/vm_sys_input.c runtime/vm/vm_sys_graphics.c runtime/vm/vm_sys_time.c vm_sys_pin_sim.c vm_sys_file_sim.c \
+          runtime/vm/bc_source.c runtime/vm/bc_compiler_core.c runtime/vm/bc_vm.c runtime/vm/bc_runtime.c runtime/vm/bc_debug.c
 
 # Port-native files reused wholesale — the HAL impls + runtime state
 # container.  host_fb / host_fastgfx / host_terminal / host_main are
@@ -95,6 +105,10 @@ $(BUILD_DIR)/%.o: $(SIM_VM_DIR)/%.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 $(BUILD_DIR)/%.o: $(REPO_ROOT)/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/third_party/%.o: $(REPO_ROOT)/third_party/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c -o $@ $<
 

@@ -184,7 +184,7 @@ Switching to `spi_gap0_sample1` was needed for any divider ≥ 6.
   `GetMemory()` is safe. Earlier failures with poll mode were before
   the priority/divider tuning was right.
 
-DMA priority bump on CYW43 channels (in MMsetwifi.c WebConnect after
+DMA priority bump on CYW43 channels (in shared/net/MMsetwifi.c WebConnect after
 cyw43_arch_init):
 
 ```c
@@ -281,8 +281,8 @@ healthy.
 - `ports/dvi_wifi_rp2350/port_sources.cmake` — `CYW43_PIO_CLOCK_DIV_INT=8`,
   `CYW43_SPI_PROGRAM_NAME=spi_gap0_sample1`, `pico_cyw43_arch_lwip_poll`,
   `pico_stdio_rtt`, `CYW43_PRINTF=printf` debug overrides.
-- `MMsetwifi.c` — DMA priority bump, async-event trace flags.
-- `MMtelnet.c` — `cyw43_arch_poll()` + heartbeat in ProcessWeb.
-- `MMtcpserver.c` — `printf` traces in accept / open / recv.
+- `shared/net/MMsetwifi.c` — DMA priority bump, async-event trace flags.
+- `shared/net/MMtelnet.c` — `cyw43_arch_poll()` + heartbeat in ProcessWeb.
+- `shared/net/MMtcpserver.c` — `printf` traces in accept / open / recv.
 - `Commands.c` — TCP cleanup added to `do_end()` (cleanserver,
   TCPreceive*, CurrentLinePtr).

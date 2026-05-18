@@ -2,7 +2,7 @@
 
 This document is the current command-coverage matrix for the VM BASIC program path.
 
-It is derived from the legacy command table in [AllCommands.h](../AllCommands.h) and uses only these status terms:
+It is derived from the legacy command table in [AllCommands.h](../core/mmbasic/AllCommands.h) and uses only these status terms:
 
 - `implemented`
 - `partial`

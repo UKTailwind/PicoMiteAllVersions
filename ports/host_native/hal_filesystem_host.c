@@ -99,7 +99,7 @@ char *hal_fs_getcwd(char *buf, size_t n)
 
 extern const char *host_sd_root;
 
-/* Host mounts FatFS with the default empty drive (see vm_host_fat.c).
+/* Host mounts FatFS with the default empty drive (see runtime/vm/vm_host_fat.c).
  * Strip MMBasic's "A:"/"B:" prefix before dispatch. */
 static const char *host_hal_path(const char *p)
 {

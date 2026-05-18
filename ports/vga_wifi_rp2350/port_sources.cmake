@@ -4,7 +4,7 @@
 
 target_include_directories(PicoMite PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}
-    ${CMAKE_SOURCE_DIR}     # for our common lwipopts
+    ${CMAKE_SOURCE_DIR}/ports/pico_sdk_common
 )
 
 target_sources(PicoMite PRIVATE
@@ -22,13 +22,13 @@ target_sources(PicoMite PRIVATE
     ${CMAKE_SOURCE_DIR}/drivers/audio_i2s_pio/audio_i2s_pio_stub.c
 
     # WiFi stack (CYW43 + lwIP + MQTT/UDP/TFTP/Telnet/NTP/HTTPD). NOTE:
-    # SSD1963.c and Touch.c are intentionally omitted — they live in the
-    # SPI-LCD path and Touch.c references TOUCH_XSCALE/YSCALE fields
+    # drivers/ssd1963/SSD1963.c and drivers/gui_touch/Touch.c are intentionally omitted — they live in the
+    # SPI-LCD path and drivers/gui_touch/Touch.c references TOUCH_XSCALE/YSCALE fields
     # that don't exist on PICOMITEVGA's `struct option_s`. AllCommands.h
     # only dispatches fun_touch on non-VGA ports so the linker is happy
-    # without Touch.c on this F2 combo.
-    ${CMAKE_SOURCE_DIR}/cJSON.c
-    ${CMAKE_SOURCE_DIR}/mqtt.c
+    # without drivers/gui_touch/Touch.c on this F2 combo.
+    ${CMAKE_SOURCE_DIR}/third_party/cjson/cJSON.c
+    ${CMAKE_SOURCE_DIR}/shared/net/mqtt.c
     ${CMAKE_SOURCE_DIR}/shared/net/mm_net_http_file.c
     ${CMAKE_SOURCE_DIR}/shared/net/mm_net_http_page.c
     ${CMAKE_SOURCE_DIR}/shared/net/mm_net_mqtt_cmd.c
@@ -46,18 +46,18 @@ target_sources(PicoMite PRIVATE
     ${CMAKE_SOURCE_DIR}/shared/net/mm_net_web_cmd.c
     ${CMAKE_SOURCE_DIR}/shared/net/mm_net_wifi_cmd.c
     ${CMAKE_SOURCE_DIR}/drivers/net_lwip_raw/hal_net_lwip.c
-    ${CMAKE_SOURCE_DIR}/MMMqtt.c
-    ${CMAKE_SOURCE_DIR}/MMTCPclient.c
-    ${CMAKE_SOURCE_DIR}/MMtelnet.c
-    ${CMAKE_SOURCE_DIR}/MMntp.c
-    ${CMAKE_SOURCE_DIR}/MMtcpserver.c
-    ${CMAKE_SOURCE_DIR}/MMtftp.c
-    ${CMAKE_SOURCE_DIR}/MMudp.c
-    ${CMAKE_SOURCE_DIR}/MMsetwifi.c
+    ${CMAKE_SOURCE_DIR}/shared/net/MMMqtt.c
+    ${CMAKE_SOURCE_DIR}/shared/net/MMTCPclient.c
+    ${CMAKE_SOURCE_DIR}/shared/net/MMtelnet.c
+    ${CMAKE_SOURCE_DIR}/shared/net/MMntp.c
+    ${CMAKE_SOURCE_DIR}/shared/net/MMtcpserver.c
+    ${CMAKE_SOURCE_DIR}/shared/net/MMtftp.c
+    ${CMAKE_SOURCE_DIR}/shared/net/MMudp.c
+    ${CMAKE_SOURCE_DIR}/shared/net/MMsetwifi.c
 
     # rp2350 features. This board has no PSRAM, so link the
     # psram_heap stub.
-    ${CMAKE_SOURCE_DIR}/upng.c
+    ${CMAKE_SOURCE_DIR}/third_party/upng/upng.c
     ${CMAKE_SOURCE_DIR}/drivers/audio_mp3/audio_mp3_real.c
     ${CMAKE_SOURCE_DIR}/drivers/heartbeat/heartbeat_stub.c
     ${CMAKE_SOURCE_DIR}/drivers/psram_heap/psram_heap_stub.c
@@ -75,7 +75,7 @@ target_sources(PicoMite PRIVATE
 
     # gfx_3d.c included — F2 has PICOMITEVGA so the dispatch table
     # references fun_3D / fun_map / fun_getscanline (gated on
-    # #ifdef PICOMITEVGA in AllCommands.h). MMtcpserver.c's closeall3d
+    # #ifdef PICOMITEVGA in AllCommands.h). shared/net/MMtcpserver.c's closeall3d
     # stub is gated out on PICOMITEVGA so the real closeall3d from
     # gfx_3d.c provides it.
     ${CMAKE_SOURCE_DIR}/drivers/gfx_3d/gfx_3d.c
@@ -88,12 +88,12 @@ target_sources(PicoMite PRIVATE
     ${CMAKE_SOURCE_DIR}/drivers/ps2_matrix/Keyboard.c
         ${CMAKE_SOURCE_DIR}/drivers/ps2_matrix/hal_keyboard_ps2.c
         ${CMAKE_SOURCE_DIR}/drivers/console_cdc/console_cdc.c
-    ${CMAKE_SOURCE_DIR}/mouse.c
+    ${CMAKE_SOURCE_DIR}/drivers/ps2_mouse/mouse.c
 )
 
-set_source_files_properties(${CMAKE_SOURCE_DIR}/cJSON.c PROPERTIES COMPILE_FLAGS -Os)
+set_source_files_properties(${CMAKE_SOURCE_DIR}/third_party/cjson/cJSON.c PROPERTIES COMPILE_FLAGS -Os)
 
-pico_generate_pio_header(PicoMite ${CMAKE_SOURCE_DIR}/PicoMiteVGA.pio)
+pico_generate_pio_header(PicoMite ${CMAKE_SOURCE_DIR}/drivers/pio/PicoMiteVGA.pio)
 
 # --- Per-port build config ------------------------------------------------
 # PICOMITEVGA — VGA-family core branches.

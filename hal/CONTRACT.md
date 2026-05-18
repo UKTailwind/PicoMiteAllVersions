@@ -263,11 +263,11 @@ Return type dropped to `void` — the earlier sketch returned `int` but neither 
 
 **Call sites in core (migrated Phase 6a):**
 
-- `Audio.c` host arm (lines 2225–2323) — `cmd_play`, `CloseAudio`, `StopAudio` route through `hal_audio_*` instead of calling `host_sim_audio_*` directly.
+- `shared/audio/Audio.c` host arm (lines 2225–2323) — `cmd_play`, `CloseAudio`, `StopAudio` route through `hal_audio_*` instead of calling `host_sim_audio_*` directly.
 
 **Not yet migrated:**
 
-- `Audio.c` device arm (~2000 lines of PWM / DMA / codec logic). Device `cmd_play` TONE/SOUND/STOP/VOLUME/PAUSE/RESUME handling stays hardware-gated until the `#ifndef MMBASIC_HOST` wrapper is collapsed in Phase 6b.
+- `shared/audio/Audio.c` device arm (~2000 lines of PWM / DMA / codec logic). Device `cmd_play` TONE/SOUND/STOP/VOLUME/PAUSE/RESUME handling stays hardware-gated until the `#ifndef MMBASIC_HOST` wrapper is collapsed in Phase 6b.
 - `hal_audio_sample_push(const int16_t *samples, size_t frames)` for WAV/FLAC/MP3/MOD/MIDI streaming — Phase 6b.
 - `drivers/pwm_synth/` + `drivers/vs1053/` physical relocation — Phase 6c.
 

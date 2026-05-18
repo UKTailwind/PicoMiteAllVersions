@@ -63,7 +63,7 @@ extern int TOUCH_CS_PIN;
 #ifndef nop
 #define nop asm("NOP")
 #endif
-#include "VS1053.h"
+#include "drivers/vs1053/VS1053.h"
 #include "pico/multicore.h"
 #include "hardware/sync.h"
 #include "hardware/pio.h"

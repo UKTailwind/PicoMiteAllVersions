@@ -24,13 +24,13 @@ target_sources(PicoMite PRIVATE
     ${CMAKE_SOURCE_DIR}/drivers/editor_console/editor_console_stub.c
     ${CMAKE_SOURCE_DIR}/drivers/gui_touch/gui_touch.c
     ${CMAKE_SOURCE_DIR}/drivers/gui_controls/gui_controls_real.c
-    ${CMAKE_SOURCE_DIR}/SSD1963.c
-    ${CMAKE_SOURCE_DIR}/Touch.c
-    ${CMAKE_SOURCE_DIR}/GUI.c
+    ${CMAKE_SOURCE_DIR}/drivers/ssd1963/SSD1963.c
+    ${CMAKE_SOURCE_DIR}/drivers/gui_touch/Touch.c
+    ${CMAKE_SOURCE_DIR}/drivers/gui_controls/GUI.c
 
     # rp2350 features.
-    ${CMAKE_SOURCE_DIR}/psram.c
-    ${CMAKE_SOURCE_DIR}/upng.c
+    ${CMAKE_SOURCE_DIR}/drivers/psram_heap/psram.c
+    ${CMAKE_SOURCE_DIR}/third_party/upng/upng.c
     ${CMAKE_SOURCE_DIR}/drivers/audio_mp3/audio_mp3_real.c
     ${CMAKE_SOURCE_DIR}/drivers/heartbeat/heartbeat_real.c
     ${CMAKE_SOURCE_DIR}/drivers/psram_heap/psram_heap_real.c
@@ -41,7 +41,7 @@ target_sources(PicoMite PRIVATE
 
     # Non-WEB feature backends.
     ${CMAKE_SOURCE_DIR}/drivers/gfx_3d/gfx_3d.c
-    ${CMAKE_SOURCE_DIR}/MMweb_stubs.c
+    ${CMAKE_SOURCE_DIR}/shared/net/MMweb_stubs.c
 )
 
 # Keyboard backend axis.
@@ -55,7 +55,7 @@ else()
         ${CMAKE_SOURCE_DIR}/drivers/ps2_matrix/Keyboard.c
         ${CMAKE_SOURCE_DIR}/drivers/ps2_matrix/hal_keyboard_ps2.c
         ${CMAKE_SOURCE_DIR}/drivers/console_cdc/console_cdc.c
-        ${CMAKE_SOURCE_DIR}/mouse.c
+        ${CMAKE_SOURCE_DIR}/drivers/ps2_mouse/mouse.c
     )
 endif()
 
@@ -89,5 +89,5 @@ else()
 endif()
 
 if (SDBOOT STREQUAL "true" AND COMPILE STREQUAL "PICORP2350")
-    pico_set_linker_script(PicoMite ${CMAKE_SOURCE_DIR}/memmap_default_rp2350.ld)
+    pico_set_linker_script(PicoMite ${CMAKE_SOURCE_DIR}/cmake/linker/memmap_default_rp2350.ld)
 endif()

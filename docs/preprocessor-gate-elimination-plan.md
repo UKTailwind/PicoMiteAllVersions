@@ -67,9 +67,9 @@ is *every* form of `HAL_PORT_*` consultation in compiled source.
 | `Hardware_Includes.h` | 10 | Includes by feature |
 | `drivers/vga_pio/vga_ops.c` | 10 | NEXTGEN-display + GUICONTROLS gates |
 | `ports/pico_sdk_common/print_display_options.c` | 9 | OPTION LIST per feature |
-| `Touch.c` | 8 | Touch panel gating |
+| `drivers/gui_touch/Touch.c` | 8 | Touch panel gating |
 | `Custom.c` | 6 | CSUB / CFunction gating |
-| `I2C.c` | 5 | I2C-keypad protocol |
+| `drivers/i2c_bus/I2C.c` | 5 | I2C-keypad protocol |
 | (long tail) | … | 4 sites or fewer in 16 more files |
 
 Per-flag distribution:
@@ -191,12 +191,12 @@ splits (E5i, E5j) rather than more conditional compilation.
 From the E1 audit, attack the smallest-flag elimination first:
 
 - `HAL_PORT_HAS_GUICONTROLS` (10 sites). After P3 most should already
-  be hooks. Remaining sites are likely in `Touch.c` / `gui_touch.c`.
-  `Touch.c` is itself GUI-only and may not need to compile at all on
+  be hooks. Remaining sites are likely in `drivers/gui_touch/Touch.c` / `gui_touch.c`.
+  `drivers/gui_touch/Touch.c` is itself GUI-only and may not need to compile at all on
   non-GUICONTROLS ports — gate it via `port_sources.cmake` linkage
   rather than in-file `#if`s. Drop the internal gates.
 - `HAL_PORT_HAS_I2C_KEYPAD` (14 sites). Small enough to fully
-  decompose. Targets: I2C.c keypad protocol → real-vs-stub split,
+  decompose. Targets: drivers/i2c_bus/I2C.c keypad protocol → real-vs-stub split,
   PicoMite.c boot delay → hook, drivers/sd_spi/mmc_stm32.c
   shared-bus init → hook, port_load_overrides.c + picocalc_features.c
   → split.
@@ -278,7 +278,7 @@ drivers/board_profiles/
     board_profile_registry.c   — table of registered profiles + dispatch
     profile_picocalc.c         — sets OPTION defaults for the PicoCalc board
     profile_gamemite.c         —      …      Game*Mite
-    profile_pico_computer.c    —      …      Pico Computer
+    profile_pico_computer.c    —      …      Pico-Computer board
     profile_picoresttouch.c    —      …      Pico-ResTouch
     profile_hdmi_usb.c         —      …      HDMI-USB
     …

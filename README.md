@@ -134,7 +134,7 @@ For the BASIC language itself, see Geoff Graham's MMBasic manuals and Peter Math
 
 ## License and copyright
 
-MMBasic is licensed under the terms in [Version.h](Version.h). The license requires that the name MMBasic be used when referring to the interpreter and that the original copyright lines be displayed at startup. Both conditions are honored on every target's boot banner.
+MMBasic is licensed under the terms in [core/mmbasic/Version.h](core/mmbasic/Version.h). The license requires that the name MMBasic be used when referring to the interpreter and that the original copyright lines be displayed at startup. Both conditions are honored on every target's boot banner.
 
 ```
 Copyright 2011-2026 Geoff Graham

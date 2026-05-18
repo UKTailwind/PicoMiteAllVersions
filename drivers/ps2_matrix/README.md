@@ -19,8 +19,8 @@ variants link `drivers/usb_host_kbd/USBKeyboard.c` instead.
 
 `Keyboard.c` (repo root, pre-Phase-5 refactor). No behavioural change
 on the move — source was relocated and the CMake reference updated.
-`PS2Keyboard.h` stays at repo root because it's the interface header
-read by core files.
+`PS2Keyboard.h` now lives with this driver and is included through the
+explicit `drivers/ps2_matrix/` path where shared keyboard glue needs it.
 
 ## Future work
 

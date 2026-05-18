@@ -97,19 +97,19 @@ PORT_IFDEF_RE="${ALL_IFDEF_RE}.*\\b(HAL_PORT_[A-Za-z0-9_]+|PORT_[A-Za-z0-9_]+)\\
 # Files whose purity is currently enforced (fail on any hit).
 # Empty at Phase 0 start — populated as phases migrate files.
 STRICT_FILES=(
-  External.c  # F2 close: zero target-macro, zero port-config ifdefs.
-  FileIO.c    # F3 close: zero target-macro, zero port-config ifdefs.
-  MM_Misc.c   # F4 close: zero target-macro, zero port-config ifdefs.
-  Audio.c     # Phase 6b close: zero target-macro, zero port-config ifdefs.
-  Draw.c      # Phase 7b close: zero target-macro, zero port-config ifdefs.
+  core/mmbasic/External.c  # F2 close: zero target-macro, zero port-config ifdefs.
+  core/mmbasic/FileIO.c    # F3 close: zero target-macro, zero port-config ifdefs.
+  core/mmbasic/MM_Misc.c   # F4 close: zero target-macro, zero port-config ifdefs.
+  shared/audio/Audio.c     # Phase 6b close: zero target-macro, zero port-config ifdefs.
+  core/mmbasic/Draw.c      # Phase 7b close: zero target-macro, zero port-config ifdefs.
               # Remaining 3 #ifdef GUICONTROLS gates are feature flags
               # (not target macros), permitted by the strict check.
-  Memory.c    # Phase 10 close: zero target-macro, zero port-config
+  core/mmbasic/Memory.c    # Phase 10 close: zero target-macro, zero port-config
               # ifdefs. Remaining 1 #ifdef GUICONTROLS is a feature
               # flag, permitted by the strict check.
-  Commands.c  # Phase 11 close: zero target-macro, zero port-config
+  core/mmbasic/Commands.c  # Phase 11 close: zero target-macro, zero port-config
               # ifdefs.
-  Functions.c # Phase 11 close: zero target-macro, zero port-config
+  core/mmbasic/Functions.c # Phase 11 close: zero target-macro, zero port-config
               # ifdefs.
   bc_runtime.c # Phase 11 step 12 close: zero target-macro, zero
               # port-config ifdefs. Source-load and source-free moved
@@ -123,7 +123,7 @@ STRICT_FILES=(
               # deleted — the 170-line VM-local draw_circle impl works
               # on host too (uses only shared DrawPixel/DrawRectangle
               # plus the VM's own scratch allocator, both unconditional).
-  MMBasic.c   # Phase 11 step 20 close: zero target-macro, zero
+  core/mmbasic/MMBasic.c   # Phase 11 step 20 close: zero target-macro, zero
               # port-config ifdefs. funtbl[] + hashlabels + hash-based
               # FindSubFun / findlabel / findvar collision check moved
               # to ports/pico_sdk_common/funtbl_port.c behind
@@ -156,16 +156,16 @@ ESP32_PLATFORM=ports/esp32_s3_metro/main/esp32_platform.h
 
 # Files tracked informationally (report counts, do not fail).
 INFO_FILES=(
-  Draw.c
-  MM_Misc.c
-  External.c
-  FileIO.c
-  Commands.c
-  Memory.c
-  Functions.c
-  Audio.c
-  Operators.c
-  MMBasic.c
+  core/mmbasic/Draw.c
+  core/mmbasic/MM_Misc.c
+  core/mmbasic/External.c
+  core/mmbasic/FileIO.c
+  core/mmbasic/Commands.c
+  core/mmbasic/Memory.c
+  core/mmbasic/Functions.c
+  shared/audio/Audio.c
+  core/mmbasic/Operators.c
+  core/mmbasic/MMBasic.c
   bc_source.c
   bc_vm.c
   bc_runtime.c

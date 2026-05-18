@@ -14,6 +14,15 @@ REPO_ROOT := $(abspath $(PORT_DIR)/../..)
 PICO_COMPAT_DIR := $(REPO_ROOT)/ports/pico_sdk_compat
 BUILD_DIR := $(PORT_DIR)/build
 PC386_AUDIO ?= sb16
+THIRD_PARTY_CFLAGS := -I$(REPO_ROOT)/third_party/aes \
+                      -I$(REPO_ROOT)/third_party/cjson \
+                      -I$(REPO_ROOT)/third_party/dr_libs \
+                      -I$(REPO_ROOT)/third_party/fatfs \
+                      -I$(REPO_ROOT)/third_party/hxcmod \
+                      -I$(REPO_ROOT)/third_party/littlefs \
+                      -I$(REPO_ROOT)/third_party/picojpeg \
+                      -I$(REPO_ROOT)/third_party/regex \
+                      -I$(REPO_ROOT)/third_party/upng
 
 CROSS_PREFIX ?= i686-elf-
 CC      := $(CROSS_PREFIX)gcc
@@ -39,15 +48,16 @@ CFLAGS = -std=gnu11 -ffreestanding -O2 -g \
          -DMMBASIC_HOST -DPORT_PC386 \
          -DFF_VOLUMES=3 -DFF_STR_VOLUME_ID=1 -DFF_VOLUME_STRS='"A","B","C"' \
          -include pc386_platform.h \
+         $(THIRD_PARTY_CFLAGS) \
          -I$(PORT_DIR)/include_shim -I$(PORT_DIR) \
-         -I$(REPO_ROOT)/ports/host_native -I$(PICO_COMPAT_DIR) -I$(REPO_ROOT) \
+         -I$(REPO_ROOT)/ports/host_native -I$(PICO_COMPAT_DIR) -I$(REPO_ROOT)/core/mmbasic -I$(REPO_ROOT)/runtime/vm -I$(REPO_ROOT)/shared/gfx -I$(REPO_ROOT)/shared/audio -I$(REPO_ROOT)/shared/mmbasic -I$(REPO_ROOT)/drivers/bmp_decoder -I$(REPO_ROOT)/drivers/gps -I$(REPO_ROOT)/drivers/gui_controls -I$(REPO_ROOT)/drivers/gui_touch -I$(REPO_ROOT)/drivers/i2c_bus -I$(REPO_ROOT)/drivers/onewire -I$(REPO_ROOT)/drivers/psram_heap -I$(REPO_ROOT)/drivers/serial -I$(REPO_ROOT)/drivers/spi_bus -I$(REPO_ROOT)/drivers/spi_lcd -I$(REPO_ROOT)/drivers/ssd1963 -I$(REPO_ROOT) \
          -MMD -MP
 
 # Assembly: drop -include (assembler can't parse C typedefs) and the
 # include_shim path (no .S file needs it).
 ASFLAGS = -ffreestanding -g -fno-pic -fno-pie \
           -DMMBASIC_HOST -DPORT_PC386 \
-          -I$(PORT_DIR) -I$(REPO_ROOT)
+          -I$(PORT_DIR) -I$(REPO_ROOT)/shared/gfx -I$(REPO_ROOT)/shared/audio -I$(REPO_ROOT)/shared/mmbasic -I$(REPO_ROOT)/drivers/bmp_decoder -I$(REPO_ROOT)/drivers/gps -I$(REPO_ROOT)/drivers/gui_controls -I$(REPO_ROOT)/drivers/gui_touch -I$(REPO_ROOT)/drivers/i2c_bus -I$(REPO_ROOT)/drivers/onewire -I$(REPO_ROOT)/drivers/psram_heap -I$(REPO_ROOT)/drivers/serial -I$(REPO_ROOT)/drivers/spi_bus -I$(REPO_ROOT)/drivers/spi_lcd -I$(REPO_ROOT)/drivers/ssd1963 -I$(REPO_ROOT)
 
 LDFLAGS = -nostdlib -no-pie -T $(PORT_DIR)/linker.ld -Wl,--build-id=none
 
@@ -77,12 +87,12 @@ PORT_SRCS = kmain.c kprint.c mmap.c heap_region.c kstring.c \
 # MMBasic core sources brought in for stage 3c.1+. Mirrors mmbasic_stdio's
 # CORE_SRCS list. Files in repo root, drivers/, and core/state/ each
 # get their own pattern rule below so the build dir stays organised.
-CORE_SRCS = MMBasic.c Commands.c Functions.c Operators.c MATHS.c Memory.c Editor.c
-CORE_SRCS += MMBasic_Print.c MMBasic_REPL.c MMBasic_Prompt.c
-CORE_SRCS += gfx_box_shared.c gfx_circle_shared.c gfx_line_shared.c gfx_pixel_shared.c
-CORE_SRCS += gfx_cls_shared.c gfx_text_shared.c gfx_console_shared.c
-CORE_SRCS += mm_misc_shared.c OptionCommands.c
-CORE_SRCS += Draw.c RGB121.c Tilemap.c FileIO.c Audio.c BmpDecoder.c re.c picojpeg.c
+CORE_SRCS = core/mmbasic/MMBasic.c core/mmbasic/Commands.c core/mmbasic/Functions.c core/mmbasic/Operators.c core/mmbasic/MATHS.c core/mmbasic/Memory.c core/mmbasic/Editor.c
+CORE_SRCS += core/mmbasic/MMBasic_Print.c core/mmbasic/MMBasic_REPL.c core/mmbasic/MMBasic_Prompt.c
+CORE_SRCS += shared/gfx/gfx_box_shared.c shared/gfx/gfx_circle_shared.c shared/gfx/gfx_line_shared.c shared/gfx/gfx_pixel_shared.c
+CORE_SRCS += shared/gfx/gfx_cls_shared.c shared/gfx/gfx_text_shared.c shared/gfx/gfx_console_shared.c
+CORE_SRCS += shared/mmbasic/mm_misc_shared.c core/mmbasic/OptionCommands.c
+CORE_SRCS += core/mmbasic/Draw.c shared/gfx/RGB121.c shared/gfx/Tilemap.c core/mmbasic/FileIO.c shared/audio/Audio.c drivers/bmp_decoder/BmpDecoder.c third_party/regex/re.c third_party/picojpeg/picojpeg.c
 
 CORE_STATE_SRCS = display_state.c pin_state.c option_state.c audio_state.c
 # runtime_interrupt.c is omitted: pc386's check_interrupt/cmd_ireturn
@@ -93,10 +103,10 @@ RUNTIME_SRCS = runtime_boot.c runtime_program.c runtime_console_putchar.c runtim
 
 # BC (bytecode) compiler + VM. ff/ffunicode/ffsystem are already in
 # FATFS_SRCS so don't re-list them here.
-BC_SRCS = bc_alloc.c bc_bridge.c \
-          vm_sys_input.c vm_sys_graphics.c vm_sys_time.c \
-          bc_source.c bc_compiler_core.c bc_vm.c bc_runtime.c bc_debug.c
-# vm_host_fat.c (in-RAM FAT for sim B: drive) is omitted: pc386 has
+BC_SRCS = runtime/vm/bc_alloc.c runtime/vm/bc_bridge.c \
+          runtime/vm/vm_sys_input.c runtime/vm/vm_sys_graphics.c runtime/vm/vm_sys_time.c \
+          runtime/vm/bc_source.c runtime/vm/bc_compiler_core.c runtime/vm/bc_vm.c runtime/vm/bc_runtime.c runtime/vm/bc_debug.c
+# runtime/vm/vm_host_fat.c (in-RAM FAT for sim B: drive) is omitted: pc386 has
 # real FatFs over ATA-PIO from Stage 2 and provides its own
 # get_fattime() in drivers/fatfs/ff_glue.c.
 
@@ -146,10 +156,10 @@ DRIVER_SRCS = \
     lpt_centronics/lpt_centronics.c \
     vga_mode13h/vga_mode13h.c
 
-# FatFs is vendored at the repo root (R0.14, shared with every other
+# FatFs is vendored under third_party/ (R0.14, shared with every other
 # port). Compile in-place; our drivers/fatfs/ff_glue.c provides the
 # disk_io adapter onto ATA-PIO.
-FATFS_SRCS = ff.c ffunicode.c ffsystem.c
+FATFS_SRCS = third_party/fatfs/ff.c third_party/fatfs/ffunicode.c third_party/fatfs/ffsystem.c
 
 ASM_OBJS    := $(addprefix $(BUILD_DIR)/,$(PORT_ASM:.S=.o))
 PORT_C_OBJS := $(addprefix $(BUILD_DIR)/,$(PORT_SRCS:.c=.o))
@@ -237,7 +247,7 @@ $(BUILD_DIR)/hal/generic/%.o: $(REPO_ROOT)/hal/generic/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-# MMBasic core sources from the repo root.
+# MMBasic core sources.
 $(BUILD_DIR)/core/%.o: $(REPO_ROOT)/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c -o $@ $<

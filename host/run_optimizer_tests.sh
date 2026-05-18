@@ -688,7 +688,7 @@ run_inc_side_effect_equiv_test() {
 }
 
 run_mand_opt_smoke_test() {
-    local testfile="../mand.bas"
+    local testfile="../demos/bench/mand.bas"
     local tmpfile
     printf "  %-30s " "mand_opt_smoke"
     tmpfile=$(mktemp)

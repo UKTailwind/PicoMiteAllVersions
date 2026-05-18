@@ -3,7 +3,7 @@
 
 target_include_directories(PicoMite PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}
-    ${CMAKE_SOURCE_DIR}     # for our common lwipopts
+    ${CMAKE_SOURCE_DIR}/ports/pico_sdk_common
 )
 
 target_sources(PicoMite PRIVATE
@@ -13,10 +13,10 @@ target_sources(PicoMite PRIVATE
     ${CMAKE_SOURCE_DIR}/ports/pico_sdk_common/mmbasic_port_pico.c
 
     # WiFi stack.
-    ${CMAKE_SOURCE_DIR}/SSD1963.c
-    ${CMAKE_SOURCE_DIR}/Touch.c
-    ${CMAKE_SOURCE_DIR}/cJSON.c
-    ${CMAKE_SOURCE_DIR}/mqtt.c
+    ${CMAKE_SOURCE_DIR}/drivers/ssd1963/SSD1963.c
+    ${CMAKE_SOURCE_DIR}/drivers/gui_touch/Touch.c
+    ${CMAKE_SOURCE_DIR}/third_party/cjson/cJSON.c
+    ${CMAKE_SOURCE_DIR}/shared/net/mqtt.c
     ${CMAKE_SOURCE_DIR}/shared/net/mm_net_http_file.c
     ${CMAKE_SOURCE_DIR}/shared/net/mm_net_http_page.c
     ${CMAKE_SOURCE_DIR}/shared/net/mm_net_mqtt_cmd.c
@@ -34,23 +34,23 @@ target_sources(PicoMite PRIVATE
     ${CMAKE_SOURCE_DIR}/shared/net/mm_net_web_cmd.c
     ${CMAKE_SOURCE_DIR}/shared/net/mm_net_wifi_cmd.c
     ${CMAKE_SOURCE_DIR}/drivers/net_lwip_raw/hal_net_lwip.c
-    ${CMAKE_SOURCE_DIR}/MMMqtt.c
-    ${CMAKE_SOURCE_DIR}/MMTCPclient.c
-    ${CMAKE_SOURCE_DIR}/MMtelnet.c
-    ${CMAKE_SOURCE_DIR}/MMntp.c
-    ${CMAKE_SOURCE_DIR}/MMtcpserver.c
-    ${CMAKE_SOURCE_DIR}/MMtftp.c
-    ${CMAKE_SOURCE_DIR}/MMudp.c
-    ${CMAKE_SOURCE_DIR}/MMsetwifi.c
+    ${CMAKE_SOURCE_DIR}/shared/net/MMMqtt.c
+    ${CMAKE_SOURCE_DIR}/shared/net/MMTCPclient.c
+    ${CMAKE_SOURCE_DIR}/shared/net/MMtelnet.c
+    ${CMAKE_SOURCE_DIR}/shared/net/MMntp.c
+    ${CMAKE_SOURCE_DIR}/shared/net/MMtcpserver.c
+    ${CMAKE_SOURCE_DIR}/shared/net/MMtftp.c
+    ${CMAKE_SOURCE_DIR}/shared/net/MMudp.c
+    ${CMAKE_SOURCE_DIR}/shared/net/MMsetwifi.c
 
     # GUICONTROLS (only WEBRP2350 combines WiFi with the widget family).
-    ${CMAKE_SOURCE_DIR}/GUI.c
+    ${CMAKE_SOURCE_DIR}/drivers/gui_controls/GUI.c
     ${CMAKE_SOURCE_DIR}/drivers/gui_controls/gui_controls_real.c
 
     # rp2350 features. PicoCalc/WebMite RP2350B boards keep QSPI PSRAM
     # available while CYW43 uses regular GPIOs for its PIO-SPI bus.
-    ${CMAKE_SOURCE_DIR}/psram.c
-    ${CMAKE_SOURCE_DIR}/upng.c
+    ${CMAKE_SOURCE_DIR}/drivers/psram_heap/psram.c
+    ${CMAKE_SOURCE_DIR}/third_party/upng/upng.c
     ${CMAKE_SOURCE_DIR}/drivers/audio_mp3/audio_mp3_real.c
     ${CMAKE_SOURCE_DIR}/drivers/heartbeat/heartbeat_stub.c
     ${CMAKE_SOURCE_DIR}/drivers/psram_heap/psram_heap_real.c
@@ -78,10 +78,10 @@ target_sources(PicoMite PRIVATE
     ${CMAKE_SOURCE_DIR}/drivers/ps2_matrix/Keyboard.c
         ${CMAKE_SOURCE_DIR}/drivers/ps2_matrix/hal_keyboard_ps2.c
         ${CMAKE_SOURCE_DIR}/drivers/console_cdc/console_cdc.c
-    ${CMAKE_SOURCE_DIR}/mouse.c
+    ${CMAKE_SOURCE_DIR}/drivers/ps2_mouse/mouse.c
 )
 
-set_source_files_properties(${CMAKE_SOURCE_DIR}/cJSON.c PROPERTIES COMPILE_FLAGS -Os)
+set_source_files_properties(${CMAKE_SOURCE_DIR}/third_party/cjson/cJSON.c PROPERTIES COMPILE_FLAGS -Os)
 
 # --- Per-port build config (Stage E2) -------------------------------------
 # CYW43_PIO_CLOCK_DIV_INT=3 (default 2 = 50 MHz gSPI at clk_sys 200 MHz,
@@ -104,5 +104,5 @@ pico_set_float_implementation(PicoMite pico_dcp)
 Pico_enable_stdio_usb(PicoMite 1)
 
 if (SDBOOT STREQUAL "true")
-    pico_set_linker_script(PicoMite ${CMAKE_SOURCE_DIR}/memmap_default_rp2350.ld)
+    pico_set_linker_script(PicoMite ${CMAKE_SOURCE_DIR}/cmake/linker/memmap_default_rp2350.ld)
 endif()

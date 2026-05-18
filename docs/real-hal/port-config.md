@@ -53,10 +53,10 @@ We will **not** create cross-product driver variants (`vga_pio_rp2040`, `vga_pio
 
 Several globals are referenced by both the interpreter and would-be drivers:
 
-- **Display state:** `HRes`, `VRes`, `FontTable[]`, `gui_font*`, `CursorTimer`, `spritebuff[]`, `struct3d[]`, `layer_in_use[]`, `frameBufferMutex` — currently defined in `Draw.c`, referenced from `MM_Misc.c`, `External.c`, `Editor.c`, `Commands.c`, `GUI.c`, and the VM.
+- **Display state:** `HRes`, `VRes`, `FontTable[]`, `gui_font*`, `CursorTimer`, `spritebuff[]`, `struct3d[]`, `layer_in_use[]`, `frameBufferMutex` — currently defined in `Draw.c`, referenced from `MM_Misc.c`, `External.c`, `Editor.c`, `Commands.c`, `drivers/gui_controls/GUI.c`, and the VM.
 - **Pin state:** `PinDef[]` — defined in `External.c`, written from both interpreter (`cmd_setpin`) and host stub init.
 - **Option block:** `Option` struct — touched everywhere; persisted by `hal_flash`.
-- **Audio state:** sample buffers, voice slots — currently in `Audio.c`.
+- **Audio state:** sample buffers, voice slots — currently in `shared/audio/Audio.c`.
 
 If `Draw.c` is split into `drivers/<display>/` files in Phase 7+, every driver that references `HRes` would either re-declare it (multiple-definition link error) or include `Draw.c` indirectly (defeats the split). **Phase 0.5 hoisted these globals into `core/state/` files** (`core/state/display_state.c`, `core/state/pin_state.c`, `core/state/option_state.c`, `core/state/audio_state.c`) before any driver split begins. The current files keep `extern` declarations; the global definitions moved. This was mechanical, low-risk, and unblocks every later phase.
 

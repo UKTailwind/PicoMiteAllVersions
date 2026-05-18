@@ -1,15 +1,16 @@
 #!/bin/bash
-# flash.sh — Build and flash PicoMite firmware to connected device
+# tools/flash.sh — Build and flash PicoMite firmware to connected device
 #
 # Usage:
-#   ./flash.sh              Build RP2350 (default) and flash
-#   ./flash.sh --build-only Just build, don't flash
-#   ./flash.sh --flash-only Flash existing build, don't rebuild
+#   ./tools/flash.sh              Build RP2350 (default) and flash
+#   ./tools/flash.sh --build-only Just build, don't flash
+#   ./tools/flash.sh --flash-only Flash existing build, don't rebuild
 #
 # Requires: picotool (brew install picotool), arm-none-eabi-gcc
 
 set -e
-cd "$(dirname "$0")"
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
 
 # Always use the correct SDK — ignore any stale PICO_SDK_PATH in the environment
 PICO_SDK_PATH="$HOME/pico/pico-sdk"

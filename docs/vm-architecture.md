@@ -38,12 +38,12 @@ One firmware target:
 ### Legacy Oracle Path
 
 - Core sources:
-  - `MMBasic.c`
-  - `Commands.c`
-  - `Functions.c`
-  - `Operators.c`
-  - `MATHS.c`
-  - `Memory.c`
+  - `core/mmbasic/MMBasic.c`
+  - `core/mmbasic/Commands.c`
+  - `core/mmbasic/Functions.c`
+  - `core/mmbasic/Operators.c`
+  - `core/mmbasic/MATHS.c`
+  - `core/mmbasic/Memory.c`
 - Host boundary:
   - `host/host_stubs_legacy.c`
 - Purpose:
@@ -58,15 +58,15 @@ Current caveat:
 ### VM Frontend and Runtime
 
 - Source frontend:
-  - `bc_source.c`
+  - `runtime/vm/bc_source.c`
 - Compiler/core metadata:
-  - `bc_compiler_core.c`
-  - `bytecode.h`
+  - `runtime/vm/bc_compiler_core.c`
+  - `runtime/vm/bytecode.h`
 - VM execution:
-  - `bc_vm.c`
-  - `bc_runtime.c`
+  - `runtime/vm/bc_vm.c`
+  - `runtime/vm/bc_runtime.c`
 - Debug/disassembly:
-  - `bc_debug.c`
+  - `runtime/vm/bc_debug.c`
 
 The VM frontend compiles raw `.bas` source directly. It does not depend on the legacy tokenizer for the VM path.
 
@@ -226,12 +226,11 @@ Rules:
 
 Current VM syscall modules:
 
-- `vm_sys_graphics.c`
-- `vm_sys_file.c`
-- `vm_sys_pin.c`
-- `vm_sys_audio.c`
-- `vm_sys_time.c`
-- `vm_sys_input.c`
+- `runtime/vm/vm_sys_graphics.c`
+- `runtime/vm/vm_sys_file.c`
+- `runtime/vm/vm_sys_pin.c`
+- `runtime/vm/vm_sys_time.c`
+- `runtime/vm/vm_sys_input.c`
 
 ## Memory Model
 
@@ -240,7 +239,7 @@ The allocator is no longer fully monolithic, but it is not fully separated yet.
 ### Current State
 
 - device heap:
-  - `bc_alloc.c`
+  - `runtime/vm/bc_alloc.c`
   - fixed `bc_heap` arena on device
 - compile scratch:
   - temporary compile arena carved from the top of the device heap
@@ -250,7 +249,7 @@ The allocator is no longer fully monolithic, but it is not fully separated yet.
 - VM instance state:
   - `BCCompiler` and `BCVMState` are explicit device-static state, not heap-allocated on device
 - graphics scratch:
-  - reusable grow-on-demand scratch buffers live in `vm_sys_graphics.c`
+  - reusable grow-on-demand scratch buffers live in `runtime/vm/vm_sys_graphics.c`
   - reset between runs with `vm_sys_graphics_reset()`
 
 ### What This Fixes

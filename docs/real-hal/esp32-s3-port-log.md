@@ -96,7 +96,7 @@ audit confirms it for the Xtensa concern specifically.
 
 ✅ **Zero real inline asm** in `MMBasic.c`, `Commands.c`,
 `Functions.c`, `Operators.c`, `MATHS.c`, `Memory.c`, `Draw.c`,
-`FileIO.c`, `Audio.c`, all `bc_*.c`, all `vm_sys_*.c`. The one
+`FileIO.c`, `shared/audio/Audio.c`, all `bc_*.c`, all `vm_sys_*.c`. The one
 `grep` hit in `FileIO.c` was a false positive — the substring
 `asm` inside a comment about `f_lseek`.
 
@@ -108,11 +108,11 @@ contracts.
 held up.
 
 ⚠️ **8 core files include Pico SDK headers directly:**
-- `MMBasic.c`, `mm_misc_shared.c`, `FileIO.c` → `pico/stdlib.h`
+- `MMBasic.c`, `shared/mmbasic/mm_misc_shared.c`, `FileIO.c` → `pico/stdlib.h`
 - `Functions.c`, `vm_sys_pin.c` → `hardware/adc.h`, `hardware/pwm.h` etc.
 - `Commands.c` → `hardware/dma.h`, `hardware/structs/watchdog.h`
 - `MATHS.c` → `pico/rand.h`
-- `Audio.c` → `hardware/pwm.h`, `hardware/irq.h`, `hardware/regs/addressmap.h`
+- `shared/audio/Audio.c` → `hardware/pwm.h`, `hardware/irq.h`, `hardware/regs/addressmap.h`
 - `FileIO.c` → 11 `hardware/*` headers (the worst offender)
 
 These are Xtensa blockers if compiled raw, **but** —
@@ -493,7 +493,7 @@ host comparison suite still passes: 243/243.
 
 Moved `WS2812` out of the Pico-only `External.c` body and out of the
 ESP32 unsupported-stub list. The BASIC-facing parser, pin validation,
-and colour packing now live in `cmd_ws2812_shared.c`; the waveform
+and colour packing now live in `shared/cmd_ws2812_shared.c`; the waveform
 backend is the per-port `hal_ws2812_write()` implementation.
 
 Backends:

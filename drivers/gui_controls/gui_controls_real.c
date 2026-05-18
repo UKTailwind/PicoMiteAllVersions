@@ -11,7 +11,7 @@
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
-#include "gfx_console_shared.h"
+#include "shared/gfx/gfx_console_shared.h"
 #include "hal/hal_gui_controls.h"
 
 extern int InvokingCtrl;

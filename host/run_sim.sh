@@ -9,7 +9,7 @@
 # Defaults:
 #   Port:          5150
 #   Listen addr:   127.0.0.1   (use --listen 0.0.0.0 to share on LAN)
-#   SD root:       repo root   (so `RUN "demo_gfx_shapes"` finds demos)
+#   SD root:       repo demos/ (so `RUN "graphics/demo_gfx_shapes"` finds demos)
 #   Web root:      ../web
 #   Resolution:    320x320     (PicoCalc-native)
 #   Slowdown:      0           (uncapped; try 5–50 for device-ish pacing)
@@ -37,6 +37,6 @@ exec ./mmbasic_sim \
     --port 5150 \
     --listen 127.0.0.1 \
     --web-root "$WEB_ROOT" \
-    --sd-root  "$REPO_ROOT" \
+    --sd-root  "$REPO_ROOT/demos" \
     --resolution 320x320 \
     "$@"

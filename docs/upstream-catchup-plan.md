@@ -29,7 +29,7 @@ Corollaries:
 ## Why manual, not merge
 
 1. **Upstream has no real git history.** 108 of 172 post-fork commits are `"Add files via upload"` — whole-tree zip drops. A three-way merge sees them as one giant conflict per file per drop with no rationale to resolve against.
-2. **Our architectural direction is different.** We are splitting interpreter from HAL (`docs/host-hal-plan.md`). Upstream is piling more `#ifdef`-gated chip variants onto the same monolith. Merging would reintroduce hardware coupling into files we have already cleaned up (`Draw.c`, `FileIO.c`, `Audio.c`, `MM_Misc.c`, `mm_misc_shared.c`).
+2. **Our architectural direction is different.** We are splitting interpreter from HAL (`docs/host-hal-plan.md`). Upstream is piling more `#ifdef`-gated chip variants onto the same monolith. Merging would reintroduce hardware coupling into files we have already cleaned up (`Draw.c`, `FileIO.c`, `shared/audio/Audio.c`, `MM_Misc.c`, `shared/mmbasic/mm_misc_shared.c`).
 3. **We have three targets upstream does not.** Host (`MMBASIC_HOST`) and WebAssembly (`MMBASIC_WASM`) must keep compiling through every feature we take. A straight merge breaks both until repaired, with no way to test incrementally.
 4. **Much of the upstream churn is formatting.** Upstream reformatted brace style (`cmd_foo(void){` → `cmd_foo(void)\n{`) across the whole tree; a merge would surface that as thousands of spurious conflicts mixed in with real work.
 5. **Per-feature ports can be tested.** Each feature lands as one or a few commits behind the full `./run_tests.sh` gate. A merge cannot.
@@ -81,17 +81,17 @@ These touch hardware or peripheral bus code. They make sense for device builds o
 | feature | upstream file | notes |
 |---|---|---|
 | `Stepper` | `stepper.c` (5965 lines) | Stepper motor control. Large, hardware-bound (GPIO + timers). Low priority unless a user needs it. |
-| `I2CLCD` | `I2C.c` | HD44780-over-I²C driver. Useful if requested. |
+| `I2CLCD` | `drivers/i2c_bus/I2C.c` | HD44780-over-I²C driver. Useful if requested. |
 | `YModem` | `External.c` / `FileIO.c` | File transfer protocol. Moderate value; needs serial console hooks. |
 | `OneShot` | `External.c` / `MM_Misc.c` | Single-shot IRQ trigger. Small, chip-specific. |
 | `IRQ NEXT` / `IRQ PREV` | `External.c` | IRQ routing helpers. |
-| `Location` | `GPS.c` | GPS command. Depends on GPS module support. |
+| `Location` | `drivers/gps/GPS.c` | GPS command. Depends on GPS module support. |
 | `Raycaster` | `Raycaster.c` (1732 lines) | Wolfenstein-style rendering. Pure compute + our framebuffer, so actually portable, but large — move to Tier 2 only if someone asks. |
 | `Mode`, `Fill` variants | display-specific | Tied to upstream's new framebuffer layout; adapt only if we port the underlying feature. |
 
 ### Explicit non-goals
 
-- **New display drivers.** `VGA222.c`, `RGB121.c`, expanded `SSD1963.c`, HDMI variants. Our target hardware list is PicoCalc (single LCD), host, web. Adding these expands the `#ifdef` matrix we are trying to shrink.
+- **New display drivers.** `VGA222.c`, `RGB121.c`, expanded `drivers/ssd1963/SSD1963.c`, HDMI variants. Our target hardware list is PicoCalc (single LCD), host, web. Adding these expands the `#ifdef` matrix we are trying to shrink.
 - **New chip variants.** PICORP2350 etc. are already building from our RP2350 CMake file; we do not adopt upstream's `set(COMPILE …)` taxonomy.
 - **USB stack rework.** `USBKeyboard.c` churn upstream is mostly refactoring. Low-value, high-risk to touch.
 - **Formatting churn.** Do not reformat files to match upstream brace style. Each port carries its own minimal diff against our current file.
@@ -106,7 +106,7 @@ For every feature ported, follow this loop exactly:
 2. **Fetch fresh upstream.** `git fetch upstream` so the reference is current.
 3. **Read, don't copy blindly.** Open the upstream implementation in its new location. Read the full function, every helper it calls, every new field on `Option`, every new entry in `AllCommands.h` / command table.
 4. **Port source changes.** Apply the minimum diff to our files (`Commands.c`, `Functions.c`, `AllCommands.h`, `MMBasic.h` as needed). Keep our surrounding code untouched.
-5. **Update HAL split if needed.** If the feature touches `Draw.c` / `FileIO.c` / `Audio.c` / `MM_Misc.c`, mirror the split pattern already established there (device body vs. shared body). Do NOT introduce bare `#ifdef PICOMITE` gates into logic — route through the existing HAL entry points or add a new one.
+5. **Update HAL split if needed.** If the feature touches `Draw.c` / `FileIO.c` / `shared/audio/Audio.c` / `MM_Misc.c`, mirror the split pattern already established there (device body vs. shared body). Do NOT introduce bare `#ifdef PICOMITE` gates into logic — route through the existing HAL entry points or add a new one.
 6. **Bridge, don't native-VM.** New commands land as interpreter entries + `OP_BRIDGE_CMD` bridging so `FRUN` still reaches them. Native VM opcodes only after profiling.
 7. **Write a test.** Every ported feature gets at least one `host/tests/*.bas` that exercises it. Regressions in tier-1 features bite hardest, so cover edge cases (empty string, negative index, nested TYPE, etc.).
 8. **Run the simulator gate — all three must pass:**

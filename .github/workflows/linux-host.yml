@@ -9,7 +9,7 @@ on:
       - 'CMakeLists.txt'
       - 'pico_sdk_import.cmake'
       - 'buildall.sh'
-      - 'validate_all.sh'
+      - 'tools/validate_all.sh'
       - 'core/**'
       - 'drivers/**'
       - 'hal/**'
@@ -29,7 +29,7 @@ on:
       - 'CMakeLists.txt'
       - 'pico_sdk_import.cmake'
       - 'buildall.sh'
-      - 'validate_all.sh'
+      - 'tools/validate_all.sh'
       - 'core/**'
       - 'drivers/**'
       - 'hal/**'
@@ -82,4 +82,4 @@ jobs:
       - name: Run full validation
         env:
           PICO_SDK_PATH: ${{ github.workspace }}/pico-sdk
-        run: ./validate_all.sh
+        run: ./tools/validate_all.sh

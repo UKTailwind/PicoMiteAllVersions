@@ -64,7 +64,7 @@ With PICOMITE cleared from Draw.c, phase 7a's ILI9341-proof exit gate is effecti
 
 ### Progress (as of 2026-04-23)
 
-- **Step 1** (TBD): first `hal_vga_ops.h` surface and per-function lifts. Five hooks — `handle_cls`, `handle_tile_cls`, `handle_layer_clear`, `retile_for_font`, `wait_scanline_zero` — cover `ClearScreen` + `gfx_cls_helper` + `cmd_font` + the DrawCircle benchmark loop. Real impls in `drivers/vga_pio/vga_ops.c` (HDMI-vs-QVGA dispatch local-ifdef'd inside); no-op stubs in `drivers/vga_pio/vga_ops_stub.c`. `HAL_PORT_CONSOLE_FONT_MEDIUM` port-config macro collapses the FontTable[2] arial_bold-vs-Hom_16x24 triple-nested `#ifdef PICOMITEVGA/HDMI` pair. `ScrollStart` promoted to unconditional storage in `core/state/display_state.c` (was duplicated between SSD1963.c and host_runtime.c). Draw.c ifdefs: 110 → 97 (−13).
+- **Step 1** (TBD): first `hal_vga_ops.h` surface and per-function lifts. Five hooks — `handle_cls`, `handle_tile_cls`, `handle_layer_clear`, `retile_for_font`, `wait_scanline_zero` — cover `ClearScreen` + `gfx_cls_helper` + `cmd_font` + the DrawCircle benchmark loop. Real impls in `drivers/vga_pio/vga_ops.c` (HDMI-vs-QVGA dispatch local-ifdef'd inside); no-op stubs in `drivers/vga_pio/vga_ops_stub.c`. `HAL_PORT_CONSOLE_FONT_MEDIUM` port-config macro collapses the FontTable[2] arial_bold-vs-Hom_16x24 triple-nested `#ifdef PICOMITEVGA/HDMI` pair. `ScrollStart` promoted to unconditional storage in `core/state/display_state.c` (was duplicated between drivers/ssd1963/SSD1963.c and host_runtime.c). Draw.c ifdefs: 110 → 97 (−13).
 
 ## Phase 7c — `hal_display.h` for HDMI
 
@@ -117,7 +117,7 @@ core-interpreter code, and not scoped to this phase.
 
 ## Phase 7d — `hal_display.h` for SSD1963 + Web variants
 
-- `drivers/ssd1963/` lifted from current `SSD1963.c`. Web variants pull in `drivers/cyw43/` (Phase 9) at the same time.
+- `drivers/ssd1963/` lifted from current `drivers/ssd1963/SSD1963.c`. Web variants pull in `drivers/cyw43/` (Phase 9) at the same time.
 - 2 Web ports switch over.
 
 **Exit gate:** Draw.c target-macro + port-config-macro ifdef count → 0. All 12 device ports use `hal_display`. Draw.c promoted to `STRICT_FILES`. All 12 device variants + host + purity gate green. (RAM-baseline verification: desirable, not a blocker.)

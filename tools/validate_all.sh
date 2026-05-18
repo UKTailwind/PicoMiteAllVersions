@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# validate_all.sh — the real pre-commit gate.
+# tools/validate_all.sh — the real pre-commit gate.
 #
 # Runs every build + every test suite the repository ships:
 #   1. HAL purity check (tools/check_hal_purity.sh)
@@ -19,7 +19,7 @@
 
 set -uo pipefail
 
-ROOT="$(cd "$(dirname "$0")" && pwd)"
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 fail=0
@@ -68,7 +68,26 @@ run_section "mmbasic_ansi build" \
     bash -c "cd '$ROOT/ports/mmbasic_ansi' && make" || true
 
 # ---- 5. host_wasm build (only if emcc available) -----------------------
-if command -v emcc >/dev/null 2>&1; then
+ensure_emcc() {
+    if command -v emcc >/dev/null 2>&1; then
+        return 0
+    fi
+
+    local env_script
+    for env_script in \
+        "${EMSDK:-}/emsdk_env.sh" \
+        "$HOME/emsdk/emsdk_env.sh"; do
+        if [ -n "$env_script" ] && [ -f "$env_script" ]; then
+            # shellcheck disable=SC1090
+            EMSDK_QUIET=1 . "$env_script" >/dev/null 2>&1
+            command -v emcc >/dev/null 2>&1 && return 0
+        fi
+    done
+
+    return 1
+}
+
+if ensure_emcc; then
     run_section "host_wasm build" \
         bash -c "cd '$ROOT/ports/host_wasm' && make" || true
 else

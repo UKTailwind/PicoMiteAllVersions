@@ -259,7 +259,7 @@ E2 removed the unconditional overwrite behavior: `app_main.c` now loads the NVS-
 
 ### D10. Split WS2812 into shared command + per-port HAL ✅
 
-`cmd_WS2812` no longer lives as a Pico-only body in `External.c` or as an ESP32 unsupported stub. The BASIC parser, pin validation, and RGB/GRB byte packing now live in `cmd_ws2812_shared.c`; the wire-level timing lives behind `hal_ws2812_write()`.
+`cmd_WS2812` no longer lives as a Pico-only body in `External.c` or as an ESP32 unsupported stub. The BASIC parser, pin validation, and RGB/GRB byte packing now live in `shared/cmd_ws2812_shared.c`; the wire-level timing lives behind `hal_ws2812_write()`.
 
 Port backends:
 - `ports/esp32_s3_metro/main/hal_ws2812_esp32.c` uses ESP-IDF RMT TX.

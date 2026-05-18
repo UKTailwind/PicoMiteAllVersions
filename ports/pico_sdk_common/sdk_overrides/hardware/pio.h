@@ -16,7 +16,7 @@
 #include "hardware/structs/pio.h"
 #include "hardware/gpio.h"
 #include "hardware/regs/dreq.h"
-#include "pio_instructions.h"
+#include "hardware/pio_instructions.h"
 
 // PICO_CONFIG: PARAM_ASSERTIONS_ENABLED_PIO, Enable/disable assertions in the PIO module, type=bool, default=0, group=hardware_pio
 #ifndef PARAM_ASSERTIONS_ENABLED_PIO

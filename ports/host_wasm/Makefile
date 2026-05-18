@@ -24,6 +24,15 @@ SIM_VM_DIR := $(REPO_ROOT)/ports/vm_sys_sim
 WASM_DIR   := $(PORT_DIR)
 BUILD_DIR  := $(WASM_DIR)/wasm_obj
 WEB_DIR    := $(REPO_ROOT)/host/web
+THIRD_PARTY_CFLAGS := -I$(REPO_ROOT)/third_party/aes \
+                      -I$(REPO_ROOT)/third_party/cjson \
+                      -I$(REPO_ROOT)/third_party/dr_libs \
+                      -I$(REPO_ROOT)/third_party/fatfs \
+                      -I$(REPO_ROOT)/third_party/hxcmod \
+                      -I$(REPO_ROOT)/third_party/littlefs \
+                      -I$(REPO_ROOT)/third_party/picojpeg \
+                      -I$(REPO_ROOT)/third_party/regex \
+                      -I$(REPO_ROOT)/third_party/upng
 
 # Compiler-table sizing lives in bytecode.h keyed on MMBASIC_WASM.  No
 # DEVICE_SIM knob here — the WASM build is deterministic regardless of
@@ -36,14 +45,15 @@ CFLAGS = -O2 -std=gnu11 -funsigned-char \
          -Wno-missing-braces \
          -DMMBASIC_HOST -DMMBASIC_WASM -DFF_MAX_LFN_LARGE \
          -include host_platform.h \
-         -I$(WASM_DIR) -I$(NATIVE_DIR) -I$(PICO_COMPAT_DIR) -I$(REPO_ROOT) \
+         $(THIRD_PARTY_CFLAGS) \
+         -I$(WASM_DIR) -I$(NATIVE_DIR) -I$(PICO_COMPAT_DIR) -I$(REPO_ROOT)/core/mmbasic -I$(REPO_ROOT)/runtime/vm -I$(REPO_ROOT)/shared/gfx -I$(REPO_ROOT)/shared/audio -I$(REPO_ROOT)/shared/mmbasic -I$(REPO_ROOT)/drivers/bmp_decoder -I$(REPO_ROOT)/drivers/gps -I$(REPO_ROOT)/drivers/gui_controls -I$(REPO_ROOT)/drivers/gui_touch -I$(REPO_ROOT)/drivers/i2c_bus -I$(REPO_ROOT)/drivers/onewire -I$(REPO_ROOT)/drivers/psram_heap -I$(REPO_ROOT)/drivers/serial -I$(REPO_ROOT)/drivers/spi_bus -I$(REPO_ROOT)/drivers/spi_lcd -I$(REPO_ROOT)/drivers/ssd1963 -I$(REPO_ROOT) \
          -MMD -MP \
          -pthread
 # `-pthread` here makes the wasm module's linear memory a
 # SharedArrayBuffer so main thread and the dedicated interpreter
 # worker share a single HEAPU8 view (zero-copy framebuffer).
 # MMBasic relies on gcc-style tentative-definition merging (e.g. `int
-# gui_bcolour;` in Draw.c coexisting with `int gui_bcolour = 0;` in
+# gui_bcolour;` in core/mmbasic/Draw.c coexisting with `int gui_bcolour = 0;` in
 # host_runtime.c). Under clang/wasm-ld we can't use -fcommon because
 # wasm doesn't support common linkage; we also can't use plain
 # -fno-common because that would promote every tentative def to a
@@ -63,13 +73,13 @@ LDFLAGS = -pthread -sPTHREAD_POOL_SIZE=1 \
           -Wl,--allow-multiple-definition
 
 # Core MMBasic sources — mirror ports/host_native/Makefile CORE_SRCS.
-CORE_SRCS = MMBasic.c Commands.c Functions.c Operators.c MATHS.c \
-            Memory.c Editor.c \
-            MMBasic_Prompt.c MMBasic_Print.c MMBasic_REPL.c \
-            gfx_box_shared.c gfx_circle_shared.c gfx_line_shared.c \
-            gfx_pixel_shared.c gfx_cls_shared.c gfx_text_shared.c \
-            gfx_console_shared.c \
-            mm_misc_shared.c OptionCommands.c \
+CORE_SRCS = core/mmbasic/MMBasic.c core/mmbasic/Commands.c core/mmbasic/Functions.c core/mmbasic/Operators.c core/mmbasic/MATHS.c \
+            core/mmbasic/Memory.c core/mmbasic/Editor.c \
+            core/mmbasic/MMBasic_Prompt.c core/mmbasic/MMBasic_Print.c core/mmbasic/MMBasic_REPL.c \
+            shared/gfx/gfx_box_shared.c shared/gfx/gfx_circle_shared.c shared/gfx/gfx_line_shared.c \
+            shared/gfx/gfx_pixel_shared.c shared/gfx/gfx_cls_shared.c shared/gfx/gfx_text_shared.c \
+            shared/gfx/gfx_console_shared.c \
+            shared/mmbasic/mm_misc_shared.c core/mmbasic/OptionCommands.c \
             display_state.c pin_state.c option_state.c audio_state.c \
             mm_net_interrupts.c \
             mm_net_http.c \
@@ -92,7 +102,7 @@ CORE_SRCS = MMBasic.c Commands.c Functions.c Operators.c MATHS.c \
             mm_net_udp_cmd.c \
             mm_net_web_cmd.c \
             mm_net_wifi_cmd.c \
-            Draw.c RGB121.c Tilemap.c FileIO.c Audio.c BmpDecoder.c re.c picojpeg.c
+            core/mmbasic/Draw.c shared/gfx/RGB121.c shared/gfx/Tilemap.c core/mmbasic/FileIO.c shared/audio/Audio.c drivers/bmp_decoder/BmpDecoder.c third_party/regex/re.c third_party/picojpeg/picojpeg.c
 # Stubs + host-only subsystems — match ports/host_native/Makefile.
 CORE_SRCS += audio_mp3_stub.c spi_lcd_mem332_stub.c display_merge_stub.c vga_ops_stub.c
 CORE_SRCS += gfx_3d.c upng_sprite_stub.c gui_touch_stub.c gui_controls_stub.c psram_heap_stub.c hal_psram_stub.c i2c_keypad_stub.c heartbeat_stub.c
@@ -100,12 +110,12 @@ CORE_SRCS += editor_console_stub.c
 CORE_SRCS += display_pixel_host.c
 
 # Bytecode VM sources.
-BC_SRCS = bc_alloc.c bc_bridge.c vm_host_fat.c \
-          ff.c ffunicode.c ffsystem.c \
-          vm_sys_input.c vm_sys_graphics.c vm_sys_time.c \
+BC_SRCS = runtime/vm/bc_alloc.c runtime/vm/bc_bridge.c runtime/vm/vm_host_fat.c \
+          third_party/fatfs/ff.c third_party/fatfs/ffunicode.c third_party/fatfs/ffsystem.c \
+          runtime/vm/vm_sys_input.c runtime/vm/vm_sys_graphics.c runtime/vm/vm_sys_time.c \
           vm_sys_pin_sim.c vm_sys_file_sim.c \
-          bc_source.c bc_compiler_core.c \
-          bc_vm.c bc_runtime.c bc_debug.c
+          runtime/vm/bc_source.c runtime/vm/bc_compiler_core.c \
+          runtime/vm/bc_vm.c runtime/vm/bc_runtime.c runtime/vm/bc_debug.c
 
 # Host HAL — the portable subset that works under emcc unchanged, plus
 # the WASM-specific trio that replaces host_terminal.c / host_main.c
@@ -161,6 +171,10 @@ $(BUILD_DIR)/%.o: $(SIM_VM_DIR)/%.c
 	$(EMCC) $(CFLAGS) -c -o $@ $<
 
 $(BUILD_DIR)/%.o: $(REPO_ROOT)/%.c
+	@mkdir -p $(dir $@)
+	$(EMCC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/third_party/%.o: $(REPO_ROOT)/third_party/%.c
 	@mkdir -p $(dir $@)
 	$(EMCC) $(CFLAGS) -c -o $@ $<
 

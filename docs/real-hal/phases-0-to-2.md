@@ -52,9 +52,9 @@ Note: `Include.h` still pulls `hardware/flash.h` unconditionally — the header 
 
 - `hal/hal_time.h`: `hal_time_us_64`, `hal_time_sleep_us`, `hal_time_ms_tick`, RTC accessors.
 - `ports/pico_sdk_common/hal_time_pico.c`.
-- 42 core call sites migrated (`MM_Misc.c`, `Audio.c`, `Commands.c`, `Draw.c`, `External.c`, `FileIO.c`, `MATHS.c`, `bc_vm.c`, `mm_misc_shared.c`). All scored files call `hal_time_us_64()` — zero direct `time_us_64()`.
+- 42 core call sites migrated (`MM_Misc.c`, `shared/audio/Audio.c`, `Commands.c`, `Draw.c`, `External.c`, `FileIO.c`, `MATHS.c`, `bc_vm.c`, `shared/mmbasic/mm_misc_shared.c`). All scored files call `hal_time_us_64()` — zero direct `time_us_64()`.
 - Host port: thin `host_time.c` shim already existed; added a 1-line forward. No host file renamed.
-- Peripheral files (`PicoMite.c`, `I2C.c`, `USBKeyboard.c`, `MMMqtt`, `MMntp`, `MMtcpserver.c`, `XModem.c`) still call SDK time directly — migrate with their HALs.
+- Peripheral files (`PicoMite.c`, `drivers/i2c_bus/I2C.c`, `USBKeyboard.c`, `MMMqtt`, `MMntp`, `shared/net/MMtcpserver.c`, `XModem.c`) still call SDK time directly — migrate with their HALs.
 
 **Perf gate (met):** `pico_blocks_tilemap` SWAP rate held within 1% of the Phase 1 baseline on web host AND at least one physical device.
 

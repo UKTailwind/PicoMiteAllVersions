@@ -37,11 +37,12 @@ That decision controls what is irrelevant.
 - `third_party/`: FatFs, LittleFS, picojpeg, regex, `dr_*`, hxcmod, upng,
   AES, cJSON, and MQTT.
 - `assets/fonts/`: root font headers.
-- `examples/basic/`: root `.bas` demos.
+- `demos/`: BASIC demos grouped by use.
 - `demos/web/` or `assets/web/`: root `.htm` demo files.
-- `scripts/`: `buildall.sh`, `build_firmware.sh`, `buildesp32.sh`,
-  `validate_all.sh`, `flash.sh`, and one-off diagnostics.
-- `hardware/pico-computer/`: current `Pico Computer/` manufacturing files.
+- root/tool scripts: root entry points `buildall.sh`, `build_firmware.sh`,
+  and `buildesp32.sh`; helper scripts such as `tools/validate_all.sh` and
+  `tools/flash.sh`.
+- `hardware/pico-computer/`: board manufacturing files.
 - `docs/archive/`: stale plans and upstream notes.
 
 ## Removal Plan
@@ -76,7 +77,7 @@ That decision controls what is irrelevant.
 
    - `SPI-111.c` appears unreferenced.
    - `goodix.c` is not built.
-   - Root `PicoMite_User_Manual.pdf` duplicates
+   - The PicoMite user manual lives at
      `docs/reference/PicoMite_User_Manual.pdf`.
    - Root HTML and BASIC demo files should move under demos/examples.
    - Root plan docs should move to `docs/archive/` or be deleted if

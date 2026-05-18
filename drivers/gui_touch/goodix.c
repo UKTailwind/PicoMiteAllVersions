@@ -11,7 +11,7 @@
  */
 
 
-#include "touch.h"
+#include "Touch.h"
 #include <stdint.h>
 #define GOODIX_GPIO_INT_NAME		"irq"
 #define GOODIX_GPIO_RST_NAME		"reset"

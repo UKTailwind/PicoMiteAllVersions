@@ -418,5 +418,5 @@ extern struct tagMTRand *g_myrand;
 #include "port_peripherals.h"
 #include "GPS.h"
 #include "Audio.h"
-#include "PS2Keyboard.h"
+#include "drivers/ps2_matrix/PS2Keyboard.h"
 /*  @endcond */

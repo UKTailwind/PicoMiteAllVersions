@@ -139,11 +139,11 @@ if [[ ! -f "$C_IMG" || "${PC386_REBUILD_C:-0}" == "1" ]]; then
     mmd   y:/PROGRAMS
     mcopy "$DEMOS_DIR/mand.bas"   y:/PROGRAMS/MAND.BAS
     mcopy "$DEMOS_DIR/sieve.bas"  y:/PROGRAMS/SIEVE.BAS
-    if [[ -f "$REPO_ROOT/pico_blocks.bas" ]]; then
-        mcopy "$REPO_ROOT/pico_blocks.bas" y:/PICO_BLOCKS.BAS
+    if [[ -f "$REPO_ROOT/demos/apps/pico_blocks.bas" ]]; then
+        mcopy "$REPO_ROOT/demos/apps/pico_blocks.bas" y:/PICO_BLOCKS.BAS
     fi
-    if [[ -f "$REPO_ROOT/demo_sound_sfx.bas" ]]; then
-        mcopy "$REPO_ROOT/demo_sound_sfx.bas" y:/SFX_DEMO.BAS
+    if [[ -f "$REPO_ROOT/demos/sound/demo_sound_sfx.bas" ]]; then
+        mcopy "$REPO_ROOT/demos/sound/demo_sound_sfx.bas" y:/SFX_DEMO.BAS
     fi
     if [[ -f "$PORT_DIR/demos/pcl_demo.bas" ]]; then
         mcopy "$PORT_DIR/demos/pcl_demo.bas" y:/PCL_DEMO.BAS

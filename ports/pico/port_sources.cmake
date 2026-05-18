@@ -25,8 +25,8 @@ target_sources(PicoMite PRIVATE
     ${CMAKE_SOURCE_DIR}/drivers/editor_console/editor_console_stub.c
     ${CMAKE_SOURCE_DIR}/drivers/gui_touch/gui_touch.c
     ${CMAKE_SOURCE_DIR}/drivers/gui_controls/gui_controls_stub.c
-    ${CMAKE_SOURCE_DIR}/SSD1963.c
-    ${CMAKE_SOURCE_DIR}/Touch.c
+    ${CMAKE_SOURCE_DIR}/drivers/ssd1963/SSD1963.c
+    ${CMAKE_SOURCE_DIR}/drivers/gui_touch/Touch.c
 
     # rp2040 stubs for rp2350-only features.
     ${CMAKE_SOURCE_DIR}/drivers/audio_mp3/audio_mp3_stub.c
@@ -39,7 +39,7 @@ target_sources(PicoMite PRIVATE
 
     # Non-WEB feature backends.
     ${CMAKE_SOURCE_DIR}/drivers/gfx_3d/gfx_3d.c
-    ${CMAKE_SOURCE_DIR}/MMweb_stubs.c
+    ${CMAKE_SOURCE_DIR}/shared/net/MMweb_stubs.c
 )
 
 # Keyboard backend axis (USB host stack vs PS/2 matrix).
@@ -53,7 +53,7 @@ else()
         ${CMAKE_SOURCE_DIR}/drivers/ps2_matrix/Keyboard.c
         ${CMAKE_SOURCE_DIR}/drivers/ps2_matrix/hal_keyboard_ps2.c
         ${CMAKE_SOURCE_DIR}/drivers/console_cdc/console_cdc.c
-        ${CMAKE_SOURCE_DIR}/mouse.c
+        ${CMAKE_SOURCE_DIR}/drivers/ps2_mouse/mouse.c
     )
 endif()
 
@@ -91,5 +91,5 @@ endif()
 # Optional SDBOOT linker script — relocates firmware so a 256 KB
 # bootloader can sit in the first part of flash.
 if (SDBOOT STREQUAL "true" AND COMPILE STREQUAL "PICO")
-    pico_set_linker_script(PicoMite ${CMAKE_SOURCE_DIR}/memmap_default_rp2040.ld)
+    pico_set_linker_script(PicoMite ${CMAKE_SOURCE_DIR}/cmake/linker/memmap_default_rp2040.ld)
 endif()

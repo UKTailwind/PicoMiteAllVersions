@@ -10,27 +10,27 @@ set(REPO_ROOT  ${CMAKE_CURRENT_LIST_DIR}/../../..)
 set(PORT_DIR   ${CMAKE_CURRENT_LIST_DIR}/..)
 
 set(CORE_SRCS
-    ${REPO_ROOT}/MMBasic.c
-    ${REPO_ROOT}/Commands.c
-    ${REPO_ROOT}/Functions.c
-    ${REPO_ROOT}/Operators.c
-    ${REPO_ROOT}/MATHS.c
-    ${REPO_ROOT}/Memory.c
-    ${REPO_ROOT}/MMBasic_Print.c
-    ${REPO_ROOT}/MMBasic_REPL.c
-    ${REPO_ROOT}/MMBasic_Prompt.c
-    ${REPO_ROOT}/Editor.c
-    ${REPO_ROOT}/gfx_box_shared.c
-    ${REPO_ROOT}/gfx_circle_shared.c
-    ${REPO_ROOT}/gfx_line_shared.c
-    ${REPO_ROOT}/gfx_pixel_shared.c
-    ${REPO_ROOT}/gfx_cls_shared.c
-    ${REPO_ROOT}/gfx_text_shared.c
-    ${REPO_ROOT}/gfx_console_shared.c
-    ${REPO_ROOT}/mm_misc_shared.c
+    ${REPO_ROOT}/core/mmbasic/MMBasic.c
+    ${REPO_ROOT}/core/mmbasic/Commands.c
+    ${REPO_ROOT}/core/mmbasic/Functions.c
+    ${REPO_ROOT}/core/mmbasic/Operators.c
+    ${REPO_ROOT}/core/mmbasic/MATHS.c
+    ${REPO_ROOT}/core/mmbasic/Memory.c
+    ${REPO_ROOT}/core/mmbasic/MMBasic_Print.c
+    ${REPO_ROOT}/core/mmbasic/MMBasic_REPL.c
+    ${REPO_ROOT}/core/mmbasic/MMBasic_Prompt.c
+    ${REPO_ROOT}/core/mmbasic/Editor.c
+    ${REPO_ROOT}/shared/gfx/gfx_box_shared.c
+    ${REPO_ROOT}/shared/gfx/gfx_circle_shared.c
+    ${REPO_ROOT}/shared/gfx/gfx_line_shared.c
+    ${REPO_ROOT}/shared/gfx/gfx_pixel_shared.c
+    ${REPO_ROOT}/shared/gfx/gfx_cls_shared.c
+    ${REPO_ROOT}/shared/gfx/gfx_text_shared.c
+    ${REPO_ROOT}/shared/gfx/gfx_console_shared.c
+    ${REPO_ROOT}/shared/mmbasic/mm_misc_shared.c
     ${REPO_ROOT}/drivers/fs_lfs_fatfs/fs_lfs_fatfs_helpers.c
-    ${REPO_ROOT}/OptionCommands.c
-    ${REPO_ROOT}/cmd_ws2812_shared.c
+    ${REPO_ROOT}/core/mmbasic/OptionCommands.c
+    ${REPO_ROOT}/shared/cmd_ws2812_shared.c
     ${REPO_ROOT}/shared/cmd_psram.c
 )
 
@@ -74,14 +74,14 @@ set(RUNTIME_SRCS
 )
 
 set(DEVICE_FACING_SRCS
-    ${REPO_ROOT}/Draw.c
-    ${REPO_ROOT}/RGB121.c
-    ${REPO_ROOT}/Tilemap.c
-    ${REPO_ROOT}/FileIO.c
-    ${REPO_ROOT}/Audio.c
-    ${REPO_ROOT}/BmpDecoder.c
-    ${REPO_ROOT}/re.c
-    ${REPO_ROOT}/picojpeg.c
+    ${REPO_ROOT}/core/mmbasic/Draw.c
+    ${REPO_ROOT}/shared/gfx/RGB121.c
+    ${REPO_ROOT}/shared/gfx/Tilemap.c
+    ${REPO_ROOT}/core/mmbasic/FileIO.c
+    ${REPO_ROOT}/shared/audio/Audio.c
+    ${REPO_ROOT}/drivers/bmp_decoder/BmpDecoder.c
+    ${REPO_ROOT}/third_party/regex/re.c
+    ${REPO_ROOT}/third_party/picojpeg/picojpeg.c
 )
 
 set(DRIVER_STUBS
@@ -101,23 +101,23 @@ set(DRIVER_STUBS
 )
 
 set(BC_SRCS
-    ${REPO_ROOT}/lfs.c                      # vendored LittleFS used by A: drive
-    ${REPO_ROOT}/lfs_util.c
-    ${REPO_ROOT}/bc_bridge.c
-    ${REPO_ROOT}/bc_source.c
-    ${REPO_ROOT}/bc_compiler_core.c
-    ${REPO_ROOT}/bc_vm.c
-    ${REPO_ROOT}/bc_runtime.c
-    ${REPO_ROOT}/bc_debug.c
-    ${REPO_ROOT}/ff.c
-    ${REPO_ROOT}/ffunicode.c
-    ${REPO_ROOT}/ffsystem.c
-    ${REPO_ROOT}/vm_sys_input.c
-    ${REPO_ROOT}/vm_sys_graphics.c
-    ${REPO_ROOT}/vm_sys_time.c
+    ${REPO_ROOT}/third_party/littlefs/lfs.c # vendored LittleFS used by A: drive
+    ${REPO_ROOT}/third_party/littlefs/lfs_util.c
+    ${REPO_ROOT}/runtime/vm/bc_bridge.c
+    ${REPO_ROOT}/runtime/vm/bc_source.c
+    ${REPO_ROOT}/runtime/vm/bc_compiler_core.c
+    ${REPO_ROOT}/runtime/vm/bc_vm.c
+    ${REPO_ROOT}/runtime/vm/bc_runtime.c
+    ${REPO_ROOT}/runtime/vm/bc_debug.c
+    ${REPO_ROOT}/third_party/fatfs/ff.c
+    ${REPO_ROOT}/third_party/fatfs/ffunicode.c
+    ${REPO_ROOT}/third_party/fatfs/ffsystem.c
+    ${REPO_ROOT}/runtime/vm/vm_sys_input.c
+    ${REPO_ROOT}/runtime/vm/vm_sys_graphics.c
+    ${REPO_ROOT}/runtime/vm/vm_sys_time.c
     esp32_bc_alloc.c                        # VM runtime on MMBasic heap; compiler scratch on ESP-IDF internal heap
     vm_sys_pin_esp32.c
-    ${REPO_ROOT}/vm_sys_file.c
+    ${REPO_ROOT}/runtime/vm/vm_sys_file.c
 )
 
 # ESP32 port-local sources. Unsupported peripherals are represented by
@@ -134,7 +134,7 @@ set(PORT_LOCAL_SRCS
     ${REPO_ROOT}/runtime/runtime_filesystem_defaults.c # shared port_drivecheck_remap + port_filesystem_prefix (Finding 7)
     ${REPO_ROOT}/drivers/calendar/calendar_bare.c      # hal_calendar: port-agnostic timegm/gmtime replacement
     esp32_system.c                          # CPU RESTART / SLEEP
-    esp32_terminal.c                        # VT100 CLS + COLOUR via Draw.c port hooks
+    esp32_terminal.c                        # VT100 CLS + COLOUR via core/mmbasic/Draw.c port hooks
     esp32_lfs.c                             # LittleFS over esp_partition_* (A: drive)
     esp32_flash_storage.c                   # flash_target_* / flash_option_* / flash_range_* / esp32_options_snapshot
     esp32_compat.c                          # small porting bits
@@ -201,7 +201,32 @@ idf_component_register(
     INCLUDE_DIRS
         "."
         ${PORT_DIR}
+        ${REPO_ROOT}/core/mmbasic
+        ${REPO_ROOT}/runtime/vm
+        ${REPO_ROOT}/shared/gfx
+        ${REPO_ROOT}/shared/audio
+        ${REPO_ROOT}/shared/mmbasic
+        ${REPO_ROOT}/drivers/bmp_decoder
+        ${REPO_ROOT}/drivers/gps
+        ${REPO_ROOT}/drivers/gui_controls
+        ${REPO_ROOT}/drivers/gui_touch
+        ${REPO_ROOT}/drivers/i2c_bus
+        ${REPO_ROOT}/drivers/onewire
+        ${REPO_ROOT}/drivers/psram_heap
+        ${REPO_ROOT}/drivers/serial
+        ${REPO_ROOT}/drivers/spi_bus
+        ${REPO_ROOT}/drivers/spi_lcd
+        ${REPO_ROOT}/drivers/ssd1963
         ${REPO_ROOT}
+        ${REPO_ROOT}/third_party/aes
+        ${REPO_ROOT}/third_party/cjson
+        ${REPO_ROOT}/third_party/dr_libs
+        ${REPO_ROOT}/third_party/fatfs
+        ${REPO_ROOT}/third_party/hxcmod
+        ${REPO_ROOT}/third_party/littlefs
+        ${REPO_ROOT}/third_party/picojpeg
+        ${REPO_ROOT}/third_party/regex
+        ${REPO_ROOT}/third_party/upng
         ${REPO_ROOT}/ports/pico_sdk_compat # legacy hardware/* Pico SDK header shims
     REQUIRES
         driver

@@ -76,21 +76,25 @@ UF2_PAYLOAD = 256
 def gather_files(root: Path) -> list[tuple[Path, str]]:
     """Returns [(source_path, target_name)].
 
-    - demo_*.bas, sieve*.bas from local picocalc tree
+    - demo_*.bas, sieve*.bas from local picocalc demos tree
     - host/bench_*.bas → BENCH/ subdir
     - mand.bas + companion CSUB demos from github.com/jvanderberg/picocalc_csub_helpers
     - pico_blocks.bas from github.com/jvanderberg/pico_blocks
       (these GitHub versions work on stock firmware; the locally bundled
-       mand.bas and pico_blocks.bas in picocalc/ do not, so we replace them.)
+       demos/bench/mand.bas and demos/apps/pico_blocks.bas in picocalc/ do not,
+       so we replace them.)
     """
     csub = Path("/tmp/pmsrc/picocalc_csub_helpers")
     blocks = Path("/tmp/pmsrc/pico_blocks")
 
     sources: list[tuple[Path, str]] = []
-    for p in sorted(root.glob("demo_*.bas")):
+    demos_root = root / "demos"
+    for p in sorted((demos_root / "graphics").glob("demo_*.bas")):
+        sources.append((p, p.name))
+    for p in sorted((demos_root / "sound").glob("demo_*.bas")):
         sources.append((p, p.name))
     for name in ("sieve.bas", "sieveasm.bas"):
-        p = root / name
+        p = demos_root / "bench" / name
         if p.exists():
             sources.append((p, name))
     for p in sorted((root / "host").glob("bench_*.bas")):

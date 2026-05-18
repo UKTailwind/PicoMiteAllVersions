@@ -38,7 +38,7 @@ target_sources(PicoMite PRIVATE
 
     # Non-WEB feature backends.
     ${CMAKE_SOURCE_DIR}/drivers/gfx_3d/gfx_3d.c
-    ${CMAKE_SOURCE_DIR}/MMweb_stubs.c
+    ${CMAKE_SOURCE_DIR}/shared/net/MMweb_stubs.c
 )
 
 if (COMPILE STREQUAL "VGAUSB")
@@ -51,12 +51,12 @@ else()
         ${CMAKE_SOURCE_DIR}/drivers/ps2_matrix/Keyboard.c
         ${CMAKE_SOURCE_DIR}/drivers/ps2_matrix/hal_keyboard_ps2.c
         ${CMAKE_SOURCE_DIR}/drivers/console_cdc/console_cdc.c
-        ${CMAKE_SOURCE_DIR}/mouse.c
+        ${CMAKE_SOURCE_DIR}/drivers/ps2_mouse/mouse.c
     )
 endif()
 
 # VGA scanout PIO (PIOmite I2S is generated globally for every device build).
-pico_generate_pio_header(PicoMite ${CMAKE_SOURCE_DIR}/PicoMiteVGA.pio)
+pico_generate_pio_header(PicoMite ${CMAKE_SOURCE_DIR}/drivers/pio/PicoMiteVGA.pio)
 
 # --- Per-port build config (Stage E2) -------------------------------------
 # PICOMITEVGA still consulted by Hardware_Includes.h (multicore include)

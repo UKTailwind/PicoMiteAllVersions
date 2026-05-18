@@ -54,7 +54,7 @@ WEB; the ~150 bytes of dead BSS on WEB isn't worth a gate).
 
 5 ifdefs. MM.MESSAGE$ / MM.ADDRESS$ / MM.TOPIC$ routed through a
 `port_fun_mm_mqtt_copy(which, out)` port hook (WEB real impl in
-MMMqtt.c, non-WEB stub in MMweb_stubs.c / host_peripheral_stubs.c).
+shared/net/MMMqtt.c, non-WEB stub in shared/net/MMweb_stubs.c / host_peripheral_stubs.c).
 MM.SUPPLY case body was already runtime-checking
 `ExtCurrentConfig[44]==EXT_ANA_IN || Option.LOCAL_KEYBOARD` which is
 false on WEB — the `#ifndef PICOMITEWEB` gate was redundant. Enum
@@ -66,7 +66,7 @@ configuration.h.
 
 6 ifdefs. Mix of:
   - `core1stack[0]` canary check — added a 1-element core1stack stub
-    to MMtcpserver.c (WEB has no core1 but needs the symbol).
+    to shared/net/MMtcpserver.c (WEB has no core1 but needs the symbol).
   - `DefinedSubFun` / `getvalue` / `findvar` flash-vs-RAM placement
     — introduced per-port `MMB_HOT_FUNC(name)` and
     `MMB_DISPATCH_FUNC(name)` macros in every
@@ -87,7 +87,7 @@ configuration.h.
     → MMB_DISPATCH_FUNC or MMB_HOT_FUNC
     (cmd_loop uses HOT, the other three use SUBFUN — they differ on
     rp2040 VGA placement).
-  - cleanserver() + close_tcpclient() stubs added to MMweb_stubs.c +
+  - cleanserver() + close_tcpclient() stubs added to shared/net/MMweb_stubs.c +
     host_peripheral_stubs.c.
   - SaveContext / RestoreContext PSRAM fast-path flattened to
     runtime `if(PSRAMsize)` branch; psmap bitmap stubbed as a 1-word
@@ -238,7 +238,7 @@ PICOMITEPLUS, PICOCALC, HAL_PORT_*).** The scoreboard total of 12
 is entirely `#ifdef GUICONTROLS` feature-flag gates + two `#ifndef
 min/max` stdlib polyfills in FileIO.c. Memory.c + Commands.c +
 Functions.c are now all in STRICT_FILES alongside Draw.c / MM_Misc.c
-/ External.c / FileIO.c / Audio.c.
+/ External.c / FileIO.c / shared/audio/Audio.c.
 
 ### Step 3 ✅ — vm_sys_time + bc_debug port hooks
 
@@ -303,9 +303,9 @@ already met because their parent core files (`MM_Misc.c`,
 zero ifdefs.
 
 - **`drivers/watchdog_pico/`** for `cmd_watchdog`, `fun_restart`, `cmd_cpu`, `cmd_reset` (currently in `MM_Misc.c`).
-- **`drivers/gps_uart/`** for the GPS subsystem (currently `GPS.c` at root, with globals in `ports/host_native/host_peripheral_stubs.c`).
+- **`drivers/gps_uart/`** for the GPS subsystem (currently `drivers/gps/GPS.c` at root, with globals in `ports/host_native/host_peripheral_stubs.c`).
 - **`drivers/goodix_touch/`** (currently `goodix.c` at root).
-- **`drivers/mouse_serial/`** (currently `mouse.c` at root).
+- **`drivers/mouse_serial/`** (currently `drivers/ps2_mouse/mouse.c` at root).
 - **CFunctions architectural decision + wasm-ld `CallCFunction` warning** — bundled with Phase 13 contract lock.
 
 **Exit gate (met):** `tools/check_hal_purity.sh` passes; every device target builds clean; host tests 240/240; mmbasic_stdio corpus 8/8.

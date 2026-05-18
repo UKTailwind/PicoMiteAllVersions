@@ -1,10 +1,4 @@
-build/
-build2350/
-build2350_vm_only/
-build_rp2040/
-build_all/
-build_picocalc/
-build_web2350_picocalc/
+build*/
 __pycache__/
 */__pycache__/
 host/*.o
@@ -20,10 +14,6 @@ host/wasm_obj/
 .claude/
 hardcopy.*
 out.bmp
-build_test/
-build_a0_vgawifi/
-build_dvi_wifi/
-build_lfs/
 pico-sdk/
 ports/esp32_s3_metro/build/
 ports/esp32_s3_metro/sdkconfig

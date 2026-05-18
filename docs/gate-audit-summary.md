@@ -58,9 +58,9 @@ flag set in `port_config.h`.
 | `drivers/vga_pio/vga_ops.c`                        | 10 | split-driver        | NEXTGEN + GUICONTROLS gates. |
 | `ports/pico_sdk_common/print_display_options.c`    |  9 | extract-hook        | OPTION LIST per feature → hooks. |
 | `Hardware_Includes.h`                              |  9 | split-driver        | Replace per-feature includes with port-config-driven include. |
-| `Touch.c`                                          |  8 | split-driver        | Gate the entire file by linkage; drop in-file gates. |
+| `drivers/gui_touch/Touch.c`                                          |  8 | split-driver        | Gate the entire file by linkage; drop in-file gates. |
 | `Custom.c`                                         |  6 | extract-hook        | CSUB / CFunction WiFi gates → hook. |
-| `I2C.c`                                            |  5 | extract-hook        | I2C-keypad protocol → `drivers/i2c_picocalc_kbd` hook. |
+| `drivers/i2c_bus/I2C.c`                                            |  5 | extract-hook        | I2C-keypad protocol → `drivers/i2c_picocalc_kbd` hook. |
 | `ports/pico/port_defaults.c`                       |  4 | extract-hook        | Per-board defaults → `drivers/board_profiles/<board>.c` linked at port composition; OPTION RESET <BOARD> ladder becomes a runtime board-profile dispatch. |
 | `ports/pico_sdk_common/cmd_files_hooks.c`          |  4 | extract-hook        | cmd_files USBKEYBOARD axis → hook. |
 | `ports/pico_sdk_common/clear_runtime_port.c`       |  4 | extract-hook        | |
@@ -89,7 +89,7 @@ dispatch rather than an `#if`-bracketed `checkstring()` ladder.
 ### split-driver (104 sites, 29%)
 
 `drivers/spi_lcd/spi_lcd.c` alone owns 47 of these; `drivers/vga_pio/`
-owns 31; `Hardware_Includes.h` 9; `Touch.c` 8; `drivers/hdmi/` 4;
+owns 31; `Hardware_Includes.h` 9; `drivers/gui_touch/Touch.c` 8; `drivers/hdmi/` 4;
 `SPI-LCD.h` 3. Strategy:
 
 - **`spi_lcd.c`**: split per display-controller family. ~6 new files.
@@ -99,7 +99,7 @@ owns 31; `Hardware_Includes.h` 9; `Touch.c` 8; `drivers/hdmi/` 4;
   NEXTGEN modes. 2 new files.
 - **`vga_pio/vga_ops.c`**: similar split + GUICONTROLS gates collapse
   via existing `gui_controls` hook surface.
-- **`Touch.c`**: file is already touch-only; the in-file gates are
+- **`drivers/gui_touch/Touch.c`**: file is already touch-only; the in-file gates are
   vestigial. Remove the file from non-GUICONTROLS port_sources and
   drop the gates.
 - **`drivers/hdmi/hdmi_modes.c`**: split HDMI mode tables vs DVI mode
@@ -123,7 +123,7 @@ needs. Sample re-categorizations (full list in `gate-audit.csv`):
   `HideAllControls()` call is already routed through
   `hal_gui_controls_hide_all()` from P3; the stub is a no-op, so
   the call site doesn't need a gate.
-- **`MMtcpserver.c`** (single WiFi gate). Now **split-driver**: the
+- **`shared/net/MMtcpserver.c`** (single WiFi gate). Now **split-driver**: the
   whole file is already linked only on WiFi ports — drop the
   internal gate, file selection handles it.
 - **`drivers/display_merge/display_merge_pico.c`** (single
