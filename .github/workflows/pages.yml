@@ -72,6 +72,8 @@ jobs:
           cp ports/host_wasm/web/index.html             _site/
           cp ports/host_wasm/web/manifest.webmanifest   _site/
           cp ports/host_wasm/web/icon.svg               _site/
+          cp ports/host_wasm/web/icon-192.png           _site/
+          cp ports/host_wasm/web/icon-512.png           _site/
           cp ports/host_wasm/web/apple-touch-icon.png   _site/
           cp ports/host_wasm/web/safari-pinned-tab.svg  _site/
           cp ports/host_wasm/web/picomite.css           _site/

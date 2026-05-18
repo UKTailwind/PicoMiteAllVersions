@@ -173,8 +173,8 @@ $(PWA_MANIFEST): FORCE
 	@release="$(MMBA_RELEASE_VERSION)"; \
 	{ \
 		printf "{\n"; \
-		printf "  \"name\": \"MMBasic Web\",\n"; \
-		printf "  \"short_name\": \"MMBasic\",\n"; \
+		printf "  \"name\": \"MMBasic Anywhere\",\n"; \
+		printf "  \"short_name\": \"MMBasic Anywhere\",\n"; \
 		printf "  \"description\": \"Installable MMBasic Anywhere for the browser.\",\n"; \
 		printf "  \"id\": \"./\",\n"; \
 		printf "  \"start_url\": \"./\",\n"; \
@@ -184,7 +184,9 @@ $(PWA_MANIFEST): FORCE
 		printf "  \"theme_color\": \"#2f7d68\",\n"; \
 		printf "  \"version\": \"%s\",\n" "$$release"; \
 		printf "  \"icons\": [\n"; \
-		printf "    { \"src\": \"./icon.svg\", \"sizes\": \"any\", \"type\": \"image/svg+xml\", \"purpose\": \"any maskable\" }\n"; \
+		printf "    { \"src\": \"./icon.svg\", \"sizes\": \"any\", \"type\": \"image/svg+xml\", \"purpose\": \"any maskable\" },\n"; \
+		printf "    { \"src\": \"./icon-192.png\", \"sizes\": \"192x192\", \"type\": \"image/png\", \"purpose\": \"any maskable\" },\n"; \
+		printf "    { \"src\": \"./icon-512.png\", \"sizes\": \"512x512\", \"type\": \"image/png\", \"purpose\": \"any maskable\" }\n"; \
 		printf "  ]\n"; \
 		printf "}\n"; \
 	} > "$@"

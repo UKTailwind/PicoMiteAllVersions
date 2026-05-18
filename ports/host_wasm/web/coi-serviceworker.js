@@ -19,6 +19,8 @@
         './index.html',
         './manifest.webmanifest',
         './icon.svg',
+        './icon-192.png',
+        './icon-512.png',
         './apple-touch-icon.png',
         './safari-pinned-tab.svg',
         './picomite.css',

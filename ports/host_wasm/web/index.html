@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MMBasic Web</title>
+    <title>MMBasic Anywhere Web</title>
     <meta name="theme-color" content="#2f7d68">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-title" content="MMBasic">
+    <meta name="apple-mobile-web-app-title" content="MMBasic Anywhere">
     <meta name="apple-mobile-web-app-status-bar-style" content="black">
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="icon" href="./icon.svg" type="image/svg+xml">
@@ -247,8 +247,13 @@
         <svg class="ico"><use href="#ico-close"/></svg>
     </button>
     <div class="help-body">
-        <h2>MMBasic Web</h2>
-        <p id="app-version-label"></p>
+        <div class="help-title">
+            <img src="./icon.svg" alt="" aria-hidden="true">
+            <div class="help-title-text">
+                <h2>MMBasic Anywhere Web</h2>
+                <p id="app-version-label"></p>
+            </div>
+        </div>
         <p>
             A WebAssembly port of <strong>PicoMite</strong>, the Raspberry&nbsp;Pi
             Pico build of <strong>MMBasic</strong>. The full interpreter plus its
