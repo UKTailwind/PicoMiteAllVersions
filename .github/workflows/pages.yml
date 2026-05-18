@@ -49,12 +49,6 @@ jobs:
         run: |
           if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
             tag_version="${GITHUB_REF_NAME}"
-            case "$tag_version" in
-              v*)
-                echo "Release tags must not start with v; use 1.0.1, not v1.0.1" >&2
-                exit 1
-                ;;
-            esac
             file_version="$(cat ../../VERSION)"
             if [ "$tag_version" != "$file_version" ]; then
               echo "Tag version $tag_version does not match VERSION $file_version" >&2
