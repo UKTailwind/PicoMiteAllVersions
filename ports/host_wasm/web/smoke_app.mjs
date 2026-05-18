@@ -49,13 +49,24 @@ try {
         if (!isolated) fail('crossOriginIsolated = false');
         console.log('OK — crossOriginIsolated.');
 
-        // Check 2: PWA manifest + versioned service-worker cache are wired.
+        // Check 2: PWA manifest is wired. Header-isolated dev servers
+        // intentionally unregister the service worker to avoid stale
+        // app-shell artefacts during rebuilds; static hosts still use the
+        // versioned SW cache path.
         const pwa = await page.evaluate(async () => {
-            const reg = await navigator.serviceWorker.ready;
             const manifest = await fetch('./manifest.webmanifest', { cache: 'no-store' }).then((r) => r.json());
             const svgIcon = await fetch('./icon.svg', { cache: 'no-store' });
             const pngIcon = await fetch('./icon-192.png', { cache: 'no-store' });
             const appIcon = await fetch('./apple-touch-icon.png', { cache: 'no-store' });
+            const devOrTunnelHost = location.hostname === 'localhost' ||
+                location.hostname === '127.0.0.1' ||
+                location.hostname.endsWith('.ngrok-free.dev');
+            const expectServiceWorker = !(window.crossOriginIsolated && devOrTunnelHost);
+            let serviceWorkerUrl = '';
+            if (expectServiceWorker) {
+                const reg = await navigator.serviceWorker.ready;
+                serviceWorkerUrl = reg.active?.scriptURL || '';
+            }
             const cacheKeys = 'caches' in window ? await caches.keys() : [];
             return {
                 appVersion: window.picomiteAppVersion,
@@ -65,17 +76,18 @@ try {
                 pngIconOk: pngIcon.ok && pngIcon.headers.get('content-type')?.includes('image/png'),
                 svgIconOk: svgIcon.ok && svgIcon.headers.get('content-type')?.includes('image/svg+xml'),
                 cacheKeys,
+                expectServiceWorker,
                 manifestVersion: manifest.version,
-                serviceWorkerUrl: reg.active?.scriptURL || '',
+                serviceWorkerUrl,
             };
         });
         if (pwa.manifestVersion !== pwa.appVersion.release) {
             fail(`manifest version ${pwa.manifestVersion} != app release ${pwa.appVersion.release}`);
         }
-        if (!pwa.serviceWorkerUrl.includes(`version=${encodeURIComponent(pwa.appVersion.cache)}`)) {
+        if (pwa.expectServiceWorker && !pwa.serviceWorkerUrl.includes(`version=${encodeURIComponent(pwa.appVersion.cache)}`)) {
             fail(`service worker URL missing cache version: ${pwa.serviceWorkerUrl}`);
         }
-        if (!pwa.cacheKeys.includes(`${pwa.appVersion.cache}-app-shell`)) {
+        if (pwa.expectServiceWorker && !pwa.cacheKeys.includes(`${pwa.appVersion.cache}-app-shell`)) {
             fail(`missing app-shell cache for ${pwa.appVersion.cache}; caches=${pwa.cacheKeys.join(',')}`);
         }
         if (pwa.appleCapable !== 'yes' || !pwa.appIconOk) {
@@ -84,7 +96,9 @@ try {
         if (pwa.manifestIconCount < 3 || !pwa.svgIconOk || !pwa.pngIconOk) {
             fail(`app logo metadata incomplete; icons=${pwa.manifestIconCount} svg=${pwa.svgIconOk} png=${pwa.pngIconOk}`);
         }
-        console.log(`OK — PWA manifest/service worker cache ${pwa.appVersion.cache}.`);
+        console.log(pwa.expectServiceWorker
+            ? `OK — PWA manifest/service worker cache ${pwa.appVersion.cache}.`
+            : 'OK — PWA manifest; service worker skipped on header-isolated dev host.');
 
         // Check 3: worker has booted — window.picomite hook is installed
         // by onWorkerReady after it receives 'ready' from the worker.

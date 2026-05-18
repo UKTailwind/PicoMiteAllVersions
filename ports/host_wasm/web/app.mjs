@@ -35,6 +35,7 @@ const keyRepeatDelayInput    = document.getElementById('key-repeat-delay');
 const keyRepeatIntervalInput = document.getElementById('key-repeat-interval');
 const dropOverlay = document.getElementById('drop-overlay');
 const filesListEl = document.getElementById('files-list');
+const debugWorkerLogs = new URLSearchParams(window.location.search).get('debug') === '1';
 
 window.picomiteAppVersion = {
     release: APP_RELEASE_VERSION,
@@ -559,7 +560,7 @@ worker.onmessage = (e) => {
     if (!m || !m.type) return;
 
     if (m.type === 'log') {
-        console[m.level === 'warn' ? 'warn' : 'log']('[picomite]', m.line);
+        if (debugWorkerLogs) console[m.level === 'warn' ? 'warn' : 'log']('[picomite]', m.line);
         return;
     }
 
@@ -1133,17 +1134,125 @@ function pushKeyToRing(code) {
     Atomics.store(memoryU32, keyHeadIdx, next);
 }
 
+// Soft-keyboard support runs at page load — independent of the WASM
+// worker — so tapping the canvas raises the OS keyboard immediately,
+// and the layout adapts to visualViewport changes even before the
+// interpreter is live. Ring-pushing handlers (the hot path) wait for
+// wireKeyboard() once the ring memory is mapped.
+function wireSoftKeyboardShell() {
+    const kbdInput = document.getElementById('kbd-helper');
+    if (!kbdInput) return;
+    const fullViewportHeight = CSS.supports('height: 100dvh') ? '100dvh' : '100vh';
+
+    // Tap on the canvas: focus the hidden input on touch (summons the
+    // soft keyboard) or the canvas itself on mouse (preserves the
+    // existing hardware-key flow).
+    canvas.addEventListener('pointerdown', (ev) => {
+        if (ev.pointerType === 'touch' || ev.pointerType === 'pen') {
+            kbdInput.value = '';
+            kbdInput.focus({ preventScroll: true });
+        } else {
+            canvas.focus();
+        }
+    });
+    canvas.addEventListener('touchend', (ev) => {
+        ev.preventDefault();
+        kbdInput.value = '';
+        kbdInput.focus({ preventScroll: true });
+    }, { passive: false });
+
+    // Shrink #stage to the visible viewport while the soft keyboard is
+    // up so the canvas + sidebar stay above the keyboard instead of
+    // behind it. iOS Safari may report no layout/visual occlusion even
+    // while the keyboard overlays the page, so focus on this helper
+    // input is enough to activate the visualViewport-sized layout.
+    const vv = window.visualViewport;
+    const syncViewport = () => {
+        if (!vv) return;
+        const focused = document.activeElement === kbdInput;
+        if (focused) {
+            document.documentElement.style.setProperty('--app-vh', `${Math.round(vv.height)}px`);
+            document.documentElement.style.setProperty('--app-vv-top', `${Math.max(0, Math.round(vv.offsetTop))}px`);
+            document.body.classList.add('keyboard-active');
+            requestAnimationFrame(fitCanvas);
+        } else {
+            document.documentElement.style.setProperty('--app-vh', fullViewportHeight);
+            document.documentElement.style.setProperty('--app-vv-top', '0px');
+            document.body.classList.remove('keyboard-active');
+            requestAnimationFrame(fitCanvas);
+        }
+    };
+    if (vv) {
+        vv.addEventListener('resize', syncViewport);
+        vv.addEventListener('scroll', syncViewport);
+    }
+    kbdInput.addEventListener('focus', () => {
+        syncViewport();
+        for (const delay of [50, 150, 300, 600, 1000]) {
+            setTimeout(syncViewport, delay);
+        }
+    });
+    kbdInput.addEventListener('blur', () => {
+        document.documentElement.style.setProperty('--app-vh', fullViewportHeight);
+        document.documentElement.style.setProperty('--app-vv-top', '0px');
+        document.body.classList.remove('keyboard-active');
+        requestAnimationFrame(fitCanvas);
+    });
+}
+wireSoftKeyboardShell();
+
 function wireKeyboard() {
     const held = new Map();  // event.code -> {delayTimer, intervalTimer, mmCode}
+    const pendingHelperControls = new Map();  // mmCode -> fallback timer
+    const inputBackedKey = (event) => {
+        if (event.ctrlKey || event.metaKey || event.altKey) return false;
+        return event.key.length === 1;
+    };
+    const helperControlCode = (event) => {
+        if (event.currentTarget !== kbdInput) return 0;
+        if (event.key === 'Backspace') return 0x08;
+        if (event.key === 'Delete')    return 0x7f;
+        if (event.key === 'Enter')     return 0x0d;
+        return 0;
+    };
+    const clearPendingHelperControls = () => {
+        for (const timer of pendingHelperControls.values()) clearTimeout(timer);
+        pendingHelperControls.clear();
+    };
+    const scheduleHelperControlFallback = (code) => {
+        const old = pendingHelperControls.get(code);
+        if (old) clearTimeout(old);
+        pendingHelperControls.set(code, setTimeout(() => {
+            pendingHelperControls.delete(code);
+            pushKeyToRing(code);
+        }, 32));
+    };
+    const pushHelperControlFromBeforeInput = (code) => {
+        const pending = pendingHelperControls.get(code);
+        if (pending) {
+            clearTimeout(pending);
+            pendingHelperControls.delete(code);
+        }
+        pushKeyToRing(code);
+    };
     const releaseAll = () => {
         for (const s of held.values()) {
             if (s.delayTimer)    clearTimeout(s.delayTimer);
             if (s.intervalTimer) clearInterval(s.intervalTimer);
         }
         held.clear();
+        clearPendingHelperControls();
     };
 
-    canvas.addEventListener('keydown', (event) => {
+    const kbdInput = document.getElementById('kbd-helper');
+
+    const onKeyDown = (event) => {
+        if (event.currentTarget === kbdInput && inputBackedKey(event)) return;
+        const helperCode = helperControlCode(event);
+        if (helperCode) {
+            scheduleHelperControlFallback(helperCode);
+            return;
+        }
         const mm = mapKeyEvent(event);
         if (mm < 0) return;
         if (event.repeat) return;
@@ -1160,19 +1269,101 @@ function wireKeyboard() {
             }, KEY_REPEAT_INTERVAL_MS);
         }, KEY_REPEAT_DELAY_MS);
         held.set(event.code, s);
-    }, { passive: true });
-
-    canvas.addEventListener('keyup', (event) => {
+    };
+    const onKeyUp = (event) => {
         const s = held.get(event.code);
         if (!s) return;
         if (s.delayTimer)    clearTimeout(s.delayTimer);
         if (s.intervalTimer) clearInterval(s.intervalTimer);
         held.delete(event.code);
-    }, { passive: true });
+    };
 
+    // Hardware keyboards focus the canvas; soft keyboards focus the hidden
+    // helper input. On mobile Safari the helper input can emit both
+    // keydown and input for a single text key; text-producing keys are
+    // handled by beforeinput/input below, while keydown remains for
+    // non-text keys such as arrows.
+    canvas.addEventListener('keydown', onKeyDown, { passive: true });
+    canvas.addEventListener('keyup',   onKeyUp,   { passive: true });
+    canvas.addEventListener('blur',    releaseAll);
+    if (kbdInput) {
+        kbdInput.addEventListener('keydown', onKeyDown, { passive: true });
+        kbdInput.addEventListener('keyup',   onKeyUp,   { passive: true });
+        kbdInput.addEventListener('blur',    releaseAll);
+    }
     window.addEventListener('blur', releaseAll);
-    canvas.addEventListener('blur', releaseAll);
-    canvas.addEventListener('click', () => canvas.focus());
+
+    // Mobile soft keyboards typically skip keydown/keyup and only fire
+    // `input` / `beforeinput`. Translate those into ring pushes so
+    // typed characters reach MMBasic the same way.
+    if (kbdInput) {
+        kbdInput.addEventListener('beforeinput', (ev) => {
+            if (ev.inputType === 'deleteContentBackward') {
+                ev.preventDefault();
+                pushHelperControlFromBeforeInput(0x08);
+            } else if (ev.inputType === 'deleteContentForward') {
+                ev.preventDefault();
+                pushHelperControlFromBeforeInput(0x7f);
+            } else if (ev.inputType === 'insertLineBreak' ||
+                       ev.inputType === 'insertParagraph') {
+                ev.preventDefault();
+                pushHelperControlFromBeforeInput(0x0d);
+            }
+        });
+        kbdInput.addEventListener('input', (ev) => {
+            const data = ev.data;
+            kbdInput.value = '';
+            if (!data) return;
+            for (let i = 0; i < data.length; i++) {
+                const c = data.charCodeAt(i);
+                if (c < 256) pushKeyToRing(c);
+            }
+        });
+        kbdInput.addEventListener('compositionend', (ev) => {
+            kbdInput.value = '';
+            const data = ev.data || '';
+            for (let i = 0; i < data.length; i++) {
+                const c = data.charCodeAt(i);
+                if (c < 256) pushKeyToRing(c);
+            }
+        });
+    }
+
+    const mobileKeybar = document.getElementById('mobile-keybar');
+    if (mobileKeybar) {
+        let keybarHeld = null;
+        const stopKeybarRepeat = () => {
+            if (!keybarHeld) return;
+            if (keybarHeld.delayTimer) clearTimeout(keybarHeld.delayTimer);
+            if (keybarHeld.intervalTimer) clearInterval(keybarHeld.intervalTimer);
+            keybarHeld = null;
+        };
+        mobileKeybar.addEventListener('pointerdown', (ev) => {
+            const button = ev.target.closest('button[data-mm-key]');
+            if (!button) return;
+            ev.preventDefault();
+            const code = parseInt(button.dataset.mmKey || '', 10);
+            stopKeybarRepeat();
+            if (Number.isFinite(code)) {
+                pushKeyToRing(code);
+                keybarHeld = { delayTimer: 0, intervalTimer: 0 };
+                keybarHeld.delayTimer = setTimeout(() => {
+                    if (!keybarHeld) return;
+                    keybarHeld.delayTimer = 0;
+                    keybarHeld.intervalTimer = setInterval(() => {
+                        pushKeyToRing(code);
+                    }, KEY_REPEAT_INTERVAL_MS);
+                }, KEY_REPEAT_DELAY_MS);
+                try { button.setPointerCapture(ev.pointerId); } catch (_) {}
+            }
+            if (kbdInput) kbdInput.focus({ preventScroll: true });
+        }, { passive: false });
+        mobileKeybar.addEventListener('pointerup', stopKeybarRepeat);
+        mobileKeybar.addEventListener('pointercancel', stopKeybarRepeat);
+        mobileKeybar.addEventListener('pointerleave', stopKeybarRepeat);
+        window.addEventListener('blur', stopKeybarRepeat);
+    }
+
     canvas.focus();
 }
 

@@ -157,6 +157,23 @@
     </section>
 </main>
 
+<!-- Off-screen input used to summon the soft keyboard on touch devices
+     when the user taps the canvas. Hardware-keyboard input still flows
+     through the listeners attached to the canvas itself. -->
+<input id="kbd-helper" type="text" inputmode="text"
+       autocomplete="off" autocorrect="off" autocapitalize="off"
+       spellcheck="false" aria-hidden="true" tabindex="-1">
+
+<div id="mobile-keybar" aria-label="Navigation keys">
+    <button type="button" data-mm-key="27" aria-label="Escape">Esc</button>
+    <button type="button" data-mm-key="34" aria-label="Double quote">"</button>
+    <button type="button" data-mm-key="46" aria-label="Period">.</button>
+    <button type="button" data-mm-key="130" aria-label="Left">←</button>
+    <button type="button" data-mm-key="128" aria-label="Up">↑</button>
+    <button type="button" data-mm-key="129" aria-label="Down">↓</button>
+    <button type="button" data-mm-key="131" aria-label="Right">→</button>
+</div>
+
 <div id="status">Loading WASM module…</div>
 
 <div id="drop-overlay" hidden>

@@ -119,14 +119,37 @@
         return;
     }
 
-    // Running on the page: register the SW. GitHub Pages needs it for
-    // COOP/COEP; all hosts need it for PWA install/offline behaviour.
+    // Running on the page: register the SW. Static hosts such as GitHub
+    // Pages need it for COOP/COEP and app-shell caching; local dev and
+    // ngrok usually get real headers from serve.py and skip the SW below.
     if (typeof window === 'undefined') return;
     if (!window.isSecureContext)       return;   // SW requires HTTPS or localhost
     if (!('serviceWorker' in navigator)) return; // no SW support → nothing we can do
 
     const currentScriptUrl = document.currentScript.src;
     const alreadyIsolated = window.crossOriginIsolated;
+    const devOrTunnelHost = (
+        window.location.hostname === 'localhost' ||
+        window.location.hostname === '127.0.0.1' ||
+        window.location.hostname.endsWith('.ngrok-free.dev')
+    );
+
+    // Local dev servers and ngrok already send real COOP/COEP headers.
+    // Keeping an app-shell SW active there can serve a stale worker/wasm
+    // set during rapid rebuilds and leave the page stuck at "Booting
+    // worker...". Use the SW only on static hosts that need header
+    // synthesis, such as GitHub Pages.
+    if (alreadyIsolated && devOrTunnelHost) {
+        navigator.serviceWorker.getRegistrations()
+            .then((regs) => Promise.all(regs.map((reg) => reg.unregister())))
+            .then((removed) => {
+                if (navigator.serviceWorker.controller && removed.some(Boolean)) {
+                    window.location.reload();
+                }
+            })
+            .catch((err) => { console.warn('coi-serviceworker: unregister failed', err); });
+        return;
+    }
 
     import('./app_version.mjs')
         .then(({ APP_CACHE_VERSION }) => {
