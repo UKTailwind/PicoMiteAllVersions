@@ -1,10 +1,8 @@
 /*
- * drivers/i2c_picocalc_kbd/picocalc_keypad_matrix.c — PicoCalc hardware
- * keypad scanner. Compiled when PICOCALC=true (PICORP2350 / PICOUSBRP2350
- * / WEBRP2350). The PicoCalc board wires its keypad into the rp2350 GPIO
- * matrix on pins 31..40 / 26..30 and drives it through LocalKeyDown[];
- * this TU supplies cmd_keyscan() which the periodic-scan path in
- * drivers/i2c_picocalc_kbd/i2c_keypad_real.c invokes every 10 ms.
+ * drivers/i2c_picocalc_kbd/picocalc_keypad_matrix.c — legacy local
+ * GPIO-matrix keypad scanner. ClockworkPi PicoCalc ports use the I2C
+ * keypad MCU and do not link this file. A future direct-matrix keyboard
+ * port can link it when its pin table exposes pins 31..40 / 26..30.
  *
  * Declaration in AllCommands.h (`void cmd_keyscan(void)`).
  */

@@ -37,7 +37,7 @@ Corollaries:
 ## Invariants
 
 1. **Host test gate** — `cd ports/host_native && ./build.sh && ./run_tests.sh` (default compare mode, interp vs VM) must pass at every feature-boundary commit. `--interp` and `--vm` modes are diagnostic only.
-2. **Firmware gate** — `./build_firmware.sh` (both rp2040 and rp2350) must produce `.uf2` artifacts at every feature boundary. The script mirrors `.github/workflows/firmware.yml` exactly; if it passes locally, CI passes on push.
+2. **Firmware gate** — `./build_picocalc_firmware.sh` (both rp2040 and rp2350) must produce `.uf2` artifacts at every feature boundary. The script mirrors `.github/workflows/firmware.yml` exactly; if it passes locally, CI passes on push.
 3. **Web gate** — `./ports/host_wasm/build.sh` must produce `ports/host_wasm/web/picomite.{mjs,wasm}` cleanly. Pages deploy on main must stay green.
 4. **No new hardware `#ifdef` gates** added to core interpreter files (`MMBasic.c`, `Commands.c`, `Functions.c`, `Operators.c`). If an upstream feature requires a gate, the gate goes behind a HAL entry point, not into the core.
 5. **Bridge-first for new commands.** New `cmd_*` entries go to the interpreter path via `AllCommands.h`; VM gets a native opcode only when profiling shows it matters. Pattern per `docs/bridge-restoration-plan.md`.
@@ -111,7 +111,7 @@ For every feature ported, follow this loop exactly:
 7. **Write a test.** Every ported feature gets at least one `ports/host_native/tests/*.bas` that exercises it. Regressions in tier-1 features bite hardest, so cover edge cases (empty string, negative index, nested TYPE, etc.).
 8. **Run the simulator gate — all three must pass:**
    - Host: `cd ports/host_native && ./build.sh && ./run_tests.sh` (default compare mode).
-   - Firmware: `./build_firmware.sh` — both rp2040 and rp2350 must produce a `.uf2`. Mirrors CI exactly; if this passes locally, `firmware.yml` will pass on push.
+   - Firmware: `./build_picocalc_firmware.sh` — both rp2040 and rp2350 must produce a `.uf2`. Mirrors CI exactly; if this passes locally, `firmware.yml` will pass on push.
    - Web: `cd ports/host_wasm && ./build.sh` — `ports/host_wasm/web/picomite.{mjs,wasm}` must produce cleanly.
 
    If any gate fails, the port is not done — do not commit. These are necessary but **not** sufficient; see "Merge target" above.

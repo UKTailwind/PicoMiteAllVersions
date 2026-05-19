@@ -10,11 +10,6 @@
 #     directory names. buildall passes them as -DPORT=<dir>.
 # New single-board ports should use the lowercase form.
 #
-# PICOCALC is enabled for every PICOMITE or PICOMITEWEB target that isn't a
-# USB-keyboard variant — matches the legacy formula
-#   #define PICOCALC ((defined(PICOMITE) || defined(PICOMITEWEB)) && !defined(USBKEYBOARD))
-# from configuration.h. Without this, the I²C keypad driver isn't linked
-# and OPTION RESET PICOCALC leaves the keyboard non-functional.
 set -euo pipefail
 
 TARGETS=(
@@ -22,6 +17,8 @@ TARGETS=(
     PICORP2350 PICOUSBRP2350 VGARP2350 VGAUSBRP2350
     HDMI HDMIUSB WEBRP2350
     VGAWIFIRP2350 DVIWIFIRP2350
+    picocalc_rp2040 picocalc_wifi_rp2040
+    picocalc_rp2350 picocalc_wifi_rp2350
 )
 
 root="$(cd "$(dirname "$0")" && pwd)"
@@ -56,14 +53,6 @@ for t in "${TARGETS[@]}"; do
     rm -rf "$d" && mkdir -p "$d"
     printf '=== %s ===\n' "$t"
 
-    # Enable PICOCALC for every non-USB-keyboard PICOMITE / PICOMITEWEB
-    # variant — matches the legacy formula. The I²C keypad driver gets
-    # compiled in; runtime OPTION RESET PICOCALC then activates it.
-    picocalc_flag="false"
-    case "$t" in
-        PICO|WEB|PICORP2350|WEBRP2350) picocalc_flag="true" ;;
-    esac
-
     # Uppercase target → legacy -DCOMPILE; lowercase → direct -DPORT.
     if [[ "$t" =~ ^[A-Z0-9_]+$ ]]; then
         select_arg="-DCOMPILE=$t"
@@ -71,7 +60,7 @@ for t in "${TARGETS[@]}"; do
         select_arg="-DPORT=$t"
     fi
 
-    if ! (cd "$d" && cmake "$select_arg" -DPICOCALC="$picocalc_flag" "$root" > cmake.log 2>&1 && make -j8 > make.log 2>&1); then
+    if ! (cd "$d" && cmake "$select_arg" "$root" > cmake.log 2>&1 && make -j8 > make.log 2>&1); then
         printf 'FAIL (%s)\n' "$t"
         if [ -f "$d/make.log" ]; then
             tail -30 "$d/make.log" || true
@@ -86,6 +75,16 @@ done
 
 if [ "$fail" = 0 ]; then
     echo "All ${#TARGETS[@]} device variants built clean."
+
+    # Flash-layout gate — verifies firmware LOAD segments end before each
+    # target's option/program flash region, with headroom. Skip with
+    # SKIP_FLASH_LAYOUT=1.
+    if [ "${SKIP_FLASH_LAYOUT:-0}" != "1" ] && [ -x "$root/tools/check_flash_layout.sh" ]; then
+        printf '\n=== Flash layout gate ===\n'
+        if ! "$root/tools/check_flash_layout.sh"; then
+            fail=1
+        fi
+    fi
 
     # RAM-baseline gate — runs after a successful build so arm-none-eabi-size
     # can read the freshly-built ELFs. Skip with SKIP_RAM_BASELINE=1.

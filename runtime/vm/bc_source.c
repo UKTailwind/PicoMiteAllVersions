@@ -4196,10 +4196,19 @@ static void source_compile_end_function(BCCompiler *cs) {
  * '!FAST loop converter — stack bytecode to register micro-ops
  * ====================================================================== */
 
+#ifndef BC_FAST_MAX_ROP_BYTES
+#define BC_FAST_MAX_ROP_BYTES 4096
+#endif
+
+#ifndef BC_FAST_MAX_BC_BYTES
+#define BC_FAST_MAX_BC_BYTES 4096
+#endif
+
 /* Converter state */
 typedef struct {
-    uint8_t  rop[4096];          /* micro-op output buffer */
+    uint8_t  rop[BC_FAST_MAX_ROP_BYTES]; /* micro-op output buffer */
     uint32_t rop_len;
+    int      rop_overflow;
 
     /* Simulated stack — each entry is a register index */
     uint8_t  sim[64];
@@ -4225,7 +4234,7 @@ typedef struct {
     int      max_regs;           /* high-water mark */
 
     /* Bytecode-to-ROP offset mapping (for jump resolution) */
-    uint16_t bc_to_rop[4096];    /* indexed by bc offset within loop */
+    uint16_t bc_to_rop[BC_FAST_MAX_BC_BYTES + 1]; /* indexed by bc offset within loop */
     uint32_t bc_len;             /* length of loop bytecode being converted */
 
     /* Forward jump fixups */
@@ -4238,6 +4247,7 @@ typedef struct {
 
 static void fc_emit(FastConv *fc, uint8_t b) {
     if (fc->rop_len < sizeof(fc->rop)) fc->rop[fc->rop_len++] = b;
+    else fc->rop_overflow = 1;
 }
 
 static void fc_emit_u16(FastConv *fc, uint16_t v) {
@@ -4435,7 +4445,7 @@ static int source_convert_fast_loop(BCCompiler *cs, uint32_t loop_start,
     #define FC_FAIL do { fc_result = 0; goto fc_cleanup; } while(0)
     #define FC_OK   do { fc_result = 1; goto fc_cleanup; } while(0)
 
-    if (fc.bc_len > sizeof(fc.bc_to_rop)) {
+    if (fc.bc_len > BC_FAST_MAX_BC_BYTES) {
         bc_set_error(cs, "'!FAST loop too large");
         FC_FAIL;
     }
@@ -4716,7 +4726,7 @@ static int source_convert_fast_loop(BCCompiler *cs, uint32_t loop_start,
                 case BC_JCMP_GE: rop = ROP_JCMP_GE_I; break;
                 default:
                     bc_set_error(cs, "'!FAST: unknown JCMP relation %d", rel);
-                    return 0;
+                    FC_FAIL;
             }
             /* Compute bytecode target (absolute within loop) */
             uint32_t bc_here = (uint32_t)(pc - base);
@@ -4821,7 +4831,7 @@ static int source_convert_fast_loop(BCCompiler *cs, uint32_t loop_start,
             uint8_t ndim = *pc++;
             if (ndim != 1) {
                 bc_set_error(cs, "'!FAST: only 1D arrays supported (got %dD)", ndim);
-                return 0;
+                FC_FAIL;
             }
             uint8_t is_local = (op == OP_LOAD_LOCAL_ARR_I || op == OP_LOAD_LOCAL_ARR_F);
             uint8_t is_float = (op == OP_LOAD_LOCAL_ARR_F || op == OP_LOAD_ARR_F);
@@ -4839,7 +4849,7 @@ static int source_convert_fast_loop(BCCompiler *cs, uint32_t loop_start,
             uint8_t ndim = *pc++;
             if (ndim != 1) {
                 bc_set_error(cs, "'!FAST: only 1D arrays supported (got %dD)", ndim);
-                return 0;
+                FC_FAIL;
             }
             uint8_t is_local = (op == OP_STORE_LOCAL_ARR_I || op == OP_STORE_LOCAL_ARR_F);
             uint8_t is_float = (op == OP_STORE_LOCAL_ARR_F || op == OP_STORE_ARR_F);
@@ -4871,6 +4881,11 @@ static int source_convert_fast_loop(BCCompiler *cs, uint32_t loop_start,
 
     /* Record final bc_to_rop mapping entry (for forward jumps to loop end) */
     fc.bc_to_rop[fc.bc_len] = (uint16_t)fc.rop_len;
+
+    if (fc.rop_overflow) {
+        bc_set_error(cs, "'!FAST loop output too large");
+        FC_FAIL;
+    }
 
     /* Patch forward jump fixups */
     for (int i = 0; i < fc.fixup_count; i++) {

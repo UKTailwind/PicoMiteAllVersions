@@ -816,9 +816,14 @@ typedef struct {
 /*
  * VM array storage
  */
+#ifndef BC_ARRAY_DIM_TYPE
+#define BC_ARRAY_DIM_TYPE int
+#endif
+typedef BC_ARRAY_DIM_TYPE BCArrayDim;
+
 typedef struct {
     BCValue    *data;           /* allocated array of BCValues */
-    int         dims[MAXDIM];   /* dimension sizes */
+    BCArrayDim dims[MAXDIM];    /* dimension sizes */
     uint8_t     ndims;
     uint8_t     elem_type;      /* T_INT, T_NBR, T_STR */
     uint8_t     data_external;  /* 1 = data is aliased into g_vartbl
@@ -847,7 +852,9 @@ typedef struct {
  * letting programs that OOM on real RP2040 succeed in the simulator.
  * Gate on BC_SIM_RP2040 / BC_SIM_RP2350 (the host port Makefiles set
  * these to match the device being simulated). */
-#if defined(BC_SIM_RP2040)
+#if defined(BC_VM_MAX_LOCALS)
+  #define VM_MAX_LOCALS   BC_VM_MAX_LOCALS
+#elif defined(BC_SIM_RP2040)
   #define VM_MAX_LOCALS   256    /* supports ~4 recursion levels * 64 locals */
 #elif defined(BC_SIM_RP2350)
   #define VM_MAX_LOCALS   512
@@ -874,6 +881,7 @@ typedef struct {
     /* Global variable storage (allocated: BC_MAX_SLOTS entries) */
     BCValue    *globals;
     uint8_t    *global_types;   /* tracks what's stored */
+    uint8_t    *global_valid;   /* slot has runtime state to sync */
 
     /* Array storage for globals (allocated: BC_MAX_SLOTS entries) */
     BCArray    *arrays;         /* parallel to globals[], used if is_array */

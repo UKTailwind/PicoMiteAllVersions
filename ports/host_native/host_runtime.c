@@ -738,7 +738,7 @@ void port_drive_check(char drive)
 }
 
 /* PicoCalc HW hooks — error stubs on host. Real impls in
- * ports/pico_sdk_common/picocalc_features.c on PICOCALC builds. */
+ * ports/pico_sdk_common/picocalc_features_real.c on PicoCalc ports. */
 void port_picocalc_set_keyboard_backlight(int level) { (void)level; error("Not supported on host"); }
 int  port_picocalc_battery_pct(void)                 { error("Not supported on host"); return 0; }
 int  port_picocalc_is_charging(void)                 { error("Not supported on host"); return 0; }

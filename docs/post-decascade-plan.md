@@ -249,7 +249,7 @@ P6.1. **Top-level CMakeLists.txt**: change
       port_sources.cmake (they already pick the board file at the
       top of every snippet via the CMake `set(PICO_BOARD …)`
       mechanism — just need to lift them).
-P6.2. **buildall.sh, build_firmware.sh, firmware.yml**: switch
+P6.2. **buildall.sh, build_picocalc_firmware.sh, firmware.yml**: switch
       `-DCOMPILE=…` to `-DPORT=…` and update target lists to be
       lowercase port-directory names.
 P6.3. **Backwards-compat shim** (one release): if `COMPILE` is set

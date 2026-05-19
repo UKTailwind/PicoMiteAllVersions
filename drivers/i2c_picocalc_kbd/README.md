@@ -14,8 +14,7 @@ Entry points:
   polling on PicoCalc goes through the generic `I2C.c::CheckI2CKeyboard`
   from `PicoMite.c::routinechecks`, not through this function).
 
-Linked only when CMake is invoked with `-DPICOCALC=true` per
-CMakeLists.txt.
+Linked only by PicoCalc ports via their `port_sources.cmake`.
 
 ## Lifted from
 

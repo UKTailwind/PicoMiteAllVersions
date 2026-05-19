@@ -29,6 +29,8 @@ TARGETS=(
     PICORP2350 PICOUSBRP2350 VGARP2350 VGAUSBRP2350
     HDMI HDMIUSB WEBRP2350
     VGAWIFIRP2350 DVIWIFIRP2350
+    picocalc_rp2040 picocalc_wifi_rp2040
+    picocalc_rp2350 picocalc_wifi_rp2350
 )
 
 mode="check"

@@ -201,7 +201,7 @@ Move non-entry-point shell helpers under `tools/` or `tools/build/`.
 Likely root entry points to keep for now:
 
 - `buildall.sh`
-- `build_firmware.sh`
+- `build_picocalc_firmware.sh`
 - `buildesp32.sh`
 
 Likely moves:
@@ -217,7 +217,7 @@ Compatibility option:
 
 Verification:
 
-- `rg 'bisect_tilemap.sh|flash.sh|validate_all.sh|buildall.sh|build_firmware.sh|buildesp32.sh' .`
+- `rg 'bisect_tilemap.sh|flash.sh|validate_all.sh|buildall.sh|build_picocalc_firmware.sh|buildesp32.sh' .`
 
 ## Stage 6: Build Metadata And Low-Level Inputs
 
@@ -511,7 +511,7 @@ After all stages, root should contain only:
   `CLAUDE.md`
 - top-level build/docs entry points: `CMakeLists.txt`, `Doxyfile` if retained
 - temporary root build entry scripts retained by Stage 5: `buildall.sh`,
-  `build_firmware.sh`, `buildesp32.sh`
+  `build_picocalc_firmware.sh`, `buildesp32.sh`
 - major source directories: `assets/`, `boards/`, `cmake/`, `core/`, `demos/`,
   `docs/`, `drivers/`, `examples/`, `hal/`, `hardware/`, `host/`, `picocalc/`,
   `ports/`, `porttools/`, `runtime/`, `shared/`, `third_party/`, `toolchain/`,

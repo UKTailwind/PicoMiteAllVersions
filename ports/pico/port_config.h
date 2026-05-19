@@ -31,6 +31,11 @@
  * 200 MHz. */
 #define HAL_PORT_DEFAULT_CPU_SPEED_KHZ   200000
 
+#define HAL_PORT_HAS_I2C_KEYPAD          0
+#define HAL_PORT_BACKLIGHT_VIA_KEYPAD_I2C 0
+#define HAL_PORT_I2C_TIMEOUT_MS          5
+#define HAL_PORT_I2C_SLOW_HZ             100000
+
 /* MMInkey placement: PicoMite SPI-LCD has the headroom to pin
  * MMInkey to RAM (no scanout shadow framebuffer eating SRAM). */
 #define MMINKEY_DECL(name)      __not_in_flash_func(name)
@@ -95,8 +100,8 @@
 #define HAL_PORT_MIN_CPU                 48000
 #define HAL_PORT_MAX_VARS                512
 #define HAL_PORT_MAX_SUBFUN              256
-#define HAL_PORT_FLASH_TARGET_OFFSET     (1024 * 1024)
-#define HAL_PORT_FLASH_TARGET_OFFSET_USB (1024 * 1024)
+#define HAL_PORT_FLASH_TARGET_OFFSET     (1152 * 1024)
+#define HAL_PORT_FLASH_TARGET_OFFSET_USB (1152 * 1024)
 #define HAL_PORT_MAGIC_KEY               0xE1799B93
 #define HAL_PORT_MAGIC_KEY_USB           0x6210519E
 #define HAL_PORT_HEAP_TOP                0x2003EC00

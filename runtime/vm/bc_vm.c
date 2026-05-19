@@ -218,11 +218,12 @@ void bc_vm_release_arrays(BCVMState *vm) {
 int bc_vm_alloc(BCVMState *vm) {
     vm->globals      = (BCValue *)BC_ALLOC(BC_MAX_SLOTS * sizeof(BCValue));
     vm->global_types = (uint8_t *)BC_ALLOC(BC_MAX_SLOTS);
+    vm->global_valid = (uint8_t *)BC_ALLOC(BC_MAX_SLOTS);
     vm->arrays       = (BCArray *)BC_ALLOC(BC_MAX_SLOTS * sizeof(BCArray));
     vm->locals       = (BCValue *)BC_ALLOC(VM_MAX_LOCALS * sizeof(BCValue));
     vm->local_types  = (uint8_t *)BC_ALLOC(VM_MAX_LOCALS);
     vm->local_arrays = (BCArray *)BC_ALLOC(VM_MAX_LOCALS * sizeof(BCArray));
-    if (!vm->globals || !vm->global_types || !vm->arrays ||
+    if (!vm->globals || !vm->global_types || !vm->global_valid || !vm->arrays ||
         !vm->locals || !vm->local_types || !vm->local_arrays) {
         bc_vm_free(vm);
         return -1;
@@ -246,6 +247,9 @@ void bc_vm_free(BCVMState *vm) {
     if (vm->global_types) {
         BC_FREE(vm->global_types);
     }
+    if (vm->global_valid) {
+        BC_FREE(vm->global_valid);
+    }
     if (vm->arrays) {
         BC_FREE(vm->arrays);
     }
@@ -268,6 +272,7 @@ void bc_vm_free(BCVMState *vm) {
     }
     vm->globals = NULL;
     vm->global_types = NULL;
+    vm->global_valid = NULL;
     vm->arrays = NULL;
     vm->locals = NULL;
     vm->local_types = NULL;
@@ -298,6 +303,8 @@ void bc_vm_init(BCVMState *vm, BCCompiler *cs) {
         memset(vm->globals, 0, BC_MAX_SLOTS * sizeof(BCValue));
     if (vm->global_types)
         memset(vm->global_types, 0, BC_MAX_SLOTS);
+    if (vm->global_valid)
+        memset(vm->global_valid, 0, BC_MAX_SLOTS);
     if (vm->locals)
         memset(vm->locals, 0, VM_MAX_LOCALS * sizeof(BCValue));
     if (vm->local_types)
@@ -1933,6 +1940,7 @@ op_store_i: {
         vm->globals[slot].i = (int64_t)POP_F();
     else
         vm->globals[slot].i = POP_I();
+    vm->global_valid[slot] = 1;
     DISPATCH();
 }
 
@@ -1942,6 +1950,7 @@ op_store_f: {
         vm->globals[slot].f = (MMFLOAT)POP_I();
     else
         vm->globals[slot].f = POP_F();
+    vm->global_valid[slot] = 1;
     DISPATCH();
 }
 
@@ -1954,6 +1963,7 @@ op_store_s: {
         if (!vm->globals[slot].s) bc_vm_error(vm, "Out of memory for string");
     }
     Mstrcpy(vm->globals[slot].s, src);
+    vm->global_valid[slot] = 1;
     DISPATCH();
 }
 
@@ -2483,10 +2493,12 @@ op_mov_var: {
         case BC_MOV_INT:
             dst->i = src->i;
             if (dst_is_local) vm->local_types[vm->frame_base + dst_slot] = T_INT;
+            else vm->global_valid[dst_slot] = 1;
             break;
         case BC_MOV_FLT:
             dst->f = src->f;
             if (dst_is_local) vm->local_types[vm->frame_base + dst_slot] = T_NBR;
+            else vm->global_valid[dst_slot] = 1;
             break;
         case BC_MOV_STR:
             if (!dst->s) {
@@ -2495,6 +2507,7 @@ op_mov_var: {
             }
             Mstrcpy(dst->s, src->s ? src->s : (uint8_t *)"");
             if (dst_is_local) vm->local_types[vm->frame_base + dst_slot] = T_STR;
+            else vm->global_valid[dst_slot] = 1;
             break;
         default:
             bc_vm_error(vm, "Invalid MOV_VAR kind %u", (unsigned)kind);
@@ -2583,6 +2596,7 @@ op_for_next_i: {
 
     int64_t step = step_is_local ? vm->locals[vm->frame_base + step_slot].i : vm->globals[step_slot].i;
     var_ptr->i += step;
+    if (!var_is_local) vm->global_valid[var_slot] = 1;
 
     int64_t val = var_ptr->i;
     int64_t lim = lim_is_local ? vm->locals[vm->frame_base + lim_slot].i : vm->globals[lim_slot].i;
@@ -2664,6 +2678,7 @@ op_for_next_f: {
 
     MMFLOAT step = step_is_local ? vm->locals[vm->frame_base + step_slot].f : vm->globals[step_slot].f;
     var_ptr->f += step;
+    if (!var_is_local) vm->global_valid[var_slot] = 1;
 
     MMFLOAT val = var_ptr->f;
     MMFLOAT lim = lim_is_local ? vm->locals[vm->frame_base + lim_slot].f : vm->globals[lim_slot].f;
@@ -3971,6 +3986,7 @@ op_inc_i: {
     }
 
     dst->i += delta;
+    if (!is_local) vm->global_valid[slot] = 1;
     DISPATCH();
 }
 
@@ -3990,6 +4006,7 @@ op_inc_f: {
     }
 
     dst->f += delta;
+    if (!is_local) vm->global_valid[slot] = 1;
     DISPATCH();
 }
 
@@ -4915,8 +4932,10 @@ fast_loop_done:
         vm->locals[vm->frame_base + i].i = regs[i];
 
     /* Write back globals */
-    for (int i = 0; i < nglobals; i++)
+    for (int i = 0; i < nglobals; i++) {
         vm->globals[global_slots[i]].i = regs[nlocals + i];
+        vm->global_valid[global_slots[i]] = 1;
+    }
 
     /* Advance past entire block */
     vm->pc = block_end;

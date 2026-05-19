@@ -53,13 +53,7 @@ extern "C" {
     #define HEAPTOP             HAL_PORT_HEAP_TOP
 #endif
 
-/* PICOMITE rp2350 PICOCALC trims heap by 4 KB to fit the VM alongside
- * the full interpreter — handled here so port_config.h stays ifdef-free. */
-#if defined(PICOCALC) && defined(HAL_PORT_HEAP_MEMORY_SIZE_PICOCALC)
-    #define HEAP_MEMORY_SIZE    HAL_PORT_HEAP_MEMORY_SIZE_PICOCALC
-#else
-    #define HEAP_MEMORY_SIZE    HAL_PORT_HEAP_MEMORY_SIZE
-#endif
+#define HEAP_MEMORY_SIZE HAL_PORT_HEAP_MEMORY_SIZE
 
 #define MAX_CPU     HAL_PORT_MAX_CPU
 #define MIN_CPU     HAL_PORT_MIN_CPU

@@ -58,8 +58,8 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "aes.h"
 #include "OptionCommands.h"
 
-/* PicoCalc HW hooks — real impls in ports/pico_sdk_common/picocalc_features.c
- * (PICOCALC builds) and host/host_runtime.c (host stubs). */
+/* PicoCalc HW hooks — real impls are linked by PicoCalc ports; other
+ * ports link stubs. */
 extern void port_picocalc_set_keyboard_backlight(int level);
 extern int  port_picocalc_battery_pct(void);
 extern int  port_picocalc_is_charging(void);

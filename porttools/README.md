@@ -195,9 +195,10 @@ Implemented checks:
   `LOC`, `LOF`, `EOF`, `SEEK`, append, and overwrite file I/O.
 - `program`: `LOAD`, `SAVE`, `RUN`, `FRUN`, autorun `LOAD ..., R`,
   empty-program `SAVE` refusal, and prompt recovery after the expected error.
-- `vm`: `FRUN` of arithmetic, strings, arrays, `SUB`/`FUNCTION`,
-  `SELECT CASE`, `DATA`/`READ`/`RESTORE`, VM-side file I/O, and a Sieve of
-  Eratosthenes benchmark that verifies 168 primes up to 1000.
+- `vm`: `FRUN` of a bridged mixed scalar/array `DIM` regression, arithmetic,
+  strings, arrays, `SUB`/`FUNCTION`, `SELECT CASE`, `DATA`/`READ`/`RESTORE`,
+  VM-side file I/O, and a Sieve of Eratosthenes benchmark that verifies 168
+  primes up to 1000.
 - `gpio`: safe Metro checks on GP13 DOUT/DIN and GP1 ARAW, then verifies
   current `SETPIN ..., PWM` and `SERVO` unsupported errors remain explicit.
 - `flash`: opt-in flash-slot persistence using `FLASH ERASE`, `FLASH SAVE`,
@@ -375,9 +376,10 @@ Implemented checks:
 - `flash`: destructive test of one flash program slot using `FLASH ERASE`,
   `FLASH SAVE`, `FLASH LIST`, `FLASH LOAD`, and `FLASH RUN`.
 - `autosave`: drives `AUTOSAVE N` over serial and runs the captured program.
-- `vm`: runs a generated program with `FRUN`, checks integer loops and basic
-  string handling, arrays passed to `SUB`/`FUNCTION`, `SELECT CASE`, float
-  math, `DATA`/`READ`/`RESTORE`, then verifies VM-side file write/read/delete.
+- `vm`: runs generated programs with `FRUN`, checks the bridged mixed
+  scalar/array `DIM` regression, integer loops and basic string handling,
+  arrays passed to `SUB`/`FUNCTION`, `SELECT CASE`, float math,
+  `DATA`/`READ`/`RESTORE`, then verifies VM-side file write/read/delete.
 - `sieve`: runs a bytecode VM Sieve of Eratosthenes with a `!FAST` inner loop
   and verifies there are 168 primes up to 1000.
 - `timing`: `TIMER`, `PAUSE`, and `SETTICK`.

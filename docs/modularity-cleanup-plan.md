@@ -14,7 +14,7 @@ every module, so moving files should happen with compatibility include paths
 in place first.
 
 There is also a relevance mismatch. `README.md` presents this as a broad
-multi-port project, while `build_firmware.sh` is PicoCalc-focused and only
+multi-port project, while `build_picocalc_firmware.sh` is PicoCalc-focused and only
 builds the RP2040/RP2350 PicoCalc targets. Before deleting ports or drivers,
 decide whether this repo is:
 
@@ -39,7 +39,7 @@ That decision controls what is irrelevant.
 - `assets/fonts/`: root font headers.
 - `demos/`: BASIC demos grouped by use.
 - `demos/web/` or `assets/web/`: root `.htm` demo files.
-- root/tool scripts: root entry points `buildall.sh`, `build_firmware.sh`,
+- root/tool scripts: root entry points `buildall.sh`, `build_picocalc_firmware.sh`,
   and `buildesp32.sh`; helper scripts such as `tools/validate_all.sh` and
   `tools/flash.sh`.
 - `hardware/pico-computer/`: board manufacturing files.
@@ -133,8 +133,8 @@ After each phase, run the smallest relevant gate first, then broaden:
 ```sh
 ./ports/host_native/build.sh
 ./ports/host_native/run_tests.sh
-./build_firmware.sh rp2040
-./build_firmware.sh rp2350
+./build_picocalc_firmware.sh rp2040
+./build_picocalc_firmware.sh rp2350
 ```
 
 Run these when the affected scope requires them:
