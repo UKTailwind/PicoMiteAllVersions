@@ -22,6 +22,11 @@
 #define HAL_PORT_AUDIO_I2S_PIO_NUM       0
 #define HAL_PORT_DEFAULT_CPU_SPEED_KHZ   252000
 
+#define HAL_PORT_HAS_I2C_KEYPAD          0
+#define HAL_PORT_BACKLIGHT_VIA_KEYPAD_I2C 0
+#define HAL_PORT_I2C_TIMEOUT_MS          5
+#define HAL_PORT_I2C_SLOW_HZ             100000
+
 /* MMInkey pinned to RAM — rp2350 has plenty of SRAM. */
 #define MMINKEY_DECL(name)      __not_in_flash_func(name)
 

@@ -22,6 +22,11 @@
 #define HAL_PORT_AUDIO_I2S_PIO_NUM       2
 #define HAL_PORT_DEFAULT_CPU_SPEED_KHZ   200000
 
+#define HAL_PORT_HAS_I2C_KEYPAD          0
+#define HAL_PORT_BACKLIGHT_VIA_KEYPAD_I2C 0
+#define HAL_PORT_I2C_TIMEOUT_MS          5
+#define HAL_PORT_I2C_SLOW_HZ             100000
+
 /* MMInkey pinned to RAM — rp2350 has plenty of SRAM. */
 #define MMINKEY_DECL(name)      __not_in_flash_func(name)
 
@@ -48,10 +53,8 @@
 #define HAL_PORT_CORE1_STACK_WORDS       512
 
 /* Stage-D per-port memory + clock + MMBasic-table values (decascade plan
- * D1). PICOCALC trims heap by 4 KB to fit the VM alongside the full
- * interpreter — handled in configuration.h with a runtime PICOCALC ifdef. */
+ * D1). */
 #define HAL_PORT_HEAP_MEMORY_SIZE        (300 * 1024)
-#define HAL_PORT_HEAP_MEMORY_SIZE_PICOCALC (296 * 1024)
 #define HAL_PORT_MAX_CPU                 396000
 #define HAL_PORT_MIN_CPU                 48000
 #define HAL_PORT_MAX_VARS                768

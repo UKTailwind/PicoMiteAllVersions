@@ -34,6 +34,11 @@
 #define HAL_PORT_AUDIO_I2S_PIO_NUM       2
 #define HAL_PORT_DEFAULT_CPU_SPEED_KHZ   378000
 
+#define HAL_PORT_HAS_I2C_KEYPAD          0
+#define HAL_PORT_BACKLIGHT_VIA_KEYPAD_I2C 0
+#define HAL_PORT_I2C_TIMEOUT_MS          5
+#define HAL_PORT_I2C_SLOW_HZ             100000
+
 /* MMInkey pinned to RAM — rp2350 has plenty of SRAM. */
 #define MMINKEY_DECL(name)      __not_in_flash_func(name)
 
@@ -48,7 +53,6 @@
  * Wires up via port_sources.cmake linkage; configuration.h reads it for
  * USB-vs-non-USB flash offset / magic key / heap top selection. */
 #define HAL_PORT_KEYBOARD_USB_HOST        1
-#define HAL_PORT_HAS_I2C_KEYPAD          0
 
 /* core1stack[] size in words. HDMI runs the DVI scanout loop on core1
  * (hdmi_scanout::HDMICore, 512-byte stack). */

@@ -2000,8 +2000,8 @@ void PWMoff(int slice){
     pwm_set_enabled(slice, false);
 }
 /* Unified backlight set. Signature is (level, setfrequency) on every
- * target; PICOCALC's body writes the keypad-controller I2C register
- * and ignores setfrequency, non-PICOCALC drives a PWM slice. VGA
+ * target; PicoCalc ports write the keypad-controller I2C register
+ * and ignore setfrequency, other ports drive a PWM slice. VGA
  * variants have no BASIC-level backlight control — the function is
  * still defined so core can call it unconditionally; on VGA the
  * DISPLAY_TYPE check falls through to the error arm and the BASIC
@@ -2515,10 +2515,9 @@ exitcheck:
     PinSetBit(keypad_pins[cols], ODCSET);
     return false;
 }
-/* cmd_keyscan() (PicoCalc hardware-keypad scanner) + its keymap tables
- * moved to ports/pico_rp2350/picocalc_keypad.c. Only linked on
- * COMPILE=PICORP2350 and PICOUSBRP2350; other targets never reference
- * the symbol (the one caller in PicoMite.c is itself gated). */
+/* Local GPIO-matrix keyscan code lives outside core and is linked only
+ * by ports that expose that hardware. ClockworkPi PicoCalc ports use
+ * the I2C keypad MCU instead. */
 
 
 /****************************************************************************************************************************

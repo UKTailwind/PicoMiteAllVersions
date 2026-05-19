@@ -79,32 +79,14 @@ void hal_i2c_keypad_apply_spi480_resolution(void) {
     VRes = 480;
 }
 
-extern void cmd_keyscan(void);
-
-/* PicoCalc periodic keypad-matrix scan — runs at LOCALKEYSCANRATE
- * (10 ms) from the timer-tick path. Skipped when the user has
- * disabled the local keyboard. */
+/* ClockworkPi PicoCalc uses the keypad MCU over I²C. Local GPIO-matrix
+ * keyboard scanning is not part of these PicoCalc ports. */
 void hal_i2c_keypad_periodic_scan(uint64_t mSecTimer) {
-    if (Option.LOCAL_KEYBOARD && (mSecTimer % LOCALKEYSCANRATE == 0)) {
-        cmd_keyscan();
-    }
+    (void)mSecTimer;
 }
 
-/* PicoCalc keypad-matrix pin reservation, called from
- * InitReservedIO() at boot. Reserves the analogue backlight pin, the
- * keypad-power digital out, and the 15 matrix-row digital inputs so
- * the user's BASIC code can't reassign them. Skipped when the user
- * has disabled the local keyboard. */
+/* The I²C keypad controller has no local GPIO-matrix pins to reserve. */
 void hal_i2c_keypad_reserve_io(void) {
-    if (!Option.LOCAL_KEYBOARD) return;
-    ExtCfg(PINMAP[47], EXT_ANA_IN, 0);
-    ExtCfg(PINMAP[47], EXT_BOOT_RESERVED, 0);
-    ExtCfg(PINMAP[24], EXT_DIG_OUT, 0);
-    ExtCfg(PINMAP[24], EXT_BOOT_RESERVED, 0);
-    for (int i = 26; i < 41; i++) {
-        ExtCfg(PINMAP[i], EXT_DIG_IN, ODCSET);
-        ExtCfg(PINMAP[i], EXT_BOOT_RESERVED, 0);
-    }
 }
 
 /* PicoCalc routes the LCD backlight through the keypad-controller's

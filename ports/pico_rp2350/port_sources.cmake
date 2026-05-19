@@ -3,6 +3,9 @@
 
 target_include_directories(PicoMite PRIVATE ${CMAKE_CURRENT_LIST_DIR})
 
+picomite_enable_bytecode_vm(PicoMite)
+picomite_enable_bytecode_vm_pico_hooks(PicoMite)
+
 target_sources(PicoMite PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/pin_tables.c
     ${CMAKE_CURRENT_LIST_DIR}/port_defaults.c
@@ -58,6 +61,13 @@ else()
         ${CMAKE_SOURCE_DIR}/drivers/ps2_mouse/mouse.c
     )
 endif()
+
+# Non-PicoCalc board hooks.
+target_sources(PicoMite PRIVATE
+    ${CMAKE_SOURCE_DIR}/drivers/i2c_picocalc_kbd/i2c_keypad_stub.c
+    ${CMAKE_SOURCE_DIR}/ports/pico_sdk_common/picocalc_features_stub.c
+    ${CMAKE_SOURCE_DIR}/ports/pico_sdk_common/port_load_overrides_stub.c
+)
 
 # --- Per-port build config (Stage E2) -------------------------------------
 target_compile_options(PicoMite PRIVATE

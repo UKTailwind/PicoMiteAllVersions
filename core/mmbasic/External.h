@@ -219,7 +219,7 @@ extern int BacklightSlice,BacklightChannel;
  * control paths that read them are guarded elsewhere. */
 extern int KeyboardlightSlice,KeyboardlightChannel;
 extern void SetADCFreq(float frequency);
-/* Unified backlight setter — PICOCALC's implementation ignores the
+/* Unified backlight setter — PicoCalc ports ignore the
  * frequency; other variants map it to the backlight PWM's wrap. */
 extern void setBacklight(int level, int frequency);
 /* PINMAP is defined per-port in ports/<COMPILE>/pin_tables.c.

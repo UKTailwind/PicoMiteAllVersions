@@ -8,6 +8,7 @@ on:
       - '*.h'
       - 'CMakeLists.txt'
       - 'buildall.sh'
+      - 'build_picocalc_firmware.sh'
       - 'cmake/**'
       - 'core/**'
       - 'drivers/**'
@@ -17,6 +18,7 @@ on:
       - 'shared/**'
       - 'third_party/**'
       - 'tools/check_hal_purity.sh'
+      - 'tools/check_flash_layout.sh'
       - 'tools/check_ram_baseline.sh'
       - 'tools/patch_pico_sdk_gcc15.sh'
       - 'tools/ram_baseline_*.txt'
@@ -27,9 +29,9 @@ permissions:
   contents: read
 
 jobs:
-  # All-12-target compile gate. Mirrors the local buildall.sh — every
-  # COMPILE variant must build clean before release artifacts are
-  # uploaded for the two PicoCalc targets.
+  # Full compile gate. Mirrors the local buildall.sh; every supported
+  # port must build clean before release artifacts are uploaded for the
+  # PicoCalc variants.
   buildall:
     runs-on: ubuntu-latest
     steps:
@@ -69,10 +71,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - target: PICO
-            label:  rp2040-picocalc
-          - target: PICORP2350
-            label:  rp2350-picocalc
+          - target: picocalc_rp2040
+            label:  picocalc-rp2040
+          - target: picocalc_wifi_rp2040
+            label:  picocalc-wifi-rp2040
+          - target: picocalc_rp2350
+            label:  picocalc-rp2350
+          - target: picocalc_wifi_rp2350
+            label:  picocalc-wifi-rp2350
     steps:
       - uses: actions/checkout@v4
 
@@ -101,16 +107,15 @@ jobs:
         run: bash tools/patch_pico_sdk_gcc15.sh "${{ github.workspace }}/pico-sdk"
 
       - name: Build
-        # CMakeLists.txt's `if(NOT DEFINED COMPILE) set(COMPILE PICO)`
-        # default lets us select a target by passing -DCOMPILE=<variant>
-        # — no source-tree rewriting needed.
+        # Explicit PORT names select the PicoCalc hardware variants; no
+        # compiler flags are needed to opt into PicoCalc support.
         env:
           PICO_SDK_PATH: ${{ github.workspace }}/pico-sdk
         run: |
           mkdir -p build
-          cd build
-          cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DCOMPILE=${{ matrix.target }} ..
-          ninja
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DPORT=${{ matrix.target }}
+          ninja -C build
+          ./tools/check_flash_layout.sh --target ${{ matrix.target }} --build-dir build
 
       - name: Stage artifacts
         run: |
@@ -131,8 +136,8 @@ jobs:
           if-no-files-found: error
 
   release:
-    # Publish both .uf2s as raw downloads on a rolling 'latest' release
-    # after both matrix builds succeed. No zip wrapper, direct links.
+    # Publish PicoCalc .uf2s as raw downloads on a rolling 'latest'
+    # release after matrix builds succeed. No zip wrapper, direct links.
     needs: build
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
@@ -171,8 +176,10 @@ jobs:
 
           | Target | File |
           |---|---|
-          | RP2040 PicoCalc | \`PicoMite-rp2040-picocalc.uf2\` |
-          | RP2350 PicoCalc | \`PicoMite-rp2350-picocalc.uf2\` |
+          | PicoCalc RP2040 | \`PicoMite-picocalc-rp2040.uf2\` |
+          | PicoCalc Pico W | \`PicoMite-picocalc-wifi-rp2040.uf2\` |
+          | PicoCalc RP2350 | \`PicoMite-picocalc-rp2350.uf2\` |
+          | PicoCalc Pico 2 W | \`PicoMite-picocalc-wifi-rp2350.uf2\` |
 
           Web build: <https://jvanderberg.github.io/PicoMiteAllVersions/>
           EOF

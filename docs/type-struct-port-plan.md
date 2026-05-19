@@ -6,7 +6,7 @@ Sub-plan for Phase A item 5 of `docs/upstream-catchup-plan.md`. TYPE/STRUCT is t
 - **Acceptance spec:** `ports/host_native/tests/acceptance/struct_full.bas` — the upstream `StructTest.bas`, 2188 lines, 86 numbered tests. When this passes under `./mmbasic_test ... --vm` and `--interp`, the port is done.
 - **Our branch:** `catchup/type-struct` (off `catchup-integration`, lands per the standard catch-up workflow — **never directly to `main`**; see the "Merge target" section of `docs/upstream-catchup-plan.md`).
 - **Prerequisite:** bridge-rebinding fix in `bc_bridge.c` (lands as its own commit; unlocks REDIM-in-VM at the same time, and is what lets struct memory live in `g_vartbl` without breaking VM reads after a bridged allocation).
-- **Gate per phase:** host `./run_tests.sh` default compare mode green, `./build_firmware.sh rp2040 && ./build_firmware.sh rp2350` green, `./ports/host_wasm/build.sh` green.
+- **Gate per phase:** host `./run_tests.sh` default compare mode green, `./build_picocalc_firmware.sh rp2040 && ./build_picocalc_firmware.sh rp2350` green, `./ports/host_wasm/build.sh` green.
 
 ## Architecture: single storage, shared by both engines
 

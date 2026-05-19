@@ -165,7 +165,7 @@ Before you start: decide which kind of port you're writing.
   the user picks between with `OPTION RESET <BOARD>`. The existing
   `ports/pico/`, `ports/hdmi_rp2350/`, etc. are this kind: each ships
   a `port_factory_reset_board()` that's a long `if (checkstring(p,
-  "GAMEMITE")) … else if (checkstring(p, "PICOCALC")) …` ladder of
+  "GAMEMITE")) … else if (checkstring(p, "PICO BACKPACK")) …` ladder of
   per-board profiles, plus a `port_print_supported_boards()` that
   lists them all for `CONFIGURE LIST`. This pattern made sense for
   upstream PicoMite, which shipped one binary across many community
@@ -635,7 +635,7 @@ Direct `-DPORT` invocation (preferred for new single-board ports):
 
 ```bash
 mkdir build_mymite && cd build_mymite
-cmake -DPORT=mymite -DPICOCALC=false -DPICO_SDK_PATH="$HOME/pico/pico-sdk" ..
+cmake -DPORT=mymite -DPICO_SDK_PATH="$HOME/pico/pico-sdk" ..
 make -j8
 ```
 

@@ -1,14 +1,9 @@
 cmake_minimum_required(VERSION 3.13)
 # Port selector is -DPORT=<port_dir_name>; the legacy -DCOMPILE=<TARGET>
-# knob is still recognized for backwards compatibility (buildall.sh +
-# build_firmware.sh + the GitHub Actions matrix all still drive
-# -DCOMPILE=). When only COMPILE is set, the inference block below picks
-# the matching ports/<dir>. New invocations should pass -DPORT=<dir>
-# directly.
+# knob is still recognized for backwards compatibility. When only COMPILE
+# is set, the inference block below picks the matching ports/<dir>. New
+# invocations should pass -DPORT=<dir> directly.
 
-if(NOT DEFINED PICOCALC)
-  set(PICOCALC true)
-endif()
 # For dynamic loading from SD card:
 # SDBOOT requires the bootloader to be in the first 256KB of flash
 # PicoMite will need to be shifted by this amount, and all references to
@@ -53,11 +48,12 @@ endif()
 # PICO_BOARD have to be set before pico_sdk_import.cmake / pico_sdk_init,
 # so the lookup lives here at top-level CMakeLists rather than in the
 # per-port port_sources.cmake (which runs after sdk init).
-set(_RP2350_PORTS pico_rp2350 vga_rp2350 web_rp2350 hdmi_rp2350
+set(_RP2350_PORTS pico_rp2350 picocalc_rp2350 vga_rp2350
+                  web_rp2350 picocalc_wifi_rp2350 hdmi_rp2350
                   vga_wifi_rp2350 dvi_wifi_rp2350)
 if (PORT IN_LIST _RP2350_PORTS)
     set(PICO_PLATFORM rp2350)
-    if (PORT STREQUAL "web_rp2350" OR PORT STREQUAL "vga_wifi_rp2350")
+    if (PORT STREQUAL "web_rp2350" OR PORT STREQUAL "picocalc_wifi_rp2350" OR PORT STREQUAL "vga_wifi_rp2350")
         set(PICO_BOARD pico2_w)
     elseif (PORT STREQUAL "dvi_wifi_rp2350")
         # Custom board file lives in the repo at boards/include/boards/.
@@ -69,7 +65,7 @@ if (PORT IN_LIST _RP2350_PORTS)
     endif()
 else()
     set(PICO_PLATFORM rp2040)
-    if (PORT STREQUAL "web")
+    if (PORT STREQUAL "web" OR PORT STREQUAL "picocalc_wifi_rp2040")
         set(PICO_BOARD pico_w)
     else()
         set(PICO_BOARD pico)
@@ -79,6 +75,7 @@ include(cmake/pico_sdk_import.cmake)
 project(PicoMite C CXX ASM)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/bytecode_vm.cmake)
 if(DEFINED ENV{MMBA_RELEASE_VERSION} AND NOT "$ENV{MMBA_RELEASE_VERSION}" STREQUAL "")
     set(MMBA_RELEASE_VERSION "$ENV{MMBA_RELEASE_VERSION}")
 else()
@@ -168,6 +165,15 @@ set(PICOMITE_VM_SHARED_GFX_SOURCES
 	shared/gfx/gfx_console_shared.c
 )
 
+set(PICOMITE_VM_SUPPORT_SOURCES
+	runtime/vm/vm_sys_input.c
+	runtime/vm/vm_sys_graphics.c
+	runtime/vm/vm_sys_time.c
+	runtime/vm/vm_sys_pin.c
+	runtime/vm/vm_sys_file.c
+	${PICOMITE_VM_SHARED_GFX_SOURCES}
+)
+
 # Cross-cutting state (display, pin, Option, audio globals) shared across
 # core/mmbasic/Draw.c / core/mmbasic/External.c / core/mmbasic/FileIO.c / shared/audio/Audio.c. Consolidating storage here lets
 # per-driver source files coexist without multiple-definition link errors.
@@ -211,16 +217,13 @@ set(PICOMITE_PICO_SDK_HAL_SOURCES
 	ports/pico_sdk_common/pico_fault.c
 	ports/pico_sdk_common/pico_program_flash.c
 	ports/pico_sdk_common/pico_cfunction_bridge.c
-	# port_load_overrides + picocalc_features are added by the
-	# PICOCALC selection block below — real on PicoCalc, stub elsewhere.
+	# port_load_overrides + picocalc_features are selected by each
+	# port_sources.cmake — real on PicoCalc ports, stub elsewhere.
 	ports/pico_sdk_common/print_display_options.c
 	ports/pico_sdk_common/spi_lcd_options.c
 	ports/pico_sdk_common/misc_option_setters.c
 	ports/pico_sdk_common/runtime_reset_pico.c
 	ports/pico_sdk_common/vm_sys_time_pico.c
-	ports/pico_sdk_common/bc_crash_pico.c
-	ports/pico_sdk_common/bc_bridge_pico.c
-	ports/pico_sdk_common/bc_runtime_pico.c
 	ports/pico_sdk_common/clear_runtime_port.c
 	# port_terminal_handle_cls / port_terminal_emit_colour live in
 	# runtime/runtime_terminal_hooks_noop.c — added via target_sources below.
@@ -229,27 +232,11 @@ set(PICOMITE_PICO_SDK_HAL_SOURCES
 	drivers/pico_flash/pico_flash_lfs.c
 )
 
-set(PICOMITE_VM_SOURCES
-	runtime/vm/bc_alloc.c
-	runtime/vm/bc_bridge.c
-	runtime/vm/bc_source.c
-	runtime/vm/bc_compiler_core.c
-	runtime/vm/bc_vm.c
-	runtime/vm/bc_runtime.c
-	runtime/vm/bc_debug.c
-	runtime/vm/vm_sys_input.c
-	runtime/vm/vm_sys_graphics.c
-	runtime/vm/vm_sys_time.c
-	runtime/vm/vm_sys_pin.c
-	runtime/vm/vm_sys_file.c
-	${PICOMITE_VM_SHARED_GFX_SOURCES}
-)
-
 add_executable(PicoMite
 	${PICOMITE_BASE_SOURCES}
-	${PICOMITE_VM_SOURCES}
 )
 target_sources(PicoMite PRIVATE ${PICOMITE_LEGACY_CORE_SOURCES})
+target_sources(PicoMite PRIVATE ${PICOMITE_VM_SUPPORT_SOURCES})
 target_sources(PicoMite PRIVATE ${PICOMITE_AUDIO_DEVICE_SOURCES})
 target_sources(PicoMite PRIVATE ${PICOMITE_CORE_STATE_SOURCES})
 target_sources(PicoMite PRIVATE ${PICOMITE_PICO_SDK_HAL_SOURCES})
@@ -318,22 +305,7 @@ target_include_directories(PicoMite PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/drivers/
 # vs HDMI vs WiFi, USB-host vs PS/2 keyboard, rp2040 stubs vs rp2350
 # real-feature backends). PORT names the directory directly.
 include(${CMAKE_SOURCE_DIR}/ports/${PORT}/port_sources.cmake)
-
-if(PICOCALC STREQUAL "true")
-    target_sources(PicoMite PRIVATE
-        drivers/i2c_picocalc_kbd/i2ckbd.c
-        drivers/i2c_picocalc_kbd/i2c_keypad_real.c
-        drivers/i2c_picocalc_kbd/picocalc_keypad_matrix.c
-        ports/pico_sdk_common/picocalc_features_real.c
-        ports/pico_sdk_common/port_load_overrides_picocalc.c
-    )
-else()
-    target_sources(PicoMite PRIVATE
-        drivers/i2c_picocalc_kbd/i2c_keypad_stub.c
-        ports/pico_sdk_common/picocalc_features_stub.c
-        ports/pico_sdk_common/port_load_overrides_stub.c
-    )
-endif()
+picomite_finalize_bytecode_vm(PicoMite)
 
 set_source_files_properties(drivers/sd_spi/mmc_stm32.c PROPERTIES COMPILE_FLAGS -O2)
 set_source_files_properties(third_party/fatfs/ff.c PROPERTIES COMPILE_FLAGS -Os)
@@ -369,34 +341,6 @@ target_compile_options(PicoMite PRIVATE -DNDEBUG
                                         -DPICO_MALLOC_PANIC
                                         -O2
                                         -Wall)
-
-# PICOCALC global axis (set via -DPICOCALC=true|false). The CMake
-# variable PICOCALC drives:
-#   -DHAL_PORT_HAS_I2C_KEYPAD            — gates the I²C keypad-controller
-#                                           protocol in core/drivers and
-#                                           the keypad init delay in
-#                                           PicoMite.c boot.
-#   -DHAL_PORT_BACKLIGHT_VIA_KEYPAD_I2C  — switches setBacklight() to
-#                                           write the keypad's backlight
-#                                           register instead of driving
-#                                           a PWM slice.
-#   drivers/i2c_picocalc_kbd/i2ckbd.c    — linked above when PICOCALC=true.
-# core/mmbasic/configuration.h still consults the CMake-level PICOCALC name for the
-# heap-size override (HAL_PORT_HEAP_MEMORY_SIZE_PICOCALC) — that's a
-# legacy port-impl shim, kept for the dual-shipping ports/pico/.
-if(PICOCALC STREQUAL "true")
-    target_compile_options(PicoMite PRIVATE -DPICOCALC
-                                            -DHAL_PORT_HAS_I2C_KEYPAD=1
-                                            -DHAL_PORT_BACKLIGHT_VIA_KEYPAD_I2C=1
-                                            -DHAL_PORT_I2C_TIMEOUT_MS=500
-                                            -DHAL_PORT_I2C_SLOW_HZ=10000
-                                            )
-else()
-    target_compile_options(PicoMite PRIVATE -DHAL_PORT_HAS_I2C_KEYPAD=0
-                                            -DHAL_PORT_BACKLIGHT_VIA_KEYPAD_I2C=0
-                                            -DHAL_PORT_I2C_TIMEOUT_MS=5
-                                            -DHAL_PORT_I2C_SLOW_HZ=100000)
-endif()
 
 # Library linkage shared across every device port.
 target_link_libraries(PicoMite

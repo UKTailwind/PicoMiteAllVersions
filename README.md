@@ -27,25 +27,29 @@ This isn't a perfect port of every upstream feature. Some of the newer commands 
 
 | Target | Display | Keyboard | WiFi | Notes |
 |---|---|---|---|---|
-| `PICO` | optional SPI LCD | USB CDC console | no | PicoCalc shell linked by default |
+| `PICO` | optional SPI LCD | USB CDC console | no | |
 | `PICOUSB` | optional SPI LCD | USB host keyboard | no | |
 | `VGA` | VGA via PIO | USB CDC console | no | |
 | `VGAUSB` | VGA via PIO | USB host keyboard | no | |
-| `WEB` | optional SPI LCD | USB CDC console | yes | Pico W; PicoCalc shell linked by default |
+| `WEB` | optional SPI LCD | USB CDC console | yes | Pico W |
+| `picocalc_rp2040` | PicoCalc SPI LCD | PicoCalc I2C keyboard | no | ClockworkPi PicoCalc |
+| `picocalc_wifi_rp2040` | PicoCalc SPI LCD | PicoCalc I2C keyboard | yes | ClockworkPi PicoCalc with Pico W |
 
 ### RP2350 (Pico 2, Pico 2 W)
 
 | Target | Display | Keyboard | WiFi | Notes |
 |---|---|---|---|---|
-| `PICORP2350` | optional SPI LCD | USB CDC console | no | PicoCalc shell linked by default |
+| `PICORP2350` | optional SPI LCD | USB CDC console | no | |
 | `PICOUSBRP2350` | optional SPI LCD | USB host keyboard | no | |
 | `VGARP2350` | VGA via PIO | USB CDC console | no | |
 | `VGAUSBRP2350` | VGA via PIO | USB host keyboard | no | |
 | `HDMI` | HDMI via HSTX | USB CDC console | no | |
 | `HDMIUSB` | HDMI via HSTX | USB host keyboard | no | |
-| `WEBRP2350` | optional SPI LCD | USB CDC console | yes | Pico 2 W; PicoCalc shell linked by default |
+| `WEBRP2350` | optional SPI LCD | USB CDC console | yes | Pico 2 W |
 | `VGAWIFIRP2350` | VGA via PIO | USB CDC console | yes | Pico 2 W |
 | `DVIWIFIRP2350` | HDMI via HSTX | USB CDC console | yes | Pico 2 W |
+| `picocalc_rp2350` | PicoCalc SPI LCD | PicoCalc I2C keyboard | no | ClockworkPi PicoCalc |
+| `picocalc_wifi_rp2350` | PicoCalc SPI LCD | PicoCalc I2C keyboard | yes | ClockworkPi PicoCalc with Pico 2 W |
 
 After `./buildall.sh`, the `.uf2` for each target lands in `build_all/<TARGET>/PicoMite.uf2`. The `.elf` is alongside it (used by SWD flashing).
 
@@ -60,7 +64,7 @@ Hold the BOOTSEL button while plugging the Pico into USB. The board mounts as a 
 ### picotool (USB)
 
 ```
-picotool load build_all/PICORP2350/PicoMite.uf2 -f
+picotool load build_all/picocalc_rp2350/PicoMite.uf2 -f
 picotool reboot
 ```
 
@@ -71,7 +75,7 @@ The `-f` flag puts a running Pico into BOOTSEL mode automatically.
 Requires a Raspberry Pi Debug Probe, picoprobe, or compatible CMSIS-DAP.
 
 ```
-probe-rs download --chip RP235x build_all/PICORP2350/PicoMite.elf
+probe-rs download --chip RP235x build_all/picocalc_rp2350/PicoMite.elf
 probe-rs reset --chip RP235x
 ```
 
@@ -108,12 +112,12 @@ Install the [Pico SDK 2.1.1](https://github.com/raspberrypi/pico-sdk) and export
 Single-target build:
 
 ```
-mkdir build && cd build && cmake -DCOMPILE=PICORP2350 .. && make
+mkdir build && cd build && cmake -DPORT=picocalc_rp2350 .. && make
 ```
 
 ## PicoCalc
 
-Builds for the [ClockworkPi PicoCalc](https://www.clockworkpi.com/picocalc) shell are automatic on the `PICO`, `WEB`, `PICORP2350`, and `WEBRP2350` targets. The I2C keypad, SPI LCD, and PicoCalc options link in.
+Builds for the [ClockworkPi PicoCalc](https://www.clockworkpi.com/picocalc) shell are explicit ports: `picocalc_rp2040`, `picocalc_wifi_rp2040`, `picocalc_rp2350`, and `picocalc_wifi_rp2350`. The I2C keypad, SPI LCD, and PicoCalc options link in through those port directories.
 
 | Command | Description |
 |---|---|

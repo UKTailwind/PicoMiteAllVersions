@@ -22,6 +22,11 @@
 #define HAL_PORT_AUDIO_I2S_PIO_NUM       0
 #define HAL_PORT_DEFAULT_CPU_SPEED_KHZ   200000
 
+#define HAL_PORT_HAS_I2C_KEYPAD          0
+#define HAL_PORT_BACKLIGHT_VIA_KEYPAD_I2C 0
+#define HAL_PORT_I2C_TIMEOUT_MS          5
+#define HAL_PORT_I2C_SLOW_HZ             100000
+
 /* MMInkey placement: rp2040 WEB has tight RAM (CYW43 firmware + lwIP
  * heap eat most of it), so MMInkey stays in flash. */
 #define MMINKEY_DECL(name)      name
@@ -51,7 +56,6 @@
  * Wires up via port_sources.cmake linkage; configuration.h reads it for
  * USB-vs-PS/2 flash offset / magic key / heap top selection. */
 #define HAL_PORT_KEYBOARD_USB_HOST        0
-#define HAL_PORT_HAS_I2C_KEYPAD          0
 
 /* core1stack[] size in words. WEB never launches core1 — single canary
  * word satisfies MMBasic.c's overflow check at core1stack[0]. */
@@ -67,8 +71,8 @@
 #define HAL_PORT_MIN_CPU                 126000
 #define HAL_PORT_MAX_VARS                480
 #define HAL_PORT_MAX_SUBFUN              256
-#define HAL_PORT_FLASH_TARGET_OFFSET     (1080 * 1024)
-#define HAL_PORT_FLASH_TARGET_OFFSET_USB (1080 * 1024)
+#define HAL_PORT_FLASH_TARGET_OFFSET     (1408 * 1024)
+#define HAL_PORT_FLASH_TARGET_OFFSET_USB (1408 * 1024)
 #define HAL_PORT_MAGIC_KEY               0x54472B1C
 #define HAL_PORT_MAGIC_KEY_USB           0x54472B1C
 #define HAL_PORT_HEAP_TOP                0x2003D000

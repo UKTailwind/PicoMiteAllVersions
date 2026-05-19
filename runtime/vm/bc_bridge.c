@@ -82,6 +82,7 @@ static void sync_vm_to_mmbasic(BCVMState *vm) {
         if (!slot->name[0] || !isnamestart((unsigned char)slot->name[0])) continue;
         if (vm->arrays[i].data || slot->is_array) continue;
         if (slot->type == T_STRUCT) continue;   // handled by the struct-only pass below
+        if (!slot->is_const && (!vm->global_valid || !vm->global_valid[i])) continue;
 
         unsigned char namebuf[MAXVARLEN + 2];
         int nlen = strlen(slot->name);
@@ -229,8 +230,10 @@ static void sync_mmbasic_to_vm(BCVMState *vm) {
 
         if (slot->type == T_INT) {
             vm->globals[i].i = v->val.i;
+            if (vm->global_valid) vm->global_valid[i] = 1;
         } else if (slot->type == T_NBR) {
             vm->globals[i].f = v->val.f;
+            if (vm->global_valid) vm->global_valid[i] = 1;
         } else if (slot->type == T_STR) {
             if (v->val.s) {
                 if (!vm->globals[i].s) {
@@ -238,6 +241,7 @@ static void sync_mmbasic_to_vm(BCVMState *vm) {
                 }
                 if (vm->globals[i].s) {
                     Mstrcpy(vm->globals[i].s, v->val.s);
+                    if (vm->global_valid) vm->global_valid[i] = 1;
                 }
             }
         }

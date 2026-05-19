@@ -7,7 +7,6 @@
 #include "Hardware_Includes.h"
 
 extern int checkslice(int pin1, int pin2, int ignore);
-extern void port_picocalc_factory_reset_options(void);
 void port_set_default_options(void)
 {
     Option.CPU_Speed = FreqDefault;
@@ -16,9 +15,6 @@ void port_set_default_options(void)
     Option.ServerResponceTime = 5000;
     Option.TOUCH_XSCALE = 1.0f;
     Option.TOUCH_YSCALE = 1.0f;
-#ifdef PICOCALC
-    Option.PSRAM_CS_PIN = PINMAP[0];
-#endif
 }
 
 /* Boards advertised by `CONFIGURE LIST`. The body's #ifdef gates stay
@@ -31,9 +27,6 @@ void port_print_supported_boards(void)
     /* PALM PICO is PICOMITE-only; this port's factory_reset_board
      * doesn't accept it — don't advertise it. */
     MMPrintString("Game*Mite\r\n");
-#  ifdef PICOCALC
-    MMPrintString("PicoCalc\r\n");
-#  endif
     MMPrintString("Pico-ResTouch-LCD-3.5\r\n");
     MMPrintString("Pico-ResTouch-LCD-2.8\r\n");
     MMPrintString("PICO BACKPACK\r\n");
@@ -73,10 +66,6 @@ int port_factory_reset_board(unsigned char *p)
         printoptions();uSec(100000);
         _excep_code = RESET_COMMAND;
         SoftReset();
-        return 1;
-    }
-    if(checkstring(p,(unsigned char *) "PICOCALC"))  {
-        port_picocalc_factory_reset_options();
         return 1;
     }
     if(checkstring(p,(unsigned char *) "PICORESTOUCHLCD3.5"))  {

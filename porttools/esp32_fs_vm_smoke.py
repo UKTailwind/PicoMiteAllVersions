@@ -129,6 +129,7 @@ class Esp32Smoke:
             join_drive(self.drive, f"{self.prefix}_save_copy.bas"),
             join_drive(self.drive, f"{self.prefix}_empty.bas"),
             join_drive(self.drive, f"{self.prefix}_flash.bas"),
+            join_drive(self.drive, f"{self.prefix}_bridge_dim.bas"),
             join_drive(self.drive, f"{self.prefix}_vm.bas"),
             join_drive(self.drive, f"{self.prefix}_sieve.bas"),
         ]
@@ -220,6 +221,15 @@ class Esp32Smoke:
 
     def vm_smoke(self) -> None:
         print("=== bytecode vm ===", flush=True)
+        bridge_dim_path = join_drive(self.drive, f"{self.prefix}_bridge_dim.bas")
+        self.write_program(bridge_dim_path, bridged_dim_regression_program("ESP32_BRIDGE_DIM_OK"))
+        self.command("NEW")
+        self.run_program(f'FRUN "{bridge_dim_path}"', "ESP32_BRIDGE_DIM_OK", timeout=self.long_timeout)
+        self.pass_check(
+            "FRUN bridged DIM regression",
+            "mixed scalar/array DIM does not predeclare compile-known globals",
+        )
+
         path = join_drive(self.drive, f"{self.prefix}_vm.bas")
         vm_temp = join_drive(self.drive, f"{self.prefix}_vm.txt")
         self.command(f'ON ERROR SKIP : KILL "{vm_temp}"', check_error=False)
@@ -512,6 +522,18 @@ def flash_source_program(slot: int) -> list[str]:
         "DIM INTEGER slot%",
         f"slot% = {slot}",
         'PRINT "ESP32_FLASH_SLOT_OK " + STR$(slot%)',
+    ]
+
+
+def bridged_dim_regression_program(marker: str) -> list[str]:
+    return [
+        "OPTION EXPLICIT",
+        "DIM INTEGER i%, total%, arr%(4), doubled%",
+        "FOR i% = 0 TO 4: arr%(i%) = i% + 1: NEXT i%",
+        "FOR i% = 0 TO 4: total% = total% + arr%(i%): NEXT i%",
+        "doubled% = total% * 2",
+        'IF doubled% <> 30 THEN ERROR "bridged dim total"',
+        f'PRINT "{marker}"',
     ]
 
 
