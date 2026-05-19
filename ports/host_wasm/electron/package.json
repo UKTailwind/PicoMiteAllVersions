@@ -1,0 +1,65 @@
+{
+  "name": "mmbasic-anywhere-desktop",
+  "version": "1.0.6",
+  "private": true,
+  "description": "Desktop bundle for the MMBasic Anywhere WebAssembly app.",
+  "author": "Josh Vanderberg",
+  "main": "main.js",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "start": "electron .",
+    "build:wasm": "../build.sh",
+    "pack": "electron-builder --dir",
+    "dist": "npm run build:wasm && electron-builder",
+    "dist:ci": "electron-builder --publish never"
+  },
+  "build": {
+    "appId": "com.mmbasicanywhere.desktop",
+    "productName": "MMBasic Anywhere",
+    "artifactName": "MMBasic-Anywhere-${os}-${arch}.${ext}",
+    "asar": true,
+    "files": [
+      "main.js",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../web",
+        "to": "web",
+        "filter": [
+          "**/*",
+          "!**/.gitignore",
+          "!__pycache__/**",
+          "!serve.*",
+          "!smoke_*.mjs",
+          "!vendor/build.sh",
+          "!worker_test.*"
+        ]
+      }
+    ],
+    "mac": {
+      "identity": null,
+      "target": [
+        "dir",
+        "zip"
+      ]
+    },
+    "win": {
+      "target": [
+        "zip"
+      ]
+    },
+    "linux": {
+      "category": "Development",
+      "target": [
+        "AppImage"
+      ]
+    }
+  },
+  "devDependencies": {
+    "electron": "42.1.0",
+    "electron-builder": "26.8.1"
+  }
+}
