@@ -1,0 +1,188 @@
+name: Build desktop apps
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'VERSION'
+      - 'ports/host_wasm/**'
+      - 'ports/host_native/**'
+      - 'core/**'
+      - 'drivers/**'
+      - 'hal/**'
+      - 'runtime/**'
+      - 'shared/**'
+      - 'tools/**'
+      - '.github/workflows/desktop.yml'
+      - '*.c'
+      - '*.h'
+      - '*.bas'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-latest
+  cancel-in-progress: true
+
+jobs:
+  build-wasm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: 5.0.2
+          actions-cache-folder: emsdk-cache
+
+      - name: Build wasm
+        working-directory: ports/host_wasm
+        run: ./build.sh
+
+      - name: Stage web bundle
+        run: |
+          mkdir -p desktop-web/ui desktop-web/vendor
+          cp ports/host_wasm/web/index.html             desktop-web/
+          cp ports/host_wasm/web/manifest.webmanifest   desktop-web/
+          cp ports/host_wasm/web/icon.svg               desktop-web/
+          cp ports/host_wasm/web/icon-192.png           desktop-web/
+          cp ports/host_wasm/web/icon-512.png           desktop-web/
+          cp ports/host_wasm/web/apple-touch-icon.png   desktop-web/
+          cp ports/host_wasm/web/safari-pinned-tab.svg  desktop-web/
+          cp ports/host_wasm/web/picomite.css           desktop-web/
+          cp ports/host_wasm/web/app.mjs                desktop-web/
+          cp ports/host_wasm/web/app_version.mjs        desktop-web/
+          cp ports/host_wasm/web/proxy_client.mjs       desktop-web/
+          cp ports/host_wasm/web/worker.mjs             desktop-web/
+          cp ports/host_wasm/web/coi-serviceworker.js   desktop-web/
+          cp ports/host_wasm/web/picomite.mjs           desktop-web/
+          cp ports/host_wasm/web/picomite.js            desktop-web/ 2>/dev/null || true
+          cp ports/host_wasm/web/picomite.wasm          desktop-web/
+          cp ports/host_wasm/web/picomite.data          desktop-web/
+          cp ports/host_wasm/web/ui/audio.js            desktop-web/ui/
+          cp ports/host_wasm/web/vendor/codemirror.js   desktop-web/vendor/
+          find desktop-web -type f | sort
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: host-wasm-web
+          path: desktop-web
+          if-no-files-found: error
+
+  package:
+    needs: build-wasm
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            platform: mac
+            build_args: --mac zip --universal
+            asset_name: MMBasic-Anywhere-mac-universal.zip
+            asset_glob: '*.zip'
+          - os: windows-latest
+            platform: windows
+            build_args: --win zip --x64
+            asset_name: MMBasic-Anywhere-windows-x64.zip
+            asset_glob: '*.zip'
+          - os: ubuntu-latest
+            platform: linux
+            build_args: --linux AppImage --x64
+            asset_name: MMBasic-Anywhere-linux-x64.AppImage
+            asset_glob: '*.AppImage'
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: ports/host_wasm/electron/package-lock.json
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: host-wasm-web
+          path: ports/host_wasm/web
+
+      - name: Install desktop dependencies
+        working-directory: ports/host_wasm/electron
+        run: npm ci
+
+      - name: Build desktop package
+        working-directory: ports/host_wasm/electron
+        shell: bash
+        run: npx electron-builder ${{ matrix.build_args }} --publish never
+
+      - name: Stage desktop artifact
+        working-directory: ports/host_wasm/electron
+        shell: bash
+        run: |
+          mkdir -p desktop-artifacts
+          asset=$(find dist -maxdepth 1 -type f -name '${{ matrix.asset_glob }}' | head -1)
+          if [ -z "$asset" ]; then
+            echo "No desktop artifact matched ${{ matrix.asset_glob }}" >&2
+            find dist -maxdepth 2 -type f -print >&2
+            exit 1
+          fi
+          cp "$asset" "desktop-artifacts/${{ matrix.asset_name }}"
+          ls -la desktop-artifacts
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.platform }}
+          path: ports/host_wasm/electron/desktop-artifacts/*
+          if-no-files-found: error
+
+  release:
+    needs: package
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: desktop-*
+          path: desktop-release
+          merge-multiple: true
+
+      - name: Upsert desktop-latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sha=$(git rev-parse --short HEAD)
+          date=$(git log -1 --format=%cI)
+          summary=$(git log -1 --format='%s')
+
+          cat > notes.md <<EOF
+          Rolling desktop build from \`main\`.
+
+          **Commit:** [\`$sha\`](https://github.com/${{ github.repository }}/commit/${{ github.sha }}) - $summary
+          **Built:** $date
+
+          ### Downloads
+
+          | Platform | File |
+          |---|---|
+          | macOS universal | \`MMBasic-Anywhere-mac-universal.zip\` |
+          | Windows x64 | \`MMBasic-Anywhere-windows-x64.zip\` |
+          | Linux x64 | \`MMBasic-Anywhere-linux-x64.AppImage\` |
+
+          Latest release page: https://github.com/${{ github.repository }}/releases/tag/desktop-latest
+          EOF
+
+          gh release delete desktop-latest --cleanup-tag --yes 2>/dev/null || true
+          git push origin :refs/tags/desktop-latest 2>/dev/null || true
+          gh release create desktop-latest \
+              --title "Latest desktop apps" \
+              --notes-file notes.md \
+              --target "${{ github.sha }}" \
+              desktop-release/*
