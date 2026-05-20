@@ -52,8 +52,8 @@ extern uint16_t pc386_bios_video_int10(uint16_t ax, uint16_t bx, uint16_t cx,
 
 static volatile uint8_t *const vga_fb = (volatile uint8_t *)0xA0000u;
 static volatile uint8_t *fb;
-static uint32_t shadow[VGA_MAX_PIXELS];
-static uint32_t fastgfx_back[VGA_MAX_PIXELS];
+static uint8_t shadow[VGA_MAX_PIXELS];
+static uint8_t fastgfx_back[VGA_MAX_PIXELS];
 static bool linear_fb_available;
 static bool fastgfx_active;
 static int fastgfx_fps;
@@ -116,6 +116,7 @@ static const Pc386VideoMode pc386_modes[] = {
 };
 
 static uint8_t rgb_to_332(uint32_t rgb);
+static uint32_t rgb_from_332(uint8_t idx);
 static int rgb_to_cmm1_index(uint32_t rgb);
 
 static uint32_t fit_to_mask(uint8_t value, uint8_t bits) {
@@ -137,6 +138,64 @@ static inline uint16_t inw(uint16_t port) {
     __asm__ volatile("inw %1, %0" : "=a"(val) : "Nd"(port));
     return val;
 }
+
+#ifdef PC386_NO_BIOS_VIDEO
+static inline uint8_t inb(uint16_t port) {
+    uint8_t val;
+    __asm__ volatile("inb %1, %0" : "=a"(val) : "Nd"(port));
+    return val;
+}
+
+static void vga_write_regs(const uint8_t *regs) {
+    outb(0x3C2, *regs++);
+
+    for (uint8_t i = 0; i < 5; i++) {
+        outb(0x3C4, i);
+        outb(0x3C5, *regs++);
+    }
+
+    outb(0x3D4, 0x03);
+    outb(0x3D5, (uint8_t)(inb(0x3D5) | 0x80));
+    outb(0x3D4, 0x11);
+    outb(0x3D5, (uint8_t)(inb(0x3D5) & ~0x80));
+
+    for (uint8_t i = 0; i < 25; i++) {
+        outb(0x3D4, i);
+        outb(0x3D5, *regs++);
+    }
+
+    for (uint8_t i = 0; i < 9; i++) {
+        outb(0x3CE, i);
+        outb(0x3CF, *regs++);
+    }
+
+    for (uint8_t i = 0; i < 21; i++) {
+        (void)inb(0x3DA);
+        outb(0x3C0, i);
+        outb(0x3C0, *regs++);
+    }
+
+    (void)inb(0x3DA);
+    outb(0x3C0, 0x20);
+}
+
+static void vga_program_mode13h_registers(void) {
+    static const uint8_t mode13h_regs[] = {
+        0x63,
+        0x03, 0x01, 0x0F, 0x00, 0x0E,
+        0x5F, 0x4F, 0x50, 0x82, 0x54, 0x80, 0xBF, 0x1F,
+        0x00, 0x41, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x9C, 0x0E, 0x8F, 0x28, 0x40, 0x96, 0xB9, 0xA3,
+        0xFF,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x40, 0x05, 0x0F,
+        0xFF,
+        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+        0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
+        0x41, 0x00, 0x0F, 0x00, 0x00,
+    };
+    vga_write_regs(mode13h_regs);
+}
+#endif
 
 static uint8_t scale_to_dac(uint8_t value) {
     return (uint8_t)((value * 63u + 127u) / 255u);
@@ -284,6 +343,13 @@ static uint8_t rgb_to_332(uint32_t rgb) {
     return (uint8_t)((r & 0xE0u) | ((g & 0xE0u) >> 3) | (b >> 6));
 }
 
+static uint32_t rgb_from_332(uint8_t idx) {
+    uint32_t r = expand3((uint8_t)((idx >> 5) & 0x07u));
+    uint32_t g = expand3((uint8_t)((idx >> 2) & 0x07u));
+    uint32_t b = expand2((uint8_t)(idx & 0x03u));
+    return (r << 16) | (g << 8) | b;
+}
+
 static int rgb_to_cmm1_index(uint32_t rgb) {
     int best = 0;
     uint32_t best_dist = UINT32_MAX;
@@ -335,44 +401,70 @@ static void hw_put_pixel_xy(int x, int y, uint32_t rgb) {
     }
 }
 
+static void hw_put_pixel_index_xy(int x, int y, uint8_t idx) {
+    if (x < 0 || y < 0 || x >= fb_width || y >= fb_height) return;
+    if (!linear_fb_available) {
+        if (x < VGA_WIDTH && y < VGA_HEIGHT) {
+            vga_fb[(size_t)y * VGA_WIDTH + (size_t)x] = idx;
+        }
+        return;
+    }
+    hw_put_pixel_xy(x, y, rgb_from_332(idx));
+}
+
 static inline size_t visible_pixels(void) {
     return (size_t)vga_width * (size_t)vga_height;
 }
 
-static inline uint32_t *draw_target(void) {
+static inline uint8_t *draw_target(void) {
     return fastgfx_active ? fastgfx_back : shadow;
 }
 
-static void hw_put_logical_pixel(int x, int y, uint32_t rgb) {
+static inline bool pure_vga13h_frontbuffer(void) {
+    return !linear_fb_available && !fastgfx_active && vga_scale == 1 &&
+           vga_x_offset == 0 && vga_y_offset == 0 &&
+           vga_width == VGA_WIDTH && vga_height == VGA_HEIGHT;
+}
+
+static void hw_put_logical_pixel_index(int x, int y, uint8_t idx) {
     int sx = vga_x_offset + x * vga_scale;
     int sy = vga_y_offset + y * vga_scale;
     for (int dy = 0; dy < vga_scale; dy++) {
-        for (int dx = 0; dx < vga_scale; dx++) hw_put_pixel_xy(sx + dx, sy + dy, rgb);
+        for (int dx = 0; dx < vga_scale; dx++) hw_put_pixel_index_xy(sx + dx, sy + dy, idx);
     }
 }
 
 static void store_draw_pixel(size_t off, uint32_t rgb) {
-    rgb &= 0x00FFFFFFu;
+    uint8_t idx = rgb_to_332(rgb & 0x00FFFFFFu);
     if (fastgfx_active) {
-        fastgfx_back[off] = rgb;
+        fastgfx_back[off] = idx;
         return;
     }
-    shadow[off] = rgb;
+    shadow[off] = idx;
     int y = (int)(off / (size_t)vga_width);
     int x = (int)(off - (size_t)y * (size_t)vga_width);
-    hw_put_logical_pixel(x, y, rgb);
+    hw_put_logical_pixel_index(x, y, idx);
 }
 
 static void present_shadow(void) {
+    if (!linear_fb_available && vga_scale == 1 && vga_x_offset == 0 &&
+        vga_y_offset == 0 && vga_width == VGA_WIDTH && vga_height == VGA_HEIGHT) {
+        memcpy((void *)vga_fb, shadow, visible_pixels());
+        return;
+    }
     for (int y = 0; y < vga_height; y++) {
         size_t src = (size_t)y * (size_t)vga_width;
         for (int x = 0; x < vga_width; x++) {
-            hw_put_logical_pixel(x, y, shadow[src + (size_t)x]);
+            hw_put_logical_pixel_index(x, y, shadow[src + (size_t)x]);
         }
     }
 }
 
 static void clear_physical_framebuffer(uint32_t rgb) {
+    if (!linear_fb_available && fb_width == VGA_WIDTH && fb_height == VGA_HEIGHT) {
+        memset((void *)vga_fb, rgb_to_332(rgb), (size_t)VGA_WIDTH * (size_t)VGA_HEIGHT);
+        return;
+    }
     for (int y = 0; y < fb_height; y++) {
         for (int x = 0; x < fb_width; x++) hw_put_pixel_xy(x, y, rgb);
     }
@@ -410,6 +502,22 @@ static void mode13h_draw_pixel(int x, int y, int c) {
 static void mode13h_draw_rectangle(int x1, int y1, int x2, int y2, int c) {
     if (!clip_rect(&x1, &y1, &x2, &y2)) return;
     uint32_t rgb = (uint32_t)c & 0xFFFFFFu;
+    if (vga_scale == 1 && vga_x_offset == 0 && vga_y_offset == 0) {
+        uint8_t idx = rgb_to_332(rgb);
+        uint8_t *target = draw_target();
+        for (int y = y1; y <= y2; y++) {
+            size_t off = (size_t)y * (size_t)vga_width + (size_t)x1;
+            size_t len = (size_t)(x2 - x1 + 1);
+            memset(target + off, idx, len);
+            if (!linear_fb_available && !fastgfx_active &&
+                vga_width == VGA_WIDTH && vga_height == VGA_HEIGHT) {
+                memset((void *)(vga_fb + off), idx, len);
+            } else if (!fastgfx_active) {
+                for (int x = x1; x <= x2; x++) hw_put_logical_pixel_index(x, y, idx);
+            }
+        }
+        return;
+    }
     for (int y = y1; y <= y2; y++) {
         size_t off = (size_t)y * (size_t)vga_width + (size_t)x1;
         for (int x = x1; x <= x2; x++, off++) store_draw_pixel(off, rgb);
@@ -445,19 +553,34 @@ static void mode13h_scroll_lcd(int lines) {
         return;
     }
 
+    uint8_t blank = rgb_to_332((uint32_t)PromptBC & 0x00FFFFFFu);
     if (lines > 0) {
         size_t keep = (size_t)(vga_height - lines) * (size_t)vga_width;
-        uint32_t *target = draw_target();
-        memmove(target, target + (size_t)lines * (size_t)vga_width, keep * sizeof(target[0]));
-        if (!fastgfx_active) present_shadow();
-        mode13h_draw_rectangle(0, vga_height - lines, vga_width - 1, vga_height - 1, PromptBC);
+        uint8_t *target = draw_target();
+        memmove(target, target + (size_t)lines * (size_t)vga_width, keep);
+        memset(target + keep, blank, (size_t)lines * (size_t)vga_width);
+        if (pure_vga13h_frontbuffer()) {
+            memmove((void *)vga_fb,
+                    (const void *)(vga_fb + (size_t)lines * (size_t)vga_width),
+                    keep);
+            memset((void *)(vga_fb + keep), blank, (size_t)lines * (size_t)vga_width);
+        } else if (!fastgfx_active) {
+            present_shadow();
+        }
     } else {
         lines = -lines;
         size_t keep = (size_t)(vga_height - lines) * (size_t)vga_width;
-        uint32_t *target = draw_target();
-        memmove(target + (size_t)lines * (size_t)vga_width, target, keep * sizeof(target[0]));
-        if (!fastgfx_active) present_shadow();
-        mode13h_draw_rectangle(0, 0, vga_width - 1, lines - 1, PromptBC);
+        uint8_t *target = draw_target();
+        memmove(target + (size_t)lines * (size_t)vga_width, target, keep);
+        memset(target, blank, (size_t)lines * (size_t)vga_width);
+        if (pure_vga13h_frontbuffer()) {
+            memmove((void *)(vga_fb + (size_t)lines * (size_t)vga_width),
+                    (const void *)vga_fb,
+                    keep);
+            memset((void *)vga_fb, blank, (size_t)lines * (size_t)vga_width);
+        } else if (!fastgfx_active) {
+            present_shadow();
+        }
     }
 }
 
@@ -523,8 +646,8 @@ static void mode13h_read_buffer_fast(int x1, int y1, int x2, int y2, unsigned ch
 
 uint32_t vga_mode13h_get_pixel(int x, int y) {
     if (x < 0 || y < 0 || x >= vga_width || y >= vga_height) return 0;
-    uint32_t *target = draw_target();
-    return target[(size_t)y * (size_t)vga_width + (size_t)x] & 0xFFFFFFu;
+    uint8_t *target = draw_target();
+    return rgb_from_332(target[(size_t)y * (size_t)vga_width + (size_t)x]);
 }
 
 static const Pc386VideoMode *find_mode(int mode) {
@@ -536,7 +659,11 @@ static const Pc386VideoMode *find_mode(int mode) {
 
 static bool mode_fits(const Pc386VideoMode *m) {
     if (m->backend == PC386_VIDEO_VGA13H) return true;
+#ifdef PC386_NO_BIOS_VIDEO
+    return false;
+#else
     return vesa_mode_supported(m->bios_mode);
+#endif
 }
 
 void vga_mode13h_set_mode(int mode, int clear) {
@@ -550,14 +677,20 @@ void vga_mode13h_set_mode(int mode, int clear) {
     vga_mode13h_fastgfx_reset();
     if (m->backend == PC386_VIDEO_VGA13H) {
         bool using_vbe_compat = false;
+#ifndef PC386_NO_BIOS_VIDEO
         if (linear_fb_available && vesa_mode_supported(0x4112)) {
             using_vbe_compat = vesa_set_bios_mode(0x4112);
             next_scale = 2;
             next_x_offset = 0;
             next_y_offset = 0;
         }
+#endif
         if (!using_vbe_compat) {
+#ifndef PC386_NO_BIOS_VIDEO
             pc386_bios_video_int10(m->bios_mode, 0, 0, 0, 0, 0);
+#else
+            vga_program_mode13h_registers();
+#endif
             fb = vga_fb;
             fb_width = VGA_WIDTH;
             fb_height = VGA_HEIGHT;
@@ -584,7 +717,7 @@ void vga_mode13h_set_mode(int mode, int clear) {
         Option.Height = VRes / gui_font_height;
     }
     if (clear) {
-        memset(shadow, 0, visible_pixels() * sizeof(shadow[0]));
+        memset(shadow, 0, visible_pixels());
         clear_physical_framebuffer(0);
         present_shadow();
         CurrentX = CurrentY = 0;
@@ -593,7 +726,7 @@ void vga_mode13h_set_mode(int mode, int clear) {
 
 void vga_mode13h_fastgfx_create(void) {
     size_t pixels = visible_pixels();
-    memcpy(fastgfx_back, shadow, pixels * sizeof(fastgfx_back[0]));
+    memcpy(fastgfx_back, shadow, pixels);
     fastgfx_active = true;
     fastgfx_next_sync_us = 0;
 }
@@ -619,7 +752,7 @@ void vga_mode13h_fastgfx_set_fps(int fps) {
 void vga_mode13h_fastgfx_swap(void) {
     if (!fastgfx_active) return;
     size_t pixels = visible_pixels();
-    memcpy(shadow, fastgfx_back, pixels * sizeof(shadow[0]));
+    memcpy(shadow, fastgfx_back, pixels);
     present_shadow();
 }
 
@@ -644,20 +777,31 @@ void cmd_mode(void) {
         MMPrintString((char *)find_mode(vga_current_mode)->name);
         MMPrintString("\r\n");
         MMPrintString("1:320x200");
+#ifndef PC386_NO_BIOS_VIDEO
         if (vesa_mode_supported(0x4112)) MMPrintString(" 2:640x480 5:480x480");
         if (vesa_mode_supported(0x4114)) MMPrintString(" 3:800x600");
         if (vesa_mode_supported(0x4117)) MMPrintString(" 4:1024x768 6:320x320x2");
+#endif
         MMPrintString("\r\n");
         return;
     }
-    vga_mode13h_set_mode(getint(cmdline, 1, 6), true);
+    int mode = getint(cmdline, 1, 6);
+#ifdef PC386_NO_BIOS_VIDEO
+    if (mode != 1) {
+        MMPrintString("Mode not available\r\n");
+        return;
+    }
+#endif
+    vga_mode13h_set_mode(mode, true);
 }
 
 void vga_mode13h_init(void) {
     (void)pc386_multiboot_info;
+#ifndef PC386_NO_BIOS_VIDEO
     (void)vesa_mode_supported(0x4112);
     (void)vesa_mode_supported(0x4114);
     (void)vesa_mode_supported(0x4117);
+#endif
     fb = vga_fb;
     fb_width = VGA_WIDTH;
     fb_height = VGA_HEIGHT;

@@ -13,7 +13,13 @@ PORT_DIR  := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 REPO_ROOT := $(abspath $(PORT_DIR)/../..)
 PICO_COMPAT_DIR := $(REPO_ROOT)/ports/pico_sdk_compat
 BUILD_DIR := $(PORT_DIR)/build
-PC386_AUDIO ?= sb16
+PC386_AUDIO ?= opl3
+PC386_LOW_MEM ?= 0
+PC386_NO_FPU ?= 0
+PC386_NO_FDC ?= 0
+PC386_BOOT_TRACE ?= 0
+PC386_NO_BIOS_VIDEO ?= 0
+PC386_KBD_SCANCODE_SET ?= 0
 VERSION_FILE := $(REPO_ROOT)/VERSION
 MMBA_RELEASE_VERSION ?= $(shell sed -n '1p;q;' $(VERSION_FILE) 2>/dev/null)
 MMBA_RELEASE_VERSION := $(strip $(MMBA_RELEASE_VERSION))
@@ -49,9 +55,14 @@ endif
 CFLAGS = -std=gnu11 -ffreestanding -O2 -g \
          -Wall -Wextra -Wno-unused-parameter -Wno-unused-function \
          -fno-pic -fno-pie -fno-stack-protector \
+         -fno-delete-null-pointer-checks \
+         -fno-isolate-erroneous-paths-dereference \
+         -fno-isolate-erroneous-paths-attribute \
+         -march=i386 -mtune=i386 \
          -mno-red-zone -mno-mmx -mno-sse -mno-sse2 \
          -funsigned-char \
          -DMMBASIC_HOST -DPORT_PC386 \
+         -DPC386_KBD_SCANCODE_SET=$(PC386_KBD_SCANCODE_SET) \
          -DMMBA_RELEASE_VERSION=\"$(MMBA_RELEASE_VERSION)\" \
          -DFF_VOLUMES=3 -DFF_STR_VOLUME_ID=1 -DFF_VOLUME_STRS='"A","B","C"' \
          -include pc386_platform.h \
@@ -60,20 +71,92 @@ CFLAGS = -std=gnu11 -ffreestanding -O2 -g \
          -I$(REPO_ROOT)/ports/host_native -I$(PICO_COMPAT_DIR) -I$(REPO_ROOT)/core/mmbasic -I$(REPO_ROOT)/runtime/vm -I$(REPO_ROOT)/shared/gfx -I$(REPO_ROOT)/shared/audio -I$(REPO_ROOT)/shared/mmbasic -I$(REPO_ROOT)/drivers/bmp_decoder -I$(REPO_ROOT)/drivers/gps -I$(REPO_ROOT)/drivers/gui_controls -I$(REPO_ROOT)/drivers/gui_touch -I$(REPO_ROOT)/drivers/i2c_bus -I$(REPO_ROOT)/drivers/onewire -I$(REPO_ROOT)/drivers/psram_heap -I$(REPO_ROOT)/drivers/serial -I$(REPO_ROOT)/drivers/spi_bus -I$(REPO_ROOT)/drivers/spi_lcd -I$(REPO_ROOT)/drivers/ssd1963 -I$(REPO_ROOT) \
          -MMD -MP
 
+ifeq ($(PC386_LOW_MEM),1)
+CFLAGS += -DPC386_LOW_MEM=1
+PC386_BOOT_MEM_UPPER_KB := 7168
+PC386_BOOT_HIGH_MEM_BYTES := 0x00700000
+else
+PC386_BOOT_MEM_UPPER_KB := 15360
+PC386_BOOT_HIGH_MEM_BYTES := 0x00F00000
+endif
+
+ifeq ($(PC386_NO_FPU),1)
+CFLAGS += -DPC386_NO_FPU=1 -msoft-float -mlong-double-64
+endif
+ifeq ($(PC386_NO_FDC),1)
+CFLAGS += -DPC386_NO_FDC=1
+endif
+ifeq ($(PC386_BOOT_TRACE),1)
+CFLAGS += -DPC386_BOOT_TRACE=1
+endif
+ifeq ($(PC386_NO_BIOS_VIDEO),1)
+CFLAGS += -DPC386_NO_BIOS_VIDEO=1
+endif
+
 # Assembly: drop -include (assembler can't parse C typedefs) and the
 # include_shim path (no .S file needs it).
 ASFLAGS = -ffreestanding -g -fno-pic -fno-pie \
+          -march=i386 -mtune=i386 \
           -DMMBASIC_HOST -DPORT_PC386 \
           -I$(PORT_DIR) -I$(REPO_ROOT)/shared/gfx -I$(REPO_ROOT)/shared/audio -I$(REPO_ROOT)/shared/mmbasic -I$(REPO_ROOT)/drivers/bmp_decoder -I$(REPO_ROOT)/drivers/gps -I$(REPO_ROOT)/drivers/gui_controls -I$(REPO_ROOT)/drivers/gui_touch -I$(REPO_ROOT)/drivers/i2c_bus -I$(REPO_ROOT)/drivers/onewire -I$(REPO_ROOT)/drivers/psram_heap -I$(REPO_ROOT)/drivers/serial -I$(REPO_ROOT)/drivers/spi_bus -I$(REPO_ROOT)/drivers/spi_lcd -I$(REPO_ROOT)/drivers/ssd1963 -I$(REPO_ROOT)
+
+ifeq ($(PC386_LOW_MEM),1)
+ASFLAGS += -DPC386_LOW_MEM=1
+endif
+ifeq ($(PC386_NO_FPU),1)
+ASFLAGS += -DPC386_NO_FPU=1
+endif
+ifeq ($(PC386_NO_FDC),1)
+ASFLAGS += -DPC386_NO_FDC=1
+endif
+ifeq ($(PC386_BOOT_TRACE),1)
+ASFLAGS += -DPC386_BOOT_TRACE=1
+endif
+ifeq ($(PC386_NO_BIOS_VIDEO),1)
+ASFLAGS += -DPC386_NO_BIOS_VIDEO=1
+endif
 
 LDFLAGS = -nostdlib -no-pie -T $(PORT_DIR)/linker.ld -Wl,--build-id=none
 
 ifeq ($(PC386_AUDIO),pcspk)
 PORT_AUDIO_SRC := hal_audio_pc386.c
+else ifeq ($(PC386_AUDIO),opl3)
+PORT_AUDIO_SRC := hal_audio_pc386_opl3.c
 else ifeq ($(PC386_AUDIO),sb16)
 PORT_AUDIO_SRC := hal_audio_pc386_sb16.c
 else
-$(error PC386_AUDIO must be one of: pcspk sb16)
+$(error PC386_AUDIO must be one of: pcspk opl3 sb16)
+endif
+
+ifeq ($(PC386_NO_FPU),1)
+PC386_SOFTFLOAT_SRCS := compiler_rt/adddf3.c \
+                        compiler_rt/subdf3.c \
+                        compiler_rt/muldf3.c \
+                        compiler_rt/divdf3.c \
+                        compiler_rt/comparedf2.c \
+                        compiler_rt/addsf3.c \
+                        compiler_rt/subsf3.c \
+                        compiler_rt/mulsf3.c \
+                        compiler_rt/divsf3.c \
+                        compiler_rt/comparesf2.c \
+                        compiler_rt/fixdfsi.c \
+                        compiler_rt/fixsfsi.c \
+                        compiler_rt/fixunsdfsi.c \
+                        compiler_rt/fixsfdi.c \
+                        compiler_rt/fixdfdi.c \
+                        compiler_rt/fixunssfdi.c \
+                        compiler_rt/fixunsdfdi.c \
+                        compiler_rt/floatsidf.c \
+                        compiler_rt/floatsisf.c \
+                        compiler_rt/floatunsidf.c \
+                        compiler_rt/floatdisf.c \
+                        compiler_rt/floatdidf.c \
+                        compiler_rt/floatundidf.c \
+                        compiler_rt/extendsfdf2.c \
+                        compiler_rt/truncdfsf2.c \
+                        compiler_rt/pc386_fp_mode.c
+else
+PC386_SOFTFLOAT_SRCS :=
 endif
 
 # --- Sources -----------------------------------------------------------------
@@ -89,7 +172,8 @@ PORT_SRCS = kmain.c kprint.c mmap.c heap_region.c kstring.c \
             $(PORT_AUDIO_SRC) hal_filesystem_pc386.c hal_flash_pc386.c \
             hal_keyboard_pc386.c hal_pin_pc386.c hal_random_pc386.c \
             hal_storage_pc386.c hal_time_pc386.c \
-            hal_vm_framebuffer_pc386.c
+            hal_vm_framebuffer_pc386.c \
+            $(PC386_SOFTFLOAT_SRCS)
 
 # MMBasic core sources brought in for stage 3c.1+. Mirrors mmbasic_stdio's
 # CORE_SRCS list. Files in repo root, drivers/, and core/state/ each
@@ -122,11 +206,17 @@ BC_SRCS = runtime/vm/bc_alloc.c runtime/vm/bc_bridge.c \
 SIM_VM_SRCS = vm_sys_file_sim.c
 
 # Stubs inherited from host_native — same set mmbasic_stdio links.
+ifeq ($(PC386_NO_FPU),1)
+PC386_GFX_3D_SRC := gfx_3d/gfx_3d_stub.c
+else
+PC386_GFX_3D_SRC := gfx_3d/gfx_3d.c
+endif
+
 CORE_DRV_SRCS = audio_mp3/audio_mp3_stub.c \
                 spi_lcd/spi_lcd_mem332_stub.c \
                 display_merge/display_merge_stub.c \
                 vga_pio/vga_ops_stub.c \
-                gfx_3d/gfx_3d.c \
+                $(PC386_GFX_3D_SRC) \
                 upng_sprite/upng_sprite_stub.c \
                 gui_touch/gui_touch_stub.c \
                 gui_controls/gui_controls_stub.c \
@@ -189,10 +279,15 @@ FLOPPY_STAGE1_OBJ := $(FLOPPY_BOOT_DIR)/floppy_stage1.o
 FLOPPY_STAGE2_OBJ := $(FLOPPY_BOOT_DIR)/floppy_stage2.o
 FLOPPY_STAGE1_BIN := $(FLOPPY_BOOT_DIR)/floppy_stage1.bin
 FLOPPY_STAGE2_BIN := $(FLOPPY_BOOT_DIR)/floppy_stage2.bin
+HDD_LOAD_PLAN := $(FLOPPY_BOOT_DIR)/hdd_load_plan.inc
+HDD_STAGE1_OBJ := $(FLOPPY_BOOT_DIR)/hdd_stage1.o
+HDD_STAGE2_OBJ := $(FLOPPY_BOOT_DIR)/hdd_stage2.o
+HDD_STAGE1_BIN := $(FLOPPY_BOOT_DIR)/hdd_stage1.bin
+HDD_STAGE2_BIN := $(FLOPPY_BOOT_DIR)/hdd_stage2.bin
 
 # --- Targets -----------------------------------------------------------------
 
-.PHONY: all clean iso release floppy_bootloader FORCE
+.PHONY: all clean iso release floppy_bootloader hdd_bootloader FORCE
 
 all: $(KERNEL) $(KERNEL_STRIPPED) floppy_bootloader
 
@@ -202,7 +297,7 @@ $(KERNEL): $(OBJS) $(PORT_DIR)/linker.ld $(CONFIG_STAMP) | $(BUILD_DIR)
 $(OBJS): $(VERSION_FILE)
 
 $(CONFIG_STAMP): FORCE | $(BUILD_DIR)
-	@cfg='PC386_AUDIO=$(PC386_AUDIO)'; \
+	@cfg='PC386_AUDIO=$(PC386_AUDIO) PC386_LOW_MEM=$(PC386_LOW_MEM) PC386_NO_FPU=$(PC386_NO_FPU) PC386_NO_FDC=$(PC386_NO_FDC) PC386_BOOT_TRACE=$(PC386_BOOT_TRACE) PC386_NO_BIOS_VIDEO=$(PC386_NO_BIOS_VIDEO) PC386_KBD_SCANCODE_SET=$(PC386_KBD_SCANCODE_SET)'; \
 	if [ ! -f $@ ] || [ "$$(cat $@)" != "$$cfg" ]; then \
 		echo "$$cfg" > $@; \
 	fi
@@ -216,6 +311,8 @@ $(KERNEL_BIN): $(KERNEL)
 	$(OBJCOPY) -O binary $< $@
 
 floppy_bootloader: $(FLOPPY_STAGE1_BIN) $(FLOPPY_STAGE2_BIN)
+
+hdd_bootloader: $(HDD_STAGE1_BIN) $(HDD_STAGE2_BIN)
 
 $(FLOPPY_BOOT_DIR):
 	mkdir -p $@
@@ -235,10 +332,24 @@ $(FLOPPY_STAGE2_OBJ): $(PORT_DIR)/bootloader/floppy_stage2.S $(FLOPPY_LOAD_PLAN)
 $(FLOPPY_STAGE2_BIN): $(FLOPPY_STAGE2_OBJ)
 	$(LD) -Ttext 0x0000 --oformat binary -o $@ $<
 
+$(HDD_STAGE1_OBJ): $(PORT_DIR)/bootloader/hdd_stage1.S | $(FLOPPY_BOOT_DIR)
+	$(CC) $(ASFLAGS) -c -o $@ $<
+
+$(HDD_STAGE1_BIN): $(HDD_STAGE1_OBJ)
+	$(LD) -Ttext 0x7C00 --oformat binary -o $@ $<
+
+$(HDD_STAGE2_OBJ): $(PORT_DIR)/bootloader/floppy_stage2.S $(HDD_LOAD_PLAN) | $(FLOPPY_BOOT_DIR)
+	$(CC) $(ASFLAGS) -I$(FLOPPY_BOOT_DIR) -DPC386_BOOT_SECTORS_TRACK=63 -DPC386_BOOT_HEADS=16 -DPC386_BOOT_LOAD_PLAN='"hdd_load_plan.inc"' -DPC386_BOOT_STAGE2_MSG='"PC386 HDD stage2\r\n"' -DPC386_BOOT_DISK_ERROR_MSG='"PC386 HDD stage2 disk error\r\n"' -DPC386_BOOT_MEM_UPPER_KB=$(PC386_BOOT_MEM_UPPER_KB) -DPC386_BOOT_HIGH_MEM_BYTES=$(PC386_BOOT_HIGH_MEM_BYTES) -c -o $@ $<
+
+$(HDD_STAGE2_BIN): $(HDD_STAGE2_OBJ)
+	$(LD) -Ttext 0x0000 --oformat binary -o $@ $<
+
 $(BUILD_DIR)/%.o: $(PORT_DIR)/%.S | $(BUILD_DIR)
+	@mkdir -p $(dir $@)
 	$(CC) $(ASFLAGS) -c -o $@ $<
 
 $(BUILD_DIR)/%.o: $(PORT_DIR)/%.c | $(BUILD_DIR)
+	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 # Drivers under $(REPO_ROOT)/drivers/<name>/<file>.c.

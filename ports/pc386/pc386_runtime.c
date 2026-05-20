@@ -29,6 +29,13 @@
 #include "../../drivers/vga_mode13h/vga_mode13h.h"
 #include "pc386_panic.h"
 
+#ifdef PC386_BOOT_TRACE
+extern void kputs(const char *s);
+#define PC386_TRACE(s) kputs(s)
+#else
+#define PC386_TRACE(s) ((void)0)
+#endif
+
 extern jmp_buf mark;          /* defined by MMBasic.c */
 
 /* Forward decls for the output hook contract host_runtime.c established. */
@@ -69,35 +76,44 @@ void pc386_apply_runtime_option_defaults(void)
 }
 
 void mmbasic_runtime_port_begin(void) {
+    PC386_TRACE("RT:entry, ");
     timeroffset = hal_time_us_64();
+    PC386_TRACE("RT:time, ");
 
     /* Tell Draw.c "a display is configured" so cmd_box / cmd_pixel
      * don't error. DISP_USER (28) skips all panel-specific code paths
      * in Draw.c. Same trick host_runtime.c uses. */
     Option.DISPLAY_TYPE = DISP_USER;
+    PC386_TRACE("RT:display-type, ");
 
     /* Seed CFunctionFlash from the pre-erased buffer in pc386_state.c
      * so CFunction scan loops terminate immediately (mirrors host). */
     extern unsigned char pc386_cfunction_buf[];
     CFunctionFlash = pc386_cfunction_buf;
+    PC386_TRACE("RT:cfunc, ");
 
     pc386_apply_runtime_option_defaults();
+    PC386_TRACE("RT:defaults, ");
     pc386_options_defaults_ready();
+    PC386_TRACE("RT:defaults-ready, ");
 
-    /* Stage 5 display: VGA/VBE framebuffer is the primary console,
-     * with COM1 mirroring the same REPL stream for terminal capture
-     * and remote access. */
+    /* Stage 5 display: VGA/VBE framebuffer is the primary console.
+     * Keep runtime output screen-only on real hardware; boot diagnostics
+     * still go through kputs/serial before the REPL starts. */
     vga_mode13h_init();
+    PC386_TRACE("RT:vga, ");
     SetFont(Option.DefaultFont);
+    PC386_TRACE("RT:font, ");
     gui_fcolour = PromptFC = Option.DefaultFC;
     gui_bcolour = PromptBC = Option.DefaultBC;
     PromptFont = Option.DefaultFont;
     Option.DISPLAY_CONSOLE = 1;
-    OptionConsole = 3;                         /* display + serial */
+    OptionConsole = 2;                         /* display only */
     Option.Width = HRes / gui_font_width;
     Option.Height = VRes / gui_font_height;
     CurrentX = CurrentY = 0;
     ClearScreen(gui_bcolour);
+    PC386_TRACE("RT:clear, ");
 
     /* Route file ops through FatFs (=1) rather than LFS (=0). Pc386 has
      * real FAT volumes mounted as A: (FDC), B: (second FDC if present),
@@ -108,12 +124,14 @@ void mmbasic_runtime_port_begin(void) {
     FatFSFileSystem = FatFSFileSystemSave = 1;
     extern char filepath[][FF_MAX_LFN];
     strcpy(filepath[1], "C:/");
+    PC386_TRACE("RT:fatfs, ");
 
     /* Persist the live Option struct back to flash_option_buf so the
      * LoadOptions inside error()'s reset path doesn't wipe these
      * defaults. SaveOptions → hal_flash_write_options →
      * pc386_options_snapshot copies live Option to the buffer. */
     SaveOptions();
+    PC386_TRACE("RT:save-options, ");
 }
 
 void host_runtime_finish(void) { }
@@ -168,7 +186,11 @@ char SerialConsolePutC(char c, int flush) {
 void putConsole(int c, int flush) {
     /* Honour the OPTION CONSOLE routing bits (1 = serial, 2 = display). */
     if (OptionConsole & 2) DisplayPutC((char)c);
+#ifdef PORT_PC386
+    (void)flush;
+#else
     if (OptionConsole & 1) SerialConsolePutC((char)c, flush);
+#endif
 }
 
 // MMputchar lives in runtime/runtime_console_putchar.c — shared across every port.
@@ -236,7 +258,8 @@ int MMgetchar(void) {
             if (s == 0x1b) return mmbasic_escdecode_run(pc386_escdecode_read_byte_ms);
             return mmbasic_console_normalise_byte(s);
         }
-        __asm__ volatile("hlt");
+        __asm__ volatile("sti" : : : "memory");
+        hal_time_sleep_us(1000);
     }
 }
 

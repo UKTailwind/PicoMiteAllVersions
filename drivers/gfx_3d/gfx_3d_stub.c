@@ -12,4 +12,8 @@
  * `#else` of PICOMITEWEB, so WEB links don't need stubs for them.
  */
 
+void error(char *msg, ...);
+
 void closeall3d(void) { }
+void cmd_3D(void) { error("3D not available"); }
+void fun_3D(void) { error("3D not available"); }

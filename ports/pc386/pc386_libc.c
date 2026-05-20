@@ -742,6 +742,8 @@ char *ctime  (const time_t *t)     { (void)t;  pc386_panic("ctime not impl"); }
 
 #include <math.h>
 
+#ifndef PC386_NO_FPU
+
 double sin(double x)   { __asm__("fsin"  : "+t"(x)); return x; }
 double cos(double x)   { __asm__("fcos"  : "+t"(x)); return x; }
 double sqrt(double x)  { __asm__("fsqrt" : "+t"(x)); return x; }
@@ -923,6 +925,221 @@ double ldexp(double x, int e) {
 }
 
 double scalbn(double x, int e) { return ldexp(x, e); }
+
+#else
+
+static double pc386_wrap_pi(double x) {
+    const double pi = 3.14159265358979323846;
+    const double two_pi = 6.28318530717958647692;
+    while (x > pi) x -= two_pi;
+    while (x < -pi) x += two_pi;
+    return x;
+}
+
+double fabs(double x) { return x < 0.0 ? -x : x; }
+
+double floor(double x) {
+    int64_t i = (int64_t)x;
+    if (x < 0.0 && (double)i != x) i--;
+    return (double)i;
+}
+
+double ceil(double x) {
+    int64_t i = (int64_t)x;
+    if (x > 0.0 && (double)i != x) i++;
+    return (double)i;
+}
+
+double trunc(double x) { return (double)(int64_t)x; }
+double round(double x) { return x >= 0.0 ? floor(x + 0.5) : ceil(x - 0.5); }
+
+double fmod(double x, double y) {
+    if (y == 0.0) return 0.0;
+    return x - trunc(x / y) * y;
+}
+
+double sqrt(double x) {
+    if (x <= 0.0) return 0.0;
+    double g = x > 1.0 ? x : 1.0;
+    for (int i = 0; i < 24; i++) g = 0.5 * (g + x / g);
+    return g;
+}
+
+double sin(double x) {
+    x = pc386_wrap_pi(x);
+    double x2 = x * x;
+    return x * (1.0 - x2 / 6.0 + (x2 * x2) / 120.0 - (x2 * x2 * x2) / 5040.0);
+}
+
+double cos(double x) {
+    x = pc386_wrap_pi(x);
+    double x2 = x * x;
+    return 1.0 - x2 / 2.0 + (x2 * x2) / 24.0 - (x2 * x2 * x2) / 720.0;
+}
+
+double tan(double x) {
+    double c = cos(x);
+    return c == 0.0 ? 0.0 : sin(x) / c;
+}
+
+double atan(double x) {
+    const double half_pi = 1.57079632679489661923;
+    if (x > 1.0) return half_pi - atan(1.0 / x);
+    if (x < -1.0) return -half_pi - atan(1.0 / x);
+    double x2 = x * x;
+    return x * (1.0 - x2 / 3.0 + (x2 * x2) / 5.0 - (x2 * x2 * x2) / 7.0);
+}
+
+double atan2(double y, double x) {
+    const double pi = 3.14159265358979323846;
+    if (x > 0.0) return atan(y / x);
+    if (x < 0.0 && y >= 0.0) return atan(y / x) + pi;
+    if (x < 0.0 && y < 0.0) return atan(y / x) - pi;
+    if (y > 0.0) return pi / 2.0;
+    if (y < 0.0) return -pi / 2.0;
+    return 0.0;
+}
+
+double asin(double x) { return atan2(x, sqrt(1.0 - x * x)); }
+double acos(double x) { return atan2(sqrt(1.0 - x * x), x); }
+
+double exp(double x) {
+    if (x < -40.0) return 0.0;
+    if (x > 40.0) x = 40.0;
+    int n = (int)x;
+    double r = x - (double)n;
+    double term = 1.0;
+    double sum = 1.0;
+    for (int i = 1; i <= 18; i++) {
+        term *= r / (double)i;
+        sum += term;
+    }
+    const double e = 2.71828182845904523536;
+    while (n > 0) { sum *= e; n--; }
+    while (n < 0) { sum /= e; n++; }
+    return sum;
+}
+
+double log(double x) {
+    if (x <= 0.0) return -1.0 / 0.0;
+    int k = 0;
+    while (x > 1.5) { x *= 0.5; k++; }
+    while (x < 0.75) { x *= 2.0; k--; }
+    double z = (x - 1.0) / (x + 1.0);
+    double z2 = z * z;
+    double term = z;
+    double sum = 0.0;
+    for (int n = 1; n <= 19; n += 2) {
+        sum += term / (double)n;
+        term *= z2;
+    }
+    return 2.0 * sum + (double)k * 0.69314718055994530942;
+}
+
+double log2(double x) { return log(x) / 0.69314718055994530942; }
+double log10(double x) { return log(x) / 2.30258509299404568402; }
+double exp2(double x) { return exp(x * 0.69314718055994530942); }
+
+double pow(double x, double y) {
+    if (x == 0.0) return y == 0.0 ? 1.0 : 0.0;
+    if (x < 0.0) {
+        int64_t yi = (int64_t)y;
+        if ((double)yi != y) return 0.0;
+        double r = exp(y * log(-x));
+        return (yi & 1) ? -r : r;
+    }
+    return exp(y * log(x));
+}
+
+double modf(double x, double *iptr) {
+    *iptr = trunc(x);
+    return x - *iptr;
+}
+
+double sinh(double x) { return (exp(x) - exp(-x)) * 0.5; }
+double cosh(double x) { return (exp(x) + exp(-x)) * 0.5; }
+double tanh(double x) {
+    double e2 = exp(2.0 * x);
+    return (e2 - 1.0) / (e2 + 1.0);
+}
+double asinh(double x) { return log(x + sqrt(x * x + 1.0)); }
+double acosh(double x) { return log(x + sqrt(x * x - 1.0)); }
+double atanh(double x) { return 0.5 * log((1.0 + x) / (1.0 - x)); }
+double expm1(double x) { return exp(x) - 1.0; }
+double log1p(double x) { return log(1.0 + x); }
+double cbrt(double x) { return x < 0.0 ? -pow(-x, 1.0 / 3.0) : pow(x, 1.0 / 3.0); }
+double hypot(double x, double y) { return sqrt(x * x + y * y); }
+
+double copysign(double x, double y) {
+    union { double d; uint64_t u; } ux = { x }, uy = { y };
+    ux.u = (ux.u & 0x7FFFFFFFFFFFFFFFull) | (uy.u & 0x8000000000000000ull);
+    return ux.d;
+}
+
+double nextafter(double x, double y) {
+    if (x == y) return y;
+    return x + (y > x ? 1.0 : -1.0) * 1e-308;
+}
+
+double frexp(double x, int *e) {
+    if (x == 0.0) { *e = 0; return 0.0; }
+    int exp = 0;
+    double ax = fabs(x);
+    while (ax >= 1.0) { ax *= 0.5; exp++; }
+    while (ax < 0.5) { ax *= 2.0; exp--; }
+    *e = exp;
+    return x < 0.0 ? -ax : ax;
+}
+
+double ldexp(double x, int e) {
+    while (e > 0) { x *= 2.0; e--; }
+    while (e < 0) { x *= 0.5; e++; }
+    return x;
+}
+
+double scalbn(double x, int e) { return ldexp(x, e); }
+
+#endif
+
+float _Complex __mulsc3(float a, float b, float c, float d) {
+    float _Complex z;
+    __real__ z = a * c - b * d;
+    __imag__ z = a * d + b * c;
+    return z;
+}
+
+float _Complex __divsc3(float a, float b, float c, float d) {
+    float denom = c * c + d * d;
+    float _Complex z;
+    if (denom == 0.0f) {
+        __real__ z = 0.0f;
+        __imag__ z = 0.0f;
+        return z;
+    }
+    __real__ z = (a * c + b * d) / denom;
+    __imag__ z = (b * c - a * d) / denom;
+    return z;
+}
+
+double _Complex __muldc3(double a, double b, double c, double d) {
+    double _Complex z;
+    __real__ z = a * c - b * d;
+    __imag__ z = a * d + b * c;
+    return z;
+}
+
+double _Complex __divdc3(double a, double b, double c, double d) {
+    double denom = c * c + d * d;
+    double _Complex z;
+    if (denom == 0.0) {
+        __real__ z = 0.0;
+        __imag__ z = 0.0;
+        return z;
+    }
+    __real__ z = (a * c + b * d) / denom;
+    __imag__ z = (b * c - a * d) / denom;
+    return z;
+}
 
 float sinf(float x)            { return (float)sin((double)x); }
 float cosf(float x)            { return (float)cos((double)x); }

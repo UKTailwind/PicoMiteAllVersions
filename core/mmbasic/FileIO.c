@@ -82,6 +82,15 @@ extern void cmd_load_post_cleanup(void);
 extern int  port_mount_sd_drive(void);
 extern void port_apply_load_overrides(void);
 extern void port_drive_check(char drive);
+#ifdef PORT_PC386
+extern void pc386_fault_set_context(const char *ctx);
+extern void pc386_fault_clear_context(void);
+#define PC386_FAULT_CONTEXT(ctx) pc386_fault_set_context(ctx)
+#define PC386_FAULT_CONTEXT_CLEAR() pc386_fault_clear_context()
+#else
+#define PC386_FAULT_CONTEXT(ctx) do { (void)(ctx); } while (0)
+#define PC386_FAULT_CONTEXT_CLEAR() do { } while (0)
+#endif
 /* MemLoadProgram body lives in the #ifdef-rp2350 DEFINES block below. */
 int MemLoadProgram(unsigned char *fname, unsigned char *ram);
 
@@ -2203,9 +2212,11 @@ int FindFreeFileNbr(void)
 void MIPS16 CloseAllFiles(void)
 {
     int i;
+#ifndef PORT_PC386
     closeallsprites();
     closeall3d();
     closeframebuffer('A');
+#endif
     for (i = 1; i <= MAXOPENFILES; i++)
     {
         if (FileTable[i].com != 0)
@@ -2861,6 +2872,7 @@ static void cmd_files_build_sort_key(char *out, size_t out_size,
 void MIPS16 cmd_files(void)
 {
 //    if(CurrentLinePtr) error("Invalid in a program");
+    PC386_FAULT_CONTEXT("FILES: parse");
     int waste=0, t=FatFSFileSystem+1;
     unsigned char cmdbuffer[STRINGSIZE]={0};
     unsigned char *cmdbuf=cmdbuffer;
@@ -2924,6 +2936,7 @@ void MIPS16 cmd_files(void)
                 error("Syntax");
         }
     }
+    PC386_FAULT_CONTEXT("FILES: prepare");
     cmd_files_save_program_context();
     if (pp[0] == 0)
         strcpy(pp, "*");
@@ -2937,6 +2950,7 @@ void MIPS16 cmd_files(void)
     MMPrintString(fullpathname[FatFSFileSystem]);
     if(!fullpathname[FatFSFileSystem][0]) MMPrintString("/");
     PRet();
+    PC386_FAULT_CONTEXT("FILES: open dir");
     if(FatFSFileSystem==0) FSerror=lfs_dir_open(&lfs, &lfs_dir, fullpathname[FatFSFileSystem]);
     else {
         char dirpath[FF_MAX_LFN + 4];
@@ -2959,6 +2973,7 @@ void MIPS16 cmd_files(void)
     if((void *)ReadBuffer!=(void *)DisplayNotSet && Option.DISPLAY_CONSOLE)Option.NoScroll=0;
 
     for (;;) {
+        PC386_FAULT_CONTEXT("FILES: scan");
         ProcessWeb(1);
         char min_key[FF_MAX_LFN + 32];
         min_key[0] = '\xff'; min_key[1] = 0;
@@ -3062,6 +3077,7 @@ void MIPS16 cmd_files(void)
 
         if (!found_any) break;
 
+        PC386_FAULT_CONTEXT("FILES: print entry");
         /* For LFS non-TIME sorts, fetch the selected entry's date once
          * (so the printed line shows the right timestamp). FatFS got
          * the date essentially free from f_findfirst/findnext. */
@@ -3110,6 +3126,7 @@ void MIPS16 cmd_files(void)
 
         /* Pagination — same logic as before. */
         if (ListCnt >= Option.Height - overlap) {
+            PC386_FAULT_CONTEXT("FILES: pagination");
             unsigned char noscroll2 = Option.NoScroll;
             if((void *)ReadBuffer!=(void *)DisplayNotSet && Option.DISPLAY_CONSOLE)Option.NoScroll=0;
             hal_keyboard_clear_repeat_state();
@@ -3128,6 +3145,7 @@ void MIPS16 cmd_files(void)
                     FatFSFileSystem = FatFSFileSystemSave;
                     PromptFont = oldfont;
                     cmd_files_restore_program_context();
+                    PC386_FAULT_CONTEXT_CLEAR();
                     MMAbort = false;
                     return;
                 }
@@ -3148,6 +3166,7 @@ void MIPS16 cmd_files(void)
     }
 
     /* Summary line. */
+    PC386_FAULT_CONTEXT("FILES: summary");
     IntToStr(ts, dirs, 10);
     MMPrintString(ts);
     MMPrintString(" director");
@@ -3171,6 +3190,7 @@ void MIPS16 cmd_files(void)
     Option.NoScroll = noscroll;
     PromptFont = oldfont;
     cmd_files_restore_program_context();
+    PC386_FAULT_CONTEXT_CLEAR();
     return;
 }
 /*

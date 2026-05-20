@@ -47,7 +47,7 @@ def strip_ansi(b: bytes) -> bytes:
 
 def qemu_args(tmpdir: str) -> list[str]:
     boot_mode = os.environ.get("PC386_BOOT", "floppy")
-    audio_backend = os.environ.get("PC386_AUDIO", "auto")
+    audio_backend = os.environ.get("PC386_AUDIO", "opl3")
     sb_base = os.environ.get("PC386_SB_BASE", "0x220")
     sb_irq = os.environ.get("PC386_SB_IRQ", "5")
     sb_dma = os.environ.get("PC386_SB_DMA", "1")
@@ -66,7 +66,14 @@ def qemu_args(tmpdir: str) -> list[str]:
         args += [
             "-machine", "pc,pcspk-audiodev=pcaudio",
             "-audiodev", "none,id=pcaudio",
+            "-device", "adlib,audiodev=pcaudio",
             "-device", f"sb16,audiodev=pcaudio,iobase={sb_base},irq={sb_irq},dma={sb_dma},dma16={sb_dma16}",
+        ]
+    elif audio_backend == "opl3":
+        args += [
+            "-machine", "pc",
+            "-audiodev", "none,id=opl3",
+            "-device", "adlib,audiodev=opl3",
         ]
     elif audio_backend == "pcspk":
         args += ["-machine", "pc,pcspk-audiodev=pcspk", "-audiodev", "none,id=pcspk"]
@@ -77,7 +84,7 @@ def qemu_args(tmpdir: str) -> list[str]:
             "-device", f"sb16,audiodev=sb16,iobase={sb_base},irq={sb_irq},dma={sb_dma},dma16={sb_dma16}",
         ]
     else:
-        raise ValueError("PC386_AUDIO must be one of: auto pcspk sb16")
+        raise ValueError("PC386_AUDIO must be one of: auto opl3 pcspk sb16")
     if os.path.exists(F_IMG):
         dst = os.path.join(tmpdir, "pc386-floppy.img")
         shutil.copyfile(F_IMG, dst)

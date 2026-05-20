@@ -20,6 +20,13 @@
 #include "hal/hal_keyboard.h"
 #include "hal/hal_main_init.h"
 
+#ifdef PC386_BOOT_TRACE
+extern void kputs(const char *s);
+#define PC386_TRACE(s) kputs(s)
+#else
+#define PC386_TRACE(s) ((void)0)
+#endif
+
 /* Defined in MMBasic_Prompt.c. */
 extern int MMPromptPos;
 
@@ -139,22 +146,25 @@ void MIPS16 transform_star_command(char *input) {
 /* MM.PROMPT recursion guard — was a function-static inside main(). */
 static int ErrorInPrompt;
 
+static void prompt_return_cleanup(void) {
+    FlashLoad = 0;
+    hal_keyboard_clear_repeat_state();
+    ScrewUpTimer = 0;
+    ProgMemory=(uint8_t *)flash_progmemory;
+    ContinuePoint = nextstmt;
+    *tknbuf = 0;
+    optionangle=1.0;
+    useoptionangle=false;
+    WatchdogSet = false;
+}
+
 void MMBasic_RunPromptLoop(void) {
     int i = 0;
     char savewatchdog = WatchdogSet;
 
     if(setjmp(mark) != 0) {
      // we got here via a long jump which means an error or CTRL-C or the program wants to exit to the command prompt
-        FlashLoad = 0;
-//        LoadOptions();
-        hal_keyboard_clear_repeat_state();
-        ScrewUpTimer = 0;
-        ProgMemory=(uint8_t *)flash_progmemory;
-        ContinuePoint = nextstmt;                               // in case the user wants to use the continue command
-		*tknbuf = 0;											// we do not want to run whatever is in the token buffer
-		optionangle=1.0;
-        useoptionangle=false;
-        savewatchdog = WatchdogSet = false;
+        prompt_return_cleanup();
 		char *ptr = findvar((unsigned char *)"MM.ENDLINE$", V_NOFIND_NULL);
         if(ptr && *ptr){
             CurrentLinePtr=0;
@@ -166,22 +176,30 @@ void MMBasic_RunPromptLoop(void) {
             goto autorun;
         }
     } else {
+        PC386_TRACE("REPL:init, ");
         if(*ProgMemory == 0x01 ) ClearVars(0,true);
         else {
             ClearProgram(true);
         }
+    PC386_TRACE("REPL:clear, ");
     /* WiFi-stack init + WebConnect: real impl in MMsetwifi.c, stub
      * no-op in MMweb_stubs.c so the call is unconditional here.
      * PicoMite SPI-LCD post-clear-program housekeeping (SPIatRisk
      * + Display_Refresh) sits behind another universal hook. */
     port_repl_wifi_arch_init_and_connect();
+    PC386_TRACE("REPL:wifi, ");
     port_repl_post_clear_display_refresh();
+    PC386_TRACE("REPL:refresh, ");
         PrepareProgram(true);
+        PC386_TRACE("REPL:prepare1, ");
         if(FindSubFun((unsigned char *)"MM.STARTUP", 0) >= 0) {
+            PC386_TRACE("REPL:startup, ");
             ExecuteProgram((unsigned char *)"MM.STARTUP\0");
             memset(inpbuf,0,STRINGSIZE);
         }
+        PC386_TRACE("REPL:startup-check, ");
         if(Option.Autorun && _excep_code != RESTART_DOAUTORUN) {
+            PC386_TRACE("REPL:autorun, ");
             ClearRuntime(true);
             PrepareProgram(true);
             if(*ProgMemory == 0x01 ){
@@ -197,15 +215,20 @@ void MMBasic_RunPromptLoop(void) {
         }
     }
     while(1) {
+    PC386_TRACE("REPL:loop, ");
     ApplyPromptConsoleColours();
+    PC386_TRACE("REPL:colours, ");
     if(Option.DISPLAY_CONSOLE && CurrentX != 0) MMPrintString("\r\n");                    // prompt should be on a new line
+        PC386_TRACE("REPL:newline1, ");
         MMAbort = false;
         BreakKey = BREAK_KEY;
         EchoOption = true;
         g_LocalIndex = 0;                                             // this should not be needed but it ensures that all space will be cleared
         ClearTempMemory();                                          // clear temp string space (might have been used by the prompt)
+        PC386_TRACE("REPL:temp, ");
         CurrentLinePtr = NULL;                                      // do not use the line number in error reporting
         if(MMCharPos > 1) MMPrintString("\r\n");                    // prompt should be on a new line
+        PC386_TRACE("REPL:newline2, ");
         while(Option.PIN && !IgnorePIN) {
             _excep_code = PIN_RESTART;
             if(Option.PIN == 99999999)                              // 99999999 is permanent lockdown
@@ -226,16 +249,22 @@ void MMBasic_RunPromptLoop(void) {
         }
         if(_excep_code!=POSSIBLE_WATCHDOG)_excep_code = 0;
         PrepareProgram(false);
+        PC386_TRACE("REPL:prepare2, ");
         if(!ErrorInPrompt && FindSubFun((unsigned char *)"MM.PROMPT", 0) >= 0) {
+            PC386_TRACE("REPL:mmprompt, ");
             ErrorInPrompt = true;
             ExecuteProgram((unsigned char *)"MM.PROMPT\0");
             MMPromptPos=MMCharPos-1;    //Save length of prompt
         } else{
+            PC386_TRACE("REPL:prompt-print, ");
             MMPrintString("> ");                                    // print the prompt
+            PC386_TRACE("REPL:prompt-ok, ");
             MMPromptPos=2;    //Save length of prompt
         }
         ErrorInPrompt = false;
+        PC386_TRACE("REPL:edit, ");
         EditInputLine();
+        PC386_TRACE("REPL:edit-return, ");
         //InsertLastcmd(inpbuf);                                  // save in case we want to edit it later
         if(!*inpbuf) continue;                                      // ignore an empty line
         char *p=(char *)inpbuf;

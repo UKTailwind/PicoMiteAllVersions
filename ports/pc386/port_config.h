@@ -30,7 +30,11 @@
  * ESP32-S3. May raise to 2-4 MB once Stage 1 lands the heap-over-
  * memory-map allocator and we see what the actual budget looks like. */
 #undef  HAL_PORT_HEAP_MEMORY_SIZE
+#ifdef PC386_LOW_MEM
+#define HAL_PORT_HEAP_MEMORY_SIZE (512 * 1024)
+#else
 #define HAL_PORT_HEAP_MEMORY_SIZE (1 * 1024 * 1024)
+#endif
 
 /* Pc386 exposes the DB-25 LPT1 connector as BASIC-addressable GPIO.
  * The user-facing pin numbers are the connector pins: data 2..9,
@@ -59,6 +63,8 @@
 
 
 /* Compiler-table sizes. */
+#ifndef PC386_LOW_MEM
 #include "../bc_tables_host.h"
+#endif
 
 #endif /* PC386_PORT_CONFIG_H */

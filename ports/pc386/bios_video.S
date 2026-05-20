@@ -40,8 +40,10 @@ pc386_bios_video_int10:
     pushfl
     cli
     pushal
+#ifndef PC386_NO_FPU
     fnsave pc386_bios_saved_fpu
     fwait
+#endif
 
     movl %cr0, %eax
     movl %eax, RM_SAVED_CR0
@@ -109,7 +111,9 @@ bios_pm_return:
     movw %ax, %fs
     movw %ax, %gs
     movw %ax, %ss
+#ifndef PC386_NO_FPU
     frstor pc386_bios_saved_fpu
+#endif
     lidt RM_SAVED_IDTR
     movl RM_SAVED_ESP, %esp
     popal
@@ -124,8 +128,10 @@ pc386_bios_disk_int13:
     pushfl
     cli
     pushal
+#ifndef PC386_NO_FPU
     fnsave pc386_bios_saved_fpu
     fwait
+#endif
 
     movl %cr0, %eax
     movl %eax, RM_SAVED_CR0
@@ -193,7 +199,9 @@ bios_disk_pm_return:
     movw %ax, %fs
     movw %ax, %gs
     movw %ax, %ss
+#ifndef PC386_NO_FPU
     frstor pc386_bios_saved_fpu
+#endif
     lidt RM_SAVED_IDTR
     movl RM_SAVED_ESP, %esp
     popal

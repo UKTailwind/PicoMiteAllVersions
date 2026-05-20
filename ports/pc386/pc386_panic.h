@@ -20,6 +20,10 @@ extern "C" {
 __attribute__((noreturn)) void pc386_halt (void);
 __attribute__((noreturn)) void pc386_panic(const char *msg);
 
+extern volatile const char *pc386_fault_context;
+void pc386_fault_set_context(const char *ctx);
+void pc386_fault_clear_context(void);
+
 #ifdef __cplusplus
 }
 #endif

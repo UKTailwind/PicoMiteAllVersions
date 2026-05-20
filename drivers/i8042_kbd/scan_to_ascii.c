@@ -86,8 +86,17 @@ static bool ctrl_down  = false;
 static bool alt_down   = false;
 static bool caps_lock  = false;
 static bool ext_prefix = false;   /* last byte was 0xE0 */
-static bool down[2][128];
-static uint64_t next_repeat_us[2][128];
+static bool break_prefix = false; /* set 2: last byte was 0xF0 */
+static bool down[2][256];
+static uint64_t next_repeat_us[2][256];
+
+#if PC386_KBD_SCANCODE_SET == 1
+static int scancode_set = 1;
+#elif PC386_KBD_SCANCODE_SET == 2
+static int scancode_set = 2;
+#else
+static int scancode_set = 0;      /* auto: 0 unknown, then 1 or 2 */
+#endif
 
 static bool repeat_allowed(uint8_t mc, bool extended, bool released) {
     unsigned ext = extended ? 1u : 0u;
@@ -151,18 +160,111 @@ static int named_key(uint8_t mc, bool extended) {
     return 0;
 }
 
+static const uint8_t set2_unshifted[256] = {
+    [0x16] = '1', [0x1E] = '2', [0x26] = '3', [0x25] = '4', [0x2E] = '5',
+    [0x36] = '6', [0x3D] = '7', [0x3E] = '8', [0x46] = '9', [0x45] = '0',
+    [0x4E] = '-', [0x55] = '=',
+    [0x15] = 'q', [0x1D] = 'w', [0x24] = 'e', [0x2D] = 'r', [0x2C] = 't',
+    [0x35] = 'y', [0x3C] = 'u', [0x43] = 'i', [0x44] = 'o', [0x4D] = 'p',
+    [0x54] = '[', [0x5B] = ']',
+    [0x1C] = 'a', [0x1B] = 's', [0x23] = 'd', [0x2B] = 'f', [0x34] = 'g',
+    [0x33] = 'h', [0x3B] = 'j', [0x42] = 'k', [0x4B] = 'l',
+    [0x4C] = ';', [0x52] = '\'', [0x0E] = '`', [0x5D] = '\\',
+    [0x1A] = 'z', [0x22] = 'x', [0x21] = 'c', [0x2A] = 'v', [0x32] = 'b',
+    [0x31] = 'n', [0x3A] = 'm',
+    [0x41] = ',', [0x49] = '.', [0x4A] = '/',
+    [0x29] = ' ',
+};
+
+static const uint8_t set2_shifted[256] = {
+    [0x16] = '!', [0x1E] = '@', [0x26] = '#', [0x25] = '$', [0x2E] = '%',
+    [0x36] = '^', [0x3D] = '&', [0x3E] = '*', [0x46] = '(', [0x45] = ')',
+    [0x4E] = '_', [0x55] = '+',
+    [0x15] = 'Q', [0x1D] = 'W', [0x24] = 'E', [0x2D] = 'R', [0x2C] = 'T',
+    [0x35] = 'Y', [0x3C] = 'U', [0x43] = 'I', [0x44] = 'O', [0x4D] = 'P',
+    [0x54] = '{', [0x5B] = '}',
+    [0x1C] = 'A', [0x1B] = 'S', [0x23] = 'D', [0x2B] = 'F', [0x34] = 'G',
+    [0x33] = 'H', [0x3B] = 'J', [0x42] = 'K', [0x4B] = 'L',
+    [0x4C] = ':', [0x52] = '"', [0x0E] = '~', [0x5D] = '|',
+    [0x1A] = 'Z', [0x22] = 'X', [0x21] = 'C', [0x2A] = 'V', [0x32] = 'B',
+    [0x31] = 'N', [0x3A] = 'M',
+    [0x41] = '<', [0x49] = '>', [0x4A] = '?',
+    [0x29] = ' ',
+};
+
+static int named_key_set2(uint8_t mc, bool extended) {
+    if (extended) {
+        switch (mc) {
+            case 0x75: return KEY_UP;
+            case 0x72: return KEY_DOWN;
+            case 0x6B: return KEY_LEFT;
+            case 0x74: return KEY_RIGHT;
+            case 0x6C: return KEY_HOME;
+            case 0x69: return KEY_END;
+            case 0x7D: return KEY_PUP;
+            case 0x7A: return KEY_PDOWN;
+            case 0x70: return KEY_INSERT;
+            case 0x71: return KEY_DEL;
+            case 0x5A: return KEY_ENTER;
+        }
+        return 0;
+    }
+    switch (mc) {
+        case 0x76: return KEY_ESC;
+        case 0x66: return KEY_BKSP;
+        case 0x0D: return KEY_TAB;
+        case 0x5A: return KEY_ENTER;
+        case 0x05: return KEY_F1;
+        case 0x06: return KEY_F1 + 1;
+        case 0x04: return KEY_F1 + 2;
+        case 0x0C: return KEY_F1 + 3;
+        case 0x03: return KEY_F1 + 4;
+        case 0x0B: return KEY_F1 + 5;
+        case 0x83: return KEY_F1 + 6;
+        case 0x0A: return KEY_F1 + 7;
+        case 0x01: return KEY_F1 + 8;
+        case 0x09: return KEY_F1 + 9;
+        case 0x78: return KEY_F1 + 10;
+        case 0x07: return KEY_F1 + 11;
+    }
+    return 0;
+}
+
 int kbd_get_key(void) {
     while (1) {
         int sc = kbd_get_scancode();
         if (sc < 0) return -1;
 
         if (sc == 0xE0) { ext_prefix = true; continue; }
+        if (sc == 0xF0 && scancode_set != 1) {
+            scancode_set = 2;
+            break_prefix = true;
+            continue;
+        }
 
-        bool released = (sc & 0x80) != 0;
-        uint8_t mc = sc & 0x7F;
+        if (scancode_set == 0) {
+            if ((uint8_t)sc > 0x83 || set2_unshifted[(uint8_t)sc] || named_key_set2((uint8_t)sc, ext_prefix)) {
+                scancode_set = 2;
+            } else {
+                scancode_set = 1;
+            }
+        }
+
+        bool set2 = scancode_set == 2;
+        bool released = set2 ? break_prefix : ((sc & 0x80) != 0);
+        uint8_t mc = set2 ? (uint8_t)sc : (uint8_t)(sc & 0x7F);
+        break_prefix = false;
 
         /* Modifier press/release. */
-        if (!ext_prefix) {
+        if (set2 && !ext_prefix) {
+            if (mc == 0x12 || mc == 0x59) { shift_down = !released; continue; }
+            if (mc == 0x14)               { ctrl_down  = !released; continue; }
+            if (mc == 0x11)               { alt_down   = !released; continue; }
+            if (mc == 0x58 && !released)  { caps_lock  = !caps_lock; continue; }
+        } else if (set2) {
+            if (mc == 0x14) { ctrl_down = !released; ext_prefix = false; continue; }
+            if (mc == 0x11) { alt_down  = !released; ext_prefix = false; continue; }
+        } else if (!ext_prefix) {
             if (mc == 0x2A || mc == 0x36) { shift_down = !released; continue; }
             if (mc == 0x1D)               { ctrl_down  = !released; continue; }
             if (mc == 0x38)               { alt_down   = !released; continue; }
@@ -176,16 +278,16 @@ int kbd_get_key(void) {
         bool extended = ext_prefix;
         if (!repeat_allowed(mc, extended, released)) { ext_prefix = false; continue; }
 
-        int nk = named_key(mc, extended);
+        int nk = set2 ? named_key_set2(mc, extended) : named_key(mc, extended);
         ext_prefix = false;
         if (nk) return nk;
 
         /* Printable. */
-        uint8_t base = unshifted[mc];
+        uint8_t base = set2 ? set2_unshifted[mc] : unshifted[mc];
         if (!base) continue;   /* unmapped — unknown set-1 byte */
         bool letter = (base >= 'a' && base <= 'z');
         bool upper  = shift_down ^ (caps_lock && letter);
-        uint8_t ch  = upper ? shifted[mc] : base;
+        uint8_t ch  = upper ? (set2 ? set2_shifted[mc] : shifted[mc]) : base;
         if (!ch) ch = base;    /* shifted table missing — fall back */
         if (ctrl_down && letter) ch = (uint8_t)((ch & 0x1F));   /* Ctrl-A..Ctrl-Z */
         return ch;
