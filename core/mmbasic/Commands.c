@@ -1476,11 +1476,7 @@ if(Option.SerialConsole)while(ConsoleTxBufHead!=ConsoleTxBufTail)routinechecks()
 	WAVcomplete = 0;
 	if(g_myrand)FreeMemory((void *)g_myrand);
 	g_myrand=NULL;
-#ifdef PORT_PC386
-	OptionConsole=2;
-#else
 	OptionConsole=3;
-#endif
 	{
 		int mode = DISPLAY_TYPE-SCREENMODE1+1;
 		setmode(mode,false);

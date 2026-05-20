@@ -43,13 +43,6 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "Draw.h"
 #include "port_config.h"
 
-#ifdef PC386_BOOT_TRACE
-extern void kputs(const char *s);
-#define PC386_TRACE(s) kputs(s)
-#else
-#define PC386_TRACE(s) ((void)0)
-#endif
-
 // this is the command table that defines the various tokens for commands in the source code
 // most of them are listed in the .h files so you should not add your own here but instead add
 // them to the appropiate .h file
@@ -509,14 +502,11 @@ void *ResolveStructMember(unsigned char *struct_ptr, int struct_idx,
 
 // Initialise MMBasic
 void   MIPS16 InitBasic(void) {
-    PC386_TRACE("IB:entry, ");
     DefaultType = T_NBR;
     CommandTableSize =  (sizeof(commandtbl)/sizeof(struct s_tokentbl));
     TokenTableSize =  (sizeof(tokentbl)/sizeof(struct s_tokentbl));
-    PC386_TRACE("IB:sizes, ");
 
     ClearProgram(true);
-    PC386_TRACE("IB:ClearProgram ok, ");
 
     // load the commonly used tokens
     // by looking them up once here performance is improved considerably
@@ -553,14 +543,12 @@ void   MIPS16 InitBasic(void) {
     cmdNEXT= GetCommandValue( (unsigned char *)"Next");
 	cmdIRET = GetCommandValue( (unsigned char *)"IReturn");
     cmdCSUB = GetCommandValue( (unsigned char *)"CSub");
-    PC386_TRACE("IB:tokens1, ");
     cmdComment = GetCommandValue( (unsigned char *)"/*");
     cmdEndComment = GetCommandValue( (unsigned char *)"*/");
     cmdTYPE     = GetCommandValue((unsigned char *)"Type");
     cmdEND_TYPE = GetCommandValue((unsigned char *)"End Type");
     for (int i = 0; i < MAX_STRUCT_TYPES; i++) g_structtbl[i] = NULL;
     g_structcnt = 0;
-    PC386_TRACE("IB:done, ");
 //  SInt(CommandTableSize);
 //  SIntComma(TokenTableSize);
 //  SSPrintString("\r\n");
@@ -3212,11 +3200,7 @@ void MIPS16 error(char *msg, ...) {
     ApplyDefaultConsoleColours();
     OptionConsole=1;
     if(Option.DISPLAY_CONSOLE) {
-#ifdef PORT_PC386
-        OptionConsole=2;
-#else
         OptionConsole=3;
-#endif
         port_error_restore_console_surface();     // VGA retargets WriteBuf/DisplayBuf to FRAMEBUFFER;
                                                   // SPI-LCD calls restorepanel().
         SetFont(PromptFont);
@@ -3590,24 +3574,14 @@ void  MIPS16 ClearStack(void) {
 extern void port_web_clear_runtime_state(void);
 void MIPS16 ClearRuntime(bool all) {
     int i;
-    PC386_TRACE("CR:entry, ");
     port_web_clear_runtime_state();
-    PC386_TRACE("CR:web, ");
     CloseAllFiles();
-    PC386_TRACE("CR:files, ");
     ClearExternalIO();                                              // this MUST come before InitHeap(true)
-    PC386_TRACE("CR:extio, ");
     ClearStack();
-    PC386_TRACE("CR:stack, ");
     hal_keyboard_clear_repeat_state();
-    PC386_TRACE("CR:kbd, ");
     OptionExplicit = false;
     OptionEscape = false;
-#ifdef PORT_PC386
-    OptionConsole=2;
-#else
     OptionConsole=3;
-#endif
     DefaultType = T_NBR;
     ds18b20Timers = NULL;                                           // InitHeap(true) will recover the memory allocated to this array
     findlabel(NULL);                                                // clear the label cache
@@ -3622,25 +3596,19 @@ void MIPS16 ClearRuntime(bool all) {
     outframe=NULL;
 */
     port_clear_runtime_display_reset();
-    PC386_TRACE("CR:display, ");
     MMerrno = 0;                                                    // clear the error flags
    *MMErrMsg = 0;
     InitHeap(true);
-    PC386_TRACE("CR:InitHeap, ");
     m_alloc(all? M_VAR : M_LIMITED);
-    PC386_TRACE("CR:m_alloc, ");
     ClearVars(0,true);
-    PC386_TRACE("CR:vars, ");
     memset(cmdlinebuff,0,sizeof(cmdlinebuff));
     memset(datastore, 0, sizeof(struct sa_data) * MAXRESTORE);
-    PC386_TRACE("CR:memsets, ");
     restorepointer = 0;
     g_flag=0;
     g_varcnt = 0;
     CurrentLinePtr = ContinuePoint = NULL;
     for(i = 0;  i < MAXSUBFUN; i++)  subfun[i] = NULL;
     hal_gui_controls_clear_for_program();
-    PC386_TRACE("CR:done, ");
 }
 
 
@@ -3649,22 +3617,16 @@ void MIPS16 ClearRuntime(bool all) {
 // this is used before loading a program
 void MIPS16 ClearProgram(bool psram) {
 //    InitHeap(true);
-    PC386_TRACE("CP:entry, ");
     initFonts();
-    PC386_TRACE("CP:fonts, ");
     m_alloc(psram ? M_PROG : M_LIMITED);                                           // init the variables for program memory
-    PC386_TRACE("CP:m_alloc, ");
     if(Option.DISPLAY_TYPE>=VIRTUAL && WriteBuf)FreeMemorySafe((void **)&WriteBuf);
-    PC386_TRACE("CP:writebuf, ");
     ClearRuntime(true);
-    PC386_TRACE("CP:runtime, ");
 //    ProgMemory[0] = ProgMemory[1] = ProgMemory[3] = ProgMemory[4] = 0;
     PSize = 0;
     StartEditPoint = NULL;
     StartEditChar= 0;
     ProgramChanged = false;
     TraceOn = false;
-    PC386_TRACE("CP:done, ");
 }
 
 
