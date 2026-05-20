@@ -359,7 +359,12 @@ const char *port_filesystem_prefix(int filesystem) {
 
 void cmd_files_save_program_context(void) { }
 void cmd_files_restore_program_context(void) { }
-void cmd_files_pump_console_key(int *c)   { (void)c; }
+void cmd_files_pump_console_key(int *c)
+{
+    if (!c || *c != -1) return;
+    int key = MMInkey();
+    if (key >= 0) *c = key;
+}
 
 /* cmd_load_post_cleanup — shared default body in
  * runtime/runtime_cmd_load_post_cleanup.c (Finding 9). pc386's
