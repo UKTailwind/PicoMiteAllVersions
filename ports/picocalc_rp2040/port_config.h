@@ -59,10 +59,9 @@
  * WAV_BUFFER_SIZE (8192 * 3/4 = 6144); RP2350 gets the full 8192. */
 #define HAL_PORT_AUDIO_MOD_BUFFER_SIZE   6144
 
-/* HAL_PORT_HAS_MP3: software MP3 decode via dr_mp3 is RP2350-only; RP2040
- * routes PLAY MP3 through VS1053 hardware (Option.AUDIO_MISO_PIN). Used
- * as a value in runtime branches in Audio.c. */
-#define HAL_PORT_HAS_MP3                 0
+/* HAL_PORT_HAS_MP3: software MP3 decode via dr_mp3. Used as a value in
+ * runtime branches in Audio.c. */
+#define HAL_PORT_HAS_MP3                 1
 /* cmd_files flist[] cap. Device has the RAM and the SaveContext+InitHeap
  * dance to allocate ~76 KB. Host caps lower in host/port_config.h. */
 #define HAL_PORT_FILES_MAX               1000
