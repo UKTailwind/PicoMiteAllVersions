@@ -29,7 +29,7 @@ static unsigned ata_drive_for_pdrv(BYTE pdrv) {
 }
 
 DSTATUS disk_initialize(BYTE pdrv) {
-#ifdef PC386_NO_FDC
+#ifdef FATFS_NO_FDC
     if (pdrv == 0 || pdrv == 1) return STA_NODISK;
 #else
     if (pdrv == 0 || pdrv == 1) return fdc_present(pdrv) ? 0 : STA_NODISK;
@@ -47,7 +47,7 @@ DSTATUS disk_status(BYTE pdrv) {
 
 DRESULT disk_read(BYTE pdrv, BYTE *buff, LBA_t sector, UINT count) {
     if (pdrv == 0 || pdrv == 1) {
-#ifdef PC386_NO_FDC
+#ifdef FATFS_NO_FDC
         (void)buff; (void)sector; (void)count;
         return RES_NOTRDY;
 #else
@@ -102,7 +102,7 @@ DRESULT disk_write(BYTE pdrv, const BYTE *buff, LBA_t sector, UINT count) {
 
 DRESULT disk_ioctl(BYTE pdrv, BYTE cmd, void *buff) {
     if (pdrv == 0 || pdrv == 1) {
-#ifdef PC386_NO_FDC
+#ifdef FATFS_NO_FDC
         (void)cmd; (void)buff;
         return RES_NOTRDY;
 #else

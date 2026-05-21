@@ -77,7 +77,7 @@ ifeq ($(PC386_NO_FPU),1)
 CFLAGS += -DPC386_NO_FPU=1 -msoft-float -mlong-double-64
 endif
 ifeq ($(PC386_NO_FDC),1)
-CFLAGS += -DPC386_NO_FDC=1
+CFLAGS += -DPC386_NO_FDC=1 -DFATFS_NO_FDC=1
 endif
 ifeq ($(PC386_BOOT_TRACE),1)
 CFLAGS += -DPC386_BOOT_TRACE=1
