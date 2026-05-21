@@ -14,12 +14,14 @@ REPO_ROOT := $(abspath $(PORT_DIR)/../..)
 PICO_COMPAT_DIR := $(REPO_ROOT)/ports/pico_sdk_compat
 BUILD_DIR := $(PORT_DIR)/build
 PC386_AUDIO ?= opl3
-PC386_LOW_MEM ?= 0
 PC386_NO_FPU ?= 0
 PC386_NO_FDC ?= 0
 PC386_BOOT_TRACE ?= 0
 PC386_NO_BIOS_VIDEO ?= 0
+PC386_VIDEO ?= auto
 PC386_KBD_SCANCODE_SET ?= 0
+PC386_BOOT_MEM_UPPER_KB ?= 7168
+PC386_BOOT_HIGH_MEM_BYTES ?= 0x00700000
 VERSION_FILE := $(REPO_ROOT)/VERSION
 MMBA_RELEASE_VERSION ?= $(shell sed -n '1p;q;' $(VERSION_FILE) 2>/dev/null)
 MMBA_RELEASE_VERSION := $(strip $(MMBA_RELEASE_VERSION))
@@ -71,15 +73,6 @@ CFLAGS = -std=gnu11 -ffreestanding -O2 -g \
          -I$(REPO_ROOT)/ports/host_native -I$(PICO_COMPAT_DIR) -I$(REPO_ROOT)/core/mmbasic -I$(REPO_ROOT)/runtime/vm -I$(REPO_ROOT)/shared/gfx -I$(REPO_ROOT)/shared/audio -I$(REPO_ROOT)/shared/mmbasic -I$(REPO_ROOT)/drivers/bmp_decoder -I$(REPO_ROOT)/drivers/gps -I$(REPO_ROOT)/drivers/gui_controls -I$(REPO_ROOT)/drivers/gui_touch -I$(REPO_ROOT)/drivers/i2c_bus -I$(REPO_ROOT)/drivers/onewire -I$(REPO_ROOT)/drivers/psram_heap -I$(REPO_ROOT)/drivers/serial -I$(REPO_ROOT)/drivers/spi_bus -I$(REPO_ROOT)/drivers/spi_lcd -I$(REPO_ROOT)/drivers/ssd1963 -I$(REPO_ROOT) \
          -MMD -MP
 
-ifeq ($(PC386_LOW_MEM),1)
-CFLAGS += -DPC386_LOW_MEM=1
-PC386_BOOT_MEM_UPPER_KB := 7168
-PC386_BOOT_HIGH_MEM_BYTES := 0x00700000
-else
-PC386_BOOT_MEM_UPPER_KB := 15360
-PC386_BOOT_HIGH_MEM_BYTES := 0x00F00000
-endif
-
 ifeq ($(PC386_NO_FPU),1)
 CFLAGS += -DPC386_NO_FPU=1 -msoft-float -mlong-double-64
 endif
@@ -92,6 +85,15 @@ endif
 ifeq ($(PC386_NO_BIOS_VIDEO),1)
 CFLAGS += -DPC386_NO_BIOS_VIDEO=1
 endif
+ifeq ($(PC386_VIDEO),auto)
+CFLAGS += -DPC386_VIDEO_AUTO=1
+else ifeq ($(PC386_VIDEO),vesa)
+CFLAGS += -DPC386_VIDEO_VESA=1
+else ifeq ($(PC386_VIDEO),cirrus)
+CFLAGS += -DPC386_VIDEO_CIRRUS=1
+else
+$(error PC386_VIDEO must be one of: auto vesa cirrus)
+endif
 
 # Assembly: drop -include (assembler can't parse C typedefs) and the
 # include_shim path (no .S file needs it).
@@ -100,9 +102,8 @@ ASFLAGS = -ffreestanding -g -fno-pic -fno-pie \
           -DMMBASIC_HOST -DPORT_PC386 \
           -I$(PORT_DIR) -I$(REPO_ROOT)/shared/gfx -I$(REPO_ROOT)/shared/audio -I$(REPO_ROOT)/shared/mmbasic -I$(REPO_ROOT)/drivers/bmp_decoder -I$(REPO_ROOT)/drivers/gps -I$(REPO_ROOT)/drivers/gui_controls -I$(REPO_ROOT)/drivers/gui_touch -I$(REPO_ROOT)/drivers/i2c_bus -I$(REPO_ROOT)/drivers/onewire -I$(REPO_ROOT)/drivers/psram_heap -I$(REPO_ROOT)/drivers/serial -I$(REPO_ROOT)/drivers/spi_bus -I$(REPO_ROOT)/drivers/spi_lcd -I$(REPO_ROOT)/drivers/ssd1963 -I$(REPO_ROOT)
 
-ifeq ($(PC386_LOW_MEM),1)
-ASFLAGS += -DPC386_LOW_MEM=1
-endif
+ASFLAGS += -DPC386_BOOT_MEM_UPPER_KB=$(PC386_BOOT_MEM_UPPER_KB) \
+           -DPC386_BOOT_HIGH_MEM_BYTES=$(PC386_BOOT_HIGH_MEM_BYTES)
 ifeq ($(PC386_NO_FPU),1)
 ASFLAGS += -DPC386_NO_FPU=1
 endif
@@ -168,6 +169,7 @@ PORT_ASM  = boot.S setjmp.S idt_asm.S bios_video.S
 PORT_SRCS = kmain.c kprint.c mmap.c heap_region.c kstring.c \
             pc386_panic.c pc386_libc.c \
             pc386_state.c pc386_runtime.c pc386_peripheral_stubs.c \
+            pc386_cpu.c pc386_rtc.c pc386_memio.c pc386_lpt.c pc386_interp.c \
             pc386_flash.c vm_sys_pin_pc386.c idt.c \
             $(PORT_AUDIO_SRC) hal_filesystem_pc386.c hal_flash_pc386.c \
             hal_keyboard_pc386.c hal_pin_pc386.c hal_random_pc386.c \
@@ -184,13 +186,18 @@ CORE_SRCS += shared/gfx/gfx_box_shared.c shared/gfx/gfx_circle_shared.c shared/g
 CORE_SRCS += shared/gfx/gfx_cls_shared.c shared/gfx/gfx_text_shared.c shared/gfx/gfx_console_shared.c
 CORE_SRCS += shared/mmbasic/mm_misc_shared.c core/mmbasic/OptionCommands.c
 CORE_SRCS += core/mmbasic/Draw.c shared/gfx/RGB121.c shared/gfx/Tilemap.c core/mmbasic/FileIO.c shared/audio/Audio.c drivers/bmp_decoder/BmpDecoder.c third_party/regex/re.c third_party/picojpeg/picojpeg.c
+CORE_SRCS += core/mmbasic/XModem.c
 
 CORE_STATE_SRCS = display_state.c pin_state.c option_state.c audio_state.c
 # runtime_interrupt.c is omitted: pc386's check_interrupt/cmd_ireturn
 # are local stubs that don't invoke any mmbasic_runtime_* symbol, and
 # the shared TU references MQTT/UDP network externs pc386 doesn't
 # provide (pc386 has no networking).
-RUNTIME_SRCS = runtime_boot.c runtime_program.c runtime_console_putchar.c runtime_console_printstring.c runtime_console_adapter.c runtime_console_input_noop.c runtime_console_escdecode.c runtime_getline.c runtime_terminal_hooks_noop.c runtime_abort.c runtime_cmd_load_post_cleanup.c
+RUNTIME_SRCS = runtime_boot.c runtime_program.c runtime_console_putchar.c runtime_console_printstring.c runtime_console_adapter.c runtime_console_escdecode.c runtime_getline.c runtime_terminal_hooks_noop.c runtime_abort.c runtime_cmd_load_post_cleanup.c
+# Note: runtime_console_input_noop.c is intentionally NOT linked; pc386
+# provides real getConsole/kbhitConsole in pc386_runtime.c so XMODEM
+# RECEIVE (and any other path that calls getConsole()) actually drains
+# serial bytes instead of seeing -1.
 
 # BC (bytecode) compiler + VM. ff/ffunicode/ffsystem are already in
 # FATFS_SRCS so don't re-list them here.
@@ -251,6 +258,7 @@ DRIVER_SRCS = \
     i8042_kbd/i8042_kbd.c \
     i8042_kbd/scan_to_ascii.c \
     lpt_centronics/lpt_centronics.c \
+    vga_mode13h/cirrus_gd542x.c \
     vga_mode13h/vga_mode13h.c
 
 # FatFs is vendored under third_party/ (R0.14, shared with every other
@@ -294,10 +302,10 @@ all: $(KERNEL) $(KERNEL_STRIPPED) floppy_bootloader
 $(KERNEL): $(OBJS) $(PORT_DIR)/linker.ld $(CONFIG_STAMP) | $(BUILD_DIR)
 	$(CC) $(LDFLAGS) -o $@ $(OBJS) -lgcc
 
-$(OBJS): $(VERSION_FILE)
+$(OBJS): $(VERSION_FILE) $(CONFIG_STAMP)
 
 $(CONFIG_STAMP): FORCE | $(BUILD_DIR)
-	@cfg='PC386_AUDIO=$(PC386_AUDIO) PC386_LOW_MEM=$(PC386_LOW_MEM) PC386_NO_FPU=$(PC386_NO_FPU) PC386_NO_FDC=$(PC386_NO_FDC) PC386_BOOT_TRACE=$(PC386_BOOT_TRACE) PC386_NO_BIOS_VIDEO=$(PC386_NO_BIOS_VIDEO) PC386_KBD_SCANCODE_SET=$(PC386_KBD_SCANCODE_SET)'; \
+	@cfg='PC386_AUDIO=$(PC386_AUDIO) PC386_NO_FPU=$(PC386_NO_FPU) PC386_NO_FDC=$(PC386_NO_FDC) PC386_BOOT_TRACE=$(PC386_BOOT_TRACE) PC386_NO_BIOS_VIDEO=$(PC386_NO_BIOS_VIDEO) PC386_VIDEO=$(PC386_VIDEO) PC386_KBD_SCANCODE_SET=$(PC386_KBD_SCANCODE_SET) PC386_BOOT_MEM_UPPER_KB=$(PC386_BOOT_MEM_UPPER_KB) PC386_BOOT_HIGH_MEM_BYTES=$(PC386_BOOT_HIGH_MEM_BYTES)'; \
 	if [ ! -f $@ ] || [ "$$(cat $@)" != "$$cfg" ]; then \
 		echo "$$cfg" > $@; \
 	fi
@@ -326,7 +334,7 @@ $(FLOPPY_STAGE1_OBJ): $(PORT_DIR)/bootloader/floppy_stage1.S | $(FLOPPY_BOOT_DIR
 $(FLOPPY_STAGE1_BIN): $(FLOPPY_STAGE1_OBJ)
 	$(LD) -Ttext 0x7C00 --oformat binary -o $@ $<
 
-$(FLOPPY_STAGE2_OBJ): $(PORT_DIR)/bootloader/floppy_stage2.S $(FLOPPY_LOAD_PLAN) | $(FLOPPY_BOOT_DIR)
+$(FLOPPY_STAGE2_OBJ): $(PORT_DIR)/bootloader/floppy_stage2.S $(FLOPPY_LOAD_PLAN) $(CONFIG_STAMP) | $(FLOPPY_BOOT_DIR)
 	$(CC) $(ASFLAGS) -I$(FLOPPY_BOOT_DIR) -c -o $@ $<
 
 $(FLOPPY_STAGE2_BIN): $(FLOPPY_STAGE2_OBJ)
@@ -338,7 +346,7 @@ $(HDD_STAGE1_OBJ): $(PORT_DIR)/bootloader/hdd_stage1.S | $(FLOPPY_BOOT_DIR)
 $(HDD_STAGE1_BIN): $(HDD_STAGE1_OBJ)
 	$(LD) -Ttext 0x7C00 --oformat binary -o $@ $<
 
-$(HDD_STAGE2_OBJ): $(PORT_DIR)/bootloader/floppy_stage2.S $(HDD_LOAD_PLAN) | $(FLOPPY_BOOT_DIR)
+$(HDD_STAGE2_OBJ): $(PORT_DIR)/bootloader/floppy_stage2.S $(HDD_LOAD_PLAN) $(CONFIG_STAMP) | $(FLOPPY_BOOT_DIR)
 	$(CC) $(ASFLAGS) -I$(FLOPPY_BOOT_DIR) -DPC386_BOOT_SECTORS_TRACK=63 -DPC386_BOOT_HEADS=16 -DPC386_BOOT_LOAD_PLAN='"hdd_load_plan.inc"' -DPC386_BOOT_STAGE2_MSG='"PC386 HDD stage2\r\n"' -DPC386_BOOT_DISK_ERROR_MSG='"PC386 HDD stage2 disk error\r\n"' -DPC386_BOOT_MEM_UPPER_KB=$(PC386_BOOT_MEM_UPPER_KB) -DPC386_BOOT_HIGH_MEM_BYTES=$(PC386_BOOT_HIGH_MEM_BYTES) -c -o $@ $<
 
 $(HDD_STAGE2_BIN): $(HDD_STAGE2_OBJ)

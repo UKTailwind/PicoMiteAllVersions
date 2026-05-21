@@ -1,17 +1,20 @@
 /*
- * ports/pc386/pc386_peripheral_stubs.c — cmd_X / fun_X no-ops for the
+ * ports/pc386/pc386_peripheral_stubs.c — actual no-op stubs for the
  * peripherals an IBM-PC has none of (I2C, SPI, PWM, PIO, GPS, UART
  * specials, IR, DHT22, OneWire, etc.).
  *
- * Posture matches host_native: most stubs are silent no-ops so a
- * BASIC program that incidentally touches an unsupported feature
- * doesn't blow up. Stubs that take parameters and would otherwise
- * silently accept bad input get pc386_panic so the gap surfaces.
+ * Real drivers live in their own files (split by hardware distinction):
+ *   pc386_cpu.c     — cmd_cpu
+ *   pc386_rtc.c     — cmd_rtc + CMOS helpers
+ *   pc386_memio.c   — cmd_poke, fun_peek (memory + I/O ports)
+ *   pc386_lpt.c     — cmd_pin, cmd_setpin, fun_pin, Ext* / Pin* glue
+ *   pc386_interp.c  — cmd_settick, cmd_ireturn, cmd_watchdog, MM.INFO,
+ *                     GetIntAddress (interpreter glue, not a HW driver)
  *
- * Stage 6.5 (LPT1 GPIO) replaces the pin-related stubs; stage 6
- * replaces audio; stage 4 replaces keyboard. FRAMEBUFFER remains a
- * deliberate error on pc386 because VGA mode 13h is a scanout buffer,
- * not the N/F/L off-screen layer model.
+ * Stubs that take parameters and would otherwise silently accept bad
+ * input get pc386_panic so the gap surfaces. Most are silent so a
+ * BASIC program that incidentally touches an unsupported feature
+ * doesn't blow up.
  */
 
 #include "MMBasic_Includes.h"
@@ -33,16 +36,7 @@
 
 extern void pc386_audio_apply_options(void);
 extern void printoptions(void);
-
-static int pc386_parse_lpt_pin(unsigned char *arg) {
-    unsigned char *p = arg;
-    skipspace(p);
-    if ((p[0] == 'G' || p[0] == 'g') && (p[1] == 'P' || p[1] == 'p'))
-        p += 2;
-    int pin = getinteger(p);
-    if (pin < 1 || pin > NBRPINS) error("Invalid pin");
-    return pin;
-}
+extern int  pc386_parse_lpt_pin(unsigned char *arg);
 
 /* ------------------------------------------------------------------ */
 /* cmd_* — most are silent no-ops on host, same here.                 */
@@ -54,7 +48,6 @@ void cmd_camera(void) {}
 void cmd_cfunction(void) {}
 void cmd_Classic(void) {}
 void cmd_configure(void) {}
-void cmd_cpu(void) {}
 void cmd_csubinterrupt(void) {}
 void cmd_device(void) {}
 void cmd_DHT22(void) {}
@@ -93,7 +86,6 @@ void cmd_i2c(void) {}
 void cmd_i2c2(void) {}
 void cmd_in(void) {}
 void cmd_ir(void) {}
-void cmd_ireturn(void) {}
 void cmd_irq(void) {}
 void cmd_irqclear(void) {}
 void cmd_irqnowait(void) {}
@@ -152,54 +144,22 @@ void cmd_option(void)
     error("Unknown option");
 }
 void cmd_out(void) {}
-void cmd_pin(void) {
-    int pin = pc386_parse_lpt_pin(cmdline);
-    while (*cmdline && tokenfunction(*cmdline) != op_equal) cmdline++;
-    if (!*cmdline) error("Invalid syntax");
-    cmdline++;
-    if (!*cmdline) error("Invalid syntax");
-    vm_sys_pin_write(pin, getinteger(cmdline));
-}
 void cmd_pio(void) {}
 void cmd_PIOline(void) {}
-void cmd_poke(void) {}
 void cmd_port(void) {}
 void cmd_program(void) {}
 void cmd_pull(void) {}
 void cmd_pulse(void) {}
 void cmd_push(void) {}
 void cmd_pwm(void) { error("PWM not available on PC386"); }
-void cmd_rtc(void) {}
 void cmd_Servo(void) { error("Servo not available on PC386"); }
 void cmd_set(void) {}
-void cmd_setpin(void) {
-    int pin;
-    int mode = -1;
-
-    getargs(&cmdline, 5, (unsigned char *)",");
-    if (argc % 2 == 0 || argc < 3) error("Argument count");
-    pin = pc386_parse_lpt_pin(argv[0]);
-
-    if (checkstring(argv[2], (unsigned char *)"OFF") || checkstring(argv[2], (unsigned char *)"0"))
-        mode = VM_PIN_MODE_OFF;
-    else if (checkstring(argv[2], (unsigned char *)"DIN"))
-        mode = VM_PIN_MODE_DIN;
-    else if (checkstring(argv[2], (unsigned char *)"DOUT"))
-        mode = VM_PIN_MODE_DOUT;
-    else
-        error("Unsupported SETPIN mode");
-
-    if (argc >= 5 && *argv[4]) error("Unsupported SETPIN option");
-    vm_sys_pin_setpin(pin, mode, VM_PIN_OPT_NONE);
-}
-void cmd_settick(void) {}
 void cmd_spi(void) {}
 void cmd_spi2(void) {}
 void cmd_steppedstream(void) {}
 void cmd_synth(void) {}
 void cmd_temp(void) {}
 void cmd_uart(void) {}
-void cmd_watchdog(void) {}
 void cmd_web(void) {}
 void cmd_wii(void) {}
 void cmd_ws2812(void) {}
@@ -269,7 +229,19 @@ void cmd_update(void) {}
 void cmd_wait(void) {}
 void cmd_wrap(void) {}
 void cmd_wraptarget(void) {}
-void cmd_xmodem(void) {}
+/* cmd_xmodem now comes from core/mmbasic/XModem.c (which we add to
+ * CORE_SRCS). It calls _outbyte/_inbyte which dispatch via getConsole()
+ * (real impl in pc386_runtime.c) and SerialConsolePutC. The Pico-SDK
+ * uart_* references in XModem.c are gated by Option.SerialConsole != 0,
+ * which is never set on pc386, so the stubs below are link-only. */
+#include "hardware/uart.h"
+static uart_inst_t pc386_uart0_dummy, pc386_uart1_dummy;
+uart_inst_t *uart0 = &pc386_uart0_dummy;
+uart_inst_t *uart1 = &pc386_uart1_dummy;
+void uart_set_irq_enables(uart_inst_t *u, bool rx, bool tx) { (void)u; (void)rx; (void)tx; }
+void uart_putc_raw(uart_inst_t *u, char c) { (void)u; (void)c; }
+bool uart_is_readable(uart_inst_t *u) { (void)u; return false; }
+char uart_getc(uart_inst_t *u) { (void)u; return 0; }
 
 /* ------------------------------------------------------------------ */
 /* fun_* — return zero / empty-string posture.                        */
@@ -277,14 +249,12 @@ void cmd_xmodem(void) {}
 
 void fun_adc(void)            { iret = 0; targ = T_INT; }
 void fun_classic(void)        { iret = 0; targ = T_INT; }
-void fun_cpuid(void)          { iret = 0; targ = T_INT; }
 void fun_device(void)         { sret[0] = 0; targ = T_STR; }
 void fun_DHT22(void)          { fret = 0; targ = T_NBR; }
 void fun_ds18b20(void)        { fret = 0; targ = T_NBR; }
 /* fun_keydown lives in vm_sys_input.c — don't redefine. */
 void fun_keypad(void)         { iret = 0; targ = T_INT; }
 void fun_mmcmdline(void)      { sret[0] = 0; targ = T_STR; }
-void fun_pin(void)            { iret = vm_sys_pin_read(pc386_parse_lpt_pin(ep)); targ = T_INT; }
 void fun_porta(void)          { iret = 0; targ = T_INT; }
 void fun_temp(void)           { fret = 0; targ = T_NBR; }
 void fun_touch(void)          { iret = 0; targ = T_INT; }
@@ -294,8 +264,7 @@ void fun_ws2812(void)         { iret = 0; targ = T_INT; }
 void fun_dev(void)            { sret[0] = 0; targ = T_STR; }
 void fun_distance(void)       { fret = 0; targ = T_NBR; }
 void fun_GPS(void)            { sret[0] = 0; targ = T_STR; }
-void fun_info(void)           { sret[0] = 0; targ = T_STR; }
-void fun_peek(void)           { iret = 0; targ = T_INT; }
+
 void fun_pio(void)            { iret = 0; targ = T_INT; }
 void fun_port(void)           { iret = 0; targ = T_INT; }
 void fun_pulsin(void)         { iret = 0; targ = T_INT; }
@@ -313,94 +282,6 @@ void cleanserver(void) {}
 void close_tcpclient(void) {}
 void close_udpclient(void) {}
 
-/* ------------------------------------------------------------------ */
-/* LPT1 GPIO compatibility hooks used by legacy MMBasic pin paths.    */
-/* ------------------------------------------------------------------ */
-
-int codemap(int pin) {
-    if (pin < 1 || pin > NBRPINS) error("Invalid pin");
-    return pin;
-}
-
-int codecheck(unsigned char *line) {
-    if ((line[0] == 'G' || line[0] == 'g') && (line[1] == 'P' || line[1] == 'p'))
-        return 0;
-    return 4;
-}
-
-int IsInvalidPin(int pin) {
-    return pin < 1 || pin > NBRPINS;
-}
-
-void ExtCfg(int pin, int cfg, int option) {
-    if (IsInvalidPin(pin)) error("Invalid pin");
-    if (option) error("Unsupported SETPIN option");
-    switch (cfg) {
-        case EXT_NOT_CONFIG:
-            vm_sys_pin_setpin(pin, VM_PIN_MODE_OFF, VM_PIN_OPT_NONE);
-            break;
-        case EXT_DIG_IN:
-            vm_sys_pin_setpin(pin, VM_PIN_MODE_DIN, VM_PIN_OPT_NONE);
-            break;
-        case EXT_DIG_OUT:
-            vm_sys_pin_setpin(pin, VM_PIN_MODE_DOUT, VM_PIN_OPT_NONE);
-            break;
-        default:
-            error("Unsupported SETPIN mode");
-    }
-    ExtCurrentConfig[pin] = cfg;
-}
-
-void ExtSet(int pin, int val) {
-    vm_sys_pin_write(pin, val);
-    if (!IsInvalidPin(pin) && ExtCurrentConfig[pin] == EXT_NOT_CONFIG)
-        ExtCurrentConfig[pin] = EXT_DIG_OUT;
-}
-
-int64_t ExtInp(int pin) {
-    return vm_sys_pin_read(pin);
-}
-
-int PinRead(int pin) {
-    return (int)ExtInp(pin);
-}
-
-int GetPinBit(int pin) {
-    return (int)ExtInp(pin);
-}
-
-volatile unsigned int GetPinStatus(int pin) {
-    if (IsInvalidPin(pin)) return 0;
-    return (unsigned int)ExtCurrentConfig[pin];
-}
-
-void PinSetBit(int pin, unsigned int offset) {
-    if (IsInvalidPin(pin)) error("Invalid pin");
-    switch ((int)offset) {
-        case LATSET:
-            ExtSet(pin, 1);
-            break;
-        case LATCLR:
-            ExtSet(pin, 0);
-            break;
-        case LATINV:
-            hal_pin_toggle((uint32_t)pin);
-            break;
-        case TRISSET:
-            ExtCfg(pin, EXT_DIG_IN, 0);
-            break;
-        case TRISCLR:
-            ExtCfg(pin, EXT_DIG_OUT, 0);
-            break;
-        case CNPUSET:
-        case CNPUCLR:
-        case CNPDSET:
-        case CNPDCLR:
-            break;
-        default:
-            error("Unsupported pin operation");
-    }
-}
 
 /* ------------------------------------------------------------------ */
 /* AES — drivers/aes provides real impls; if we don't link aes.c the
@@ -484,7 +365,6 @@ lfs_ssize_t lfs_fs_size(lfs_t *l) { (void)l; return 0; }
 /* ------------------------------------------------------------------ */
 /* Memory pokes — PC has no useful peek/poke target until LPT1.       */
 /* ------------------------------------------------------------------ */
-unsigned char *GetIntAddress(unsigned char *p) { (void)p; pc386_panic("GetIntAddress not supported"); }
 unsigned int   GetPeekAddr  (unsigned char *p) { (void)p; pc386_panic("GetPeekAddr not supported"); }
 unsigned int   GetPokeAddr  (unsigned char *p) { (void)p; pc386_panic("GetPokeAddr not supported"); }
 

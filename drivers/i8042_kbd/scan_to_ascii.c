@@ -89,6 +89,10 @@ static bool ext_prefix = false;   /* last byte was 0xE0 */
 static bool break_prefix = false; /* set 2: last byte was 0xF0 */
 static bool down[2][256];
 static uint64_t next_repeat_us[2][256];
+static bool repeat_active = false;
+static bool repeat_set2 = false;
+static bool repeat_extended = false;
+static uint8_t repeat_mc = 0;
 
 #if PC386_KBD_SCANCODE_SET == 1
 static int scancode_set = 1;
@@ -103,6 +107,9 @@ static bool repeat_allowed(uint8_t mc, bool extended, bool released) {
     if (released) {
         down[ext][mc] = false;
         next_repeat_us[ext][mc] = 0;
+        if (repeat_active && repeat_extended == extended && repeat_mc == mc) {
+            repeat_active = false;
+        }
         return false;
     }
 
@@ -112,12 +119,20 @@ static bool repeat_allowed(uint8_t mc, bool extended, bool released) {
     if (!down[ext][mc]) {
         down[ext][mc] = true;
         next_repeat_us[ext][mc] = now + (uint64_t)start_ms * 1000ull;
+        repeat_active = true;
+        repeat_set2 = (scancode_set == 2);
+        repeat_extended = extended;
+        repeat_mc = mc;
         return true;
     }
     if (now < next_repeat_us[ext][mc]) return false;
     uint64_t interval_us = (uint64_t)rate_ms * 1000ull;
     next_repeat_us[ext][mc] += interval_us;
     if (next_repeat_us[ext][mc] <= now) next_repeat_us[ext][mc] = now + interval_us;
+    repeat_active = true;
+    repeat_set2 = (scancode_set == 2);
+    repeat_extended = extended;
+    repeat_mc = mc;
     return true;
 }
 
@@ -230,10 +245,58 @@ static int named_key_set2(uint8_t mc, bool extended) {
     return 0;
 }
 
+static int translate_key(bool set2, uint8_t mc, bool extended) {
+    int nk = set2 ? named_key_set2(mc, extended) : named_key(mc, extended);
+    if (nk) return nk;
+
+    uint8_t base = set2 ? set2_unshifted[mc] : unshifted[mc];
+    if (!base) return 0;
+    bool letter = (base >= 'a' && base <= 'z');
+    bool upper = shift_down ^ (caps_lock && letter);
+    uint8_t ch = upper ? (set2 ? set2_shifted[mc] : shifted[mc]) : base;
+    if (!ch) ch = base;
+    if (ctrl_down && letter) ch = (uint8_t)(ch & 0x1F);
+    return ch;
+}
+
+static int synth_repeat_key(void) {
+    if (!repeat_active) return -1;
+    unsigned ext = repeat_extended ? 1u : 0u;
+    if (!down[ext][repeat_mc]) {
+        repeat_active = false;
+        return -1;
+    }
+
+    uint64_t now = hal_time_us_64();
+    if (now < next_repeat_us[ext][repeat_mc]) return -1;
+
+    int rate_ms = pc386_keyboard_repeat_rate_ms();
+    uint64_t interval_us = (uint64_t)rate_ms * 1000ull;
+    next_repeat_us[ext][repeat_mc] += interval_us;
+    if (next_repeat_us[ext][repeat_mc] <= now) {
+        next_repeat_us[ext][repeat_mc] = now + interval_us;
+    }
+
+    int key = translate_key(repeat_set2, repeat_mc, repeat_extended);
+    return key ? key : -1;
+}
+
+void kbd_clear_repeat_state(void) {
+    for (int ext = 0; ext < 2; ext++) {
+        for (int i = 0; i < 256; i++) {
+            down[ext][i] = false;
+            next_repeat_us[ext][i] = 0;
+        }
+    }
+    repeat_active = false;
+    ext_prefix = false;
+    break_prefix = false;
+}
+
 int kbd_get_key(void) {
     while (1) {
         int sc = kbd_get_scancode();
-        if (sc < 0) return -1;
+        if (sc < 0) return synth_repeat_key();
 
         if (sc == 0xE0) { ext_prefix = true; continue; }
         if (sc == 0xF0 && scancode_set != 1) {
@@ -278,18 +341,8 @@ int kbd_get_key(void) {
         bool extended = ext_prefix;
         if (!repeat_allowed(mc, extended, released)) { ext_prefix = false; continue; }
 
-        int nk = set2 ? named_key_set2(mc, extended) : named_key(mc, extended);
         ext_prefix = false;
-        if (nk) return nk;
-
-        /* Printable. */
-        uint8_t base = set2 ? set2_unshifted[mc] : unshifted[mc];
-        if (!base) continue;   /* unmapped — unknown set-1 byte */
-        bool letter = (base >= 'a' && base <= 'z');
-        bool upper  = shift_down ^ (caps_lock && letter);
-        uint8_t ch  = upper ? (set2 ? set2_shifted[mc] : shifted[mc]) : base;
-        if (!ch) ch = base;    /* shifted table missing — fall back */
-        if (ctrl_down && letter) ch = (uint8_t)((ch & 0x1F));   /* Ctrl-A..Ctrl-Z */
-        return ch;
+        int key = translate_key(set2, mc, extended);
+        if (key) return key;
     }
 }

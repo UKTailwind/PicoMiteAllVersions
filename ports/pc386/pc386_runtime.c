@@ -138,18 +138,102 @@ void host_runtime_finish(void) { }
 int  host_runtime_timed_out(void) { return 0; }
 
 /* =========================================================================
- *  CheckAbort + interrupt poll hooks (all no-ops for stage 3 — no IRQs).
+ *  CheckAbort + interrupt poll hooks.
+ *
+ *  pc386 has no hardware IRQs to MMBasic, but check_interrupt is the
+ *  poll point the interpreter hits frequently (in routinechecks +
+ *  string ops + file ops). We use it to drive:
+ *    - SETTICK callbacks (poll-based, against hal_time_us_64)
+ *    - WATCHDOG enforcement (kicked-or-die deadline)
+ *  Returning 1 redirects the interpreter to the handler at nextstmt
+ *  until IRETURN is hit.
  * ========================================================================= */
 
+/* Tick* globals + InterruptReturn/InterruptUsed live in pc386_state.c. */
+extern volatile int       TickTimer[];
+extern int                TickPeriod[];
+extern unsigned char     *TickInt[];
+extern volatile unsigned char TickActive[];
+extern unsigned char     *InterruptReturn;
+extern int                InterruptUsed;
+#define PC386_NBRSETTICKS 4
+
+/* Watchdog state: deadline (in us) past which check_interrupt SoftResets. */
+static uint64_t pc386_wd_deadline_us = 0;
+static int      pc386_wd_armed = 0;
+void pc386_watchdog_kick(uint32_t period_ms) {
+    pc386_wd_deadline_us = hal_time_us_64() + (uint64_t)period_ms * 1000ull;
+    pc386_wd_armed = (period_ms != 0);
+}
+
+extern unsigned char *nextstmt;
+extern int g_LocalIndex;
+extern void SoftReset(void);
+
 void CheckAbort(void)         { mmbasic_runtime_checkabort(NULL); }
-int  check_interrupt(void)    { return 0; }
+
+int check_interrupt(void) {
+    /* 1. Watchdog: if armed and deadline passed, hard-reset the box. */
+    if (pc386_wd_armed && hal_time_us_64() > pc386_wd_deadline_us) {
+        pc386_wd_armed = 0;
+        SoftReset();
+    }
+
+    /* 2. Advance TickTimer[] based on real elapsed ms since last call. */
+    static uint64_t last_us = 0;
+    uint64_t now = hal_time_us_64();
+    if (last_us == 0) { last_us = now; return 0; }
+    uint32_t elapsed_ms = (uint32_t)((now - last_us) / 1000ull);
+    if (elapsed_ms) {
+        last_us += (uint64_t)elapsed_ms * 1000ull;
+        for (int i = 0; i < PC386_NBRSETTICKS; i++) {
+            if (TickActive[i]) TickTimer[i] += (int)elapsed_ms;
+        }
+    }
+
+    /* 3. Dispatch the first ready Tick handler. Skip if we're already in
+     *    an interrupt (no nesting). */
+    if (InterruptReturn != NULL) return 0;
+    for (int i = 0; i < PC386_NBRSETTICKS; i++) {
+        if (TickInt[i] && TickTimer[i] > TickPeriod[i]) {
+            while (TickTimer[i] > TickPeriod[i]) TickTimer[i] -= TickPeriod[i];
+            g_LocalIndex++;
+            InterruptReturn = nextstmt;
+            nextstmt = TickInt[i];
+            InterruptUsed = 1;
+            return 1;
+        }
+    }
+    return 0;
+}
 void ClearExternalIO(void)    { }
 void closeframebuffer(char l) { (void)l; }
 void clear320(void)           { }
 void initMouse0(int s)        { (void)s; }
 void restorepanel(void)       { WriteBuf = NULL; }
 void routinechecks(void)      { mmbasic_runtime_routinechecks(NULL); }
-void SoftReset(void)          { pc386_panic("SoftReset not yet implemented"); }
+/* CPU RESTART: pulse the CPU reset line via the 8042 keyboard controller
+ * (the canonical pre-ACPI x86 software reset). If the KBC is wedged,
+ * fall through to a triple fault by loading a null IDT and faulting. */
+void SoftReset(void) {
+    __asm__ volatile("cli" ::: "memory");
+    /* Wait for KBC input buffer empty (bit 1 of status port 0x64),
+     * bounded so a dead controller doesn't lock us here. */
+    for (int i = 0; i < 100000; i++) {
+        uint8_t status;
+        __asm__ volatile("inb $0x64, %0" : "=a"(status));
+        if ((status & 0x02u) == 0) break;
+    }
+    __asm__ volatile("outb %0, $0x64" :: "a"((uint8_t)0xFEu));
+    /* Give the KBC ~10ms to act before we triple-fault. */
+    for (volatile int i = 0; i < 10000000; i++) { }
+    /* Triple-fault fallback: load a null IDT and fire an int. */
+    static const struct { uint16_t limit; uint32_t base; } __attribute__((packed))
+        null_idt = { 0, 0 };
+    __asm__ volatile("lidt %0" :: "m"(null_idt));
+    __asm__ volatile("int $0x03");
+    for (;;) __asm__ volatile("hlt");
+}
 void uSec(int us)             { extern void hal_time_sleep_us(uint32_t); hal_time_sleep_us((uint32_t)us); }
 
 /* MMBasic.c uses __get_MSP for stack-overflow protection. PC has no MSP
@@ -186,11 +270,7 @@ char SerialConsolePutC(char c, int flush) {
 void putConsole(int c, int flush) {
     /* Honour the OPTION CONSOLE routing bits (1 = serial, 2 = display). */
     if (OptionConsole & 2) DisplayPutC((char)c);
-#ifdef PORT_PC386
-    (void)flush;
-#else
     if (OptionConsole & 1) SerialConsolePutC((char)c, flush);
-#endif
 }
 
 // MMputchar lives in runtime/runtime_console_putchar.c — shared across every port.
@@ -263,7 +343,21 @@ int MMgetchar(void) {
     }
 }
 
-// getConsole / kbhitConsole live in runtime/runtime_console_input_noop.c — shared.
+/* getConsole / kbhitConsole — real serial-RX taps. The shared
+ * runtime_console_input_noop.c is NOT linked on pc386 (see
+ * ports/pc386/Makefile). XMODEM RECEIVE in core/mmbasic/XModem.c calls
+ * getConsole() in its _inbyte loop; without these the receiver never
+ * sees the sender's handshake or data blocks. */
+int getConsole(void) {
+    int s = serial_getc_nonblock();
+    return s;
+}
+int kbhitConsole(void) {
+    /* serial_getc_nonblock() consumes the byte; we can't "peek". Returning
+     * 0 here keeps interactive REPL paths from spinning on a side channel
+     * they don't otherwise use on pc386. */
+    return 0;
+}
 void myprintf(char *s)     { MMPrintString(s); }
 
 /* MMfopen/MMfclose/MMgetline — file I/O routes through hal_filesystem;

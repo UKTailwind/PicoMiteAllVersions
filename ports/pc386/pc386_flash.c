@@ -25,7 +25,7 @@
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 
-/* Program area: 1 MB on pc386 (MAX_PROG_SIZE = HEAP_MEMORY_SIZE). */
+/* Program area: RAM-backed flash image sized by MAX_PROG_SIZE. */
 uint8_t pc386_flash_prog_buf[MAX_PROG_SIZE];
 
 /* Option block: just the option_s struct, padded for sector alignment. */

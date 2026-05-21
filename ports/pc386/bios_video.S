@@ -34,6 +34,60 @@ pc386_bios_saved_fpu:
 
 .section .text
 .code32
+pic_io_wait:
+    outb %al, $0x80
+    ret
+
+pic_remap_bios_vectors:
+    movb $0x11, %al
+    outb %al, $0x20
+    call pic_io_wait
+    outb %al, $0xA0
+    call pic_io_wait
+    movb $0x08, %al
+    outb %al, $0x21
+    call pic_io_wait
+    movb $0x70, %al
+    outb %al, $0xA1
+    call pic_io_wait
+    movb $0x04, %al
+    outb %al, $0x21
+    call pic_io_wait
+    movb $0x02, %al
+    outb %al, $0xA1
+    call pic_io_wait
+    movb $0x01, %al
+    outb %al, $0x21
+    call pic_io_wait
+    outb %al, $0xA1
+    call pic_io_wait
+    ret
+
+pic_remap_pm_vectors:
+    movb $0x11, %al
+    outb %al, $0x20
+    call pic_io_wait
+    outb %al, $0xA0
+    call pic_io_wait
+    movb $0x20, %al
+    outb %al, $0x21
+    call pic_io_wait
+    movb $0x28, %al
+    outb %al, $0xA1
+    call pic_io_wait
+    movb $0x04, %al
+    outb %al, $0x21
+    call pic_io_wait
+    movb $0x02, %al
+    outb %al, $0xA1
+    call pic_io_wait
+    movb $0x01, %al
+    outb %al, $0x21
+    call pic_io_wait
+    outb %al, $0xA1
+    call pic_io_wait
+    ret
+
 .global pc386_bios_video_int10
 .type pc386_bios_video_int10, @function
 pc386_bios_video_int10:
@@ -73,6 +127,11 @@ pc386_bios_video_int10:
     movb $0xFF, %al
     outb %al, $0x21
     outb %al, $0xA1
+    call pic_remap_bios_vectors
+    movb $0xFE, %al
+    outb %al, $0x21
+    movb $0xFF, %al
+    outb %al, $0xA1
 
     cld
     movl $bios_thunk_start, %esi
@@ -100,6 +159,7 @@ pc386_bios_video_int10:
 
 bios_pm_return:
     cld
+    call pic_remap_pm_vectors
     movb RM_PIC1_MASK, %al
     outb %al, $0x21
     movb RM_PIC2_MASK, %al
@@ -242,6 +302,7 @@ bios_real_entry:
     movw RM_CX, %cx
     movw RM_DX, %dx
     movw RM_DI, %di
+    sti
     int $0x10
     cli
     pushfw

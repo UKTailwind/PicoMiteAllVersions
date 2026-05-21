@@ -304,7 +304,13 @@ void kmain(uint32_t magic, uint32_t info_addr) {
         kputc('\n');
     }
 
-    kputs("MMBasic heap reserved: ");
+    kputs("MMBasic heap: ");
+    kputu32(heap_memory_size);
+    kputs(" bytes at ");
+    kputhex32((uint32_t) (uintptr_t) MMHeap);
+    kputc('\n');
+
+    kputs("C heap: ");
     kputu32((uint32_t) heap_region_size());
     kputs(" bytes at ");
     kputhex32((uint32_t) (uintptr_t) heap_region_base());
