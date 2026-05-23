@@ -55,7 +55,9 @@ ifdef IS_WINDOWS
 # Static-link libwinpthread + libgcc so the resulting .exe runs on
 # any modern Windows without dropping mingw-w64 DLLs alongside it.
 # UCRT (api-ms-win-crt-*.dll) ships with Win10+ and stays dynamic.
-LDFLAGS           := -lm -lpthread -static -static-libgcc
+# -lwinmm provides timeBeginPeriod / timeEndPeriod used to bump
+# Windows' timer resolution so --slowdown actually pauses.
+LDFLAGS           := -lm -lpthread -lwinmm -static -static-libgcc
 HOST_TERMINAL_SRC := host_terminal_win32.c
 ANSI_RESIZE_SRC   := ansi_terminal_resize_win32.c
 else

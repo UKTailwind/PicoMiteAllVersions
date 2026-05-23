@@ -24,6 +24,7 @@
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <timeapi.h>
 
 #include "host_terminal.h"
 
@@ -42,6 +43,7 @@ static void host_raw_mode_restore(void) {
     if (hout != INVALID_HANDLE_VALUE) SetConsoleMode(hout, host_orig_out_mode);
     if (host_orig_in_cp)  SetConsoleCP(host_orig_in_cp);
     if (host_orig_out_cp) SetConsoleOutputCP(host_orig_out_cp);
+    timeEndPeriod(1);
     host_raw_mode_active = 0;
 }
 
@@ -105,6 +107,12 @@ void host_raw_mode_enter(void) {
     host_orig_out_cp = GetConsoleOutputCP();
     SetConsoleCP(CP_UTF8);
     SetConsoleOutputCP(CP_UTF8);
+
+    /* Bump Windows timer resolution to 1 ms so nanosleep(1 ms) actually
+     * sleeps ~1 ms instead of the default 15.6 ms tick. Required for
+     * --slowdown to have a useful effect. timeEndPeriod is paired in
+     * the restore hook. */
+    timeBeginPeriod(1);
 
     setvbuf(stdout, NULL, _IONBF, 0);
 
