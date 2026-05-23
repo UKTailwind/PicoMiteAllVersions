@@ -6,7 +6,16 @@
  * available across the host's three targets (Linux, macOS, Windows
  * via mingw-w64). Each shim picks the right backing call at compile
  * time so callers don't carry #ifdef branches.
+ *
+ * Empty on device builds: the helpers are only meaningful on host,
+ * the system headers they pull in (sys/stat.h, direct.h, …) are
+ * either irrelevant or unavailable on embedded targets. Wrap-and-
+ * include is therefore guarded on MMBASIC_HOST. Device callers can
+ * still #include this header unconditionally — they just get an
+ * empty file.
  */
+
+#ifdef MMBASIC_HOST
 
 #include <time.h>
 #include <sys/stat.h>
@@ -41,5 +50,7 @@ static inline int host_mkdir(const char *path) {
     return mkdir(path, 0755) == 0 ? 0 : -1;
 #endif
 }
+
+#endif /* MMBASIC_HOST */
 
 #endif

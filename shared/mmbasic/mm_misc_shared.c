@@ -36,9 +36,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "hal/hal_calendar.h"
 #include <time.h>
 #include <string.h>
-#ifdef MMBASIC_HOST
 #include "host_compat.h"
-#endif
 #include "xregex.h"
 #include "aes.h"
 
