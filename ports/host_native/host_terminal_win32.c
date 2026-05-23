@@ -51,6 +51,28 @@ static void host_raw_mode_signal(int sig) {
     raise(sig);
 }
 
+/* Windows console control handler. With ENABLE_PROCESSED_INPUT
+ * cleared, the OS no longer turns Ctrl-C into a SIGINT delivered to
+ * the C runtime — the byte just flows through as 0x03. That means
+ * the standard signal() handler above never fires for Ctrl-C, and
+ * the user can't break out of a running script. CTRL_CLOSE_EVENT
+ * (window-close) and CTRL_BREAK_EVENT also need a cleanup path.
+ * Install a console handler that restores the console mode + code
+ * pages before exiting so the user's shell isn't left in raw mode. */
+static BOOL WINAPI host_win32_ctrl_handler(DWORD ctrl_type) {
+    switch (ctrl_type) {
+        case CTRL_C_EVENT:
+        case CTRL_BREAK_EVENT:
+        case CTRL_CLOSE_EVENT:
+        case CTRL_LOGOFF_EVENT:
+        case CTRL_SHUTDOWN_EVENT:
+            host_raw_mode_restore();
+            ExitProcess(1);
+            return TRUE;
+    }
+    return FALSE;
+}
+
 void host_raw_mode_enter(void) {
     if (host_raw_mode_active) return;
     if (!_isatty(_fileno(stdin))) return;
@@ -90,6 +112,7 @@ void host_raw_mode_enter(void) {
     signal(SIGINT,  host_raw_mode_signal);
     signal(SIGTERM, host_raw_mode_signal);
     signal(SIGABRT, host_raw_mode_signal);
+    SetConsoleCtrlHandler(host_win32_ctrl_handler, TRUE);
     host_raw_mode_active = 1;
 }
 
