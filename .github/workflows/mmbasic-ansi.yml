@@ -1,0 +1,95 @@
+name: mmbasic_ansi build
+
+on:
+  pull_request:
+    paths:
+      - 'ports/mmbasic_ansi/**'
+      - 'ports/host_native/**'
+      - 'core/**'
+      - 'drivers/**'
+      - 'hal/**'
+      - 'runtime/**'
+      - 'shared/**'
+      - 'third_party/**'
+      - 'VERSION'
+      - '.github/workflows/mmbasic-ansi.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'ports/mmbasic_ansi/**'
+      - 'ports/host_native/**'
+      - 'core/**'
+      - 'drivers/**'
+      - 'hal/**'
+      - 'runtime/**'
+      - 'shared/**'
+      - 'third_party/**'
+      - 'VERSION'
+      - '.github/workflows/mmbasic-ansi.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            label: linux-x64
+            shell: bash
+            binary: mmbasic_ansi
+          - os: macos-latest
+            label: macos-universal
+            shell: bash
+            binary: mmbasic_ansi
+          - os: windows-latest
+            label: windows-x64
+            shell: 'msys2 {0}'
+            binary: mmbasic_ansi.exe
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up MSYS2 (UCRT64 mingw-w64)
+        if: matrix.os == 'windows-latest'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            make
+            mingw-w64-ucrt-x86_64-gcc
+
+      - name: Install Linux build deps
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential
+
+      - name: Build mmbasic_ansi
+        working-directory: ports/mmbasic_ansi
+        run: make -j$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 2)
+
+      - name: Stage artifact
+        working-directory: ports/mmbasic_ansi
+        run: |
+          mkdir -p dist
+          if [ -f "${{ matrix.binary }}" ]; then
+            cp "${{ matrix.binary }}" "dist/${{ matrix.binary }}"
+          else
+            # Some toolchains may emit without .exe; fall back to whatever's there.
+            cp mmbasic_ansi* dist/ 2>/dev/null || true
+          fi
+          ls -la dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mmbasic_ansi-${{ matrix.label }}
+          path: ports/mmbasic_ansi/dist/*
+          if-no-files-found: error

@@ -44,7 +44,22 @@ CFLAGS = -std=gnu11 -g -O2 -Wall -Wno-unused-variable -Wno-unused-function \
          -I$(PORT_DIR) -I$(HOST_DIR) -I$(PICO_COMPAT_DIR) -I$(REPO_ROOT)/core/mmbasic -I$(REPO_ROOT)/runtime/vm -I$(REPO_ROOT)/shared/gfx -I$(REPO_ROOT)/shared/audio -I$(REPO_ROOT)/shared/mmbasic -I$(REPO_ROOT)/drivers/bmp_decoder -I$(REPO_ROOT)/drivers/gps -I$(REPO_ROOT)/drivers/gui_controls -I$(REPO_ROOT)/drivers/gui_touch -I$(REPO_ROOT)/drivers/i2c_bus -I$(REPO_ROOT)/drivers/onewire -I$(REPO_ROOT)/drivers/psram_heap -I$(REPO_ROOT)/drivers/serial -I$(REPO_ROOT)/drivers/spi_bus -I$(REPO_ROOT)/drivers/spi_lcd -I$(REPO_ROOT)/drivers/ssd1963 -I$(REPO_ROOT) \
          -MMD -MP
 
-LDFLAGS = -lm -lpthread
+UNAME_S := $(shell uname -s 2>/dev/null)
+ifneq (,$(filter MINGW% MSYS% UCRT% CYGWIN%,$(UNAME_S)))
+  IS_WINDOWS := 1
+else ifeq ($(OS),Windows_NT)
+  IS_WINDOWS := 1
+endif
+
+ifdef IS_WINDOWS
+LDFLAGS           := -lm -lpthread
+HOST_TERMINAL_SRC := host_terminal_win32.c
+ANSI_RESIZE_SRC   := ansi_terminal_resize_win32.c
+else
+LDFLAGS           := -lm -lpthread
+HOST_TERMINAL_SRC := host_terminal.c
+ANSI_RESIZE_SRC   := ansi_terminal_resize_posix.c
+endif
 
 # Core MMBasic (same list as host_native — keeps core/mmbasic/Editor.c + REPL + Prompt
 # so the interactive REPL and EDIT both work).
@@ -71,13 +86,13 @@ BC_SRCS = runtime/vm/bc_alloc.c runtime/vm/bc_bridge.c runtime/vm/vm_host_fat.c 
 # own entry); host_fastgfx.c ships the cmd_fastgfx / cmd_framebuffer /
 # bc_fastgfx_* syscalls, so it has to link.
 NATIVE_SRCS = host_runtime.c host_fastgfx.c host_fastgfx_resync.c host_fs_shims.c host_peripheral_stubs.c \
-              host_terminal.c host_fs.c host_sim_audio.c host_sim_slowdown.c host_sim_emit_stub.c host_time.c \
+              $(HOST_TERMINAL_SRC) host_fs.c host_sim_audio.c host_sim_slowdown.c host_sim_emit_stub.c host_time.c \
               host_fb.c host_keys.c host_bc_runtime_noop.c \
               host_web_stubs.c \
               hal_flash_host.c hal_time_host.c hal_random_host.c hal_pin_host.c hal_storage_host.c \
               hal_filesystem_host.c hal_keyboard_host.c hal_audio_host.c hal_vm_framebuffer_host.c
 
-PORT_SRCS = ansi_main.c ansi_terminal.c ansi_display.c
+PORT_SRCS = ansi_main.c ansi_terminal.c ansi_display.c $(ANSI_RESIZE_SRC)
 RUNTIME_SRCS = runtime_boot.c runtime_program.c runtime_console.c runtime_console_putchar.c runtime_console_printstring.c runtime_console_adapter.c runtime_console_input_noop.c runtime_console_escdecode.c runtime_getline.c runtime_terminal_hooks_noop.c runtime_abort.c runtime_interrupt.c runtime_filesystem_defaults.c runtime_cmd_load_post_cleanup.c calendar_bare.c
 HAL_GENERIC_SRCS = hal_watchdog_noop.c
 
