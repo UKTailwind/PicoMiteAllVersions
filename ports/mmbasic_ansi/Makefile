@@ -34,11 +34,23 @@ THIRD_PARTY_CFLAGS := -I$(REPO_ROOT)/third_party/aes \
 # Compiler-table sizes come from ports/mmbasic_ansi/port_config.h
 # (which pulls in ports/bc_tables_rp2350.h).  No build-flag dispatch.
 
+ifdef IS_WINDOWS
+# Suppress mingw-w64's POSIX-alias declarations in <io.h> (setmode,
+# read, write, close, etc.). MMBasic owns the name `setmode` via
+# Draw.h, and on Windows that collides with <io.h>'s POSIX alias of
+# `_setmode`. POSIX I/O is still available — unistd.h declares
+# read/write/isatty separately and isn't gated on NO_OLDNAMES.
+PLATFORM_DEFS := -DNO_OLDNAMES -D_NO_OLDNAMES
+else
+PLATFORM_DEFS :=
+endif
+
 CFLAGS = -std=gnu11 -g -O2 -Wall -Wno-unused-variable -Wno-unused-function \
          -Wno-unused-but-set-variable -Wno-misleading-indentation \
          -Wno-missing-braces -funsigned-char \
          -DMMBASIC_HOST -DMMBASIC_ANSI -DFF_MAX_LFN_LARGE \
          -DMMBA_RELEASE_VERSION=\"$(MMBA_RELEASE_VERSION)\" \
+         $(PLATFORM_DEFS) \
          -include host_platform.h \
          $(THIRD_PARTY_CFLAGS) \
          -I$(PORT_DIR) -I$(HOST_DIR) -I$(PICO_COMPAT_DIR) -I$(REPO_ROOT)/core/mmbasic -I$(REPO_ROOT)/runtime/vm -I$(REPO_ROOT)/shared/gfx -I$(REPO_ROOT)/shared/audio -I$(REPO_ROOT)/shared/mmbasic -I$(REPO_ROOT)/drivers/bmp_decoder -I$(REPO_ROOT)/drivers/gps -I$(REPO_ROOT)/drivers/gui_controls -I$(REPO_ROOT)/drivers/gui_touch -I$(REPO_ROOT)/drivers/i2c_bus -I$(REPO_ROOT)/drivers/onewire -I$(REPO_ROOT)/drivers/psram_heap -I$(REPO_ROOT)/drivers/serial -I$(REPO_ROOT)/drivers/spi_bus -I$(REPO_ROOT)/drivers/spi_lcd -I$(REPO_ROOT)/drivers/ssd1963 -I$(REPO_ROOT) \

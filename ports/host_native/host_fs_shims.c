@@ -25,6 +25,7 @@
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
+#include "host_compat.h"
 #include "host_fs.h"
 #include "runtime/runtime.h"
 
@@ -96,7 +97,7 @@ static void host_fill_finfo_from_posix(FILINFO *fi, const char *name,
     fi->fsize = (FSIZE_t)size;
     time_t t = (time_t)mtime_epoch;
     struct tm lt;
-    if (localtime_r(&t, &lt) != NULL) {
+    if (host_localtime_r(&t, &lt) != NULL) {
         int yr = lt.tm_year + 1900;
         if (yr < 1980) yr = 1980;
         fi->fdate = (WORD)(((yr - 1980) << 9) | ((lt.tm_mon + 1) << 5) | lt.tm_mday);
