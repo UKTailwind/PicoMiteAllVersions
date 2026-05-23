@@ -10,6 +10,12 @@
 
 #include <time.h>
 
+#ifdef _WIN32
+#include <direct.h>
+#else
+#include <sys/stat.h>
+#endif
+
 /* localtime_r: POSIX-reentrant local-time conversion. Returns the
  * filled tm pointer on success, NULL on failure. Windows MSVC has
  * localtime_s with swapped argument order. */
@@ -18,6 +24,16 @@ static inline struct tm *host_localtime_r(const time_t *t, struct tm *out) {
     return localtime_s(out, t) == 0 ? out : NULL;
 #else
     return localtime_r(t, out);
+#endif
+}
+
+/* mkdir: POSIX takes a permission-bits arg; the Windows CRT _mkdir
+ * is one-arg. Returns 0 on success, -1 on failure. */
+static inline int host_mkdir(const char *path) {
+#ifdef _WIN32
+    return _mkdir(path) == 0 ? 0 : -1;
+#else
+    return mkdir(path, 0755) == 0 ? 0 : -1;
 #endif
 }
 

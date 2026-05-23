@@ -15,6 +15,7 @@
 #include <stdio.h>
 #include <unistd.h>
 
+#include "host_compat.h"
 #include "host_fs.h"
 
 /* Tiny glob matcher — handles '*' and '?'. Case-insensitive. */
@@ -109,7 +110,7 @@ void host_fs_walk_close(host_fs_walker_t *w) {
 
 int host_fs_unlink(const char *path) { return unlink(path) == 0 ? 0 : -1; }
 int host_fs_rename(const char *from, const char *to) { return rename(from, to) == 0 ? 0 : -1; }
-int host_fs_mkdir(const char *path) { return mkdir(path, 0755) == 0 ? 0 : -1; }
+int host_fs_mkdir(const char *path) { return host_mkdir(path); }
 int host_fs_rmdir(const char *path) { return rmdir(path) == 0 ? 0 : -1; }
 int host_fs_chdir(const char *path) { return chdir(path) == 0 ? 0 : -1; }
 int host_fs_getcwd(char *out, int out_cap) { return getcwd(out, (size_t)out_cap) ? 0 : -1; }
