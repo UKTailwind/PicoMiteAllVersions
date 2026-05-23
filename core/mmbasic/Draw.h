@@ -177,19 +177,11 @@ extern char CMM1;
 extern int ScreenSize;
 extern char LCDAttrib;
 extern int getColour(char *c, int minus);
-/* mingw-w64's <io.h> declares int setmode(int,int) as a POSIX alias
- * of _setmode, which collides with MMBasic's setmode(int,bool). On
- * Windows we declare the function under a different name and rewrite
- * every subsequent reference to `setmode(...)` via macro. <io.h>
- * must be #included before Draw.h so its declaration is established
- * under the original name first — host_platform.h does that at the
- * top of every TU on Windows. */
-#ifdef _WIN32
-extern void Display_SetMode(int mode, bool clear);
-#define setmode Display_SetMode
-#else
+/* On Windows, host_platform.h rewrites `setmode` to Display_SetMode
+ * via macro after <io.h> is pre-included, so this declaration becomes
+ * `extern void Display_SetMode(int, bool)`. See host_platform.h for
+ * the full rationale. POSIX builds see the plain name. */
 extern void setmode(int mode, bool clear);
-#endif
 typedef struct SVD {
 	FLOAT3D x;
 	FLOAT3D y;
