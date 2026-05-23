@@ -67,9 +67,9 @@ volatile int ytileheight = 0;
  * planes to rebind). */
 void vga_memory_init_planes(void) { }
 
-/* Display_SetMode is a VGA-only entry for switching SCREENMODE (1-5) live.
+/* setmode is a VGA-only entry for switching SCREENMODE (1-5) live.
  * Draw.h extern-declares it unconditionally; Commands.c calls it from
  * cmd_new / cmd_end. Non-VGA ports don't have QVGA SCREENMODEs and
  * Option.DISPLAY_TYPE never takes a SCREENMODE value there, so the
  * stub is safely unreachable at runtime. */
-void Display_SetMode(int mode, bool clear) { (void)mode; (void)clear; }
+void setmode(int mode, bool clear) { (void)mode; (void)clear; }

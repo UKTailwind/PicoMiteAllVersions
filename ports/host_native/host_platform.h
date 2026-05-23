@@ -18,6 +18,13 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <time.h>
+#ifdef _WIN32
+/* Pull in <io.h> before Draw.h is parsed so its POSIX-aliased
+ * setmode(int,int) is declared under its original name. Draw.h
+ * then macro-renames MMBasic's setmode to Display_SetMode for the
+ * rest of the TU, letting the two functions coexist. */
+#include <io.h>
+#endif
 #ifndef uint
 typedef unsigned int uint;
 #endif

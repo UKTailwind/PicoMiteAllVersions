@@ -169,7 +169,7 @@ extern void GUIPrintString(int x, int y, int fnt, int jh, int jv, int jo, int fc
 extern void DrawTriangle(int x0, int y0, int x1, int y1, int x2, int y2, int c, int fill) ;
 extern void cmd_guiMX170(void);
 extern void initFonts(void);
-extern void Display_ShowCursor(int show);
+extern void ShowCursor(int show);
 extern unsigned char *FontTable[16];
 extern short CurrentX, CurrentY;
 extern int PrintPixelMode;
@@ -177,7 +177,19 @@ extern char CMM1;
 extern int ScreenSize;
 extern char LCDAttrib;
 extern int getColour(char *c, int minus);
+/* mingw-w64's <io.h> declares int setmode(int,int) as a POSIX alias
+ * of _setmode, which collides with MMBasic's setmode(int,bool). On
+ * Windows we declare the function under a different name and rewrite
+ * every subsequent reference to `setmode(...)` via macro. <io.h>
+ * must be #included before Draw.h so its declaration is established
+ * under the original name first — host_platform.h does that at the
+ * top of every TU on Windows. */
+#ifdef _WIN32
 extern void Display_SetMode(int mode, bool clear);
+#define setmode Display_SetMode
+#else
+extern void setmode(int mode, bool clear);
+#endif
 typedef struct SVD {
 	FLOAT3D x;
 	FLOAT3D y;

@@ -14,6 +14,6 @@
 
 void GUIPrintChar(int fnt, int fc, int bc, char c, int orientation);
 void DisplayPutC(char c);
-void Display_ShowCursor(int show);
+void ShowCursor(int show);
 
 #endif

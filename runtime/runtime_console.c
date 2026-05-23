@@ -175,11 +175,11 @@ int MMgetchar(void)
 {
     int ch;
     do {
-        Display_ShowCursor(1);
+        ShowCursor(1);
         ch = MMInkey();
         if (ch == -1) console_sleep_us(1000);
     } while (ch == -1);
-    Display_ShowCursor(0);
+    ShowCursor(0);
     return ch;
 }
 

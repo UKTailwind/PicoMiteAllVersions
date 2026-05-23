@@ -178,7 +178,7 @@ int hal_editor_mouse_main_pump(int fontinc, int *c_inout) {
         else if (nunstruct[2].R) s_rightpushed = true;
         else s_middlepushed = true;
         if (s_lastx1 >= 0 && s_lastx1 < VWidth && s_lasty1 >= 0 && s_lasty1 < VHeight) {
-            Display_ShowCursor(false);
+            ShowCursor(false);
             while (*txtp != 0 && s_lasty1 > cury)
                 if (*txtp++ == '\n') cury++;
             while (txtp != EdBuff && s_lasty1 < cury)
@@ -187,7 +187,7 @@ int hal_editor_mouse_main_pump(int fontinc, int *c_inout) {
             for (curx = 0; curx < s_lastx1 && *txtp && *txtp != '\n'; curx++) txtp++;
             PositionCursor(txtp);
             PrintStatus();
-            Display_ShowCursor(true);
+            ShowCursor(true);
             hal_editor_tile_paint_saved(s_lastx1 * fontinc, (s_lastx1 + 1) * fontinc,
                                         s_lasty1, s_lastfc, s_lastbc);
         }
