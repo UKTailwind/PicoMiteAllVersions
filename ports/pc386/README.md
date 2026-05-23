@@ -116,11 +116,20 @@ builds.
 
 ## Audio
 
-The default build uses the Sound Blaster 16 HAL. QEMU starts with both SB16 and
-PC speaker devices when `PC386_AUDIO=auto`:
+The default build uses the OPL3/AdLib HAL for Pocket386-compatible hardware at
+I/O `0x388`. QEMU uses its AdLib device for this backend:
 
 ```sh
 ./ports/pc386/run.sh
+```
+
+The Sound Blaster 16 backend is still available for QEMU or real ISA-compatible
+SB hardware:
+
+```sh
+PC386_AUDIO=sb16 ./ports/pc386/build.sh
+./ports/pc386/build_disks.sh
+PC386_AUDIO=sb16 ./ports/pc386/run.sh
 ```
 
 To build and run the PC speaker fallback:

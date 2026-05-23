@@ -13,8 +13,30 @@
 
 .set STAGE2_SEG,       0x0800
 .set STAGE2_PHYS,      0x00008000
-.set SECTORS_TRACK,    18
-.set HEADS,            2
+#ifndef PC386_BOOT_SECTORS_TRACK
+#define PC386_BOOT_SECTORS_TRACK 18
+#endif
+#ifndef PC386_BOOT_HEADS
+#define PC386_BOOT_HEADS 2
+#endif
+#ifndef PC386_BOOT_LOAD_PLAN
+#define PC386_BOOT_LOAD_PLAN "floppy_load_plan.inc"
+#endif
+#ifndef PC386_BOOT_STAGE2_MSG
+#define PC386_BOOT_STAGE2_MSG "PC386 floppy loader\r\n"
+#endif
+#ifndef PC386_BOOT_DISK_ERROR_MSG
+#define PC386_BOOT_DISK_ERROR_MSG "PC386 floppy stage2 disk error\r\n"
+#endif
+#ifndef PC386_BOOT_MEM_UPPER_KB
+#define PC386_BOOT_MEM_UPPER_KB 15360
+#endif
+#ifndef PC386_BOOT_HIGH_MEM_BYTES
+#define PC386_BOOT_HIGH_MEM_BYTES 0x00F00000
+#endif
+
+.set SECTORS_TRACK,    PC386_BOOT_SECTORS_TRACK
+.set HEADS,            PC386_BOOT_HEADS
 .set BOUNCE_SEG,       0x0000
 .set BOUNCE_OFF,       0x7000
 .set MB_INFO_ADDR,     0x5000
@@ -52,10 +74,127 @@ halt:
     jmp halt
 
 enable_a20:
+    call check_a20
+    testb %al, %al
+    jnz 1f
+
+    movw $0x2401, %ax
+    int $0x15
+    call check_a20
+    testb %al, %al
+    jnz 1f
+
     inb $0x92, %al
     orb $0x02, %al
     andb $0xFE, %al
     outb %al, $0x92
+    call check_a20
+    testb %al, %al
+    jnz 1f
+
+    call enable_a20_kbc
+    call check_a20
+    testb %al, %al
+    jnz 1f
+
+    movw $msg_a20_error, %si
+    call print
+    jmp halt
+1:
+    ret
+
+check_a20:
+    pushfw
+    cli
+    pushw %ds
+    pushw %es
+    pushw %bx
+
+    xorw %ax, %ax
+    movw %ax, %ds
+    movw $0xFFFF, %ax
+    movw %ax, %es
+
+    movb 0x0500, %al
+    movb %es:0x0510, %ah
+    pushw %ax
+
+    movb $0x00, 0x0500
+    movb $0xFF, %es:0x0510
+    xorb %dl, %dl
+    cmpb $0xFF, 0x0500
+    je 1f
+    movb $1, %dl
+1:
+    popw %bx
+    movb %bh, %es:0x0510
+    movb %bl, 0x0500
+    movb %dl, %al
+
+    popw %bx
+    popw %es
+    popw %ds
+    popfw
+    ret
+
+enable_a20_kbc:
+    call a20_wait_input_clear
+    jc 9f
+    movb $0xAD, %al
+    outb %al, $0x64
+
+    call a20_wait_input_clear
+    jc 8f
+    movb $0xD0, %al
+    outb %al, $0x64
+
+    call a20_wait_output_full
+    jc 8f
+    inb $0x60, %al
+    orb $0x02, %al
+    movb %al, %bl
+
+    call a20_wait_input_clear
+    jc 8f
+    movb $0xD1, %al
+    outb %al, $0x64
+
+    call a20_wait_input_clear
+    jc 8f
+    movb %bl, %al
+    outb %al, $0x60
+
+    call a20_wait_input_clear
+8:
+    movb $0xAE, %al
+    outb %al, $0x64
+9:
+    ret
+
+a20_wait_input_clear:
+    movw $0xFFFF, %cx
+1:
+    inb $0x64, %al
+    testb $0x02, %al
+    jz 2f
+    loop 1b
+    stc
+    ret
+2:
+    clc
+    ret
+
+a20_wait_output_full:
+    movw $0xFFFF, %cx
+1:
+    inb $0x64, %al
+    testb $0x01, %al
+    jnz 2f
+    loop 1b
+    stc
+    ret
+2:
+    clc
     ret
 
 setup_vga13h:
@@ -140,7 +279,7 @@ build_multiboot_info:
     movw $MB_INFO_ADDR, %di
     movl $MB_FLAGS, %es:0(%di)
     movl $639, %es:4(%di)
-    movl $15360, %es:8(%di)
+    movl $PC386_BOOT_MEM_UPPER_KB, %es:8(%di)
     movl $0x00000000, %es:12(%di)
     movl $72, %es:44(%di)
     movl $MB_MMAP_ADDR, %es:48(%di)
@@ -199,7 +338,7 @@ build_multiboot_info:
     movl $20, %es:0(%di)
     movl $0x00100000, %es:4(%di)
     movl $0x00000000, %es:8(%di)
-    movl $0x00F00000, %es:12(%di)
+    movl $PC386_BOOT_HIGH_MEM_BYTES, %es:12(%di)
     movl $0x00000000, %es:16(%di)
     movl $1, %es:20(%di)
     ret
@@ -331,6 +470,8 @@ enter_kernel:
     cli
     movw $msg_jump, %si
     call print
+    movw $0x0003, %ax
+    int $0x10
     lgdt gdt_desc
     movl %cr0, %eax
     orl $1, %eax
@@ -407,13 +548,15 @@ vesa_modes:
     .word 0x4118, 0x4115, 0x4112, 0
 
 msg_boot:
-    .asciz "PC386 floppy loader\r\n"
+    .asciz PC386_BOOT_STAGE2_MSG
 msg_load:
     .asciz "Loading MMBASIC.ELF\r\n"
 msg_jump:
     .asciz "Starting kernel\r\n"
 msg_disk_error:
-    .asciz "PC386 floppy stage2 disk error\r\n"
+    .asciz PC386_BOOT_DISK_ERROR_MSG
+msg_a20_error:
+    .asciz "A20 enable failed\r\n"
 
 .align 8
 gdt:
@@ -427,7 +570,7 @@ gdt_desc:
     .long STAGE2_PHYS + gdt
 
 load_plan:
-#include "floppy_load_plan.inc"
+#include PC386_BOOT_LOAD_PLAN
 
 .code32
 pm32_entry:

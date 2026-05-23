@@ -3,6 +3,7 @@
 #
 # Usage:
 #   ./run.sh               # BIOS/FDC boot, VGA window + serial mirror
+#   PC386_AUDIO=opl3 ./run.sh
 #   PC386_AUDIO=pcspk ./run.sh
 #   PC386_AUDIO=sb16 PC386_SB_BASE=0x240 ./run.sh
 #   ./run.sh unscaled      # raw guest-pixel window for pixel-level debugging
@@ -16,7 +17,7 @@ set -euo pipefail
 
 PORT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 KERNEL="$PORT_DIR/build/mmbasic.elf"
-AUDIO_BACKEND="${PC386_AUDIO:-auto}"
+AUDIO_BACKEND="${PC386_AUDIO:-opl3}"
 SB_BASE="${PC386_SB_BASE:-0x220}"
 SB_IRQ="${PC386_SB_IRQ:-5}"
 SB_DMA="${PC386_SB_DMA:-1}"
@@ -83,7 +84,15 @@ case "$AUDIO_BACKEND" in
         QEMU_ARGS+=(
             -machine pc,pcspk-audiodev=pcaudio
             -audiodev "$QEMU_AUDIO_DRIVER,id=pcaudio"
+            -device "adlib,audiodev=pcaudio"
             -device "sb16,audiodev=pcaudio,iobase=$SB_BASE,irq=$SB_IRQ,dma=$SB_DMA,dma16=$SB_DMA16"
+        )
+        ;;
+    opl3)
+        QEMU_ARGS+=(
+            -machine pc
+            -audiodev "$QEMU_AUDIO_DRIVER,id=opl3"
+            -device "adlib,audiodev=opl3"
         )
         ;;
     pcspk)
@@ -100,7 +109,7 @@ case "$AUDIO_BACKEND" in
         )
         ;;
     *)
-        echo "error: PC386_AUDIO must be one of: auto pcspk sb16" >&2
+        echo "error: PC386_AUDIO must be one of: auto opl3 pcspk sb16" >&2
         exit 2
         ;;
 esac

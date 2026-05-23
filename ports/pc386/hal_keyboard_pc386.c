@@ -16,6 +16,7 @@
 
 #include "hal/hal_keyboard.h"
 #include "pc386_panic.h"
+#include "../../drivers/i8042_kbd/i8042_kbd.h"
 
 void hal_keyboard_service(void)
 {
@@ -23,7 +24,7 @@ void hal_keyboard_service(void)
      * isn't wired yet. The real serial drain lands in 3e. */
 }
 
-void hal_keyboard_clear_repeat_state(void) {}
+void hal_keyboard_clear_repeat_state(void) { kbd_clear_repeat_state(); }
 
 void hal_keyboard_init(void)
 {

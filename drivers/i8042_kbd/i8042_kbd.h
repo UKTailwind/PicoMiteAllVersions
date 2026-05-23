@@ -43,4 +43,7 @@ bool kbd_has_scancode(void);
  * and never returned. */
 int  kbd_get_key(void);
 
+/* Clear held-key repeat bookkeeping. Does not flush queued scancodes. */
+void kbd_clear_repeat_state(void);
+
 #endif

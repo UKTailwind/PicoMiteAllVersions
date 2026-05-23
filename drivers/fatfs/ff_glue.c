@@ -29,7 +29,11 @@ static unsigned ata_drive_for_pdrv(BYTE pdrv) {
 }
 
 DSTATUS disk_initialize(BYTE pdrv) {
+#ifdef FATFS_NO_FDC
+    if (pdrv == 0 || pdrv == 1) return STA_NODISK;
+#else
     if (pdrv == 0 || pdrv == 1) return fdc_present(pdrv) ? 0 : STA_NODISK;
+#endif
     unsigned drive = ata_drive_for_pdrv(pdrv);
     if (drive >= ATA_DRIVE_COUNT) return STA_NODISK;
     const ata_drive_info_t *info = ata_drive(drive);
@@ -43,6 +47,10 @@ DSTATUS disk_status(BYTE pdrv) {
 
 DRESULT disk_read(BYTE pdrv, BYTE *buff, LBA_t sector, UINT count) {
     if (pdrv == 0 || pdrv == 1) {
+#ifdef FATFS_NO_FDC
+        (void)buff; (void)sector; (void)count;
+        return RES_NOTRDY;
+#else
         while (count > 0) {
             UINT chunk = (count > 255) ? 255 : count;
             if (fdc_read_sectors(pdrv, (uint32_t)sector, (uint8_t)chunk, buff) != 0) {
@@ -53,6 +61,7 @@ DRESULT disk_read(BYTE pdrv, BYTE *buff, LBA_t sector, UINT count) {
             count -= chunk;
         }
         return RES_OK;
+#endif
     }
     unsigned drive = ata_drive_for_pdrv(pdrv);
     if (drive >= ATA_DRIVE_COUNT) return RES_PARERR;
@@ -93,6 +102,10 @@ DRESULT disk_write(BYTE pdrv, const BYTE *buff, LBA_t sector, UINT count) {
 
 DRESULT disk_ioctl(BYTE pdrv, BYTE cmd, void *buff) {
     if (pdrv == 0 || pdrv == 1) {
+#ifdef FATFS_NO_FDC
+        (void)cmd; (void)buff;
+        return RES_NOTRDY;
+#else
         if (!fdc_present(pdrv)) return RES_NOTRDY;
         switch (cmd) {
             case CTRL_SYNC:
@@ -108,6 +121,7 @@ DRESULT disk_ioctl(BYTE pdrv, BYTE cmd, void *buff) {
                 return RES_OK;
         }
         return RES_PARERR;
+#endif
     }
     unsigned drive = ata_drive_for_pdrv(pdrv);
     if (drive >= ATA_DRIVE_COUNT) return RES_PARERR;

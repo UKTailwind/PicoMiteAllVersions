@@ -134,12 +134,19 @@ _start:
      * 387, but every machine that runs MMBasic-as-OS in 2026 has one
      * integrated. */
     movl    %cr0, %eax
+#ifdef PC386_NO_FPU
+    orl     $(1 << 2), %eax         /* set   EM: no hardware x87 */
+    andl    $~(1 << 3), %eax        /* clear TS */
+    orl     $(1 << 1), %eax         /* set   MP */
+    movl    %eax, %cr0
+#else
     andl    $~(1 << 2), %eax        /* clear EM */
     andl    $~(1 << 3), %eax        /* clear TS */
     orl     $(1 << 1), %eax         /* set   MP */
     orl     $(1 << 5), %eax         /* set   NE */
     movl    %eax, %cr0
     fninit                          /* reset FPU state — exceptions masked */
+#endif
 
     call    kmain
 

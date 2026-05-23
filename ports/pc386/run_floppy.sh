@@ -7,6 +7,7 @@
 # Usage:
 #   ./run_floppy.sh
 #   ./run_floppy.sh headless
+#   PC386_AUDIO=opl3 ./run_floppy.sh
 #   PC386_AUDIO=pcspk ./run_floppy.sh
 
 set -euo pipefail
@@ -20,7 +21,7 @@ CONFIG_STAMP="$PORT_DIR/build/.pc386_audio_config"
 FLOPPY_STAGE1="$PORT_DIR/build/bootloader/floppy_stage1.bin"
 FLOPPY_STAGE2="$PORT_DIR/build/bootloader/floppy_stage2.bin"
 MEMORY="${PC386_FLOPPY_MEM:-16M}"
-AUDIO_BACKEND="${PC386_AUDIO:-auto}"
+AUDIO_BACKEND="${PC386_AUDIO:-opl3}"
 SB_BASE="${PC386_SB_BASE:-0x220}"
 SB_IRQ="${PC386_SB_IRQ:-5}"
 SB_DMA="${PC386_SB_DMA:-1}"
@@ -95,7 +96,15 @@ case "$AUDIO_BACKEND" in
         QEMU_ARGS+=(
             -machine pc,pcspk-audiodev=pcaudio
             -audiodev "$QEMU_AUDIO_DRIVER,id=pcaudio"
+            -device "adlib,audiodev=pcaudio"
             -device "sb16,audiodev=pcaudio,iobase=$SB_BASE,irq=$SB_IRQ,dma=$SB_DMA,dma16=$SB_DMA16"
+        )
+        ;;
+    opl3)
+        QEMU_ARGS+=(
+            -machine pc
+            -audiodev "$QEMU_AUDIO_DRIVER,id=opl3"
+            -device "adlib,audiodev=opl3"
         )
         ;;
     pcspk)
@@ -112,7 +121,7 @@ case "$AUDIO_BACKEND" in
         )
         ;;
     *)
-        echo "error: PC386_AUDIO must be one of: auto pcspk sb16" >&2
+        echo "error: PC386_AUDIO must be one of: auto opl3 pcspk sb16" >&2
         exit 2
         ;;
 esac

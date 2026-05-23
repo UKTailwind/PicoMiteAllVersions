@@ -2,8 +2,8 @@
  * ports/pc386/setjmp.S — i686 setjmp/longjmp.
  *
  * AT&T syntax. Saves/restores callee-saved registers (ebx, esi, edi,
- * ebp), the stack pointer, and the return address. Uses 6 of the 8
- * jmp_buf slots; remainder reserved.
+ * ebp), the stack pointer, the return address, and EFLAGS. Uses 7 of
+ * the 8 jmp_buf slots; remainder reserved.
  *
  * jmp_buf layout (longs, in order):
  *   [0] ebx
@@ -12,7 +12,8 @@
  *   [3] ebp
  *   [4] esp (post-pop, i.e. caller's stack)
  *   [5] eip (return address)
- *   [6..7] reserved
+ *   [6] eflags
+ *   [7] reserved
  *
  * cdecl: argument 1 (jmp_buf*) at 4(%esp); argument 2 (int val for
  * longjmp) at 8(%esp); return-addr saved by call is at 0(%esp).
@@ -32,6 +33,8 @@ setjmp:
     movl    %ecx, 16(%eax)
     movl    (%esp), %ecx         /* ecx = return address */
     movl    %ecx, 20(%eax)
+    pushfl
+    popl    24(%eax)
     xorl    %eax, %eax           /* return 0 */
     ret
     .size   setjmp, . - setjmp
@@ -51,6 +54,8 @@ longjmp:
     movl    12(%edx), %ebp
     movl    16(%edx), %esp
     movl    20(%edx), %ecx       /* return address from setjmp call */
+    pushl   24(%edx)
+    popfl
     jmp     *%ecx
     .size   longjmp, . - longjmp
 

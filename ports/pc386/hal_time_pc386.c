@@ -1,27 +1,19 @@
 /*
- * ports/pc386/hal_time_pc386.c — monotonic clock + sleep over TSC.
+ * ports/pc386/hal_time_pc386.c - monotonic clock + sleep over PIT channel 0.
  *
- * Calibration: PIT channel 2 (speaker channel; safe to use because
- * we always disable the speaker output bit in port 0x61 first) gets
- * loaded for a known interval — 50 ms at 1.193182 MHz = 59659
- * counts. We read TSC before/after waiting for PIT OUT to assert
- * (visible on port 0x61 bit 5), and divide to get TSC ticks per µs.
- *
- * Calibration runs lazily on first hal_time_us_64 call. Until then,
- * timestamps are zero — kmain doesn't need real time before the
- * runtime starts.
- *
- * No interrupts, no IDT — we're stage 3, no IRQ subsystem yet.
+ * The Pocket386 target is 386-class, so do not use RDTSC or PAUSE. BIOS
+ * leaves PIT channel 0 running at 1.193182 MHz; we latch and read its
+ * 16-bit down-counter, accumulating deltas between reads.
  */
 
+#include <stdbool.h>
 #include <stdint.h>
 
 #include "hal/hal_time.h"
 
-#define PIT_FREQ_HZ        1193182u
-#define PIT_CHAN2_DATA     0x42
-#define PIT_MODE_REG       0x43
-#define KBD_CTRL_PORT      0x61
+#define PIT_FREQ_HZ     1193182u
+#define PIT_CHAN0_DATA  0x40
+#define PIT_MODE_REG    0x43
 
 static inline uint8_t inb(uint16_t port) {
     uint8_t v;
@@ -33,54 +25,39 @@ static inline void outb(uint16_t port, uint8_t v) {
     __asm__ volatile("outb %0, %1" : : "a"(v), "Nd"(port));
 }
 
-static inline uint64_t rdtsc(void) {
-    uint32_t lo, hi;
-    __asm__ volatile("rdtsc" : "=a"(lo), "=d"(hi));
-    return ((uint64_t)hi << 32) | lo;
+static bool pit_clock_started;
+static uint16_t pit_last_count;
+static uint64_t pit_total_ticks;
+
+static uint16_t pit_read_counter0(void) {
+    outb(PIT_MODE_REG, 0x00);  /* latch channel 0 count */
+    uint8_t lo = inb(PIT_CHAN0_DATA);
+    uint8_t hi = inb(PIT_CHAN0_DATA);
+    return (uint16_t)((uint16_t)lo | ((uint16_t)hi << 8));
 }
 
-static uint64_t tsc_at_boot       = 0;
-static uint64_t tsc_ticks_per_us  = 0;  /* 0 = uncalibrated */
-
-static void calibrate(void) {
-    /* Calibration window: 50 ms = 59659 PIT counts. Long enough for
-     * a few hundred TSC samples to dominate any single-sample jitter. */
-    const uint16_t pit_count = 59659;
-
-    /* Disable speaker (bit 1 = 0), enable channel 2 gate (bit 0 = 1). */
-    uint8_t kc = inb(KBD_CTRL_PORT);
-    outb(KBD_CTRL_PORT, (kc & ~0x02) | 0x01);
-
-    /* PIT channel 2, mode 0 (one-shot), lobyte/hibyte access, binary. */
-    outb(PIT_MODE_REG, 0xB0);
-    outb(PIT_CHAN2_DATA, (uint8_t)(pit_count & 0xFF));
-    outb(PIT_CHAN2_DATA, (uint8_t)(pit_count >> 8));
-
-    uint64_t t0 = rdtsc();
-    /* Wait for PIT OUT to assert (bit 5 of port 0x61). */
-    while ((inb(KBD_CTRL_PORT) & 0x20) == 0) { }
-    uint64_t t1 = rdtsc();
-
-    /* delta_us = pit_count * 1e6 / PIT_FREQ_HZ ≈ 50000 */
-    uint64_t delta_us = (uint64_t)pit_count * 1000000ull / PIT_FREQ_HZ;
-    tsc_ticks_per_us = (t1 - t0) / delta_us;
-    if (tsc_ticks_per_us == 0) tsc_ticks_per_us = 1;  /* paranoia */
-
-    tsc_at_boot = t1;
+static void pit_update(void) {
+    uint16_t now = pit_read_counter0();
+    if (!pit_clock_started) {
+        pit_last_count = now;
+        pit_clock_started = true;
+        return;
+    }
+    pit_total_ticks += (uint16_t)(pit_last_count - now);
+    pit_last_count = now;
 }
 
 uint64_t hal_time_us_64(void)
 {
-    if (tsc_ticks_per_us == 0) calibrate();
-    return (rdtsc() - tsc_at_boot) / tsc_ticks_per_us;
+    pit_update();
+    return pit_total_ticks * 1000000ull / PIT_FREQ_HZ;
 }
 
 void hal_time_sleep_us(uint32_t us)
 {
-    if (tsc_ticks_per_us == 0) calibrate();
-    uint64_t deadline = rdtsc() + (uint64_t)us * tsc_ticks_per_us;
-    while (rdtsc() < deadline) {
-        __asm__ volatile("pause");
+    uint64_t deadline = hal_time_us_64() + us;
+    while (hal_time_us_64() < deadline) {
+        __asm__ volatile("nop");
     }
 }
 

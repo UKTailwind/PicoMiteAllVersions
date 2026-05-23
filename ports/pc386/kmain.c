@@ -304,7 +304,13 @@ void kmain(uint32_t magic, uint32_t info_addr) {
         kputc('\n');
     }
 
-    kputs("MMBasic heap reserved: ");
+    kputs("MMBasic heap: ");
+    kputu32(heap_memory_size);
+    kputs(" bytes at ");
+    kputhex32((uint32_t) (uintptr_t) MMHeap);
+    kputc('\n');
+
+    kputs("C heap: ");
     kputu32((uint32_t) heap_region_size());
     kputs(" bytes at ");
     kputhex32((uint32_t) (uintptr_t) heap_region_base());
@@ -312,16 +318,25 @@ void kmain(uint32_t magic, uint32_t info_addr) {
 
     kputc('\n');
     probe_and_dump_drives();
+#ifdef PC386_NO_FDC
+    kputs("FDC probe: disabled\n");
+#else
     kputs("FDC probe:\n");
     kputs("  drive A: ");
     kputs(fdc_present(0) ? "present\n" : "absent\n");
     kputs("  drive B: ");
     kputs(fdc_present(1) ? "present\n" : "absent\n");
+#endif
 
     kputc('\n');
     kputs("FAT volumes:\n");
+#ifndef PC386_NO_FDC
     mount_and_list("A:", "  drive A", &fs0);
     mount_and_list("B:", "  drive B", &fs1);
+#else
+    (void)fs0;
+    (void)fs1;
+#endif
     mount_and_list("C:", "  drive C", &fs2);
 
     /* ---------- MMBasic runtime instantiation (stage 3c.4) ---------- */
@@ -343,16 +358,24 @@ void kmain(uint32_t magic, uint32_t info_addr) {
 
     LoadOptions();
     kputs("LoadOptions ok, ");
-    (void)kbd_set_typematic(Option.repeat);
 
+#ifdef PC386_BOOT_TRACE
+    kputs("InitBasic start, ");
+#endif
     InitBasic();
     kputs("InitBasic ok, ");
 
+#ifdef PC386_BOOT_TRACE
+    kputs("InitHeap start, ");
+#endif
     InitHeap(true);
     kputs("InitHeap ok, ");
 
     MMerrno = 0;
     MMErrMsg[0] = '\0';
+#ifdef PC386_BOOT_TRACE
+    kputs("runtime begin start, ");
+#endif
     mmbasic_runtime_port_begin();
     kputs("mmbasic_runtime_port_begin ok\n");
 

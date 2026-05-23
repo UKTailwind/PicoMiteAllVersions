@@ -612,10 +612,14 @@ char *getenv(const char *name) {
     return NULL;  /* No process environment on bare metal. */
 }
 
-/* rand/srand — same xorshift32 hal_random uses. */
+/* rand/srand — share the xorshift32 state in hal_random_pc386.c so
+ * MMBasic's RANDOMIZE n (which goes through srand) deterministically
+ * seeds the same stream RND() reads via hal_random_u32. Previously
+ * srand was a no-op, so RANDOMIZE didn't actually do anything. */
 extern uint32_t hal_random_u32(void);
+extern uint32_t pc386_rand_state;
 int rand(void) { return (int)(hal_random_u32() & 0x7FFFFFFFu); }
-void srand(unsigned int seed) { (void)seed; /* xorshift seeds itself */ }
+void srand(unsigned int seed) { pc386_rand_state = seed ? seed : 1; }
 
 void exit(int code) {
     (void)code;
@@ -679,8 +683,95 @@ extern uint64_t hal_time_us_64(void);
 
 #include <time.h>
 
+/* CMOS RTC at I/O 0x70 (index) / 0x71 (data). Standard since the PC/AT.
+ * Registers: 00 sec, 02 min, 04 hour, 07 day, 08 month, 09 year-of-cent,
+ * 32 century, 0A status A (bit 7 = update-in-progress), 0B status B
+ * (bit 1 = 24-hour mode, bit 2 = binary mode). */
+static uint8_t pc386_cmos_read(uint8_t reg) {
+    __asm__ volatile("outb %0, $0x70" :: "a"(reg));
+    uint8_t v;
+    __asm__ volatile("inb $0x71, %0" : "=a"(v));
+    return v;
+}
+
+static uint8_t pc386_bcd_to_bin(uint8_t v) {
+    return (uint8_t)(((v >> 4) * 10) + (v & 0x0F));
+}
+
+extern time_t hal_calendar_tm_to_epoch(const struct tm *tm);
+extern void   hal_calendar_epoch_to_tm(time_t epoch, struct tm *out);
+
+static void pc386_read_rtc_tm(struct tm *out) {
+    /* Spin while update-in-progress to avoid reading mid-tick. Bounded
+     * loop in case the RTC is hosed. */
+    for (int i = 0; i < 1000000; i++) {
+        if ((pc386_cmos_read(0x0A) & 0x80) == 0) break;
+    }
+    uint8_t sec  = pc386_cmos_read(0x00);
+    uint8_t min  = pc386_cmos_read(0x02);
+    uint8_t hour = pc386_cmos_read(0x04);
+    uint8_t day  = pc386_cmos_read(0x07);
+    uint8_t mon  = pc386_cmos_read(0x08);
+    uint8_t year = pc386_cmos_read(0x09);
+    uint8_t cent = pc386_cmos_read(0x32);
+    uint8_t statusB = pc386_cmos_read(0x0B);
+
+    if (!(statusB & 0x04)) {
+        /* BCD mode — convert. PM bit (0x80) of the hour byte must be
+         * preserved across the BCD conversion. */
+        uint8_t hour_pm = hour & 0x80;
+        sec  = pc386_bcd_to_bin(sec);
+        min  = pc386_bcd_to_bin(min);
+        hour = (uint8_t)(pc386_bcd_to_bin(hour & 0x7F) | hour_pm);
+        day  = pc386_bcd_to_bin(day);
+        mon  = pc386_bcd_to_bin(mon);
+        year = pc386_bcd_to_bin(year);
+        cent = pc386_bcd_to_bin(cent);
+    }
+    if (!(statusB & 0x02) && (hour & 0x80)) {
+        /* 12-hour mode with PM set — translate to 24h. */
+        hour = (uint8_t)(((hour & 0x7F) % 12) + 12);
+    }
+    hour &= 0x7F;
+
+    int full_year;
+    if (cent >= 19 && cent <= 99) {
+        full_year = cent * 100 + year;
+    } else {
+        /* CMOS century register not implemented on some chipsets;
+         * assume 21st century. */
+        full_year = 2000 + year;
+    }
+
+    out->tm_sec  = sec;
+    out->tm_min  = min;
+    out->tm_hour = hour;
+    out->tm_mday = day;
+    out->tm_mon  = (mon >= 1) ? (mon - 1) : 0;  /* RTC is 1-12; struct tm is 0-11 */
+    out->tm_year = full_year - 1900;
+    out->tm_wday = 0;
+    out->tm_yday = 0;
+    out->tm_isdst = 0;
+}
+
+/* Boot-time wall-clock offset: epoch - uptime. Lazy-init on first call.
+ * Non-static so cmd_rtc (peripheral_stubs.c) can force a re-init after
+ * writing the CMOS RTC. */
+time_t pc386_boot_epoch = 0;
+int    pc386_boot_epoch_inited = 0;
+
+static void pc386_init_boot_epoch(void) {
+    struct tm now;
+    pc386_read_rtc_tm(&now);
+    time_t now_epoch = hal_calendar_tm_to_epoch(&now);
+    time_t uptime = (time_t)(hal_time_us_64() / 1000000ull);
+    pc386_boot_epoch = now_epoch - uptime;
+    pc386_boot_epoch_inited = 1;
+}
+
 time_t time(time_t *t) {
-    time_t v = (time_t)(hal_time_us_64() / 1000000ull);
+    if (!pc386_boot_epoch_inited) pc386_init_boot_epoch();
+    time_t v = pc386_boot_epoch + (time_t)(hal_time_us_64() / 1000000ull);
     if (t) *t = v;
     return v;
 }
@@ -689,28 +780,29 @@ clock_t clock(void) {
     return (clock_t)hal_time_us_64();
 }
 
-/* localtime/gmtime/mktime/strftime — defer real impl to pc386_time.c. */
-struct tm *localtime(const time_t *t) {
-    (void)t;
-    pc386_panic("localtime not yet implemented (3c.x: pc386_time.c)");
-}
-
-struct tm *gmtime(const time_t *t) {
-    return localtime(t);
-}
+/* Single static struct for the non-_r variants (POSIX allows this). */
+static struct tm pc386_static_tm;
 
 struct tm *localtime_r(const time_t *t, struct tm *out) {
-    (void)t; (void)out;
-    pc386_panic("localtime_r not yet implemented (3c.x: pc386_time.c)");
+    if (!t || !out) return out;
+    hal_calendar_epoch_to_tm(*t, out);
+    return out;
+}
+
+struct tm *localtime(const time_t *t) {
+    return localtime_r(t, &pc386_static_tm);
 }
 
 struct tm *gmtime_r(const time_t *t, struct tm *out) {
-    return localtime_r(t, out);
+    return localtime_r(t, out);  /* no timezone offset on bare metal */
+}
+
+struct tm *gmtime(const time_t *t) {
+    return gmtime_r(t, &pc386_static_tm);
 }
 
 time_t mktime(struct tm *tm) {
-    (void)tm;
-    pc386_panic("mktime not yet implemented (3c.x: pc386_time.c)");
+    return hal_calendar_tm_to_epoch(tm);
 }
 
 time_t timegm(const struct tm *tm) {
@@ -720,9 +812,100 @@ time_t timegm(const struct tm *tm) {
     return mktime(&scratch);
 }
 
+/* strftime — useful subset. Supports the common date/time specifiers
+ * plus weekday/month names. Unrecognised %X codes are copied verbatim.
+ * Output is truncated to n-1 chars + NUL. */
+static const char *const pc386_wday_short[] = {
+    "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"
+};
+static const char *const pc386_wday_long[] = {
+    "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"
+};
+static const char *const pc386_mon_short[] = {
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+};
+static const char *const pc386_mon_long[] = {
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+};
+
+static size_t pc386_strftime_append(char *out, size_t outsz, size_t pos, const char *s) {
+    while (*s) {
+        if (pos + 1 >= outsz) return pos;
+        out[pos++] = *s++;
+    }
+    return pos;
+}
+
+static size_t pc386_strftime_append_num(char *out, size_t outsz, size_t pos,
+                                        int value, int width) {
+    char buf[8];
+    int neg = (value < 0);
+    unsigned int v = (unsigned int)(neg ? -value : value);
+    int len = 0;
+    do { buf[len++] = (char)('0' + (v % 10)); v /= 10; } while (v && len < (int)sizeof(buf));
+    if (neg && pos + 1 < outsz) out[pos++] = '-';
+    while (len < width) {
+        if (pos + 1 >= outsz) return pos;
+        out[pos++] = '0';
+        width--;
+    }
+    while (len > 0) {
+        if (pos + 1 >= outsz) return pos;
+        out[pos++] = buf[--len];
+    }
+    return pos;
+}
+
 size_t strftime(char *s, size_t n, const char *fmt, const struct tm *tm) {
-    (void)s; (void)n; (void)fmt; (void)tm;
-    pc386_panic("strftime not yet implemented (3c.x: pc386_time.c)");
+    if (!s || n == 0 || !fmt || !tm) return 0;
+    size_t pos = 0;
+    while (*fmt && pos + 1 < n) {
+        if (*fmt != '%') { s[pos++] = *fmt++; continue; }
+        fmt++;
+        switch (*fmt) {
+            case 'Y': pos = pc386_strftime_append_num(s, n, pos, tm->tm_year + 1900, 4); break;
+            case 'y': pos = pc386_strftime_append_num(s, n, pos, (tm->tm_year + 1900) % 100, 2); break;
+            case 'm': pos = pc386_strftime_append_num(s, n, pos, tm->tm_mon + 1, 2); break;
+            case 'd': pos = pc386_strftime_append_num(s, n, pos, tm->tm_mday, 2); break;
+            case 'H': pos = pc386_strftime_append_num(s, n, pos, tm->tm_hour, 2); break;
+            case 'M': pos = pc386_strftime_append_num(s, n, pos, tm->tm_min, 2); break;
+            case 'S': pos = pc386_strftime_append_num(s, n, pos, tm->tm_sec, 2); break;
+            case 'j': pos = pc386_strftime_append_num(s, n, pos, tm->tm_yday + 1, 3); break;
+            case 'I': {
+                int h = tm->tm_hour % 12; if (h == 0) h = 12;
+                pos = pc386_strftime_append_num(s, n, pos, h, 2);
+                break;
+            }
+            case 'p': pos = pc386_strftime_append(s, n, pos, tm->tm_hour < 12 ? "AM" : "PM"); break;
+            case 'A':
+                if (tm->tm_wday >= 0 && tm->tm_wday < 7)
+                    pos = pc386_strftime_append(s, n, pos, pc386_wday_long[tm->tm_wday]);
+                break;
+            case 'a':
+                if (tm->tm_wday >= 0 && tm->tm_wday < 7)
+                    pos = pc386_strftime_append(s, n, pos, pc386_wday_short[tm->tm_wday]);
+                break;
+            case 'B':
+                if (tm->tm_mon >= 0 && tm->tm_mon < 12)
+                    pos = pc386_strftime_append(s, n, pos, pc386_mon_long[tm->tm_mon]);
+                break;
+            case 'b':
+                if (tm->tm_mon >= 0 && tm->tm_mon < 12)
+                    pos = pc386_strftime_append(s, n, pos, pc386_mon_short[tm->tm_mon]);
+                break;
+            case '%': if (pos + 1 < n) s[pos++] = '%'; break;
+            case '\0': goto done;
+            default:
+                if (pos + 2 < n) { s[pos++] = '%'; s[pos++] = *fmt; }
+                break;
+        }
+        fmt++;
+    }
+done:
+    s[pos] = '\0';
+    return pos;
 }
 
 double difftime(time_t a, time_t b) { return (double)(a - b); }
@@ -741,6 +924,8 @@ char *ctime  (const time_t *t)     { (void)t;  pc386_panic("ctime not impl"); }
  */
 
 #include <math.h>
+
+#ifndef PC386_NO_FPU
 
 double sin(double x)   { __asm__("fsin"  : "+t"(x)); return x; }
 double cos(double x)   { __asm__("fcos"  : "+t"(x)); return x; }
@@ -923,6 +1108,249 @@ double ldexp(double x, int e) {
 }
 
 double scalbn(double x, int e) { return ldexp(x, e); }
+
+#else
+
+static double pc386_wrap_pi(double x) {
+    const double pi = 3.14159265358979323846;
+    const double two_pi = 6.28318530717958647692;
+    while (x > pi) x -= two_pi;
+    while (x < -pi) x += two_pi;
+    return x;
+}
+
+double fabs(double x) { return x < 0.0 ? -x : x; }
+
+double floor(double x) {
+    int64_t i = (int64_t)x;
+    if (x < 0.0 && (double)i != x) i--;
+    return (double)i;
+}
+
+double ceil(double x) {
+    int64_t i = (int64_t)x;
+    if (x > 0.0 && (double)i != x) i++;
+    return (double)i;
+}
+
+double trunc(double x) { return (double)(int64_t)x; }
+double round(double x) { return x >= 0.0 ? floor(x + 0.5) : ceil(x - 0.5); }
+
+double fmod(double x, double y) {
+    if (y == 0.0) return 0.0;
+    return x - trunc(x / y) * y;
+}
+
+double sqrt(double x) {
+    if (x <= 0.0) return 0.0;
+    double g = x > 1.0 ? x : 1.0;
+    for (int i = 0; i < 24; i++) g = 0.5 * (g + x / g);
+    return g;
+}
+
+double sin(double x) {
+    x = pc386_wrap_pi(x);
+    double x2 = x * x;
+    return x * (1.0 - x2 / 6.0 + (x2 * x2) / 120.0 - (x2 * x2 * x2) / 5040.0);
+}
+
+double cos(double x) {
+    x = pc386_wrap_pi(x);
+    double x2 = x * x;
+    return 1.0 - x2 / 2.0 + (x2 * x2) / 24.0 - (x2 * x2 * x2) / 720.0;
+}
+
+double tan(double x) {
+    double c = cos(x);
+    return c == 0.0 ? 0.0 : sin(x) / c;
+}
+
+double atan(double x) {
+    /* arctan(x) by argument reduction + Taylor series.
+     *
+     * The naive Maclaurin x - x^3/3 + x^5/5 - ... converges painfully
+     * slowly near |x| = 1 (it's the Leibniz formula for pi/4 there).
+     * Four terms gave ~7% error at x=1 which broke math.bas. We use
+     * two reductions:
+     *
+     *   1. For |x| > 1, the identity  atan(x) = pi/2 - atan(1/x)
+     *      moves the argument into [-1, 1].
+     *   2. For 0 < |x| <= 1, repeatedly apply
+     *          atan(x) = 2 * atan( x / (1 + sqrt(1 + x*x)) )
+     *      until |x| < 0.18, then sum a 6-term Taylor. Each halving
+     *      gives an extra factor of ~2 in convergence speed; with the
+     *      threshold of 0.18, six terms give ~1e-10 precision.
+     */
+    const double half_pi = 1.57079632679489661923;
+    if (x > 1.0) return half_pi - atan(1.0 / x);
+    if (x < -1.0) return -half_pi - atan(1.0 / x);
+    int doublings = 0;
+    while (x > 0.18 || x < -0.18) {
+        x = x / (1.0 + sqrt(1.0 + x * x));
+        doublings++;
+    }
+    double x2 = x * x;
+    double r = x * (1.0
+                    - x2 / 3.0
+                    + (x2 * x2) / 5.0
+                    - (x2 * x2 * x2) / 7.0
+                    + (x2 * x2 * x2 * x2) / 9.0
+                    - (x2 * x2 * x2 * x2 * x2) / 11.0
+                    + (x2 * x2 * x2 * x2 * x2 * x2) / 13.0);
+    while (doublings-- > 0) r *= 2.0;
+    return r;
+}
+
+double atan2(double y, double x) {
+    const double pi = 3.14159265358979323846;
+    if (x > 0.0) return atan(y / x);
+    if (x < 0.0 && y >= 0.0) return atan(y / x) + pi;
+    if (x < 0.0 && y < 0.0) return atan(y / x) - pi;
+    if (y > 0.0) return pi / 2.0;
+    if (y < 0.0) return -pi / 2.0;
+    return 0.0;
+}
+
+double asin(double x) { return atan2(x, sqrt(1.0 - x * x)); }
+double acos(double x) { return atan2(sqrt(1.0 - x * x), x); }
+
+double exp(double x) {
+    if (x < -40.0) return 0.0;
+    if (x > 40.0) x = 40.0;
+    int n = (int)x;
+    double r = x - (double)n;
+    double term = 1.0;
+    double sum = 1.0;
+    for (int i = 1; i <= 18; i++) {
+        term *= r / (double)i;
+        sum += term;
+    }
+    const double e = 2.71828182845904523536;
+    while (n > 0) { sum *= e; n--; }
+    while (n < 0) { sum /= e; n++; }
+    return sum;
+}
+
+double log(double x) {
+    if (x <= 0.0) return -1.0 / 0.0;
+    int k = 0;
+    while (x > 1.5) { x *= 0.5; k++; }
+    while (x < 0.75) { x *= 2.0; k--; }
+    double z = (x - 1.0) / (x + 1.0);
+    double z2 = z * z;
+    double term = z;
+    double sum = 0.0;
+    for (int n = 1; n <= 19; n += 2) {
+        sum += term / (double)n;
+        term *= z2;
+    }
+    return 2.0 * sum + (double)k * 0.69314718055994530942;
+}
+
+double log2(double x) { return log(x) / 0.69314718055994530942; }
+double log10(double x) { return log(x) / 2.30258509299404568402; }
+double exp2(double x) { return exp(x * 0.69314718055994530942); }
+
+double pow(double x, double y) {
+    if (x == 0.0) return y == 0.0 ? 1.0 : 0.0;
+    if (x < 0.0) {
+        int64_t yi = (int64_t)y;
+        if ((double)yi != y) return 0.0;
+        double r = exp(y * log(-x));
+        return (yi & 1) ? -r : r;
+    }
+    return exp(y * log(x));
+}
+
+double modf(double x, double *iptr) {
+    *iptr = trunc(x);
+    return x - *iptr;
+}
+
+double sinh(double x) { return (exp(x) - exp(-x)) * 0.5; }
+double cosh(double x) { return (exp(x) + exp(-x)) * 0.5; }
+double tanh(double x) {
+    double e2 = exp(2.0 * x);
+    return (e2 - 1.0) / (e2 + 1.0);
+}
+double asinh(double x) { return log(x + sqrt(x * x + 1.0)); }
+double acosh(double x) { return log(x + sqrt(x * x - 1.0)); }
+double atanh(double x) { return 0.5 * log((1.0 + x) / (1.0 - x)); }
+double expm1(double x) { return exp(x) - 1.0; }
+double log1p(double x) { return log(1.0 + x); }
+double cbrt(double x) { return x < 0.0 ? -pow(-x, 1.0 / 3.0) : pow(x, 1.0 / 3.0); }
+double hypot(double x, double y) { return sqrt(x * x + y * y); }
+
+double copysign(double x, double y) {
+    union { double d; uint64_t u; } ux = { x }, uy = { y };
+    ux.u = (ux.u & 0x7FFFFFFFFFFFFFFFull) | (uy.u & 0x8000000000000000ull);
+    return ux.d;
+}
+
+double nextafter(double x, double y) {
+    if (x == y) return y;
+    return x + (y > x ? 1.0 : -1.0) * 1e-308;
+}
+
+double frexp(double x, int *e) {
+    if (x == 0.0) { *e = 0; return 0.0; }
+    int exp = 0;
+    double ax = fabs(x);
+    while (ax >= 1.0) { ax *= 0.5; exp++; }
+    while (ax < 0.5) { ax *= 2.0; exp--; }
+    *e = exp;
+    return x < 0.0 ? -ax : ax;
+}
+
+double ldexp(double x, int e) {
+    while (e > 0) { x *= 2.0; e--; }
+    while (e < 0) { x *= 0.5; e++; }
+    return x;
+}
+
+double scalbn(double x, int e) { return ldexp(x, e); }
+
+#endif
+
+float _Complex __mulsc3(float a, float b, float c, float d) {
+    float _Complex z;
+    __real__ z = a * c - b * d;
+    __imag__ z = a * d + b * c;
+    return z;
+}
+
+float _Complex __divsc3(float a, float b, float c, float d) {
+    float denom = c * c + d * d;
+    float _Complex z;
+    if (denom == 0.0f) {
+        __real__ z = 0.0f;
+        __imag__ z = 0.0f;
+        return z;
+    }
+    __real__ z = (a * c + b * d) / denom;
+    __imag__ z = (b * c - a * d) / denom;
+    return z;
+}
+
+double _Complex __muldc3(double a, double b, double c, double d) {
+    double _Complex z;
+    __real__ z = a * c - b * d;
+    __imag__ z = a * d + b * c;
+    return z;
+}
+
+double _Complex __divdc3(double a, double b, double c, double d) {
+    double denom = c * c + d * d;
+    double _Complex z;
+    if (denom == 0.0) {
+        __real__ z = 0.0;
+        __imag__ z = 0.0;
+        return z;
+    }
+    __real__ z = (a * c + b * d) / denom;
+    __imag__ z = (b * c - a * d) / denom;
+    return z;
+}
 
 float sinf(float x)            { return (float)sin((double)x); }
 float cosf(float x)            { return (float)cos((double)x); }

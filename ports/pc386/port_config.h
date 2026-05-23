@@ -23,14 +23,20 @@
 #undef  MMBASIC_BANNER_TRAILER
 #define MMBASIC_BANNER_TRAILER "PC/386 bare-metal REPL.\r\n\r\n"
 
-/* 1 MB MMBasic heap. The realistic floor target is a 386 with 4 MB
- * RAM; with kernel + drivers + stack budget at ~256 KB and the
- * multiboot memory map giving us the rest, 1 MB of BASIC heap leaves
- * plenty of slack. Compares to 128 KB on RP2040 PicoMite and 104 KB on
- * ESP32-S3. May raise to 2-4 MB once Stage 1 lands the heap-over-
- * memory-map allocator and we see what the actual budget looks like. */
+/* 2 MB MMBasic heap. The Pocket386 target has 8 MB RAM; this still
+ * leaves room for the kernel, BSS-backed program/flash buffer, drivers,
+ * and stack while giving BASIC a materially larger workspace. */
 #undef  HAL_PORT_HEAP_MEMORY_SIZE
-#define HAL_PORT_HEAP_MEMORY_SIZE (1 * 1024 * 1024)
+#define HAL_PORT_HEAP_MEMORY_SIZE (2 * 1024 * 1024)
+
+/* Keep the RAM-backed flash/program buffer smaller than the heap. The
+ * default MAX_PROG_SIZE follows HEAP_MEMORY_SIZE, which is too expensive
+ * on an 8 MB PC because pc386 also needs a BSS-backed ProgMemory image. */
+#define MAX_PROG_SIZE (1 * 1024 * 1024)
+
+/* Separate C-library bump heap. This is for port/libc allocations, not
+ * MMBasic variables; do not tie it to HAL_PORT_HEAP_MEMORY_SIZE. */
+#define PC386_LIBC_HEAP_SIZE (256 * 1024)
 
 /* Pc386 exposes the DB-25 LPT1 connector as BASIC-addressable GPIO.
  * The user-facing pin numbers are the connector pins: data 2..9,
@@ -58,7 +64,7 @@
 #define PORT_PC386                       1
 
 
-/* Compiler-table sizes. */
-#include "../bc_tables_host.h"
+/* Compiler-table sizes are inherited from host_native/port_config.h:
+ * rp2350-class tables are a better RAM fit here than host-sized tables. */
 
 #endif /* PC386_PORT_CONFIG_H */

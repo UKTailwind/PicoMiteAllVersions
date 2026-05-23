@@ -12,6 +12,7 @@
 # Usage:
 #   ./run_limine.sh              # interactive boot, VGA window + serial
 #   ./run_limine.sh headless     # headless, COM1 -> stdio (test harness)
+#   PC386_AUDIO=opl3 ./run_limine.sh
 #   PC386_AUDIO=sb16 ./run_limine.sh
 #   PC386_LIMINE_BOOT=a ./run_limine.sh
 #                                # legacy helper image as IDE primary
@@ -24,7 +25,7 @@ A_IMG="$PORT_DIR/test_disks/a.img"
 C_IMG="$PORT_DIR/test_disks/c.img"
 BOOT_DISK="${PC386_LIMINE_BOOT:-c}"
 MEMORY="${PC386_LIMINE_MEM:-32M}"
-AUDIO_BACKEND="${PC386_AUDIO:-auto}"
+AUDIO_BACKEND="${PC386_AUDIO:-opl3}"
 SB_BASE="${PC386_SB_BASE:-0x220}"
 SB_IRQ="${PC386_SB_IRQ:-5}"
 SB_DMA="${PC386_SB_DMA:-1}"
@@ -52,7 +53,15 @@ case "$AUDIO_BACKEND" in
         QEMU_ARGS+=(
             -machine pc,pcspk-audiodev=pcaudio
             -audiodev "$QEMU_AUDIO_DRIVER,id=pcaudio"
+            -device "adlib,audiodev=pcaudio"
             -device "sb16,audiodev=pcaudio,iobase=$SB_BASE,irq=$SB_IRQ,dma=$SB_DMA,dma16=$SB_DMA16"
+        )
+        ;;
+    opl3)
+        QEMU_ARGS+=(
+            -machine pc
+            -audiodev "$QEMU_AUDIO_DRIVER,id=opl3"
+            -device "adlib,audiodev=opl3"
         )
         ;;
     pcspk)
@@ -69,7 +78,7 @@ case "$AUDIO_BACKEND" in
         )
         ;;
     *)
-        echo "error: PC386_AUDIO must be one of: auto pcspk sb16" >&2
+        echo "error: PC386_AUDIO must be one of: auto opl3 pcspk sb16" >&2
         exit 2
         ;;
 esac

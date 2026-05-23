@@ -263,6 +263,12 @@ static int do_pio_xfer(unsigned drive, uint32_t lba, uint8_t count,
     }
 
     if (is_write) {
+        /* After the last sector's data words are written, the drive
+         * raises BSY while it commits to media. Issuing a new command
+         * (CACHE_FLUSH) while BSY is asserted is undefined per ATA
+         * spec — most CF cards hang. Wait for the drive to finish the
+         * write before kicking off the flush. */
+        if (wait_busy_clear(base) < 0) return -1;
         outb(base + ATA_REG_COMMAND, ATA_CMD_CACHE_FLUSH);
         if (wait_busy_clear(base) < 0) return -1;
     }

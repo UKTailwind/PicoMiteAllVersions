@@ -29,6 +29,13 @@
 #include "../../drivers/vga_mode13h/vga_mode13h.h"
 #include "pc386_panic.h"
 
+#ifdef PC386_BOOT_TRACE
+extern void kputs(const char *s);
+#define PC386_TRACE(s) kputs(s)
+#else
+#define PC386_TRACE(s) ((void)0)
+#endif
+
 extern jmp_buf mark;          /* defined by MMBasic.c */
 
 /* Forward decls for the output hook contract host_runtime.c established. */
@@ -69,35 +76,44 @@ void pc386_apply_runtime_option_defaults(void)
 }
 
 void mmbasic_runtime_port_begin(void) {
+    PC386_TRACE("RT:entry, ");
     timeroffset = hal_time_us_64();
+    PC386_TRACE("RT:time, ");
 
     /* Tell Draw.c "a display is configured" so cmd_box / cmd_pixel
      * don't error. DISP_USER (28) skips all panel-specific code paths
      * in Draw.c. Same trick host_runtime.c uses. */
     Option.DISPLAY_TYPE = DISP_USER;
+    PC386_TRACE("RT:display-type, ");
 
     /* Seed CFunctionFlash from the pre-erased buffer in pc386_state.c
      * so CFunction scan loops terminate immediately (mirrors host). */
     extern unsigned char pc386_cfunction_buf[];
     CFunctionFlash = pc386_cfunction_buf;
+    PC386_TRACE("RT:cfunc, ");
 
     pc386_apply_runtime_option_defaults();
+    PC386_TRACE("RT:defaults, ");
     pc386_options_defaults_ready();
+    PC386_TRACE("RT:defaults-ready, ");
 
-    /* Stage 5 display: VGA/VBE framebuffer is the primary console,
-     * with COM1 mirroring the same REPL stream for terminal capture
-     * and remote access. */
+    /* Stage 5 display: VGA/VBE framebuffer is the primary console.
+     * Keep runtime output screen-only on real hardware; boot diagnostics
+     * still go through kputs/serial before the REPL starts. */
     vga_mode13h_init();
+    PC386_TRACE("RT:vga, ");
     SetFont(Option.DefaultFont);
+    PC386_TRACE("RT:font, ");
     gui_fcolour = PromptFC = Option.DefaultFC;
     gui_bcolour = PromptBC = Option.DefaultBC;
     PromptFont = Option.DefaultFont;
     Option.DISPLAY_CONSOLE = 1;
-    OptionConsole = 3;                         /* display + serial */
+    OptionConsole = 2;                         /* display only */
     Option.Width = HRes / gui_font_width;
     Option.Height = VRes / gui_font_height;
     CurrentX = CurrentY = 0;
     ClearScreen(gui_bcolour);
+    PC386_TRACE("RT:clear, ");
 
     /* Route file ops through FatFs (=1) rather than LFS (=0). Pc386 has
      * real FAT volumes mounted as A: (FDC), B: (second FDC if present),
@@ -108,30 +124,116 @@ void mmbasic_runtime_port_begin(void) {
     FatFSFileSystem = FatFSFileSystemSave = 1;
     extern char filepath[][FF_MAX_LFN];
     strcpy(filepath[1], "C:/");
+    PC386_TRACE("RT:fatfs, ");
 
     /* Persist the live Option struct back to flash_option_buf so the
      * LoadOptions inside error()'s reset path doesn't wipe these
      * defaults. SaveOptions → hal_flash_write_options →
      * pc386_options_snapshot copies live Option to the buffer. */
     SaveOptions();
+    PC386_TRACE("RT:save-options, ");
 }
 
 void host_runtime_finish(void) { }
 int  host_runtime_timed_out(void) { return 0; }
 
 /* =========================================================================
- *  CheckAbort + interrupt poll hooks (all no-ops for stage 3 — no IRQs).
+ *  CheckAbort + interrupt poll hooks.
+ *
+ *  pc386 has no hardware IRQs to MMBasic, but check_interrupt is the
+ *  poll point the interpreter hits frequently (in routinechecks +
+ *  string ops + file ops). We use it to drive:
+ *    - SETTICK callbacks (poll-based, against hal_time_us_64)
+ *    - WATCHDOG enforcement (kicked-or-die deadline)
+ *  Returning 1 redirects the interpreter to the handler at nextstmt
+ *  until IRETURN is hit.
  * ========================================================================= */
 
+/* Tick* globals + InterruptReturn/InterruptUsed live in pc386_state.c. */
+extern volatile int       TickTimer[];
+extern int                TickPeriod[];
+extern unsigned char     *TickInt[];
+extern volatile unsigned char TickActive[];
+extern unsigned char     *InterruptReturn;
+extern int                InterruptUsed;
+#define PC386_NBRSETTICKS 4
+
+/* Watchdog state: deadline (in us) past which check_interrupt SoftResets. */
+static uint64_t pc386_wd_deadline_us = 0;
+static int      pc386_wd_armed = 0;
+void pc386_watchdog_kick(uint32_t period_ms) {
+    pc386_wd_deadline_us = hal_time_us_64() + (uint64_t)period_ms * 1000ull;
+    pc386_wd_armed = (period_ms != 0);
+}
+
+extern unsigned char *nextstmt;
+extern int g_LocalIndex;
+extern void SoftReset(void);
+
 void CheckAbort(void)         { mmbasic_runtime_checkabort(NULL); }
-int  check_interrupt(void)    { return 0; }
+
+int check_interrupt(void) {
+    /* 1. Watchdog: if armed and deadline passed, hard-reset the box. */
+    if (pc386_wd_armed && hal_time_us_64() > pc386_wd_deadline_us) {
+        pc386_wd_armed = 0;
+        SoftReset();
+    }
+
+    /* 2. Advance TickTimer[] based on real elapsed ms since last call. */
+    static uint64_t last_us = 0;
+    uint64_t now = hal_time_us_64();
+    if (last_us == 0) { last_us = now; return 0; }
+    uint32_t elapsed_ms = (uint32_t)((now - last_us) / 1000ull);
+    if (elapsed_ms) {
+        last_us += (uint64_t)elapsed_ms * 1000ull;
+        for (int i = 0; i < PC386_NBRSETTICKS; i++) {
+            if (TickActive[i]) TickTimer[i] += (int)elapsed_ms;
+        }
+    }
+
+    /* 3. Dispatch the first ready Tick handler. Skip if we're already in
+     *    an interrupt (no nesting). */
+    if (InterruptReturn != NULL) return 0;
+    for (int i = 0; i < PC386_NBRSETTICKS; i++) {
+        if (TickInt[i] && TickTimer[i] > TickPeriod[i]) {
+            while (TickTimer[i] > TickPeriod[i]) TickTimer[i] -= TickPeriod[i];
+            g_LocalIndex++;
+            InterruptReturn = nextstmt;
+            nextstmt = TickInt[i];
+            InterruptUsed = 1;
+            return 1;
+        }
+    }
+    return 0;
+}
 void ClearExternalIO(void)    { }
 void closeframebuffer(char l) { (void)l; }
 void clear320(void)           { }
 void initMouse0(int s)        { (void)s; }
 void restorepanel(void)       { WriteBuf = NULL; }
 void routinechecks(void)      { mmbasic_runtime_routinechecks(NULL); }
-void SoftReset(void)          { pc386_panic("SoftReset not yet implemented"); }
+/* CPU RESTART: pulse the CPU reset line via the 8042 keyboard controller
+ * (the canonical pre-ACPI x86 software reset). If the KBC is wedged,
+ * fall through to a triple fault by loading a null IDT and faulting. */
+void SoftReset(void) {
+    __asm__ volatile("cli" ::: "memory");
+    /* Wait for KBC input buffer empty (bit 1 of status port 0x64),
+     * bounded so a dead controller doesn't lock us here. */
+    for (int i = 0; i < 100000; i++) {
+        uint8_t status;
+        __asm__ volatile("inb $0x64, %0" : "=a"(status));
+        if ((status & 0x02u) == 0) break;
+    }
+    __asm__ volatile("outb %0, $0x64" :: "a"((uint8_t)0xFEu));
+    /* Give the KBC ~10ms to act before we triple-fault. */
+    for (volatile int i = 0; i < 10000000; i++) { }
+    /* Triple-fault fallback: load a null IDT and fire an int. */
+    static const struct { uint16_t limit; uint32_t base; } __attribute__((packed))
+        null_idt = { 0, 0 };
+    __asm__ volatile("lidt %0" :: "m"(null_idt));
+    __asm__ volatile("int $0x03");
+    for (;;) __asm__ volatile("hlt");
+}
 void uSec(int us)             { extern void hal_time_sleep_us(uint32_t); hal_time_sleep_us((uint32_t)us); }
 
 /* MMBasic.c uses __get_MSP for stack-overflow protection. PC has no MSP
@@ -236,11 +338,26 @@ int MMgetchar(void) {
             if (s == 0x1b) return mmbasic_escdecode_run(pc386_escdecode_read_byte_ms);
             return mmbasic_console_normalise_byte(s);
         }
-        __asm__ volatile("hlt");
+        __asm__ volatile("sti" : : : "memory");
+        hal_time_sleep_us(1000);
     }
 }
 
-// getConsole / kbhitConsole live in runtime/runtime_console_input_noop.c — shared.
+/* getConsole / kbhitConsole — real serial-RX taps. The shared
+ * runtime_console_input_noop.c is NOT linked on pc386 (see
+ * ports/pc386/Makefile). XMODEM RECEIVE in core/mmbasic/XModem.c calls
+ * getConsole() in its _inbyte loop; without these the receiver never
+ * sees the sender's handshake or data blocks. */
+int getConsole(void) {
+    int s = serial_getc_nonblock();
+    return s;
+}
+int kbhitConsole(void) {
+    /* serial_getc_nonblock() consumes the byte; we can't "peek". Returning
+     * 0 here keeps interactive REPL paths from spinning on a side channel
+     * they don't otherwise use on pc386. */
+    return 0;
+}
 void myprintf(char *s)     { MMPrintString(s); }
 
 /* MMfopen/MMfclose/MMgetline — file I/O routes through hal_filesystem;
@@ -336,7 +453,12 @@ const char *port_filesystem_prefix(int filesystem) {
 
 void cmd_files_save_program_context(void) { }
 void cmd_files_restore_program_context(void) { }
-void cmd_files_pump_console_key(int *c)   { (void)c; }
+void cmd_files_pump_console_key(int *c)
+{
+    if (!c || *c != -1) return;
+    int key = MMInkey();
+    if (key >= 0) *c = key;
+}
 
 /* cmd_load_post_cleanup — shared default body in
  * runtime/runtime_cmd_load_post_cleanup.c (Finding 9). pc386's

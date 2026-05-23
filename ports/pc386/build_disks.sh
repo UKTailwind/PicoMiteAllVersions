@@ -41,12 +41,20 @@ done
 DISK_DIR="$PORT_DIR/test_disks"
 A_IMG="$DISK_DIR/a.img"
 C_IMG="$DISK_DIR/c.img"
+DIRECT_C_IMG="$DISK_DIR/c-direct.img"
 F_IMG="$DISK_DIR/pc386-floppy.img"
 DEMOS_DIR="$REPO_ROOT/ports/esp32_s3_metro/main/demos"
+MAND_MENU_SRC="$REPO_ROOT/demos/bench/mand.bas"
+PICO_BLOCKS_PC386_SRC="$PORT_DIR/demos/pico_blocks_20fps.bas"
+PICO_VADERS_SRC="$REPO_ROOT/ports/host_wasm/demos/Picovaders.bas"
+PICO_VADERS_FASTGFX_SRC="$REPO_ROOT/ports/host_wasm/demos/Picovaders_fastgfx.bas"
 KERNEL="$PORT_DIR/build/mmbasic.elf"
 KERNEL_BOOT="$PORT_DIR/build/mmbasic-stripped.elf"
 FLOPPY_STAGE1="$PORT_DIR/build/bootloader/floppy_stage1.bin"
 FLOPPY_STAGE2="$PORT_DIR/build/bootloader/floppy_stage2.bin"
+HDD_STAGE1="$PORT_DIR/build/bootloader/hdd_stage1.bin"
+HDD_STAGE2="$PORT_DIR/build/bootloader/hdd_stage2.bin"
+HDD_LOAD_PLAN="$PORT_DIR/build/bootloader/hdd_load_plan.inc"
 
 if [[ ! -f "$KERNEL" ]]; then
     echo "error: $KERNEL not found. Run ./build.sh first." >&2
@@ -93,6 +101,7 @@ cat > "$MTOOLSRC_FILE" <<EOF
 drive x: file="$F_IMG" mformat_only
 drive z: file="$A_IMG" partition=1 mformat_only
 drive y: file="$C_IMG" partition=1 mformat_only
+drive w: file="$DIRECT_C_IMG" partition=1 mformat_only
 EOF
 export MTOOLSRC="$MTOOLSRC_FILE"
 
@@ -137,10 +146,17 @@ if [[ ! -f "$C_IMG" || "${PC386_REBUILD_C:-0}" == "1" ]]; then
     mformat -h 16 -s 63 -t 65 -v "PCM_DATA" y:
     mmd   y:/BOOT
     mmd   y:/PROGRAMS
-    mcopy "$DEMOS_DIR/mand.bas"   y:/PROGRAMS/MAND.BAS
+    mcopy "$MAND_MENU_SRC"        y:/MAND.BAS
+    mcopy "$MAND_MENU_SRC"        y:/PROGRAMS/MAND.BAS
     mcopy "$DEMOS_DIR/sieve.bas"  y:/PROGRAMS/SIEVE.BAS
-    if [[ -f "$REPO_ROOT/demos/apps/pico_blocks.bas" ]]; then
-        mcopy "$REPO_ROOT/demos/apps/pico_blocks.bas" y:/PICO_BLOCKS.BAS
+    if [[ -f "$PICO_BLOCKS_PC386_SRC" ]]; then
+        mcopy "$PICO_BLOCKS_PC386_SRC" y:/PBLOCK20.BAS
+    fi
+    if [[ -f "$PICO_VADERS_SRC" ]]; then
+        mcopy "$PICO_VADERS_SRC" y:/VADERS.BAS
+    fi
+    if [[ -f "$PICO_VADERS_FASTGFX_SRC" ]]; then
+        mcopy "$PICO_VADERS_FASTGFX_SRC" y:/VADERSFG.BAS
     fi
     if [[ -f "$REPO_ROOT/demos/sound/demo_sound_sfx.bas" ]]; then
         mcopy "$REPO_ROOT/demos/sound/demo_sound_sfx.bas" y:/SFX_DEMO.BAS
@@ -157,6 +173,67 @@ mcopy -o "$KERNEL_BOOT"          y:/BOOT/MMBASIC.ELF
 mcopy -o "$PORT_DIR/limine.conf" y:/BOOT/LIMINE.CONF
 mcopy -o "$LIMINE_BIOS_SYS"      y:/BOOT/LIMINE-BIOS.SYS
 limine bios-install "$C_IMG"
+
+# --- C: 32 MB FAT16 direct-boot IDE image, no Limine. -----------------------
+#
+# This image is intended for old BIOSes that can boot CHS hard disks but do
+# not reliably support INT 13h Extensions. The MBR loads a tiny stage2 from
+# sectors 1..16, and stage2 loads /BOOT/MMBASIC.ELF from a fixed contiguous
+# LBA plan.
+rm -f "$DIRECT_C_IMG"
+truncate -s 32M "$DIRECT_C_IMG"
+mpartition -I w:
+mpartition -c -b 63 w:
+mpartition -a w:
+mformat -h 16 -s 63 -t 65 -v "PCM_DIRECT" w:
+mmd   w:/BOOT
+mcopy "$KERNEL_BOOT"          w:/BOOT/MMBASIC.ELF
+mcopy "$PORT_DIR/limine.conf" w:/BOOT/LIMINE.CONF
+mcopy "$LIMINE_BIOS_SYS"      w:/BOOT/LIMINE-BIOS.SYS
+mmd   w:/PROGRAMS
+mcopy "$MAND_MENU_SRC"        w:/MAND.BAS
+mcopy "$MAND_MENU_SRC"        w:/PROGRAMS/MAND.BAS
+mcopy "$DEMOS_DIR/sieve.bas"  w:/PROGRAMS/SIEVE.BAS
+if [[ -f "$PICO_BLOCKS_PC386_SRC" ]]; then
+    mcopy "$PICO_BLOCKS_PC386_SRC" w:/PBLOCK20.BAS
+fi
+if [[ -f "$PICO_VADERS_SRC" ]]; then
+    mcopy "$PICO_VADERS_SRC" w:/VADERS.BAS
+fi
+if [[ -f "$PICO_VADERS_FASTGFX_SRC" ]]; then
+    mcopy "$PICO_VADERS_FASTGFX_SRC" w:/VADERSFG.BAS
+fi
+if [[ -f "$REPO_ROOT/demos/sound/demo_sound_sfx.bas" ]]; then
+    mcopy "$REPO_ROOT/demos/sound/demo_sound_sfx.bas" w:/SFX_DEMO.BAS
+fi
+if [[ -f "$PORT_DIR/demos/pcl_demo.bas" ]]; then
+    mcopy "$PORT_DIR/demos/pcl_demo.bas" w:/PCL_DEMO.BAS
+fi
+mcopy "$DISK_DIR/README.TXT"  w:/README.TXT
+
+kernel_fat_ranges="$(mshowfat w:/BOOT/MMBASIC.ELF)"
+kernel_range_count="$(printf '%s\n' "$kernel_fat_ranges" | grep -o '<[^>]*>' | wc -l | tr -d ' ')"
+if [[ "$kernel_range_count" != "1" ]]; then
+    echo "error: direct-boot MMBASIC.ELF is not contiguous: $kernel_fat_ranges" >&2
+    exit 1
+fi
+kernel_first_cluster="$(printf '%s\n' "$kernel_fat_ranges" | sed -E 's/.*<([0-9]+)(-[0-9]+)?>.*/\1/')"
+# Geometry is fixed by the mpartition/mformat commands above:
+# partition start 63, reserved 1, FATs 2, sectors/FAT 254, root dir 32.
+kernel_lba=$((63 + 1 + 2 * 254 + 32 + kernel_first_cluster - 2))
+python3 "$PORT_DIR/tools/gen_floppy_load_plan.py" \
+    --kernel-lba "$kernel_lba" \
+    "$KERNEL_BOOT" \
+    "$HDD_LOAD_PLAN"
+make -C "$PORT_DIR" hdd_bootloader
+
+hdd_stage2_sectors=$((($(stat -f '%z' "$HDD_STAGE2") + 511) / 512))
+if (( hdd_stage2_sectors > 16 )); then
+    echo "error: HDD stage2 is $hdd_stage2_sectors sectors, max is 16" >&2
+    exit 1
+fi
+dd if="$HDD_STAGE1" of="$DIRECT_C_IMG" bs=1 count=446 conv=notrunc status=none
+dd if="$HDD_STAGE2" of="$DIRECT_C_IMG" bs=512 seek=1 conv=notrunc status=none
 
 # --- 1.44 MB FAT12 bootable superfloppy. ------------------------------------
 cat > "$DISK_DIR/FLOPPY.TXT" <<'EOF'
@@ -182,5 +259,10 @@ echo "Legacy helper image contents:"
 mdir -/ z:
 echo "C: contents:"
 mdir -/ y:
+echo "Direct-boot C: contents:"
+mdir -/ w:
+echo "Direct-boot kernel FAT allocation:"
+printf '%s\n' "$kernel_fat_ranges"
+echo "Direct-boot kernel LBA: $kernel_lba"
 echo "A: floppy image contents:"
 mdir -/ x:

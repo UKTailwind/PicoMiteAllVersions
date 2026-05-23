@@ -3,7 +3,8 @@
 # COM1 piped to stdio. The form used by run_tests.sh.
 #
 # Usage:
-#   ./run_headless.sh                     # boot mmbasic.elf with SB16
+#   ./run_headless.sh                     # boot mmbasic.elf with OPL3/AdLib
+#   PC386_AUDIO=opl3 ./run_headless.sh
 #   PC386_AUDIO=pcspk ./run_headless.sh
 #   PC386_AUDIO=sb16 PC386_SB_BASE=0x240 ./run_headless.sh
 #   ./run_headless.sh path/to/other.elf   # boot a specific kernel
@@ -18,7 +19,7 @@ PORT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 KERNEL="$PORT_DIR/build/mmbasic.elf"
 TIMEOUT_SECS=""
-AUDIO_BACKEND="${PC386_AUDIO:-sb16}"
+AUDIO_BACKEND="${PC386_AUDIO:-opl3}"
 SB_BASE="${PC386_SB_BASE:-0x220}"
 SB_IRQ="${PC386_SB_IRQ:-5}"
 SB_DMA="${PC386_SB_DMA:-1}"
@@ -58,6 +59,13 @@ QEMU_ARGS=(
 )
 
 case "$AUDIO_BACKEND" in
+    opl3)
+        QEMU_ARGS+=(
+            -machine pc
+            -audiodev none,id=opl3
+            -device "adlib,audiodev=opl3"
+        )
+        ;;
     pcspk)
         QEMU_ARGS+=(
             -machine pc,pcspk-audiodev=pcspk
@@ -72,7 +80,7 @@ case "$AUDIO_BACKEND" in
         )
         ;;
     *)
-        echo "error: PC386_AUDIO must be one of: pcspk sb16" >&2
+        echo "error: PC386_AUDIO must be one of: opl3 pcspk sb16" >&2
         exit 2
         ;;
 esac
