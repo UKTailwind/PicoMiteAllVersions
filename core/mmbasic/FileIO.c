@@ -33,6 +33,9 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  */
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
+#ifdef MMBASIC_HOST
+#include "host_compat.h"
+#endif
 #include "port_config.h"
 #include "ff.h"
 #include "diskio.h"
