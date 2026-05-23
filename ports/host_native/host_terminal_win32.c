@@ -30,6 +30,8 @@
 static int   host_raw_mode_active = 0;
 static DWORD host_orig_in_mode    = 0;
 static DWORD host_orig_out_mode   = 0;
+static UINT  host_orig_in_cp      = 0;
+static UINT  host_orig_out_cp     = 0;
 static int   host_pending_byte    = -1;
 
 static void host_raw_mode_restore(void) {
@@ -38,6 +40,8 @@ static void host_raw_mode_restore(void) {
     HANDLE hout = GetStdHandle(STD_OUTPUT_HANDLE);
     if (hin  != INVALID_HANDLE_VALUE) SetConsoleMode(hin,  host_orig_in_mode);
     if (hout != INVALID_HANDLE_VALUE) SetConsoleMode(hout, host_orig_out_mode);
+    if (host_orig_in_cp)  SetConsoleCP(host_orig_in_cp);
+    if (host_orig_out_cp) SetConsoleOutputCP(host_orig_out_cp);
     host_raw_mode_active = 0;
 }
 
@@ -69,6 +73,16 @@ void host_raw_mode_enter(void) {
      * clear and the renderer's manual cursor placement. */
     out_mode |= DISABLE_NEWLINE_AUTO_RETURN;
     SetConsoleMode(hout, out_mode);
+
+    /* The half-block renderer emits UTF-8 (▀ = U+2580 → E2 96 80).
+     * Without this, cmd / PowerShell decode those bytes as CP437 /
+     * CP850 / OEM and paint mojibake. Save the original code pages
+     * so the restore hook puts the user's shell back the way it
+     * was found. */
+    host_orig_in_cp  = GetConsoleCP();
+    host_orig_out_cp = GetConsoleOutputCP();
+    SetConsoleCP(CP_UTF8);
+    SetConsoleOutputCP(CP_UTF8);
 
     setvbuf(stdout, NULL, _IONBF, 0);
 
