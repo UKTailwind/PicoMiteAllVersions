@@ -36,6 +36,7 @@ char *getcwd(char *buf, size_t size);
 #include "runtime/runtime.h"
 
 #include "host_fb.h"
+#include "host_keyrepeat.h"
 #include "host_terminal.h"
 #include "host_time.h"
 #include "ansi_mode.h"
@@ -264,6 +265,7 @@ int main(int argc, char **argv) {
     int width = 0, height = 0;            /* 0 = auto-fit terminal */
     int use_interpreter = 0;
     const char *filename = NULL;
+    int  cli_repeat_start = 0, cli_repeat_rate = 0;   /* 0 = leave OS in charge */
     int  cli_slowdown_us  = -1;                       /* -1 = leave default */
     int  cli_memory_kb    = 0;                        /* 0 = leave default */
 
@@ -277,6 +279,17 @@ int main(int argc, char **argv) {
                 fprintf(stderr, "Bad --resolution (expected WxH, e.g. 320x320)\n");
                 return 2;
             }
+        } else if (strcmp(argv[i], "--repeat") == 0 && i + 1 < argc) {
+            int initial = 0, rate = 0;
+            if (sscanf(argv[++i], "%d,%d", &initial, &rate) != 2 ||
+                initial < 50 || initial > 2000 || rate < 10 || rate > 1000) {
+                fprintf(stderr, "Bad --repeat (expected INITIAL_MS,RATE_MS, "
+                                "e.g. 600,200; 50<=initial<=2000, "
+                                "10<=rate<=1000)\n");
+                return 2;
+            }
+            cli_repeat_start = initial;
+            cli_repeat_rate  = rate;
         } else if (strcmp(argv[i], "--slowdown") == 0 && i + 1 < argc) {
             char *end = NULL;
             long us = strtol(argv[++i], &end, 10);
@@ -312,6 +325,10 @@ int main(int argc, char **argv) {
             printf("  --resolution WxH        Framebuffer size (default: auto-fit terminal).\n");
             printf("  --modes N:WxH,...       Override MODE-N table entries (1..%d).\n", ansi_mode_max());
             printf("                          e.g. --modes 1:320x200,2:640x480\n");
+            printf("  --repeat INIT,RATE      Keystroke rate-limit in ms (50..2000, 10..1000).\n");
+            printf("                          Same key held → first repeat after INIT,\n");
+            printf("                          then one per RATE. Off by default; the OS\n");
+            printf("                          terminal drives repeat. e.g. --repeat 600,200\n");
             printf("  --slowdown US           Insert US microseconds of sleep per BASIC tick\n");
             printf("                          for device-like pacing. 0 disables.\n");
             printf("  --memory KB             MMBasic heap size in KB (16..%u).\n",
@@ -342,6 +359,10 @@ int main(int argc, char **argv) {
     /* --slowdown: pure runtime knob; safe to set anytime. */
     if (cli_slowdown_us >= 0) {
         host_sim_slowdown_us = cli_slowdown_us;
+    }
+    /* --repeat: arms the per-key rate limiter in host_keyrepeat. */
+    if (cli_repeat_start && cli_repeat_rate) {
+        host_keyrepeat_configure(cli_repeat_start, cli_repeat_rate);
     }
 
     /* Read terminal size up front. We always need it, either to

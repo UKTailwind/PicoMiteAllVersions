@@ -34,6 +34,7 @@ a pipe.
 |---|---|
 | `--resolution WxH` | Framebuffer size (default: auto-fit terminal). |
 | `--modes N:WxH,...` | Override MODE-N table entries (1..5). e.g. `--modes 1:320x200,2:640x480`. |
+| `--repeat INIT,RATE` | Opt-in per-key rate limiter (50..2000, 10..1000 ms). Holding the same key emits the first repeat after `INIT` ms, then one per `RATE` ms. Off by default — the OS terminal drives repeat. e.g. `--repeat 600,200`. Single-byte keys only; arrow keys + function keys (multi-byte escape sequences) use the OS rate. |
 | `--slowdown US` | Per-tick microsleep for device-like pacing (0 disables). Accumulator-based so sub-ms values still take effect on Windows. |
 | `--memory KB` | MMBasic heap size in KB (16..2048). Can only shrink — `AllMemory[]` is sized at compile time. |
 | `--interp` / `--vm` | Run via the interpreter or the bytecode VM (default: `--vm`). |
@@ -52,13 +53,15 @@ Ctrl-C also exits cleanly (POSIX via SIGINT, Windows via
 
 ### Keyboard repeat
 
-Keys reach the port via stdin in raw mode, and the **OS terminal layer
-drives the repeat rate when a key is held** — neither the port nor
-`Option.RepeatStart` / `Option.RepeatRate` control it. The hardware
-keyboard drivers (`drivers/i2c_picocalc_kbd`, `drivers/ps2_matrix`,
-`drivers/usb_host_kbd`) on device ports own that timing; the ANSI port
-doesn't link them. Adjust the terminal's repeat speed in its
-preferences (or via `xset r rate` on X11) instead.
+By default the OS terminal layer drives the repeat rate when a key is
+held. Pass `--repeat INIT,RATE` to opt into a per-key rate limiter
+that runs in front of the stdin byte reader (`host_keyrepeat.c`).
+While armed, identical bytes arriving from stdin are dropped until
+either `INIT` ms (first repeat) or `RATE` ms (subsequent repeats)
+have elapsed since the last byte passed through; a different byte
+always passes immediately and resets the held-key state. Useful for
+games that want device-style pacing on top of whatever the OS is
+already doing.
 
 ## Terminal size
 

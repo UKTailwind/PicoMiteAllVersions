@@ -24,6 +24,7 @@
 #include <signal.h>
 #include <sys/ioctl.h>
 
+#include "host_keyrepeat.h"
 #include "host_terminal.h"
 
 static struct termios host_orig_termios;
@@ -103,11 +104,11 @@ int host_read_byte_nonblock(void) {
     if (host_pending_byte >= 0) {
         int c = host_pending_byte;
         host_pending_byte = -1;
-        return c;
+        return host_keyrepeat_filter(c);
     }
     unsigned char b;
     ssize_t n = read(STDIN_FILENO, &b, 1);
-    if (n == 1) return (int)b;
+    if (n == 1) return host_keyrepeat_filter((int)b);
     return -1;
 }
 

@@ -91,7 +91,7 @@ BC_SRCS = runtime/vm/bc_alloc.c runtime/vm/bc_bridge.c runtime/vm/vm_host_fat.c 
 # own entry); host_fastgfx.c ships the cmd_fastgfx / cmd_framebuffer /
 # bc_fastgfx_* syscalls, so it has to link.
 NATIVE_SRCS = host_runtime.c host_fastgfx.c host_fastgfx_resync.c host_fs_shims.c host_peripheral_stubs.c \
-              $(HOST_TERMINAL_SRC) host_fs.c host_sim_audio.c host_sim_slowdown.c host_sim_emit_stub.c host_time.c \
+              $(HOST_TERMINAL_SRC) host_fs.c host_keyrepeat.c host_sim_audio.c host_sim_slowdown.c host_sim_emit_stub.c host_time.c \
               host_fb.c host_keys.c host_bc_runtime_noop.c \
               host_web_stubs.c \
               hal_flash_host.c hal_time_host.c hal_random_host.c hal_pin_host.c hal_storage_host.c \

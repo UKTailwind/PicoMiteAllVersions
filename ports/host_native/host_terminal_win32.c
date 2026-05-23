@@ -26,6 +26,7 @@
 #include <stdlib.h>
 #include <timeapi.h>
 
+#include "host_keyrepeat.h"
 #include "host_terminal.h"
 
 static int   host_raw_mode_active = 0;
@@ -132,7 +133,7 @@ int host_read_byte_nonblock(void) {
     if (host_pending_byte >= 0) {
         int c = host_pending_byte;
         host_pending_byte = -1;
-        return c;
+        return host_keyrepeat_filter(c);
     }
     if (!_kbhit()) return -1;
     int ch = _getch();
@@ -142,7 +143,7 @@ int host_read_byte_nonblock(void) {
         if (_kbhit()) (void)_getch();
         return -1;
     }
-    return ch;
+    return host_keyrepeat_filter(ch);
 }
 
 int host_read_byte_blocking_ms(int ms) {
