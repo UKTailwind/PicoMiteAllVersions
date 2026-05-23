@@ -36,6 +36,9 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "hal/hal_calendar.h"
 #include <time.h>
 #include <string.h>
+#ifdef MMBASIC_HOST
+#include "host_compat.h"
+#endif
 #include "xregex.h"
 #include "aes.h"
 
@@ -1123,7 +1126,7 @@ void fun_date(void) {
     } else {
         time_t now = time(NULL);
         struct tm lt;
-        localtime_r(&now, &lt);
+        host_localtime_r(&now, &lt);
         snprintf((char *)sret, 16, "%02d-%02d-%04d",
                  lt.tm_mday, lt.tm_mon + 1, lt.tm_year + 1900);
     }
@@ -1278,7 +1281,7 @@ void fun_time(void) {
     } else {
         time_t now = time(NULL);
         struct tm lt;
-        localtime_r(&now, &lt);
+        host_localtime_r(&now, &lt);
         snprintf((char *)sret, 16, "%02d:%02d:%02d", lt.tm_hour, lt.tm_min, lt.tm_sec);
     }
     CtoM(sret);
