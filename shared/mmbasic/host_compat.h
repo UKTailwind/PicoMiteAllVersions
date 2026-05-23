@@ -22,12 +22,6 @@
 
 #ifdef _WIN32
 #include <direct.h>
-/* Windows has no POSIX symbolic-link mode bit, so define S_ISLNK
- * as always-false. Callers that ask "is this a symlink?" get the
- * right answer on a filesystem that doesn't have them. */
-#ifndef S_ISLNK
-#define S_ISLNK(m) 0
-#endif
 #endif
 
 /* localtime_r: POSIX-reentrant local-time conversion. Returns the
