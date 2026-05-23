@@ -77,12 +77,10 @@ target_sources(PicoMite PRIVATE
     ${CMAKE_SOURCE_DIR}/drivers/vga_pio/vga_ops_stub.c
     ${CMAKE_SOURCE_DIR}/drivers/gui_touch/gui_touch.c
 
-    # PS/2 keyboard (no USB variant for WEBRP2350).
-    ${CMAKE_SOURCE_DIR}/drivers/ps2_matrix/Keyboard.c
-        ${CMAKE_SOURCE_DIR}/drivers/ps2_matrix/hal_keyboard_ps2.c
-        ${CMAKE_SOURCE_DIR}/drivers/console_cdc/console_cdc.c
-    ${CMAKE_SOURCE_DIR}/drivers/ps2_mouse/mouse.c
 )
+
+# USB-A in device mode for the CDC console (no USB-host keyboard variant).
+usb_role(CDC)
 
 set_source_files_properties(${CMAKE_SOURCE_DIR}/third_party/cjson/cJSON.c PROPERTIES COMPILE_FLAGS -Os)
 
@@ -111,7 +109,6 @@ target_link_libraries(PicoMite pico_cyw43_arch_lwip_poll)
 target_link_libraries(PicoMite pico_multicore)
 pico_set_float_implementation(PicoMite pico_dcp)
 
-Pico_enable_stdio_usb(PicoMite 1)
 
 if (SDBOOT STREQUAL "true")
     pico_set_linker_script(PicoMite ${CMAKE_SOURCE_DIR}/cmake/linker/memmap_default_rp2350.ld)

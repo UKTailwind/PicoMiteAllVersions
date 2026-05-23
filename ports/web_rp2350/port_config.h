@@ -55,7 +55,6 @@
  *                              1 = USB-host (drivers/usb_host_kbd/).
  * Wires up via port_sources.cmake linkage; configuration.h reads it for
  * USB-vs-PS/2 flash offset / magic key / heap top selection. */
-#define HAL_PORT_KEYBOARD_USB_HOST        0
 
 /* core1stack[] size in words. WEBRP2350 with SPI LCD uses core1 for the
  * same display merge / FASTGFX worker as the PicoMite SPI-LCD ports. */

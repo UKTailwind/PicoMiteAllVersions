@@ -98,15 +98,10 @@ target_sources(PicoMite PRIVATE
     # gfx_3d.c provides it.
     ${CMAKE_SOURCE_DIR}/drivers/gfx_3d/gfx_3d.c
 
-    # USB-host keyboard. The board's USB-A port is owned by TinyUSB
-    # host stack so users can plug in a USB keyboard. Connect to the
-    # BASIC REPL via that keyboard + HDMI display, or via UART
-    # (Option.SerialConsole on GP0/GP1 per the pico_stretch board
-    # file). USB-CDC stdio is unavailable on this build because the
-    # USB controller is mode-exclusive (host vs device).
-    ${CMAKE_SOURCE_DIR}/drivers/usb_host_kbd/USBKeyboard.c
-    ${CMAKE_SOURCE_DIR}/drivers/usb_host_kbd/hal_keyboard_usb.c
 )
+
+# USB-A in host mode for a USB keyboard.
+usb_role(KEYBOARD)
 
 set_source_files_properties(${CMAKE_SOURCE_DIR}/third_party/cjson/cJSON.c PROPERTIES COMPILE_FLAGS -Os)
 
@@ -146,14 +141,5 @@ target_compile_options(PicoMite PRIVATE -Drp2350
                                         -DPICO_FLASH_SPI_CLKDIV=4
                                         -DPICO_PIO_USE_GPIO_BASE
                                         )
-target_link_libraries(PicoMite pico_multicore pico_cyw43_arch_lwip_poll
-                               tinyusb_host tinyusb_board)
+target_link_libraries(PicoMite pico_multicore pico_cyw43_arch_lwip_poll)
 pico_set_float_implementation(PicoMite pico_dcp)
-
-# USB-host keyboard config. HAL_PORT_KEYBOARD_USB_HOST=1 (set in
-# port_config.h) selects the USB-host backend in port-impl files;
-# usb_host_files dir holds the TinyUSB device-config headers
-# (tusb_config.h, etc.); stdio_usb=0 because the USB-A port is in
-# host mode for the keyboard.
-target_include_directories(PicoMite PRIVATE ${CMAKE_SOURCE_DIR}/usb_host_files)
-Pico_enable_stdio_usb(PicoMite 0)

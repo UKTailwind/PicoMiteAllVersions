@@ -55,7 +55,6 @@
  *                              1 = USB-host (drivers/usb_host_kbd/).
  * Wires up via port_sources.cmake linkage; configuration.h reads it for
  * USB-vs-PS/2 flash offset / magic key / heap top selection. */
-#define HAL_PORT_KEYBOARD_USB_HOST        0
 
 /* core1stack[] size in words. WEB never launches core1 — single canary
  * word satisfies MMBasic.c's overflow check at core1stack[0]. */

@@ -47,17 +47,9 @@ target_sources(PicoMite PRIVATE
 
 # Keyboard backend axis (USB host stack vs PS/2 matrix).
 if (COMPILE STREQUAL "PICOUSB")
-    target_sources(PicoMite PRIVATE
-        ${CMAKE_SOURCE_DIR}/drivers/usb_host_kbd/USBKeyboard.c
-        ${CMAKE_SOURCE_DIR}/drivers/usb_host_kbd/hal_keyboard_usb.c
-    )
+    usb_role(KEYBOARD)
 else()
-    target_sources(PicoMite PRIVATE
-        ${CMAKE_SOURCE_DIR}/drivers/ps2_matrix/Keyboard.c
-        ${CMAKE_SOURCE_DIR}/drivers/ps2_matrix/hal_keyboard_ps2.c
-        ${CMAKE_SOURCE_DIR}/drivers/console_cdc/console_cdc.c
-        ${CMAKE_SOURCE_DIR}/drivers/ps2_mouse/mouse.c
-    )
+    usb_role(CDC)
 endif()
 
 # Non-PicoCalc board hooks.
@@ -82,20 +74,11 @@ pico_define_boot_stage2(slower_boot2 ${PICO_DEFAULT_BOOT_STAGE2_FILE})
 target_compile_definitions(slower_boot2 PRIVATE PICO_FLASH_SPI_CLKDIV=4)
 pico_set_boot_stage2(PicoMite slower_boot2)
 
-# USB axis: device name + USB-host stack vs USB-CDC stdio.
+# Device name only — the USB-axis wiring is handled by usb_role() above.
 if (COMPILE STREQUAL "PICOUSB")
-    target_compile_options(PicoMite PRIVATE -DHAL_PORT_KEYBOARD_USB_HOST=1
-                                            -DHAL_PORT_DEVICE_NAME="PicoMiteUSB"
-                                            )
-    target_link_libraries(PicoMite tinyusb_host tinyusb_board)
-    target_include_directories(PicoMite PRIVATE
-        ${CMAKE_SOURCE_DIR}/usb_host_files
-    )
-    Pico_enable_stdio_usb(PicoMite 0)
+    target_compile_definitions(PicoMite PRIVATE HAL_PORT_DEVICE_NAME="PicoMiteUSB")
 else()
-    target_compile_options(PicoMite PRIVATE -DHAL_PORT_KEYBOARD_USB_HOST=0
-                                            -DHAL_PORT_DEVICE_NAME="PicoMite")
-    Pico_enable_stdio_usb(PicoMite 1)
+    target_compile_definitions(PicoMite PRIVATE HAL_PORT_DEVICE_NAME="PicoMite")
 endif()
 
 # Optional SDBOOT linker script — relocates firmware so a 256 KB

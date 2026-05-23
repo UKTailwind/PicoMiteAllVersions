@@ -77,12 +77,10 @@ target_sources(PicoMite PRIVATE
     # WEB rp2040 has no GUICONTROLS (no headroom for the widget family).
     ${CMAKE_SOURCE_DIR}/drivers/gui_controls/gui_controls_stub.c
 
-    # PS/2 keyboard (no USB variant for WEB rp2040).
-    ${CMAKE_SOURCE_DIR}/drivers/ps2_matrix/Keyboard.c
-        ${CMAKE_SOURCE_DIR}/drivers/ps2_matrix/hal_keyboard_ps2.c
-        ${CMAKE_SOURCE_DIR}/drivers/console_cdc/console_cdc.c
-    ${CMAKE_SOURCE_DIR}/drivers/ps2_mouse/mouse.c
 )
+
+# USB-A in device mode for the CDC console.
+usb_role(CDC)
 
 set_source_files_properties(${CMAKE_SOURCE_DIR}/third_party/cjson/cJSON.c PROPERTIES COMPILE_FLAGS -Os)
 
@@ -111,4 +109,3 @@ pico_define_boot_stage2(slower_boot2 ${PICO_DEFAULT_BOOT_STAGE2_FILE})
 target_compile_definitions(slower_boot2 PRIVATE PICO_FLASH_SPI_CLKDIV=4)
 pico_set_boot_stage2(PicoMite slower_boot2)
 
-Pico_enable_stdio_usb(PicoMite 1)

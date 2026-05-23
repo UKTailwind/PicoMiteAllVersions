@@ -45,17 +45,9 @@ target_sources(PicoMite PRIVATE
 )
 
 if (COMPILE STREQUAL "VGAUSB")
-    target_sources(PicoMite PRIVATE
-        ${CMAKE_SOURCE_DIR}/drivers/usb_host_kbd/USBKeyboard.c
-        ${CMAKE_SOURCE_DIR}/drivers/usb_host_kbd/hal_keyboard_usb.c
-    )
+    usb_role(KEYBOARD)
 else()
-    target_sources(PicoMite PRIVATE
-        ${CMAKE_SOURCE_DIR}/drivers/ps2_matrix/Keyboard.c
-        ${CMAKE_SOURCE_DIR}/drivers/ps2_matrix/hal_keyboard_ps2.c
-        ${CMAKE_SOURCE_DIR}/drivers/console_cdc/console_cdc.c
-        ${CMAKE_SOURCE_DIR}/drivers/ps2_mouse/mouse.c
-    )
+    usb_role(CDC)
 endif()
 
 # VGA scanout PIO (PIOmite I2S is generated globally for every device build).
@@ -81,16 +73,7 @@ target_compile_definitions(slower_boot2 PRIVATE PICO_FLASH_SPI_CLKDIV=4)
 pico_set_boot_stage2(PicoMite slower_boot2)
 
 if (COMPILE STREQUAL "VGAUSB")
-    target_compile_options(PicoMite PRIVATE -DHAL_PORT_KEYBOARD_USB_HOST=1
-                                            -DHAL_PORT_DEVICE_NAME="PicoMiteVGAUSB"
-                                            )
-    target_link_libraries(PicoMite tinyusb_host tinyusb_board)
-    target_include_directories(PicoMite PRIVATE
-        ${CMAKE_SOURCE_DIR}/usb_host_files
-    )
-    Pico_enable_stdio_usb(PicoMite 0)
+    target_compile_definitions(PicoMite PRIVATE HAL_PORT_DEVICE_NAME="PicoMiteVGAUSB")
 else()
-    target_compile_options(PicoMite PRIVATE -DHAL_PORT_KEYBOARD_USB_HOST=0
-                                            -DHAL_PORT_DEVICE_NAME="PicoMiteVGA")
-    Pico_enable_stdio_usb(PicoMite 1)
+    target_compile_definitions(PicoMite PRIVATE HAL_PORT_DEVICE_NAME="PicoMiteVGA")
 endif()
