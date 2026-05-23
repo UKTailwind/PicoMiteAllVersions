@@ -22,9 +22,13 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* Forward-declared in lieu of pulling in unistd.h. */
-char    *getcwd(char *buf, size_t size);
-unsigned sleep(unsigned seconds);
+/* POSIX getcwd — forward-declared so we don't have to drag in
+ * unistd.h, which would collide with Draw.h's setmode on BSD. On
+ * Windows, host_platform.h's <io.h> pre-include already declares
+ * getcwd (with a slightly different signature), so skip it. */
+#ifndef _WIN32
+char *getcwd(char *buf, size_t size);
+#endif
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
@@ -33,6 +37,7 @@ unsigned sleep(unsigned seconds);
 
 #include "host_fb.h"
 #include "host_terminal.h"
+#include "host_time.h"
 #include "ansi_terminal.h"
 #include "ansi_display.h"
 
@@ -307,7 +312,7 @@ int main(int argc, char **argv) {
                     "mmbasic_ansi: terminal is %dx%d cells, need %dx%d "
                     "for %dx%d framebuffer. Output will be letterboxed.\n",
                     cols, rows, width, need_rows, width, height);
-            sleep(1);
+            host_sleep_us(1000000);
         }
     }
 
