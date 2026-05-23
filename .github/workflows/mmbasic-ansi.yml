@@ -98,3 +98,69 @@ jobs:
           name: mmbasic_ansi-${{ matrix.label }}
           path: dist/mmbasic_ansi-${{ matrix.label }}
           if-no-files-found: error
+
+  release:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: mmbasic_ansi-*
+          path: dist
+
+      - name: Zip per-OS bundles
+        run: |
+          set -eux
+          mkdir -p release
+          cd dist
+          for d in */; do
+            name="${d%/}"
+            zip -r "../release/${name}.zip" "${name}"
+          done
+          ls -la ../release
+
+      - name: Upsert mmbasic-ansi-latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sha=$(git rev-parse --short HEAD)
+          date=$(git log -1 --format=%cI)
+          summary=$(git log -1 --format='%s')
+
+          cat > notes.md <<EOF
+          Rolling terminal-port build from \`main\`.
+
+          MMBasic running in your terminal via Unicode half-block
+          truecolor graphics. Bundle contains the binary, a README,
+          and the WASM port's demo set.
+
+          **Commit:** [\`$sha\`](https://github.com/${{ github.repository }}/commit/${{ github.sha }}) - $summary
+          **Built:** $date
+
+          ### Downloads
+
+          | Platform | File |
+          |---|---|
+          | Linux x64 | \`mmbasic_ansi-linux-x64.zip\` |
+          | macOS universal | \`mmbasic_ansi-macos-universal.zip\` |
+          | Windows x64 | \`mmbasic_ansi-windows-x64.zip\` |
+
+          Each zip unpacks to a single \`mmbasic_ansi-<label>/\` folder
+          with the binary + demos. See the bundled \`README.md\` for
+          the full CLI flag reference.
+          EOF
+
+          gh release delete mmbasic-ansi-latest --cleanup-tag --yes 2>/dev/null || true
+          git push origin :refs/tags/mmbasic-ansi-latest 2>/dev/null || true
+          gh release create mmbasic-ansi-latest \
+              --title "Latest terminal build" \
+              --notes-file notes.md \
+              --target "${{ github.sha }}" \
+              release/*
