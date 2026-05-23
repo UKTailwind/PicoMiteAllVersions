@@ -47,13 +47,7 @@ target_sources(PicoMite PRIVATE
     ${CMAKE_SOURCE_DIR}/shared/net/MMweb_stubs.c
 )
 
-# Console and legacy keyboard/mouse backends.
-target_sources(PicoMite PRIVATE
-    ${CMAKE_SOURCE_DIR}/drivers/ps2_matrix/Keyboard.c
-    ${CMAKE_SOURCE_DIR}/drivers/ps2_matrix/hal_keyboard_ps2.c
-    ${CMAKE_SOURCE_DIR}/drivers/console_cdc/console_cdc.c
-    ${CMAKE_SOURCE_DIR}/drivers/ps2_mouse/mouse.c
-)
+usb_role(CDC)
 
 # PicoCalc board hooks.
 target_sources(PicoMite PRIVATE
@@ -76,10 +70,7 @@ target_compile_options(PicoMite PRIVATE -Drp2350
 target_link_libraries(PicoMite pico_multicore)
 pico_set_float_implementation(PicoMite pico_dcp)
 
-# USB CDC console.
-target_compile_options(PicoMite PRIVATE -DHAL_PORT_KEYBOARD_USB_HOST=0
-                                        -DHAL_PORT_DEVICE_NAME="PicoCalc")
-Pico_enable_stdio_usb(PicoMite 1)
+target_compile_definitions(PicoMite PRIVATE HAL_PORT_DEVICE_NAME="PicoCalc")
 
 if (SDBOOT STREQUAL "true")
     pico_set_linker_script(PicoMite ${CMAKE_SOURCE_DIR}/cmake/linker/memmap_default_rp2350.ld)

@@ -87,12 +87,10 @@ target_sources(PicoMite PRIVATE
     # No GUICONTROLS in VGA+WiFi composition.
     ${CMAKE_SOURCE_DIR}/drivers/gui_controls/gui_controls_stub.c
 
-    # PS/2 keyboard (no USB variant for this validation port).
-    ${CMAKE_SOURCE_DIR}/drivers/ps2_matrix/Keyboard.c
-        ${CMAKE_SOURCE_DIR}/drivers/ps2_matrix/hal_keyboard_ps2.c
-        ${CMAKE_SOURCE_DIR}/drivers/console_cdc/console_cdc.c
-    ${CMAKE_SOURCE_DIR}/drivers/ps2_mouse/mouse.c
 )
+
+# USB-A in device mode for the CDC console.
+usb_role(CDC)
 
 set_source_files_properties(${CMAKE_SOURCE_DIR}/third_party/cjson/cJSON.c PROPERTIES COMPILE_FLAGS -Os)
 
@@ -127,4 +125,3 @@ target_compile_options(PicoMite PRIVATE -Drp2350
 target_link_libraries(PicoMite pico_multicore pico_cyw43_arch_lwip_poll)
 pico_set_float_implementation(PicoMite pico_dcp)
 
-Pico_enable_stdio_usb(PicoMite 1)

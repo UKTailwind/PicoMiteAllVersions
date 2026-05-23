@@ -49,17 +49,9 @@ target_sources(PicoMite PRIVATE
 
 # Keyboard backend axis.
 if (COMPILE STREQUAL "PICOUSBRP2350")
-    target_sources(PicoMite PRIVATE
-        ${CMAKE_SOURCE_DIR}/drivers/usb_host_kbd/USBKeyboard.c
-        ${CMAKE_SOURCE_DIR}/drivers/usb_host_kbd/hal_keyboard_usb.c
-    )
+    usb_role(KEYBOARD)
 else()
-    target_sources(PicoMite PRIVATE
-        ${CMAKE_SOURCE_DIR}/drivers/ps2_matrix/Keyboard.c
-        ${CMAKE_SOURCE_DIR}/drivers/ps2_matrix/hal_keyboard_ps2.c
-        ${CMAKE_SOURCE_DIR}/drivers/console_cdc/console_cdc.c
-        ${CMAKE_SOURCE_DIR}/drivers/ps2_mouse/mouse.c
-    )
+    usb_role(CDC)
 endif()
 
 # Non-PicoCalc board hooks.
@@ -82,20 +74,11 @@ target_compile_options(PicoMite PRIVATE -Drp2350
 target_link_libraries(PicoMite pico_multicore)
 pico_set_float_implementation(PicoMite pico_dcp)
 
-# USB axis.
+# Device name only — USB axis wiring is in usb_role() above.
 if (COMPILE STREQUAL "PICOUSBRP2350")
-    target_compile_options(PicoMite PRIVATE -DHAL_PORT_KEYBOARD_USB_HOST=1
-                                            -DHAL_PORT_DEVICE_NAME="PicoMiteUSB"
-                                            )
-    target_link_libraries(PicoMite tinyusb_host tinyusb_board)
-    target_include_directories(PicoMite PRIVATE
-        ${CMAKE_SOURCE_DIR}/usb_host_files
-    )
-    Pico_enable_stdio_usb(PicoMite 0)
+    target_compile_definitions(PicoMite PRIVATE HAL_PORT_DEVICE_NAME="PicoMiteUSB")
 else()
-    target_compile_options(PicoMite PRIVATE -DHAL_PORT_KEYBOARD_USB_HOST=0
-                                            -DHAL_PORT_DEVICE_NAME="PicoMite")
-    Pico_enable_stdio_usb(PicoMite 1)
+    target_compile_definitions(PicoMite PRIVATE HAL_PORT_DEVICE_NAME="PicoMite")
 endif()
 
 if (SDBOOT STREQUAL "true" AND COMPILE STREQUAL "PICORP2350")

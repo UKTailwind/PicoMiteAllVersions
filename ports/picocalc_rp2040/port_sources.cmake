@@ -45,13 +45,7 @@ target_sources(PicoMite PRIVATE
     ${CMAKE_SOURCE_DIR}/shared/net/MMweb_stubs.c
 )
 
-# Console and legacy keyboard/mouse backends.
-target_sources(PicoMite PRIVATE
-    ${CMAKE_SOURCE_DIR}/drivers/ps2_matrix/Keyboard.c
-    ${CMAKE_SOURCE_DIR}/drivers/ps2_matrix/hal_keyboard_ps2.c
-    ${CMAKE_SOURCE_DIR}/drivers/console_cdc/console_cdc.c
-    ${CMAKE_SOURCE_DIR}/drivers/ps2_mouse/mouse.c
-)
+usb_role(CDC)
 
 # PicoCalc board hooks.
 target_sources(PicoMite PRIVATE
@@ -76,10 +70,7 @@ pico_define_boot_stage2(slower_boot2 ${PICO_DEFAULT_BOOT_STAGE2_FILE})
 target_compile_definitions(slower_boot2 PRIVATE PICO_FLASH_SPI_CLKDIV=4)
 pico_set_boot_stage2(PicoMite slower_boot2)
 
-# USB CDC console.
-target_compile_options(PicoMite PRIVATE -DHAL_PORT_KEYBOARD_USB_HOST=0
-                                        -DHAL_PORT_DEVICE_NAME="PicoCalc")
-Pico_enable_stdio_usb(PicoMite 1)
+target_compile_definitions(PicoMite PRIVATE HAL_PORT_DEVICE_NAME="PicoCalc")
 
 # Optional SDBOOT linker script — relocates firmware so a 256 KB
 # bootloader can sit in the first part of flash.

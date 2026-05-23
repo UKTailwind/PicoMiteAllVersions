@@ -48,11 +48,7 @@
  * GUICONTROLS off — no touch panel on a DVI display. */
 #define HAL_PORT_HAS_WIFI                1
 #define HAL_PORT_HAS_GUICONTROLS         0
-/* Keyboard backend selector: 0 = no physical keyboard / CDC-only console
- * (drivers/console_cdc/), 1 = USB-host (drivers/usb_host_kbd/).
- * Wires up via port_sources.cmake linkage; configuration.h reads it for
- * USB-vs-non-USB flash offset / magic key / heap top selection. */
-#define HAL_PORT_KEYBOARD_USB_HOST        1
+/* HAL_PORT_KEYBOARD_USB_HOST is set by usb_role() in port_sources.cmake. */
 
 /* core1stack[] size in words. HDMI runs the DVI scanout loop on core1
  * (hdmi_scanout::HDMICore, 512-byte stack). */

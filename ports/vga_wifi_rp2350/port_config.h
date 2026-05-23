@@ -50,7 +50,6 @@
  *                              1 = USB-host (drivers/usb_host_kbd/).
  * Wires up via port_sources.cmake linkage; configuration.h reads it for
  * USB-vs-PS/2 flash offset / magic key / heap top selection. */
-#define HAL_PORT_KEYBOARD_USB_HOST        0
 
 /* core1stack[] in words. QVGA scanout core1 (vga_qvga_modes::QVgaCore)
  * needs 128 words; CYW43 polled stack runs on core0, no extra core1
