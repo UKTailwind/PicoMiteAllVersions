@@ -264,7 +264,6 @@ int main(int argc, char **argv) {
     int width = 0, height = 0;            /* 0 = auto-fit terminal */
     int use_interpreter = 0;
     const char *filename = NULL;
-    int  cli_repeat_start = 0, cli_repeat_rate = 0;   /* 0 = leave default */
     int  cli_slowdown_us  = -1;                       /* -1 = leave default */
     int  cli_memory_kb    = 0;                        /* 0 = leave default */
 
@@ -278,17 +277,6 @@ int main(int argc, char **argv) {
                 fprintf(stderr, "Bad --resolution (expected WxH, e.g. 320x320)\n");
                 return 2;
             }
-        } else if (strcmp(argv[i], "--repeat") == 0 && i + 1 < argc) {
-            int initial = 0, rate = 0;
-            if (sscanf(argv[++i], "%d,%d", &initial, &rate) != 2 ||
-                initial < 50 || initial > 2000 || rate < 10 || rate > 1000) {
-                fprintf(stderr, "Bad --repeat (expected INITIAL_MS,RATE_MS, "
-                                "e.g. 600,200; 50<=initial<=2000, "
-                                "10<=rate<=1000)\n");
-                return 2;
-            }
-            cli_repeat_start = initial;
-            cli_repeat_rate  = rate;
         } else if (strcmp(argv[i], "--slowdown") == 0 && i + 1 < argc) {
             char *end = NULL;
             long us = strtol(argv[++i], &end, 10);
@@ -324,8 +312,6 @@ int main(int argc, char **argv) {
             printf("  --resolution WxH        Framebuffer size (default: auto-fit terminal).\n");
             printf("  --modes N:WxH,...       Override MODE-N table entries (1..%d).\n", ansi_mode_max());
             printf("                          e.g. --modes 1:320x200,2:640x480\n");
-            printf("  --repeat INIT,RATE      Keyboard repeat in ms (50..2000, 10..1000).\n");
-            printf("                          e.g. --repeat 600,200\n");
             printf("  --slowdown US           Insert US microseconds of sleep per BASIC tick\n");
             printf("                          for device-like pacing. 0 disables.\n");
             printf("  --memory KB             MMBasic heap size in KB (16..%u).\n",
@@ -397,13 +383,6 @@ int main(int argc, char **argv) {
     }
 
     if (ansi_boot(width, height) != 0) return 1;
-
-    /* --repeat: Option is initialised by ansi_boot's runtime init,
-     * so overrides land here. Terminals still drive their own key
-     * repeat, but BASIC programs that read these options see the
-     * configured values. */
-    if (cli_repeat_start) Option.RepeatStart = cli_repeat_start;
-    if (cli_repeat_rate)  Option.RepeatRate  = cli_repeat_rate;
 
     int rc;
     if (filename) {

@@ -34,7 +34,6 @@ a pipe.
 |---|---|
 | `--resolution WxH` | Framebuffer size (default: auto-fit terminal). |
 | `--modes N:WxH,...` | Override MODE-N table entries (1..5). e.g. `--modes 1:320x200,2:640x480`. |
-| `--repeat INIT,RATE` | Keyboard repeat in ms (50..2000, 10..1000). Populates `Option.RepeatStart`/`RepeatRate` for BASIC programs that read them; the OS terminal still drives its own repeat. |
 | `--slowdown US` | Per-tick microsleep for device-like pacing (0 disables). Accumulator-based so sub-ms values still take effect on Windows. |
 | `--memory KB` | MMBasic heap size in KB (16..2048). Can only shrink — `AllMemory[]` is sized at compile time. |
 | `--interp` / `--vm` | Run via the interpreter or the bytecode VM (default: `--vm`). |
@@ -50,6 +49,16 @@ a pipe.
 
 Ctrl-C also exits cleanly (POSIX via SIGINT, Windows via
 `SetConsoleCtrlHandler`).
+
+### Keyboard repeat
+
+Keys reach the port via stdin in raw mode, and the **OS terminal layer
+drives the repeat rate when a key is held** — neither the port nor
+`Option.RepeatStart` / `Option.RepeatRate` control it. The hardware
+keyboard drivers (`drivers/i2c_picocalc_kbd`, `drivers/ps2_matrix`,
+`drivers/usb_host_kbd`) on device ports own that timing; the ANSI port
+doesn't link them. Adjust the terminal's repeat speed in its
+preferences (or via `xset r rate` on X11) instead.
 
 ## Terminal size
 
