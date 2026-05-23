@@ -17,7 +17,10 @@
 
 void console_cdc_boot_setup(void) {
     stdio_set_translate_crlf(&stdio_usb, false);
-    if (!(Option.SerialConsole == 1 || Option.SerialConsole == 2) || Option.Telnet == -1) {
+    /* Always wait briefly for the CDC host to attach. CDC is an
+     * unconditional console whenever this driver is linked, so the
+     * boot wait is no longer gated on Option.SerialConsole. */
+    if (Option.Telnet != -1) {
         uint64_t t = time_us_64();
         while (1) {
             if (tud_cdc_connected()) break;
@@ -27,24 +30,25 @@ void console_cdc_boot_setup(void) {
 }
 
 void console_cdc_putc(char c, int flush) {
-    if (Option.SerialConsole == 0 || Option.SerialConsole > 4) {
-        if (tud_cdc_connected()) {
-            putc(c, stdout);
-            if (flush) {
-                fflush(stdout);
-            }
+    /* CDC is always a console when compiled in and the host is
+     * connected, regardless of Option.SerialConsole. That makes CDC a
+     * permanent recovery channel: a user who sets OPTION SERIAL
+     * CONSOLE and disconnects their UART can still get into the REPL
+     * over CDC. Output to UART is layered on top in SerialConsolePutC
+     * when Option.SerialConsole is non-zero. */
+    if (tud_cdc_connected()) {
+        putc(c, stdout);
+        if (flush) {
+            fflush(stdout);
         }
     }
 }
 
 void console_cdc_drain_to_rxbuf(void) {
     int c;
-    /* Pump CDC bytes whenever a host is connected and the active console
-     * is stdio (Option.SerialConsole == 0 || > 4). The historical
-     * `Option.Telnet != -1` gate that wrapped this on WiFi ports was
-     * redundant — without telnet configured, the CDC console is the
-     * only way for a developer to type at the REPL on those ports. */
-    if (tud_cdc_connected() && (Option.SerialConsole == 0 || Option.SerialConsole > 4)) {
+    /* Pump CDC bytes whenever a host is connected — no Option gating.
+     * See console_cdc_putc for rationale. */
+    if (tud_cdc_connected()) {
         while ((c = tud_cdc_read_char()) != -1) {
             ConsoleRxBuf[ConsoleRxBufHead] = c;
             if (BreakKey && ConsoleRxBuf[ConsoleRxBufHead] == BreakKey) {

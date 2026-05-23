@@ -24,15 +24,17 @@ extern "C" {
 
 /* Disable CRLF translation on the CDC pipe and wait up to 5 s for the
  * host to grab the port (so banner output isn't dropped). Skipped if
- * the user has explicitly chosen UART-1/2 with no Telnet client. */
+ * Telnet is disabled outright (Option.Telnet == -1). */
 void console_cdc_boot_setup(void);
 
-/* Write one byte to CDC if connected and the active console is CDC
- * (Option.SerialConsole == 0 || > 4). No-op otherwise. */
+/* Write one byte to CDC if a host is connected. Always-on whenever
+ * compiled in — Option.SerialConsole no longer gates this, so CDC is
+ * a permanent recovery channel even if the user routed output to
+ * UART. UART output is layered on top in SerialConsolePutC. */
 void console_cdc_putc(char c, int flush);
 
 /* Drain available CDC bytes into ConsoleRxBuf, honouring BreakKey and
- * keyselect. No-op if not connected or the active console is a UART. */
+ * keyselect. Active whenever a host is connected. */
 void console_cdc_drain_to_rxbuf(void);
 
 #ifdef __cplusplus
