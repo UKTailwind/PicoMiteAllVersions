@@ -34,28 +34,15 @@ THIRD_PARTY_CFLAGS := -I$(REPO_ROOT)/third_party/aes \
 # Compiler-table sizes come from ports/mmbasic_ansi/port_config.h
 # (which pulls in ports/bc_tables_rp2350.h).  No build-flag dispatch.
 
-UNAME_S := $(shell uname -s 2>/dev/null)
-ifneq (,$(filter MINGW% MSYS% UCRT% CYGWIN%,$(UNAME_S)))
-  IS_WINDOWS := 1
-else ifeq ($(OS),Windows_NT)
-  IS_WINDOWS := 1
-endif
-
 ifdef IS_WINDOWS
 # Suppress mingw-w64's POSIX-alias declarations in <io.h> (setmode,
 # read, write, close, etc.). MMBasic owns the name `setmode` via
 # Draw.h, and on Windows that collides with <io.h>'s POSIX alias of
 # `_setmode`. POSIX I/O is still available — unistd.h declares
 # read/write/isatty separately and isn't gated on NO_OLDNAMES.
-PLATFORM_DEFS     := -DNO_OLDNAMES -D_NO_OLDNAMES
-LDFLAGS           := -lm -lpthread
-HOST_TERMINAL_SRC := host_terminal_win32.c
-ANSI_RESIZE_SRC   := ansi_terminal_resize_win32.c
+PLATFORM_DEFS := -DNO_OLDNAMES -D_NO_OLDNAMES
 else
-PLATFORM_DEFS     :=
-LDFLAGS           := -lm -lpthread
-HOST_TERMINAL_SRC := host_terminal.c
-ANSI_RESIZE_SRC   := ansi_terminal_resize_posix.c
+PLATFORM_DEFS :=
 endif
 
 CFLAGS = -std=gnu11 -g -O2 -Wall -Wno-unused-variable -Wno-unused-function \
@@ -68,6 +55,23 @@ CFLAGS = -std=gnu11 -g -O2 -Wall -Wno-unused-variable -Wno-unused-function \
          $(THIRD_PARTY_CFLAGS) \
          -I$(PORT_DIR) -I$(HOST_DIR) -I$(PICO_COMPAT_DIR) -I$(REPO_ROOT)/core/mmbasic -I$(REPO_ROOT)/runtime/vm -I$(REPO_ROOT)/shared/gfx -I$(REPO_ROOT)/shared/audio -I$(REPO_ROOT)/shared/mmbasic -I$(REPO_ROOT)/drivers/bmp_decoder -I$(REPO_ROOT)/drivers/gps -I$(REPO_ROOT)/drivers/gui_controls -I$(REPO_ROOT)/drivers/gui_touch -I$(REPO_ROOT)/drivers/i2c_bus -I$(REPO_ROOT)/drivers/onewire -I$(REPO_ROOT)/drivers/psram_heap -I$(REPO_ROOT)/drivers/serial -I$(REPO_ROOT)/drivers/spi_bus -I$(REPO_ROOT)/drivers/spi_lcd -I$(REPO_ROOT)/drivers/ssd1963 -I$(REPO_ROOT) \
          -MMD -MP
+
+UNAME_S := $(shell uname -s 2>/dev/null)
+ifneq (,$(filter MINGW% MSYS% UCRT% CYGWIN%,$(UNAME_S)))
+  IS_WINDOWS := 1
+else ifeq ($(OS),Windows_NT)
+  IS_WINDOWS := 1
+endif
+
+ifdef IS_WINDOWS
+LDFLAGS           := -lm -lpthread
+HOST_TERMINAL_SRC := host_terminal_win32.c
+ANSI_RESIZE_SRC   := ansi_terminal_resize_win32.c
+else
+LDFLAGS           := -lm -lpthread
+HOST_TERMINAL_SRC := host_terminal.c
+ANSI_RESIZE_SRC   := ansi_terminal_resize_posix.c
+endif
 
 # Core MMBasic (same list as host_native — keeps core/mmbasic/Editor.c + REPL + Prompt
 # so the interactive REPL and EDIT both work).
