@@ -76,20 +76,25 @@ jobs:
         working-directory: ports/mmbasic_ansi
         run: make -j$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 2)
 
-      - name: Stage artifact
-        working-directory: ports/mmbasic_ansi
+      - name: Stage release bundle
+        shell: bash
         run: |
-          mkdir -p dist
-          if [ -f "${{ matrix.binary }}" ]; then
-            cp "${{ matrix.binary }}" "dist/${{ matrix.binary }}"
+          set -eux
+          BUNDLE="mmbasic_ansi-${{ matrix.label }}"
+          mkdir -p "dist/$BUNDLE"
+          BIN="ports/mmbasic_ansi/${{ matrix.binary }}"
+          if [ -f "$BIN" ]; then
+            cp "$BIN" "dist/$BUNDLE/"
           else
             # Some toolchains may emit without .exe; fall back to whatever's there.
-            cp mmbasic_ansi* dist/ 2>/dev/null || true
+            cp ports/mmbasic_ansi/mmbasic_ansi* "dist/$BUNDLE/" 2>/dev/null || true
           fi
-          ls -la dist
+          cp -R ports/host_wasm/demos "dist/$BUNDLE/demos"
+          cp -f ports/mmbasic_ansi/README.md "dist/$BUNDLE/README.md" 2>/dev/null || true
+          ls -la "dist/$BUNDLE"
 
       - uses: actions/upload-artifact@v4
         with:
           name: mmbasic_ansi-${{ matrix.label }}
-          path: ports/mmbasic_ansi/dist/*
+          path: dist/mmbasic_ansi-${{ matrix.label }}
           if-no-files-found: error
