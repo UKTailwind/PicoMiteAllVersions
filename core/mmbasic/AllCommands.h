@@ -115,6 +115,7 @@ void cmd_polygon(void);
 void cmd_gui(void);
 void cmd_tile(void);
 void cmd_mode(void);
+void cmd_quit(void);
 void cmd_3D(void);
 void cmd_framebuffer(void);
 void cmd_fastgfx(void);
