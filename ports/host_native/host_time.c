@@ -23,7 +23,7 @@ static void host_sync_msec_timer_value(uint64_t now_us) {
     mSecTimer = (int64_t)(now_us / 1000ULL);
     /* CursorTimer ticks at 1kHz on device via the timer IRQ in
      * PicoMite.c:884. On host there's no IRQ — synthesize it from the
-     * monotonic clock so ShowCursor's blink math works. */
+     * monotonic clock so Display_ShowCursor's blink math works. */
     CursorTimer = (int)((now_us / 1000ULL) % (CURSOR_OFF + CURSOR_ON));
 }
 

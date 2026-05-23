@@ -65,7 +65,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
     extern void WriteData(int data);
     extern int display_backlight;
     // cursor definition
-    extern void ShowCursor(int show);
+    extern void Display_ShowCursor(int show);
     extern volatile int CursorTimer;                                // used to time the flashing cursor
     extern volatile int ClickTimer;                                 // used to time the click when touch occurs
     extern volatile int TouchTimer;                                 // used to time the response to touch

@@ -1167,11 +1167,11 @@ void MIPS16 cmd_new(void) {
     hal_flash_erase(realflashpointer, MAX_PROG_SIZE);
     FlashWriteByte(0); FlashWriteByte(0); FlashWriteByte(0);    // terminate the program in flash
     FlashWriteClose();
-	/* setmode is a no-op on non-VGA ports (drivers/vga_pio/
+	/* Display_SetMode is a no-op on non-VGA ports (drivers/vga_pio/
 	 * vga_ops_stub.c); DISPLAY_TYPE is never a SCREENMODE there. */
 	{
 		int mode = DISPLAY_TYPE-SCREENMODE1+1;
-		setmode(mode, true);
+		Display_SetMode(mode, true);
 	}
     memset(inpbuf,0,STRINGSIZE);
 	longjmp(mark, 1);							                    // jump back to the input prompt
@@ -1479,7 +1479,7 @@ if(Option.SerialConsole)while(ConsoleTxBufHead!=ConsoleTxBufTail)routinechecks()
 	OptionConsole=3;
 	{
 		int mode = DISPLAY_TYPE-SCREENMODE1+1;
-		setmode(mode,false);
+		Display_SetMode(mode,false);
 	}
 	SSPrintString("\033[?25h"); //in case application has turned the cursor off
 	ApplyPromptConsoleColours();
@@ -2565,12 +2565,12 @@ static inline uint16_t framegetchar(int x, int y ){
 }
 static void SCursor(int x, int y) {
     char s[30];
-	ShowCursor(0);
+	Display_ShowCursor(0);
 	CurrentX=x*gui_font_width;
 	CurrentY=y*gui_font_height;
 	sprintf(s,"\033[%d;%dH",y+1,x+1);
 	SSPrintString(s);
-	ShowCursor(framecursor);
+	Display_ShowCursor(framecursor);
 }
 static void SColour(int colour, int fore){
     char s[24]={0};
@@ -2616,7 +2616,7 @@ void cmd_frame(void){
 			framecursor=true;
 			SSPrintString("\033[?25h");
 		} else if(checkstring(p,(unsigned char *)"OFF")){
-			ShowCursor(0);
+			Display_ShowCursor(0);
 			framecursor=false;
 			SSPrintString("\033[?25l");
 		} else {
@@ -2834,7 +2834,7 @@ void cmd_frame(void){
 		int sx=CurrentX/gui_font_width,sy=CurrentY/gui_font_height;
 		int ccursor=framecursor;
 		framecursor=0;
-		ShowCursor(0);
+		Display_ShowCursor(0);
 		SColour(gui_bcolour,0);
 		for(int y=0;y<framey;y++){
 			for(int x=0;x<framex;x++){
@@ -2861,7 +2861,7 @@ void cmd_frame(void){
 		gui_fcolour=savefcol;
 		SCursor(sx,sy);
 		framecursor=ccursor;
-		ShowCursor(framecursor);
+		Display_ShowCursor(framecursor);
 		if(DISPLAY_TYPE==SCREENMODE1)tilefcols[sy*X_TILE+sx]=Option.VGAFC;
 		SColour(gui_fcolour,1);
 	} else {

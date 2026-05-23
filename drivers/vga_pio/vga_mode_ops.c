@@ -5,7 +5,7 @@
  * Includes:
  *   - cmd_colourmap   : remap of 16-colour RGB121 palette
  *   - fun_map / cmd_map : SCREENMODE-specific colour quantisation
- *   - settiles / cmd_mode / setmode : screen-mode dispatch and init
+ *   - settiles / cmd_mode / Display_SetMode : screen-mode dispatch and init
  *   - cmd_tile / fun_getscanline / cmd_tile_write helpers
  *
  * Linked only into PICOMITEVGA targets (VGA + HDMI). HDMI vs VGA
@@ -549,7 +549,7 @@ void fun_map(void){
             break;
     }
 }
-void setmode(int mode, bool clear){
+void Display_SetMode(int mode, bool clear){
     closeframebuffer('A');
     if(clear)memset((void *)FRAMEBUFFER,0,framebuffersize);
     hal_vga_ops_wait_scanline_zero();
@@ -620,5 +620,5 @@ if(DISPLAY_TYPE==SCREENMODE1){
 
 void cmd_mode(void){
     int mode =getint(cmdline,1,MAXMODES);
-    setmode(mode, true);
+    Display_SetMode(mode, true);
 }

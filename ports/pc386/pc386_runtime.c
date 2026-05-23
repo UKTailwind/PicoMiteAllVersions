@@ -326,15 +326,15 @@ int MMgetchar(void) {
      * hlt order matters: cli/sti would race with the IRQ posting, so
      * we accept a possible spurious wake and re-check on every loop. */
     for (;;) {
-        ShowCursor(1);
+        Display_ShowCursor(1);
         int c = kbd_get_key();
         if (c >= 0) {
-            ShowCursor(0);
+            Display_ShowCursor(0);
             return c;
         }
         int s = serial_getc_nonblock();
         if (s >= 0) {
-            ShowCursor(0);
+            Display_ShowCursor(0);
             if (s == 0x1b) return mmbasic_escdecode_run(pc386_escdecode_read_byte_ms);
             return mmbasic_console_normalise_byte(s);
         }

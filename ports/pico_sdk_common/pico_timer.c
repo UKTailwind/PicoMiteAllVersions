@@ -76,7 +76,7 @@ void __not_in_flash_func(routinechecks)(void){
         NunchuckTimer=0;
     }
 /*frame
-    if(frame && CurrentLinePtr)ShowCursor(framecursor);
+    if(frame && CurrentLinePtr)Display_ShowCursor(framecursor);
 */
 }
 

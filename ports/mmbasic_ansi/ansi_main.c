@@ -22,8 +22,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* unistd.h conflicts with Draw.h's setmode(); host_main.c works around
- * this by forward-declaring the unistd symbols it needs. */
+/* Forward-declared in lieu of pulling in unistd.h. */
 char    *getcwd(char *buf, size_t size);
 unsigned sleep(unsigned seconds);
 

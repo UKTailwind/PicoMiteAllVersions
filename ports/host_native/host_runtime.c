@@ -443,7 +443,7 @@ static void host_runtime_check_timeout(void) {
     host_framebuffer_service();
     host_sim_apply_slowdown();
     /* Always refresh the msec/CursorTimer so code that polls without
-     * going through host_sleep_us (e.g. the Editor's ShowCursor+MMInkey
+     * going through host_sleep_us (e.g. the Editor's Display_ShowCursor+MMInkey
      * loop) still sees time advance. On device the 1ms timer IRQ does
      * this; here we piggy-back on every MMInkey/routinechecks call. */
     uint64_t now = host_time_us_64();

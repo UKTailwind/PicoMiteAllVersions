@@ -69,7 +69,7 @@ int hal_vga_assign_hdmi_screenmode(int display_type);
  * the framebuffer + writes the initial tile colors. */
 void hal_vga_init_screenmode_tiles(void);
 
-/* Mode-1 tile init at the start of setmode (rp2350 only). HDMI
+/* Mode-1 tile init at the start of Display_SetMode (rp2350 only). HDMI
  * calls mapreset(); pure-VGA assigns tilefcols/tilebcols pointers. */
 void hal_vga_setmode_mode1_pre_reset(void);
 

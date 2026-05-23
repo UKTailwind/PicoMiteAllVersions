@@ -8,7 +8,7 @@ static void __not_in_flash_func(picomite_runtime_checkabort_service)(void) {
 static void __not_in_flash_func(picomite_runtime_before_abort)(void) {
     WDTimer = 0;                                                // turn off the watchdog timer
     calibrate=0;
-    ShowCursor(false);
+    Display_ShowCursor(false);
     hal_display_merge_abort();
 }
 

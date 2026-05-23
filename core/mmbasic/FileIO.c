@@ -3116,7 +3116,7 @@ void MIPS16 cmd_files(void)
             MMPrintString("PRESS ANY KEY ...");
             Option.NoScroll = noscroll2;
             do {
-                ShowCursor(1);
+                Display_ShowCursor(1);
                 ProcessWeb(1);
                 routinechecks();
                 if (MMAbort) {
@@ -3124,7 +3124,7 @@ void MIPS16 cmd_files(void)
                     else lfs_dir_close(&lfs, &lfs_dir);
                     WDTimer = 0;
                     memset(inpbuf, 0, STRINGSIZE);
-                    ShowCursor(false);
+                    Display_ShowCursor(false);
                     FatFSFileSystem = FatFSFileSystemSave;
                     PromptFont = oldfont;
                     cmd_files_restore_program_context();
@@ -3138,7 +3138,7 @@ void MIPS16 cmd_files(void)
                 }
                 cmd_files_pump_console_key(&c);
             } while (c == -1);
-            ShowCursor(0);
+            Display_ShowCursor(0);
             MMPrintString("\r                 \r");
             if(Option.DISPLAY_CONSOLE){ClearScreen(gui_bcolour);CurrentX=0;CurrentY=0;}
             ListCnt = 2;
@@ -3789,7 +3789,7 @@ void CheckSDCard(void)
             s = SDCardStat;
             s |= (STA_NODISK | STA_NOINIT);
             SDCardStat = s;
-            ShowCursor(false);
+            Display_ShowCursor(false);
             if(!CurrentLinePtr)MMPrintString("Warning: SDcard Removed\r\n> ");
             FatFSFileSystem=0;
         }

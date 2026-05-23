@@ -2,8 +2,8 @@
  * host_fs.c — POSIX filesystem helpers for the host REPL.
  *
  * Isolated from MMBasic_Includes.h because both FatFS (ff.h) and POSIX
- * (dirent.h) declare DIR, and POSIX unistd.h's setmode() collides with
- * MMBasic's graphics setmode(). Keeping this code here means those
+ * (dirent.h) declare DIR, and POSIX unistd.h's Display_SetMode() collides with
+ * MMBasic's graphics Display_SetMode(). Keeping this code here means those
  * headers never meet.
  */
 

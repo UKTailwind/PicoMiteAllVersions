@@ -502,7 +502,7 @@ int getColour(char *c, int minus){
  * non-VGA targets ever install it (restorepanel / setframebuffer etc.
  * assign DrawPixel = DrawPixelNormal on the SPI-LCD and SSD1963
  * paths); VGA uses DrawPixel16 / DrawPixel2 / DrawPixel555 / … set
- * from setmode() in drivers/vga_pio/vga_mode_ops.c. Unconditional
+ * from Display_SetMode() in drivers/vga_pio/vga_mode_ops.c. Unconditional
  * here so the symbol exists on every link. */
 void DrawPixelNormal(int x, int y, int c) {
     DrawRectangle(x, y, x, y, c);
@@ -5982,4 +5982,4 @@ void DrawFilledCircle(int x, int y, int radius, int r, int fill, int ints_per_li
 
         } while(a <= b);
 }
-/* DisplayPutC and ShowCursor live in gfx_console_shared.c (shared with --sim). */
+/* DisplayPutC and Display_ShowCursor live in gfx_console_shared.c (shared with --sim). */

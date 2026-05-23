@@ -195,7 +195,7 @@ void DisplayPutC(char c) {
  is incremented every millisecond by the device timer interrupt (or by the
  host sim's wall-clock sync).
  *****************************************************************************************/
-void ShowCursor(int show) {
+void Display_ShowCursor(int show) {
   static int visible = false;
   int newstate;
   if(!Option.DISPLAY_CONSOLE) return;

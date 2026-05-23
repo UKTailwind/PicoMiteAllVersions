@@ -412,7 +412,7 @@ int FileLoadCMM2Program(char *fname, bool message) {
     (void)fname; (void)message;
     return 0;
 }
-/* setmode stub moved to drivers/vga_pio/vga_ops_stub.c (which host
+/* Display_SetMode stub moved to drivers/vga_pio/vga_ops_stub.c (which host
  * links as part of the CORE_SRCS) so Commands.c / Draw.c can call it
  * without a target-macro gate. */
 /* copyframetoscreen: host has no LCD to push to — this stub covers

@@ -95,10 +95,10 @@ int MMINKEY_DECL(MMInkey)(void) {
 int MMgetchar(void) {
 	int c;
 	do {
-		ShowCursor(1);
+		Display_ShowCursor(1);
 		c=MMInkey();
 	} while(c == -1);
-	ShowCursor(0);
+	Display_ShowCursor(0);
 	return c;
 }
 // MMPrintString / SSPrintString live in runtime/runtime_console_printstring.c.

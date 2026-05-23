@@ -508,14 +508,14 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
         statuscount = 0;
         do {
             c = -1;
-            ShowCursor(true);
+            Display_ShowCursor(true);
             if (hal_editor_mouse_main_pump(fontinc, &c)) {
                 c = MMInkey();
             }
 
             if(statuscount++ == 5000) PrintStatus();
         } while(c == -1);
-        ShowCursor(false);
+        Display_ShowCursor(false);
 
         if(drawstatusline) PrintFunctKeys(EDIT);
         drawstatusline = false;

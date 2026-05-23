@@ -169,7 +169,7 @@ extern void GUIPrintString(int x, int y, int fnt, int jh, int jv, int jo, int fc
 extern void DrawTriangle(int x0, int y0, int x1, int y1, int x2, int y2, int c, int fill) ;
 extern void cmd_guiMX170(void);
 extern void initFonts(void);
-extern void ShowCursor(int show);
+extern void Display_ShowCursor(int show);
 extern unsigned char *FontTable[16];
 extern short CurrentX, CurrentY;
 extern int PrintPixelMode;
@@ -177,7 +177,7 @@ extern char CMM1;
 extern int ScreenSize;
 extern char LCDAttrib;
 extern int getColour(char *c, int minus);
-extern void setmode(int mode, bool clear);
+extern void Display_SetMode(int mode, bool clear);
 typedef struct SVD {
 	FLOAT3D x;
 	FLOAT3D y;

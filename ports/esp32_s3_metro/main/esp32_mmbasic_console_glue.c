@@ -176,7 +176,7 @@ int MMgetchar(void) {
     int from_web;
     do {
         extern void ProcessWeb(int mode);
-        ShowCursor(1);
+        Display_ShowCursor(1);
         from_web = 0;
         ProcessWeb(0);
         c = esp32_console_ring_pop();
@@ -186,7 +186,7 @@ int MMgetchar(void) {
         }
         if (c < 0) c = esp32_console_read_byte_blocking_ms(1);
     } while (c < 0);
-    ShowCursor(0);
+    Display_ShowCursor(0);
     if (from_web) return c;  /* web console delivers pre-decoded key codes */
     if (c == 0x1b) return mmbasic_escdecode_run(esp32_escdecode_read_byte_ms);
     return mmbasic_console_normalise_byte(c);

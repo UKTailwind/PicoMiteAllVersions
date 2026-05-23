@@ -5,8 +5,8 @@
 
 /*
  * POSIX-backed filesystem helpers for the host REPL / simulator.
- * Kept isolated from MMBasic_Includes.h so POSIX's DIR / dirent / setmode
- * symbols don't collide with FatFS's and MMBasic's own declarations.
+ * Kept isolated from MMBasic_Includes.h so POSIX's DIR / dirent
+ * declarations don't collide with FatFS's same-named structs.
  *
  * All paths passed in are expected to be already resolved (absolute or
  * relative to cwd) — the REPL's path-resolve step lives in the stubs.
