@@ -37,13 +37,15 @@ extern "C" {
 #endif
 
 
-/* Integer types used for FatFs API */
+/* Integer types used for FatFs API. C99 (stdint.h) is the modern
+ * default and works identically on Windows, POSIX, and embedded
+ * targets — pulling <windows.h> in here would drag the Win32 API
+ * (BOOL, ShowCursor, setmode, …) into every translation unit that
+ * transitively includes ff.h and collide with MMBasic's own
+ * declarations. The Win32 branch is kept as a fallback for
+ * pre-C99 MSVC. */
 
-#if defined(_WIN32)	/* Main development platform */
-#define FF_INTDEF 2
-#include <windows.h>
-typedef unsigned __int64 QWORD;
-#elif (defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L) || defined(__cplusplus)	/* C99 or later */
+#if (defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L) || defined(__cplusplus)	/* C99 or later */
 #define FF_INTDEF 2
 #include <stdint.h>
 typedef unsigned int	UINT;	/* int must be 16-bit or 32-bit */
@@ -52,6 +54,10 @@ typedef uint16_t		WORD;	/* 16-bit unsigned integer */
 typedef uint32_t		DWORD;	/* 32-bit unsigned integer */
 typedef uint64_t		QWORD;	/* 64-bit unsigned integer */
 typedef WORD			WCHAR;	/* UTF-16 character type */
+#elif defined(_WIN32)	/* pre-C99 MSVC */
+#define FF_INTDEF 2
+#include <windows.h>
+typedef unsigned __int64 QWORD;
 #else  	/* Earlier than C99 */
 #define FF_INTDEF 1
 typedef unsigned int	UINT;	/* int must be 16-bit or 32-bit */
