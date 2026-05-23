@@ -17,9 +17,8 @@
 
 void console_cdc_boot_setup(void) {
     stdio_set_translate_crlf(&stdio_usb, false);
-    /* Always wait briefly for the CDC host to attach. CDC is an
-     * unconditional console whenever this driver is linked, so the
-     * boot wait is no longer gated on Option.SerialConsole. */
+    /* Wait briefly for the CDC host to attach so banner output isn't
+     * dropped. Skipped only when Telnet is disabled outright. */
     if (Option.Telnet != -1) {
         uint64_t t = time_us_64();
         while (1) {

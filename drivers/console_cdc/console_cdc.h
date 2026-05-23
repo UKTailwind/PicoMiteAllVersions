@@ -27,10 +27,10 @@ extern "C" {
  * Telnet is disabled outright (Option.Telnet == -1). */
 void console_cdc_boot_setup(void);
 
-/* Write one byte to CDC if a host is connected. Always-on whenever
- * compiled in — Option.SerialConsole no longer gates this, so CDC is
- * a permanent recovery channel even if the user routed output to
- * UART. UART output is layered on top in SerialConsolePutC. */
+/* Write one byte to CDC if a host is connected. Option.SerialConsole
+ * does not gate this — CDC stays available as a recovery channel
+ * even when output is routed to UART. UART output is layered on top
+ * in SerialConsolePutC. */
 void console_cdc_putc(char c, int flush);
 
 /* Drain available CDC bytes into ConsoleRxBuf, honouring BreakKey and

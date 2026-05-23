@@ -1,22 +1,15 @@
 # cmake/usb_role.cmake — single source of truth for the USB peripheral
 # role on each port.
 #
-# RP2040/RP2350 USB controllers are mode-exclusive — the chip can be
-# host OR device but not both, and the decision is compile-time. The
-# project used to spread this decision across four places per port
-# (HAL_PORT_KEYBOARD_USB_HOST macro, the keyboard source files in the
-# target_sources call, tinyusb_host link deps, and Pico_enable_stdio_usb).
-# It was easy to get inconsistent — a port could declare device mode
-# in port_config.h, link the USB-host keyboard driver, and silently
-# end up with a dead REPL on the resulting build. Boards have had to
-# be reflashed via SWD to recover.
+# RP2040/RP2350 USB controllers are mode-exclusive: the chip is host
+# OR device, not both, and the decision is compile-time.
 #
-# usb_role(KEYBOARD | CDC) collapses all four into one call. Pick
-# KEYBOARD if a USB keyboard plugs into the Pico's USB-A port (USB
-# controller in host mode); pick CDC if the Pico's USB-A presents a
+# usb_role(KEYBOARD | CDC) wires up everything that decision implies
+# — sources, defines, link libs, stdio routing — in one call. Pick
+# KEYBOARD when a USB keyboard plugs into the Pico's USB-A port (USB
+# controller in host mode). Pick CDC when the USB-A port presents a
 # CDC serial console to a host computer (USB controller in device
-# mode). The latter is also the right choice when there is no USB
-# keyboard and the BASIC REPL talks over USB-CDC and/or UART.
+# mode); the BASIC REPL then talks over USB-CDC and/or UART.
 #
 # Keyboard input on CDC ports comes from:
 #   - the CDC pipe itself (always pumped — drivers/console_cdc/),
