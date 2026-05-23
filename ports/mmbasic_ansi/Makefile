@@ -52,7 +52,10 @@ else ifeq ($(OS),Windows_NT)
 endif
 
 ifdef IS_WINDOWS
-LDFLAGS           := -lm -lpthread
+# Static-link libwinpthread + libgcc so the resulting .exe runs on
+# any modern Windows without dropping mingw-w64 DLLs alongside it.
+# UCRT (api-ms-win-crt-*.dll) ships with Win10+ and stays dynamic.
+LDFLAGS           := -lm -lpthread -static -static-libgcc
 HOST_TERMINAL_SRC := host_terminal_win32.c
 ANSI_RESIZE_SRC   := ansi_terminal_resize_win32.c
 else
