@@ -192,6 +192,7 @@ static void render_frame(void) {
 
     /* Resize shadow on first call or when framebuffer geometry
      * changed. */
+    int clear_terminal = 0;
     if (shadow == NULL || shadow_w != cells_w || shadow_h_cells != cells_h) {
         free(shadow);
         shadow = calloc((size_t)cells_w * (size_t)cells_h, sizeof(*shadow));
@@ -200,6 +201,7 @@ static void render_frame(void) {
                (size_t)cells_w * (size_t)cells_h * sizeof(*shadow));
         shadow_w = cells_w;
         shadow_h_cells = cells_h;
+        clear_terminal = 1;
     }
 
     /* Clamp output to fit the terminal. If the terminal is smaller
@@ -212,6 +214,7 @@ static void render_frame(void) {
     if (paint_cols <= 0 || paint_rows <= 0) return;
 
     outbuf_len = 0;
+    if (clear_terminal) outbuf_append("\x1b[0m\x1b[2J\x1b[H");
 
     /* Cursor + SGR run-state across the whole frame. */
     int cursor_row = -1, cursor_col = -1;  /* -1 = unknown, force move */
