@@ -71,6 +71,40 @@ static int term_cols = 0;
  * frame" — forces the first real cell to emit its SGR. */
 #define INVALID_SGR 0xFFFFFFFFFFFFFFFFULL
 
+/* Terminals that honour 24-bit truecolor SGR (\x1b[38;2;R;G;Bm) set
+ * COLORTERM=truecolor or COLORTERM=24bit (iTerm2, Ghostty, Alacritty,
+ * kitty, WezTerm, modern xterm). macOS's built-in Terminal.app does
+ * not — it silently drops those SGR codes and prints glyphs in the
+ * terminal's default fg/bg. Detect once at startup and fall back to
+ * 256-colour SGR (\x1b[38;5;Nm) where N indexes the 6×6×6 color cube
+ * at offset 16. */
+static int truecolor_supported = 0;
+
+static int detect_truecolor(void) {
+    const char *ct = getenv("COLORTERM");
+    if (!ct) return 0;
+    return (strcmp(ct, "truecolor") == 0 || strcmp(ct, "24bit") == 0);
+}
+
+/* Map a 24-bit RGB triple to the closest entry in the 6×6×6 color
+ * cube (palette indices 16..231). Each channel's six steps are at
+ * 0, 95, 135, 175, 215, 255 — so we bucket by midpoints (47, 115,
+ * 155, 195, 235). The grayscale ramp at 232..255 would give better
+ * accuracy for near-gray inputs, but the cube alone is enough for
+ * the green-phosphor palette used by the REPL. */
+static inline unsigned int rgb_to_256(uint32_t rgb) {
+    unsigned int r = (rgb >> 16) & 0xFF;
+    unsigned int g = (rgb >>  8) & 0xFF;
+    unsigned int b =  rgb        & 0xFF;
+    unsigned int r6 = (r < 48) ? 0 : (r < 115) ? 1 : (r < 155) ? 2
+                    : (r < 195) ? 3 : (r < 235) ? 4 : 5;
+    unsigned int g6 = (g < 48) ? 0 : (g < 115) ? 1 : (g < 155) ? 2
+                    : (g < 195) ? 3 : (g < 235) ? 4 : 5;
+    unsigned int b6 = (b < 48) ? 0 : (b < 115) ? 1 : (b < 155) ? 2
+                    : (b < 195) ? 3 : (b < 235) ? 4 : 5;
+    return 16 + 36 * r6 + 6 * g6 + b6;
+}
+
 /* Invalidate shadow — next frame will emit every cell. */
 void ansi_display_force_full_repaint(void) {
     if (!shadow) return;
@@ -118,21 +152,31 @@ static void emit_cursor_move(int row, int col) {
     outbuf_puts_n("H", 1);
 }
 
-/* Emit \x1b[38;2;R;G;B;48;2;R;G;Bm (combined SGR for fg+bg). */
+/* Emit combined SGR for fg+bg. Format depends on truecolor_supported:
+ *   24-bit: \x1b[38;2;R;G;B;48;2;R;G;Bm
+ *    8-bit: \x1b[38;5;N;48;5;Nm   (6×6×6 cube indices) */
 static void emit_sgr(uint32_t fg, uint32_t bg) {
-    outbuf_puts_n("\x1b[38;2;", 7);
-    outbuf_dec((fg >> 16) & 0xFF);
-    outbuf_puts_n(";", 1);
-    outbuf_dec((fg >> 8) & 0xFF);
-    outbuf_puts_n(";", 1);
-    outbuf_dec(fg & 0xFF);
-    outbuf_puts_n(";48;2;", 6);
-    outbuf_dec((bg >> 16) & 0xFF);
-    outbuf_puts_n(";", 1);
-    outbuf_dec((bg >> 8) & 0xFF);
-    outbuf_puts_n(";", 1);
-    outbuf_dec(bg & 0xFF);
-    outbuf_puts_n("m", 1);
+    if (truecolor_supported) {
+        outbuf_puts_n("\x1b[38;2;", 7);
+        outbuf_dec((fg >> 16) & 0xFF);
+        outbuf_puts_n(";", 1);
+        outbuf_dec((fg >> 8) & 0xFF);
+        outbuf_puts_n(";", 1);
+        outbuf_dec(fg & 0xFF);
+        outbuf_puts_n(";48;2;", 6);
+        outbuf_dec((bg >> 16) & 0xFF);
+        outbuf_puts_n(";", 1);
+        outbuf_dec((bg >> 8) & 0xFF);
+        outbuf_puts_n(";", 1);
+        outbuf_dec(bg & 0xFF);
+        outbuf_puts_n("m", 1);
+    } else {
+        outbuf_puts_n("\x1b[38;5;", 7);
+        outbuf_dec(rgb_to_256(fg));
+        outbuf_puts_n(";48;5;", 6);
+        outbuf_dec(rgb_to_256(bg));
+        outbuf_puts_n("m", 1);
+    }
 }
 
 /* UTF-8 encoding of ▀ (U+2580). */
@@ -278,6 +322,7 @@ static void *render_main(void *arg) {
 
 int ansi_display_start(void) {
     if (render_running) return 0;
+    truecolor_supported = detect_truecolor();
     host_fb_ensure();
     atomic_store(&render_stop, 0);
     if (pthread_create(&render_tid, NULL, render_main, NULL) != 0) {
