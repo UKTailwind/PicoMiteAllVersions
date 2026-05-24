@@ -56,19 +56,22 @@ Ctrl-C also exits cleanly (POSIX via SIGINT, Windows via
 By default the OS terminal layer drives the repeat rate when a key is
 held. Pass `--repeat INIT,RATE` to opt into a per-key rate limiter
 that runs in front of the stdin byte reader (`host_keyrepeat.c`).
-While armed, identical bytes arriving from stdin are dropped until
-either `INIT` ms (first repeat) or `RATE` ms (subsequent repeats)
-have elapsed since the last byte passed through; a different byte
-always passes immediately and resets the held-key state. Useful for
-games that want device-style pacing on top of whatever the OS is
-already doing.
+While armed, a different byte always passes immediately and resets the
+held-key state. The first repeated byte also passes through so fast
+double-typing does not get eaten; later identical bytes arriving in a
+tight cadence are treated as OS auto-repeat and capped to `INIT` ms
+(first repeat) and `RATE` ms (subsequent repeats). Useful for games
+that want device-style pacing on top of whatever the OS is already
+doing.
 
 ## Terminal size
 
-Default framebuffer is 320×320, which needs **320 columns × 160 rows**
-of terminal cells (half-blocks pair two pixels vertically into one
-cell). If the terminal is smaller the display is letterboxed to the
-top-left; shrink your font or enlarge the window until it fits.
+By default the framebuffer auto-fits the terminal, capped at 320×320.
+Half-blocks pair two framebuffer rows into one terminal cell, so a
+320×320 framebuffer needs **320 columns × 160 rows**. An explicit
+`--resolution WxH` must fit at startup: `W` terminal columns and
+`ceil(H / 2)` terminal rows. If it does not fit, the program exits
+instead of starting letterboxed.
 
 On a 13" MacBook you'll typically need ~7pt font in fullscreen; on a
 27" monitor ~9pt; on 4K ~11pt works comfortably.

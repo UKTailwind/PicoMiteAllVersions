@@ -240,25 +240,37 @@ static int run_repl(void) {
 /* Entry.                                                            */
 /* ----------------------------------------------------------------- */
 
-/* Minimum usable size. The 8×12 font needs at least 12 pixel rows
- * to show one row of glyphs, so 80×40 cells (80×80 pixels) is the
- * floor where the REPL is usable at all. */
-#define ANSI_MIN_COLS 80
-#define ANSI_MIN_ROWS 40
+#define ANSI_MIN_FB_WIDTH   80
+#define ANSI_MIN_FB_HEIGHT  60
+#define ANSI_MAX_FB_WIDTH   2048
+#define ANSI_MAX_FB_HEIGHT  2048
 
 /* Parse `1:WxH,2:WxH,...` and apply each entry via ansi_mode_set.
  * Returns 0 on success, -1 on parse error. */
-static int parse_modes_arg(const char *spec) {
+static int parse_modes_arg(const char *spec, unsigned int *mode_mask) {
     const char *p = spec;
     while (*p) {
         int n = 0, w = 0, h = 0, consumed = 0;
         if (sscanf(p, "%d:%dx%d%n", &n, &w, &h, &consumed) != 3) return -1;
         if (ansi_mode_set(n, w, h) != 0) return -1;
+        if (mode_mask) *mode_mask |= 1u << n;
         p += consumed;
         if (*p == ',') p++;
         else if (*p) return -1;
     }
     return 0;
+}
+
+static void clamp_framebuffer_size(int *w, int *h) {
+    if (*w < ANSI_MIN_FB_WIDTH)   *w = ANSI_MIN_FB_WIDTH;
+    if (*h < ANSI_MIN_FB_HEIGHT)  *h = ANSI_MIN_FB_HEIGHT;
+    if (*w > ANSI_MAX_FB_WIDTH)   *w = ANSI_MAX_FB_WIDTH;
+    if (*h > ANSI_MAX_FB_HEIGHT)  *h = ANSI_MAX_FB_HEIGHT;
+}
+
+static int framebuffer_fits_terminal(int w, int h, int cols, int rows) {
+    int need_rows = (h + 1) / 2;
+    return cols >= w && rows >= need_rows;
 }
 
 int main(int argc, char **argv) {
@@ -268,6 +280,7 @@ int main(int argc, char **argv) {
     int  cli_repeat_start = 0, cli_repeat_rate = 0;   /* 0 = leave OS in charge */
     int  cli_slowdown_us  = -1;                       /* -1 = leave default */
     int  cli_memory_kb    = 0;                        /* 0 = leave default */
+    unsigned int cli_modes_mask = 0;
 
     for (int i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "--resolution") == 0 && i + 1 < argc) {
@@ -299,7 +312,7 @@ int main(int argc, char **argv) {
             }
             cli_slowdown_us = (int)us;
         } else if (strcmp(argv[i], "--modes") == 0 && i + 1 < argc) {
-            if (parse_modes_arg(argv[++i]) != 0) {
+            if (parse_modes_arg(argv[++i], &cli_modes_mask) != 0) {
                 fprintf(stderr, "Bad --modes (expected N:WxH[,N:WxH...], "
                                 "e.g. 1:320x200,2:640x480; N is 1..%d)\n",
                                 ansi_mode_max());
@@ -374,14 +387,6 @@ int main(int argc, char **argv) {
         return 2;
     }
 
-    if (cols < ANSI_MIN_COLS || rows < ANSI_MIN_ROWS) {
-        fprintf(stderr,
-                "mmbasic_ansi: terminal is %dx%d cells; need at least %dx%d.\n"
-                "Shrink your font (Cmd-minus) or enlarge the window.\n",
-                cols, rows, ANSI_MIN_COLS, ANSI_MIN_ROWS);
-        return 2;
-    }
-
     /* Auto-size: one framebuffer pixel per terminal column, two
      * framebuffer pixel rows per terminal cell row. Cap at 320×320
      * so big terminals don't allocate a huge buffer the user can't
@@ -391,15 +396,41 @@ int main(int argc, char **argv) {
         height = rows * 2;
         if (width  > 320) width  = 320;
         if (height > 320) height = 320;
-    } else {
-        /* Explicit --resolution: warn if it won't fit (letterboxed). */
-        int need_rows = height / 2;
-        if (rows < need_rows || cols < width) {
+    }
+
+    /* Mirror host_sim_set_framebuffer_size()'s effective bounds before
+     * validating fit, so the check matches the framebuffer we will
+     * actually boot. */
+    clamp_framebuffer_size(&width, &height);
+
+    int need_rows = (height + 1) / 2;
+    if (!framebuffer_fits_terminal(width, height, cols, rows)) {
+        fprintf(stderr,
+                "mmbasic_ansi: terminal is %dx%d cells; %dx%d framebuffer "
+                "needs %dx%d cells.\n"
+                "Shrink your font (Cmd-minus), enlarge the window, or use "
+                "a smaller --resolution.\n",
+                cols, rows, width, height, width, need_rows);
+        return 2;
+    }
+
+    for (int mode = 1; mode <= ansi_mode_max(); ++mode) {
+        if (!(cli_modes_mask & (1u << mode))) continue;
+        int mode_w = 0, mode_h = 0;
+        if (ansi_mode_get(mode, &mode_w, &mode_h) != 0) continue;
+        int effective_w = mode_w;
+        int effective_h = mode_h;
+        clamp_framebuffer_size(&effective_w, &effective_h);
+        int mode_need_rows = (effective_h + 1) / 2;
+        if (!framebuffer_fits_terminal(effective_w, effective_h, cols, rows)) {
             fprintf(stderr,
-                    "mmbasic_ansi: terminal is %dx%d cells, need %dx%d "
-                    "for %dx%d framebuffer. Output will be letterboxed.\n",
-                    cols, rows, width, need_rows, width, height);
-            host_sleep_us(1000000);
+                    "mmbasic_ansi: terminal is %dx%d cells; MODE %d "
+                    "%dx%d framebuffer needs %dx%d cells.\n"
+                    "Shrink your font (Cmd-minus), enlarge the window, or "
+                    "use a smaller --modes entry.\n",
+                    cols, rows, mode, effective_w, effective_h,
+                    effective_w, mode_need_rows);
+            return 2;
         }
     }
 

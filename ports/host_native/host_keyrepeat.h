@@ -6,11 +6,12 @@
  *
  * Configure with the same (initial-delay, sustained-rate) shape as
  * Option.RepeatStart / Option.RepeatRate. While disabled the filter
- * is a no-op (terminal OS controls repeat). While enabled, identical
- * bytes arriving from stdin are dropped until either the initial
- * delay (first repeat) or the sustained rate (subsequent repeats)
- * has elapsed. A different byte always passes through and resets the
- * held-key state.
+ * is a no-op (terminal OS controls repeat). While enabled, a different
+ * byte always passes through and resets the held-key state. The first
+ * repeated byte also passes through so fast double-typing does not get
+ * eaten; later identical bytes arriving in a tight cadence are treated
+ * as OS auto-repeat and are capped to the configured initial delay and
+ * sustained rate.
  *
  * Multi-byte escape sequences (arrow keys etc) are not filtered —
  * their byte triples don't repeat at the byte level. The filter is
