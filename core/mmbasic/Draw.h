@@ -177,6 +177,10 @@ extern char CMM1;
 extern int ScreenSize;
 extern char LCDAttrib;
 extern int getColour(char *c, int minus);
+/* On Windows, host_platform.h rewrites `setmode` to Display_SetMode
+ * via macro after <io.h> is pre-included, so this declaration becomes
+ * `extern void Display_SetMode(int, bool)`. See host_platform.h for
+ * the full rationale. POSIX builds see the plain name. */
 extern void setmode(int mode, bool clear);
 typedef struct SVD {
 	FLOAT3D x;

@@ -27,7 +27,6 @@
  * now that FontTable initialisation lives there. */
 #include <ctype.h>
 #include <errno.h>
-#include <sys/stat.h>
 #include <time.h>
 
 #include "host_terminal.h"

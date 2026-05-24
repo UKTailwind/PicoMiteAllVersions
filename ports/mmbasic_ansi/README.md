@@ -19,14 +19,49 @@ Produces `./mmbasic_ansi`.
 ## Run
 
 ```
-./mmbasic_ansi                    # interactive REPL
-./mmbasic_ansi demos/hello.bas    # run a script via the bytecode VM
-./mmbasic_ansi --interp prog.bas  # run via the legacy interpreter
-./mmbasic_ansi --resolution 320x240 program.bas
+./mmbasic_ansi                          # interactive REPL
+./mmbasic_ansi demos/demo_hello.bas     # run a script via the bytecode VM
+./mmbasic_ansi --interp prog.bas        # run via the legacy interpreter
+./mmbasic_ansi --resolution 320x240 demos/demo_mandel.bas
 ```
 
 Requires a TTY on both stdin and stdout; the binary refuses to run in
 a pipe.
+
+### Options
+
+| Flag | Meaning |
+|---|---|
+| `--resolution WxH` | Framebuffer size (default: auto-fit terminal). |
+| `--modes N:WxH,...` | Override MODE-N table entries (1..5). e.g. `--modes 1:320x200,2:640x480`. |
+| `--repeat INIT,RATE` | Opt-in per-key rate limiter (50..2000, 10..1000 ms). Holding the same key emits the first repeat after `INIT` ms, then one per `RATE` ms. Off by default — the OS terminal drives repeat. e.g. `--repeat 600,200`. Single-byte keys only; arrow keys + function keys (multi-byte escape sequences) use the OS rate. |
+| `--slowdown US` | Per-tick microsleep for device-like pacing (0 disables). Accumulator-based so sub-ms values still take effect on Windows. |
+| `--memory KB` | MMBasic heap size in KB (16..2048). Can only shrink — `AllMemory[]` is sized at compile time. |
+| `--interp` / `--vm` | Run via the interpreter or the bytecode VM (default: `--vm`). |
+| `--help`, `-h` | Show all flags with examples. |
+
+### Built-in BASIC commands (this port)
+
+- `MODE 1..5` — switch the framebuffer to the size at that slot in the
+  mode table. Defaults: 320×240, 640×480, 800×600, 320×200, 480×320.
+  Override with `--modes` at launch.
+- `QUIT` — clean process exit. Useful in the alt-screen REPL where the
+  user can't always see what they typed.
+
+Ctrl-C also exits cleanly (POSIX via SIGINT, Windows via
+`SetConsoleCtrlHandler`).
+
+### Keyboard repeat
+
+By default the OS terminal layer drives the repeat rate when a key is
+held. Pass `--repeat INIT,RATE` to opt into a per-key rate limiter
+that runs in front of the stdin byte reader (`host_keyrepeat.c`).
+While armed, identical bytes arriving from stdin are dropped until
+either `INIT` ms (first repeat) or `RATE` ms (subsequent repeats)
+have elapsed since the last byte passed through; a different byte
+always passes immediately and resets the held-key state. Useful for
+games that want device-style pacing on top of whatever the OS is
+already doing.
 
 ## Terminal size
 

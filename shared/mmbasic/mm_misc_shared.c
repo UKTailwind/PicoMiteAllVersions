@@ -1122,10 +1122,11 @@ void fun_date(void) {
         snprintf((char *)sret, 16, "%02d-%02d-%04d", day, month, year);
     } else {
         time_t now = time(NULL);
-        struct tm lt;
-        localtime_r(&now, &lt);
-        snprintf((char *)sret, 16, "%02d-%02d-%04d",
-                 lt.tm_mday, lt.tm_mon + 1, lt.tm_year + 1900);
+        struct tm *lt = localtime(&now);
+        if (lt) {
+            snprintf((char *)sret, 16, "%02d-%02d-%04d",
+                     lt->tm_mday, lt->tm_mon + 1, lt->tm_year + 1900);
+        }
     }
     CtoM(sret);
     targ = T_STR;
@@ -1277,9 +1278,11 @@ void fun_time(void) {
         }
     } else {
         time_t now = time(NULL);
-        struct tm lt;
-        localtime_r(&now, &lt);
-        snprintf((char *)sret, 16, "%02d:%02d:%02d", lt.tm_hour, lt.tm_min, lt.tm_sec);
+        struct tm *lt = localtime(&now);
+        if (lt) {
+            snprintf((char *)sret, 16, "%02d:%02d:%02d",
+                     lt->tm_hour, lt->tm_min, lt->tm_sec);
+        }
     }
     CtoM(sret);
     targ = T_STR;

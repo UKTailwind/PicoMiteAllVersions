@@ -2658,8 +2658,6 @@ int resolve_path(char *path, char *result, char *pos)
     while (1)
     {
         char *slash;
-        struct stat st;
-        st.st_mode = 0;
         slash = *path ? strchr(path, '/') : NULL;
         if (slash)
             *slash = 0;
@@ -2674,23 +2672,6 @@ int resolve_path(char *path, char *result, char *pos)
         else
         {
             strcpy(pos, path);
-            //	    if (lstat(result,&st) < 0) return -1;
-            if (S_ISLNK(st.st_mode))
-            {
-                char buf[PATH_MAX];
-                //		if (readlink(result,buf,sizeof(buf)) < 0) return -1;
-                *pos = 0;
-                if (slash)
-                {
-                    *slash = '/';
-                    strcat(buf, slash);
-                }
-                strcpy(path, buf);
-                if (*path == '/')
-                    result[1] = 0;
-                pos = strchr(result, 0);
-                continue;
-            }
             pos = strchr(result, 0);
         }
         if (slash)

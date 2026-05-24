@@ -3,7 +3,8 @@
 A portable build of [PicoMite](https://github.com/UKTailwind/PicoMiteAllVersions) MMBasic. Same BASIC dialect; the same source compiles for fourteen RP2040 / RP2350 device variants, native macOS, WebAssembly in a browser, and a pure-stdio Unix binary.
 
 **[Try it in your browser](https://jvanderberg.github.io/PicoMiteAllVersions/)**  
-**[Download the latest desktop app](https://github.com/jvanderberg/PicoMiteAllVersions/releases/tag/desktop-latest)**
+**[Download the latest desktop app](https://github.com/jvanderberg/PicoMiteAllVersions/releases/tag/desktop-latest)**  
+**[Download the latest terminal build (Linux / macOS / Windows)](https://github.com/jvanderberg/PicoMiteAllVersions/releases/tag/mmbasic-ansi-latest)**
 
 ## Origins
 

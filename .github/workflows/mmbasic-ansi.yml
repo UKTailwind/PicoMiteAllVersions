@@ -1,0 +1,166 @@
+name: mmbasic_ansi build
+
+on:
+  pull_request:
+    paths:
+      - 'ports/mmbasic_ansi/**'
+      - 'ports/host_native/**'
+      - 'core/**'
+      - 'drivers/**'
+      - 'hal/**'
+      - 'runtime/**'
+      - 'shared/**'
+      - 'third_party/**'
+      - 'VERSION'
+      - '.github/workflows/mmbasic-ansi.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'ports/mmbasic_ansi/**'
+      - 'ports/host_native/**'
+      - 'core/**'
+      - 'drivers/**'
+      - 'hal/**'
+      - 'runtime/**'
+      - 'shared/**'
+      - 'third_party/**'
+      - 'VERSION'
+      - '.github/workflows/mmbasic-ansi.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            label: linux-x64
+            shell: bash
+            binary: mmbasic_ansi
+          - os: macos-latest
+            label: macos-universal
+            shell: bash
+            binary: mmbasic_ansi
+          - os: windows-latest
+            label: windows-x64
+            shell: 'msys2 {0}'
+            binary: mmbasic_ansi.exe
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up MSYS2 (UCRT64 mingw-w64)
+        if: matrix.os == 'windows-latest'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            make
+            mingw-w64-ucrt-x86_64-gcc
+
+      - name: Install Linux build deps
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential
+
+      - name: Build mmbasic_ansi
+        working-directory: ports/mmbasic_ansi
+        run: make -j$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 2)
+
+      - name: Stage release bundle
+        shell: bash
+        run: |
+          set -eux
+          BUNDLE="mmbasic_ansi-${{ matrix.label }}"
+          mkdir -p "dist/$BUNDLE"
+          BIN="ports/mmbasic_ansi/${{ matrix.binary }}"
+          if [ -f "$BIN" ]; then
+            cp "$BIN" "dist/$BUNDLE/"
+          else
+            # Some toolchains may emit without .exe; fall back to whatever's there.
+            cp ports/mmbasic_ansi/mmbasic_ansi* "dist/$BUNDLE/" 2>/dev/null || true
+          fi
+          cp -R ports/host_wasm/demos "dist/$BUNDLE/demos"
+          cp -f ports/mmbasic_ansi/README.md "dist/$BUNDLE/README.md" 2>/dev/null || true
+          ls -la "dist/$BUNDLE"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mmbasic_ansi-${{ matrix.label }}
+          path: dist/mmbasic_ansi-${{ matrix.label }}
+          if-no-files-found: error
+
+  release:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: mmbasic_ansi-*
+          path: dist
+
+      - name: Zip per-OS bundles
+        run: |
+          set -eux
+          mkdir -p release
+          cd dist
+          for d in */; do
+            name="${d%/}"
+            zip -r "../release/${name}.zip" "${name}"
+          done
+          ls -la ../release
+
+      - name: Upsert mmbasic-ansi-latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sha=$(git rev-parse --short HEAD)
+          date=$(git log -1 --format=%cI)
+          summary=$(git log -1 --format='%s')
+
+          cat > notes.md <<EOF
+          Rolling terminal-port build from \`main\`.
+
+          MMBasic running in your terminal via Unicode half-block
+          truecolor graphics. Bundle contains the binary, a README,
+          and the WASM port's demo set.
+
+          **Commit:** [\`$sha\`](https://github.com/${{ github.repository }}/commit/${{ github.sha }}) - $summary
+          **Built:** $date
+
+          ### Downloads
+
+          | Platform | File |
+          |---|---|
+          | Linux x64 | \`mmbasic_ansi-linux-x64.zip\` |
+          | macOS universal | \`mmbasic_ansi-macos-universal.zip\` |
+          | Windows x64 | \`mmbasic_ansi-windows-x64.zip\` |
+
+          Each zip unpacks to a single \`mmbasic_ansi-<label>/\` folder
+          with the binary + demos. See the bundled \`README.md\` for
+          the full CLI flag reference.
+          EOF
+
+          gh release delete mmbasic-ansi-latest --cleanup-tag --yes 2>/dev/null || true
+          git push origin :refs/tags/mmbasic-ansi-latest 2>/dev/null || true
+          gh release create mmbasic-ansi-latest \
+              --title "Latest terminal build" \
+              --notes-file notes.md \
+              --target "${{ github.sha }}" \
+              release/*

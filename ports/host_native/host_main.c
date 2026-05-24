@@ -21,8 +21,7 @@
 #include <setjmp.h>
 #include <sys/stat.h>
 
-/* Forward-declared to avoid pulling in unistd.h here, which conflicts with
- * MMBasic's own setmode(). */
+/* Forward-declared in lieu of pulling in unistd.h. */
 char *getcwd(char *buf, size_t size);
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"

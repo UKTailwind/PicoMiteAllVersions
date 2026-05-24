@@ -1,9 +1,10 @@
 /*
  * host_terminal.c — termios raw-mode plumbing for the host REPL / EDIT.
  *
- * Kept in its own translation unit so we can pull in the POSIX headers
- * (unistd.h in particular) without colliding with MMBasic's global names
- * like setmode / putchar that appear once we include MMBasic_Includes.h.
+ * Kept in its own translation unit (no MMBasic_Includes.h) so the
+ * POSIX headers — unistd.h / termios.h / fcntl.h — can be included
+ * directly without dragging the MMBasic globals into a file that
+ * doesn't need them.
  *
  * Exposed functions (declared in host_terminal.h):
  *   host_raw_mode_enter()      — switch stdin to raw mode, register atexit
@@ -23,6 +24,7 @@
 #include <signal.h>
 #include <sys/ioctl.h>
 
+#include "host_keyrepeat.h"
 #include "host_terminal.h"
 
 static struct termios host_orig_termios;
@@ -102,11 +104,11 @@ int host_read_byte_nonblock(void) {
     if (host_pending_byte >= 0) {
         int c = host_pending_byte;
         host_pending_byte = -1;
-        return c;
+        return host_keyrepeat_filter(c);
     }
     unsigned char b;
     ssize_t n = read(STDIN_FILENO, &b, 1);
-    if (n == 1) return (int)b;
+    if (n == 1) return host_keyrepeat_filter((int)b);
     return -1;
 }
 

@@ -18,6 +18,17 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <time.h>
+#ifdef _WIN32
+/* Pull in <io.h> first so its POSIX-aliased setmode(int,int) is
+ * declared under its original name. Then macro-rewrite every
+ * subsequent `setmode` reference (including MMBasic's
+ * declaration / definitions / call sites) to Display_SetMode, so
+ * the two functions can coexist in any TU on Windows. <io.h>'s
+ * declaration is unaffected because it was parsed before the
+ * macro existed. */
+#include <io.h>
+#define setmode Display_SetMode
+#endif
 #ifndef uint
 typedef unsigned int uint;
 #endif

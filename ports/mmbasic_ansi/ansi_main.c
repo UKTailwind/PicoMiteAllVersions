@@ -22,10 +22,13 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* unistd.h conflicts with Draw.h's setmode(); host_main.c works around
- * this by forward-declaring the unistd symbols it needs. */
-char    *getcwd(char *buf, size_t size);
-unsigned sleep(unsigned seconds);
+/* POSIX getcwd — forward-declared so we don't have to drag in
+ * unistd.h, which would collide with Draw.h's setmode on BSD. On
+ * Windows, host_platform.h's <io.h> pre-include already declares
+ * getcwd (with a slightly different signature), so skip it. */
+#ifndef _WIN32
+char *getcwd(char *buf, size_t size);
+#endif
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
@@ -33,9 +36,14 @@ unsigned sleep(unsigned seconds);
 #include "runtime/runtime.h"
 
 #include "host_fb.h"
+#include "host_keyrepeat.h"
 #include "host_terminal.h"
+#include "host_time.h"
+#include "ansi_mode.h"
 #include "ansi_terminal.h"
 #include "ansi_display.h"
+
+extern int host_sim_slowdown_us;
 
 extern jmp_buf mark;
 
@@ -238,10 +246,28 @@ static int run_repl(void) {
 #define ANSI_MIN_COLS 80
 #define ANSI_MIN_ROWS 40
 
+/* Parse `1:WxH,2:WxH,...` and apply each entry via ansi_mode_set.
+ * Returns 0 on success, -1 on parse error. */
+static int parse_modes_arg(const char *spec) {
+    const char *p = spec;
+    while (*p) {
+        int n = 0, w = 0, h = 0, consumed = 0;
+        if (sscanf(p, "%d:%dx%d%n", &n, &w, &h, &consumed) != 3) return -1;
+        if (ansi_mode_set(n, w, h) != 0) return -1;
+        p += consumed;
+        if (*p == ',') p++;
+        else if (*p) return -1;
+    }
+    return 0;
+}
+
 int main(int argc, char **argv) {
     int width = 0, height = 0;            /* 0 = auto-fit terminal */
     int use_interpreter = 0;
     const char *filename = NULL;
+    int  cli_repeat_start = 0, cli_repeat_rate = 0;   /* 0 = leave OS in charge */
+    int  cli_slowdown_us  = -1;                       /* -1 = leave default */
+    int  cli_memory_kb    = 0;                        /* 0 = leave default */
 
     for (int i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "--resolution") == 0 && i + 1 < argc) {
@@ -253,15 +279,65 @@ int main(int argc, char **argv) {
                 fprintf(stderr, "Bad --resolution (expected WxH, e.g. 320x320)\n");
                 return 2;
             }
+        } else if (strcmp(argv[i], "--repeat") == 0 && i + 1 < argc) {
+            int initial = 0, rate = 0;
+            if (sscanf(argv[++i], "%d,%d", &initial, &rate) != 2 ||
+                initial < 50 || initial > 2000 || rate < 10 || rate > 1000) {
+                fprintf(stderr, "Bad --repeat (expected INITIAL_MS,RATE_MS, "
+                                "e.g. 600,200; 50<=initial<=2000, "
+                                "10<=rate<=1000)\n");
+                return 2;
+            }
+            cli_repeat_start = initial;
+            cli_repeat_rate  = rate;
+        } else if (strcmp(argv[i], "--slowdown") == 0 && i + 1 < argc) {
+            char *end = NULL;
+            long us = strtol(argv[++i], &end, 10);
+            if (end == argv[i] || *end != '\0' || us < 0 || us > 1000000) {
+                fprintf(stderr, "Bad --slowdown (expected microseconds 0..1000000)\n");
+                return 2;
+            }
+            cli_slowdown_us = (int)us;
+        } else if (strcmp(argv[i], "--modes") == 0 && i + 1 < argc) {
+            if (parse_modes_arg(argv[++i]) != 0) {
+                fprintf(stderr, "Bad --modes (expected N:WxH[,N:WxH...], "
+                                "e.g. 1:320x200,2:640x480; N is 1..%d)\n",
+                                ansi_mode_max());
+                return 2;
+            }
+        } else if (strcmp(argv[i], "--memory") == 0 && i + 1 < argc) {
+            int kb = 0;
+            if (sscanf(argv[++i], "%d", &kb) != 1 || kb < 16 ||
+                (uint32_t)kb * 1024U > (uint32_t)HEAP_MEMORY_SIZE) {
+                fprintf(stderr, "Bad --memory (expected KB, 16..%u)\n",
+                        (unsigned)(HEAP_MEMORY_SIZE / 1024));
+                return 2;
+            }
+            cli_memory_kb = kb;
         } else if (strcmp(argv[i], "--interp") == 0) {
             use_interpreter = 1;
         } else if (strcmp(argv[i], "--vm") == 0) {
             use_interpreter = 0;
         } else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
-            printf("Usage: %s [--resolution WxH] [--interp|--vm] [program.bas]\n",
-                   argv[0]);
-            printf("  No file given → interactive REPL.\n");
-            printf("  Default resolution is auto-sized to the terminal.\n");
+            printf("Usage: %s [options] [program.bas]\n", argv[0]);
+            printf("\n");
+            printf("Options:\n");
+            printf("  --resolution WxH        Framebuffer size (default: auto-fit terminal).\n");
+            printf("  --modes N:WxH,...       Override MODE-N table entries (1..%d).\n", ansi_mode_max());
+            printf("                          e.g. --modes 1:320x200,2:640x480\n");
+            printf("  --repeat INIT,RATE      Keystroke rate-limit in ms (50..2000, 10..1000).\n");
+            printf("                          Same key held → first repeat after INIT,\n");
+            printf("                          then one per RATE. Off by default; the OS\n");
+            printf("                          terminal drives repeat. e.g. --repeat 600,200\n");
+            printf("  --slowdown US           Insert US microseconds of sleep per BASIC tick\n");
+            printf("                          for device-like pacing. 0 disables.\n");
+            printf("  --memory KB             MMBasic heap size in KB (16..%u).\n",
+                   (unsigned)(HEAP_MEMORY_SIZE / 1024));
+            printf("  --interp / --vm         Run via the interpreter or the bytecode VM\n");
+            printf("                          (default: --vm).\n");
+            printf("  --help, -h              This message.\n");
+            printf("\n");
+            printf("With no program.bas the interactive REPL is launched.\n");
             return 0;
         } else if (argv[i][0] == '-') {
             fprintf(stderr, "Unknown option: %s\n", argv[i]);
@@ -272,6 +348,21 @@ int main(int argc, char **argv) {
             fprintf(stderr, "Extra positional arg: %s\n", argv[i]);
             return 2;
         }
+    }
+
+    /* --memory: shrink the heap before InitHeap walks it. The static
+     * AllMemory[] buffer is sized at compile time (HEAP_MEMORY_SIZE),
+     * so we can only shrink, never grow. */
+    if (cli_memory_kb > 0) {
+        heap_memory_size = (uint32_t)cli_memory_kb * 1024U;
+    }
+    /* --slowdown: pure runtime knob; safe to set anytime. */
+    if (cli_slowdown_us >= 0) {
+        host_sim_slowdown_us = cli_slowdown_us;
+    }
+    /* --repeat: arms the per-key rate limiter in host_keyrepeat. */
+    if (cli_repeat_start && cli_repeat_rate) {
+        host_keyrepeat_configure(cli_repeat_start, cli_repeat_rate);
     }
 
     /* Read terminal size up front. We always need it, either to
@@ -308,7 +399,7 @@ int main(int argc, char **argv) {
                     "mmbasic_ansi: terminal is %dx%d cells, need %dx%d "
                     "for %dx%d framebuffer. Output will be letterboxed.\n",
                     cols, rows, width, need_rows, width, height);
-            sleep(1);
+            host_sleep_us(1000000);
         }
     }
 
