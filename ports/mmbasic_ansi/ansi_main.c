@@ -12,7 +12,7 @@
  *   mmbasic_ansi                    → interactive REPL
  *   mmbasic_ansi program.bas        → run .bas file via the VM
  *   mmbasic_ansi --interp prog.bas  → run via the legacy interpreter
- *   mmbasic_ansi --no-graphics      → plain terminal/stdout console
+ *   mmbasic_ansi --console-only      → plain terminal/stdout console
  *   mmbasic_ansi --resolution WxH   → override framebuffer size
  *                                      (default 320x320)
  */
@@ -91,16 +91,16 @@ static void ansi_stdout(const char *text, int len) {
     fwrite(text, 1, (size_t)len, stdout);
 }
 
-static int ansi_no_graphics_mode = 0;
+static int ansi_console_only_mode = 0;
 
 bool port_terminal_handle_cls(void) {
-    if (!ansi_no_graphics_mode) return false;
+    if (!ansi_console_only_mode) return false;
     ansi_stdout("\033[2J\033[H", 7);
     return true;
 }
 
 void port_terminal_emit_colour(int fg, int bg, int has_bg) {
-    if (!ansi_no_graphics_mode) return;
+    if (!ansi_console_only_mode) return;
 
     char buf[64];
     int n = snprintf(buf, sizeof buf, "\033[38;2;%d;%d;%dm",
@@ -182,7 +182,7 @@ static void configure_text_console(int cols, int rows) {
 }
 
 static void update_text_console_size(int force) {
-    if (!ansi_no_graphics_mode) return;
+    if (!ansi_console_only_mode) return;
     if (!force && !ansi_terminal_resized) return;
 
     int rows = 0, cols = 0;
@@ -215,7 +215,7 @@ static const mm_runtime_adapter ansi_boot_adapter = {
     .memory_backing_init = ansi_memory_backing_init,
 };
 
-static int ansi_boot(int width, int height, int no_graphics, int interactive) {
+static int ansi_boot(int width, int height, int console_only, int interactive) {
     if (mmbasic_runtime_init_common(&ansi_boot_adapter,
             MMBASIC_RUNTIME_INIT_FLAG_LOAD_OPTIONS |
             MMBASIC_RUNTIME_INIT_FLAG_INIT_BASIC |
@@ -224,8 +224,8 @@ static int ansi_boot(int width, int height, int no_graphics, int interactive) {
         return -1;
     }
 
-    if (no_graphics) {
-        ansi_no_graphics_mode = 1;
+    if (console_only) {
+        ansi_console_only_mode = 1;
         configure_text_console(80, 24);
         Option.ColourCode = 1;
         Option.DefaultFC = 0xFFFFFF;
@@ -371,7 +371,7 @@ int main(int argc, char **argv) {
     int  cli_repeat_start = 0, cli_repeat_rate = 0;   /* 0 = leave OS in charge */
     int  cli_slowdown_us  = -1;                       /* -1 = leave default */
     int  cli_memory_kb    = 0;                        /* 0 = leave default */
-    int  no_graphics      = 0;
+    int  console_only      = 0;
     unsigned int cli_modes_mask = 0;
 
     for (int i = 1; i < argc; ++i) {
@@ -423,13 +423,13 @@ int main(int argc, char **argv) {
             use_interpreter = 1;
         } else if (strcmp(argv[i], "--vm") == 0) {
             use_interpreter = 0;
-        } else if (strcmp(argv[i], "--no-graphics") == 0) {
-            no_graphics = 1;
+        } else if (strcmp(argv[i], "--console-only") == 0 || strcmp(argv[i], "--no-graphics") == 0) {
+            console_only = 1;
         } else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
             printf("Usage: %s [options] [program.bas]\n", argv[0]);
             printf("\n");
             printf("Options:\n");
-            printf("  --no-graphics          Plain terminal/stdout console; no half-block renderer.\n");
+            printf("  --console-only          Plain terminal/stdout console; no half-block renderer.\n");
             printf("  --resolution WxH        Framebuffer size (default: auto-fit terminal).\n");
             printf("  --modes N:WxH,...       Override MODE-N table entries (1..%d).\n", ansi_mode_max());
             printf("                          e.g. --modes 1:320x200,2:640x480\n");
@@ -473,8 +473,8 @@ int main(int argc, char **argv) {
         host_keyrepeat_configure(cli_repeat_start, cli_repeat_rate);
     }
 
-    if (no_graphics) {
-        if (ansi_boot(width, height, no_graphics, filename == NULL) != 0) return 1;
+    if (console_only) {
+        if (ansi_boot(width, height, console_only, filename == NULL) != 0) return 1;
 
         int rc;
         if (filename) {
@@ -542,7 +542,7 @@ int main(int argc, char **argv) {
         }
     }
 
-    if (ansi_boot(width, height, no_graphics, filename == NULL) != 0) return 1;
+    if (ansi_boot(width, height, console_only, filename == NULL) != 0) return 1;
 
     int rc;
     if (filename) {

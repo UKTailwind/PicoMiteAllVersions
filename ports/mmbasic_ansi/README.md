@@ -20,14 +20,14 @@ Produces `./mmbasic_ansi`.
 
 ```
 ./mmbasic_ansi                          # interactive REPL
-./mmbasic_ansi --no-graphics            # plain terminal/stdout console
+./mmbasic_ansi --console-only           # plain terminal/stdout console
 ./mmbasic_ansi demos/demo_hello.bas     # run a script via the bytecode VM
 ./mmbasic_ansi --interp prog.bas        # run via the legacy interpreter
 ./mmbasic_ansi --resolution 320x240 demos/demo_mandel.bas
 ```
 
-Requires a TTY on both stdin and stdout; the binary refuses to run in
-a pipe.
+Graphics mode requires a TTY on both stdin and stdout. `--console-only`
+can run in ordinary terminal sessions and can pipe script output.
 
 ### macOS download note
 
@@ -44,7 +44,7 @@ chmod +x mmbasic_ansi-macos-universal/mmbasic_ansi
 
 | Flag | Meaning |
 |---|---|
-| `--no-graphics` | Plain terminal/stdout console. Disables the half-block framebuffer renderer and writes the normal MMBasic console stream directly to stdout. |
+| `--console-only` | Plain terminal/stdout console. Disables the half-block framebuffer renderer and writes the normal MMBasic console stream directly to stdout. |
 | `--resolution WxH` | Framebuffer size (default: auto-fit terminal). |
 | `--modes N:WxH,...` | Override MODE-N table entries (1..5). e.g. `--modes 1:320x200,2:640x480`. |
 | `--repeat INIT,RATE` | Opt-in per-key rate limiter (50..2000, 10..1000 ms). Holding the same key emits the first repeat after `INIT` ms, then one per `RATE` ms. Off by default — the OS terminal drives repeat. e.g. `--repeat 600,200`. Single-byte keys only; arrow keys + function keys (multi-byte escape sequences) use the OS rate. |
@@ -89,7 +89,7 @@ instead of starting letterboxed.
 On a 13" MacBook you'll typically need ~7pt font in fullscreen; on a
 27" monitor ~9pt; on 4K ~11pt works comfortably.
 
-`--no-graphics` bypasses the framebuffer and terminal-fit checks. It
+`--console-only` bypasses the framebuffer and terminal-fit checks. It
 uses the terminal as a normal text console, so it is suitable for
 80×24 sessions and for piping script output. In interactive use it
 tracks terminal resizes and updates MMBasic's console width/height.
