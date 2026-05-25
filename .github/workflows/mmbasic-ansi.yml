@@ -84,7 +84,12 @@ jobs:
       - name: Build mmbasic_ansi
         if: matrix.os != 'ubuntu-latest'
         working-directory: ports/mmbasic_ansi
-        run: make -j$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 2)
+        run: |
+          make clean
+          make -j$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 2)
+          if [ "${{ matrix.os }}" = "macos-latest" ]; then
+            lipo mmbasic_ansi -verify_arch x86_64 arm64
+          fi
 
       - name: Stage release bundle
         shell: bash

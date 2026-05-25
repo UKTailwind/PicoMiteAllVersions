@@ -67,6 +67,7 @@ ANSI_RESIZE_SRC   := ansi_terminal_resize_posix.c
 
 ifeq ($(UNAME_S),Darwin)
   UNIVERSAL ?= 1
+  BUILD_DIR := $(PORT_DIR)/build-universal$(UNIVERSAL)
   ifeq ($(UNIVERSAL),1)
     CFLAGS  += -arch x86_64 -arch arm64
     LDFLAGS += -arch x86_64 -arch arm64
@@ -203,7 +204,7 @@ $(BUILD_DIR)/%.o: $(REPO_ROOT)/drivers/calendar/%.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 clean:
-	rm -rf $(BUILD_DIR) $(TARGET)
+	rm -rf $(PORT_DIR)/build $(PORT_DIR)/build-universal0 $(PORT_DIR)/build-universal1 $(TARGET)
 
 -include $(DEPS)
 

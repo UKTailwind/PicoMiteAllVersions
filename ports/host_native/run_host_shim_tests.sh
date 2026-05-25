@@ -113,6 +113,11 @@ run_expect_contains \
     "z" \
     "$BINARY" tests/host_shims/delayed_keydown.bas --interp --keys-after-ms 25 z --timeout-ms 500 || true
 
+run_expect_contains \
+    "bridge_scalar_dim_timing" \
+    "3 Variables" \
+    "$BINARY" tests/host_shims/bridge_scalar_dim_timing.bas --vm || true
+
 run_expect_internal_timeout \
     "vm_loop_internal_timeout" \
     "$BINARY" tests/host_shims/vm_loop_timeout.bas --vm --timeout-ms 50 || true

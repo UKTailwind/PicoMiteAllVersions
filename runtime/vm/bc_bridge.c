@@ -83,14 +83,8 @@ static void sync_vm_to_mmbasic(BCVMState *vm) {
         if (vm->arrays[i].data || slot->is_array) continue;
         if (slot->type == T_STRUCT) continue;   // handled by the struct-only pass below
 
-        int slot_valid = slot->is_const || (vm->global_valid && vm->global_valid[i]);
+        if (!slot->is_const && (!vm->global_valid || !vm->global_valid[i])) continue;
 
-        /* Always create the g_vartbl entry (mapping) for every known slot,
-         * even if the VM hasn't assigned it yet.  Bridged function/command
-         * handlers may write to the variable as an output parameter (e.g.
-         * the matchLen% arg of STRUCT(FIND ... regex)), and findvar inside
-         * the handler must find the entry.  Without the mapping,
-         * sync_mmbasic_to_vm cannot copy the value back to the VM. */
         unsigned char namebuf[MAXVARLEN + 2];
         int nlen = strlen(slot->name);
         memcpy(namebuf, slot->name, nlen);
@@ -100,11 +94,6 @@ static void sync_vm_to_mmbasic(BCVMState *vm) {
             findvar(namebuf, sync_find_action(slot->type));
             slot_to_vartbl[i] = g_VarIndex;
         }
-
-        /* Only copy the value from the VM if the slot has been assigned
-         * (or is a const).  Uninitialized slots keep their default zero
-         * value in g_vartbl. */
-        if (!slot_valid) continue;
 
         int vi = slot_to_vartbl[i];
         struct s_vartbl *v = &g_vartbl[vi];

@@ -818,7 +818,7 @@ void MIPS16 cmd_list(void) {
 					}
 					strcat(out,")");
 				}
-				c[j]= (char *)((int)c + sizeof(char *) * count + j*(MAXVARLEN+30));
+				c[j]= (char *)(c + count) + j*(MAXVARLEN+30);
 				strcpy(c[j],out);
 				j++;
 			}
@@ -863,7 +863,7 @@ void MIPS16 cmd_list(void) {
 		int x=0;
 		char** c=GetTempMemory((CommandTableSize+x)*sizeof(*c)+(CommandTableSize+x)*18);
 		for(i=0;i<CommandTableSize+x;i++){
-				c[m]= (char *)((int)c + sizeof(char *) * (CommandTableSize+x) + m*18);
+				c[m]= (char *)(c + CommandTableSize+x) + m*18;
 				if(m<CommandTableSize)strcpy(c[m],(char *)commandtbl[i].name);
 				if(*c[m]=='_' && c[m][1]!='(')*c[m]='.';
     			m++;
@@ -888,7 +888,7 @@ void MIPS16 cmd_list(void) {
 		int x=3+MMEND;
 		char** c=GetTempMemory((TokenTableSize+x)*sizeof(*c)+(TokenTableSize+x)*20);
 		for(i=0;i<TokenTableSize+x;i++){
-				c[m]= (char *)((int)c + sizeof(char *) * (TokenTableSize+x) + m*20);
+				c[m]= (char *)(c + TokenTableSize+x) + m*20;
 				if(m<TokenTableSize)strcpy(c[m],(char *)tokentbl[i].name);
 	   			else if(m<TokenTableSize+MMEND && m>=TokenTableSize)strcpy(c[m],overlaid_functions[i-TokenTableSize]);
     			else if(m==TokenTableSize+MMEND)strcpy(c[m],"=<");
