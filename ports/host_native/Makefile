@@ -81,7 +81,7 @@ BC_SRCS = runtime/vm/bc_alloc.c runtime/vm/bc_bridge.c runtime/vm/vm_host_fat.c 
 
 # Port-native sources (this directory).
 HOST_SRCS = host_runtime.c host_fastgfx.c host_fastgfx_resync.c host_fs_shims.c host_peripheral_stubs.c host_web.c \
-            host_main.c host_terminal.c host_fs.c host_sim_audio.c host_sim_slowdown.c host_sim_emit_stub.c host_time.c host_fb.c host_keys.c \
+            host_main.c host_terminal.c host_fs.c host_keyrepeat.c host_sim_audio.c host_sim_slowdown.c host_sim_emit_stub.c host_time.c host_fb.c host_keys.c \
             host_bc_runtime_noop.c \
             hal_flash_host.c hal_time_host.c hal_random_host.c hal_pin_host.c hal_storage_host.c \
             hal_filesystem_host.c hal_keyboard_host.c hal_audio_host.c hal_vm_framebuffer_host.c \
