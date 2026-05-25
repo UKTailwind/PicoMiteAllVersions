@@ -3,16 +3,17 @@
 #
 # Runs every build + every test suite the repository ships:
 #   1. HAL purity check (tools/check_hal_purity.sh)
-#   2. host_native build + ports/host_native/run_tests.sh (239 BASIC tests)
+#   2. host_native build + ports/host_native/run_tests.sh (252 BASIC tests)
 #   3. mmbasic_stdio build + tests/run_tests.sh (smoke corpus)
 #   4. mmbasic_ansi build (no test suite exists for ansi)
 #   5. host_wasm build, IF emcc is on PATH; otherwise skipped with a
 #      clear "skipped — run on CI" note.
 #   6. buildall.sh (14 device variants).
 #
-# Exits non-zero on the first failure. Green means every layer of
-# the project compiles + every test suite passes. Until this script
-# is green, no claim of "passing" should be made.
+# A build failure is fatal: the script stops immediately because
+# skipping the dependent test suite would silently mask regressions.
+# Independent stages (e.g. ansi build vs device buildall) still run
+# so you get a complete picture in one pass.
 #
 # Run from anywhere. Output is verbose enough to diagnose failures
 # without re-running individual stages.
@@ -39,33 +40,24 @@ run_section() {
 }
 
 # ---- 1. HAL purity gate -------------------------------------------------
-run_section "HAL purity" "$ROOT/tools/check_hal_purity.sh" || true
+run_section "HAL purity" "$ROOT/tools/check_hal_purity.sh"
 
 # ---- 2. host_native build + tests --------------------------------------
-run_section "host_native build" bash -c "cd '$ROOT/ports/host_native' && ./build.sh" || true
-if [ -x "$ROOT/ports/host_native/build/mmbasic_test" ]; then
-    run_section "host_native tests (run_tests.sh)" \
-        bash -c "cd '$ROOT/ports/host_native' && SKIP_HAL_PURITY=1 ./run_tests.sh" || true
-    run_section "host_native NEW smoke (porttools)" \
-        python3 "$ROOT/porttools/host_new_smoke.py" --no-build || true
-else
-    SECTIONS+=("SKIP: host_native tests (binary missing)")
-    SECTIONS+=("SKIP: host_native NEW smoke (binary missing)")
-fi
+run_section "host_native build" bash -c "cd '$ROOT/ports/host_native' && ./build.sh"
+run_section "host_native tests (run_tests.sh)" \
+    bash -c "cd '$ROOT/ports/host_native' && SKIP_HAL_PURITY=1 ./run_tests.sh"
+run_section "host_native NEW smoke (porttools)" \
+    python3 "$ROOT/porttools/host_new_smoke.py" --no-build
 
 # ---- 3. mmbasic_stdio build + tests ------------------------------------
 run_section "mmbasic_stdio build" \
-    bash -c "cd '$ROOT/ports/mmbasic_stdio' && make" || true
-if [ -x "$ROOT/ports/mmbasic_stdio/mmbasic_stdio" ]; then
-    run_section "mmbasic_stdio tests (smoke corpus)" \
-        bash -c "cd '$ROOT/ports/mmbasic_stdio/tests' && ./run_tests.sh" || true
-else
-    SECTIONS+=("SKIP: mmbasic_stdio tests (binary missing)")
-fi
+    bash -c "cd '$ROOT/ports/mmbasic_stdio' && make"
+run_section "mmbasic_stdio tests (smoke corpus)" \
+    bash -c "cd '$ROOT/ports/mmbasic_stdio/tests' && ./run_tests.sh"
 
 # ---- 4. mmbasic_ansi build (no test suite) -----------------------------
 run_section "mmbasic_ansi build" \
-    bash -c "cd '$ROOT/ports/mmbasic_ansi' && make" || true
+    bash -c "cd '$ROOT/ports/mmbasic_ansi' && make"
 
 # ---- 5. host_wasm build (only if emcc available) -----------------------
 ensure_emcc() {
@@ -89,7 +81,7 @@ ensure_emcc() {
 
 if ensure_emcc; then
     run_section "host_wasm build" \
-        bash -c "cd '$ROOT/ports/host_wasm' && make" || true
+        bash -c "cd '$ROOT/ports/host_wasm' && make"
 else
     printf '\n=== host_wasm build ===\nemcc not on PATH; skipping. CI runs this stage.\n'
     SECTIONS+=("SKIP: host_wasm build (emcc not installed)")
@@ -97,7 +89,7 @@ fi
 
 # ---- 6. Device buildall (14 variants) ----------------------------------
 run_section "buildall.sh (14 device variants)" \
-    bash -c "SKIP_HAL_PURITY=1 '$ROOT/buildall.sh'" || true
+    bash -c "SKIP_HAL_PURITY=1 '$ROOT/buildall.sh'"
 
 # ---- summary -----------------------------------------------------------
 printf '\n\n=== validate_all.sh summary ===\n'
