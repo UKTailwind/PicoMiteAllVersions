@@ -93,7 +93,8 @@ On a 13" MacBook you'll typically need ~7pt font in fullscreen; on a
 uses the terminal as a normal text console, so it is suitable for
 80×24 sessions and for piping script output. In interactive use it
 tracks terminal resizes and updates MMBasic's console width/height.
-Editor syntax highlighting remains enabled.
+Editor syntax highlighting remains enabled, and `CLS` / `COLOUR`
+emit ANSI terminal sequences.
 
 ## What works
 

@@ -18,6 +18,7 @@
  */
 
 #include <errno.h>
+#include <stdbool.h>
 #include <setjmp.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -91,6 +92,26 @@ static void ansi_stdout(const char *text, int len) {
 }
 
 static int ansi_no_graphics_mode = 0;
+
+bool port_terminal_handle_cls(void) {
+    if (!ansi_no_graphics_mode) return false;
+    ansi_stdout("\033[2J\033[H", 7);
+    return true;
+}
+
+void port_terminal_emit_colour(int fg, int bg, int has_bg) {
+    if (!ansi_no_graphics_mode) return;
+
+    char buf[64];
+    int n = snprintf(buf, sizeof buf, "\033[38;2;%d;%d;%dm",
+                     (fg >> 16) & 0xff, (fg >> 8) & 0xff, fg & 0xff);
+    if (n > 0 && (size_t)n < sizeof buf) ansi_stdout(buf, n);
+    if (has_bg) {
+        n = snprintf(buf, sizeof buf, "\033[48;2;%d;%d;%dm",
+                     (bg >> 16) & 0xff, (bg >> 8) & 0xff, bg & 0xff);
+        if (n > 0 && (size_t)n < sizeof buf) ansi_stdout(buf, n);
+    }
+}
 
 /* ----------------------------------------------------------------- */
 /* Source loading */
