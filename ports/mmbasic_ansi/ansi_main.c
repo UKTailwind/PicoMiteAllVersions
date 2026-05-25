@@ -106,7 +106,9 @@ void port_terminal_emit_colour(int fg, int bg, int has_bg) {
     int n = snprintf(buf, sizeof buf, "\033[38;2;%d;%d;%dm",
                      (fg >> 16) & 0xff, (fg >> 8) & 0xff, fg & 0xff);
     if (n > 0 && (size_t)n < sizeof buf) ansi_stdout(buf, n);
-    if (has_bg) {
+    if (has_bg && bg == Option.DefaultBC) {
+        ansi_stdout("\033[49m", 5);
+    } else if (has_bg) {
         n = snprintf(buf, sizeof buf, "\033[48;2;%d;%d;%dm",
                      (bg >> 16) & 0xff, (bg >> 8) & 0xff, bg & 0xff);
         if (n > 0 && (size_t)n < sizeof buf) ansi_stdout(buf, n);
@@ -226,6 +228,11 @@ static int ansi_boot(int width, int height, int no_graphics, int interactive) {
         ansi_no_graphics_mode = 1;
         configure_text_console(80, 24);
         Option.ColourCode = 1;
+        Option.DefaultFC = 0xFFFFFF;
+        Option.DefaultBC = 0x000000;
+        extern int gui_fcolour, gui_bcolour;
+        gui_fcolour = PromptFC = Option.DefaultFC;
+        gui_bcolour = PromptBC = Option.DefaultBC;
 
         mmbasic_runtime_port_begin();
         host_output_hook = ansi_stdout;
