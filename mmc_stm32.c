@@ -2993,7 +2993,10 @@ void InitReservedIO(void)
 		}
 	}
 
-#ifndef PICOMITEWEB
+#if !defined(PICOMITEWEB) && !defined(PICOMITEBT)
+	/* GP23 is the cyw43 WL_ON line on Pico W / Pico 2 W — don't drive
+	   it manually in WEB or BT builds. CheckPin would refuse anyway
+	   (UNUSED), but be explicit. */
 #ifdef rp2350
 	if (rp2350a)
 	{

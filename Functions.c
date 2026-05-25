@@ -79,7 +79,6 @@ const char *overlaid_functions[] = {
 	"MM.CODE",
 #ifndef PICOMITEWEB
 	"MM.SUPPLY",
-	"POS",
 #endif
 	"MM.END"};
 #ifndef rp2350
@@ -643,7 +642,6 @@ void fun_tilde(void)
 #ifndef PICOMITEWEB
 		MMSUPPLY,
 #endif
-		POS,
 		MMEND
 	}
 */
@@ -765,9 +763,6 @@ void fun_tilde(void)
 		targ = T_NBR;
 		break;
 #endif
-	case MMPOS:
-		fun_pos();
-		break;
 	default:
 		iret = -1;
 	}
@@ -947,7 +942,22 @@ void fun_exp(void)
  */
 
 // utility function used by HEX$(), OCT$() and BIN$()
-void DoHexOctBin(int base)
+void fun_base(void)
+{
+	unsigned long long int i;
+	int j = 1;
+	//	getargs(&tp, 3, ",");
+	getcsargs(&ep, 5);
+	int base = getint(argv[0], 2, 36);
+	i = (unsigned long long int)getinteger(argv[2]); // get the number
+	if (argc == 5)
+		j = getint(argv[4], 0, MAXSTRLEN); // get the optional number of chars to return
+	sret = GetTempStrMemory();			   // this will last for the life of the command
+	IntToStrPad((char *)sret, (signed long long int)i, '0', j, base);
+	CtoM(sret);
+	targ = T_STR;
+}
+/*void DoHexOctBin(int base)
 {
 	unsigned long long int i;
 	int j = 1;
@@ -963,7 +973,7 @@ void DoHexOctBin(int base)
 	targ = T_STR;
 }
 
-/*  @endcond */
+//  @endcond
 
 // return the hexadecimal representation of a number
 // s$ = HEX$(nbr)
@@ -984,7 +994,7 @@ void fun_oct(void)
 void fun_bin(void)
 {
 	DoHexOctBin(2);
-}
+}*/
 
 // syntax:  nbr = INSTR([start,] string1, string2)
 //          find the position of string2 in string1 starting at start chars in string1
@@ -1123,48 +1133,6 @@ void fun_fix(void)
 {
 	iret = getnumber(ep);
 	targ = T_INT;
-}
-
-// Return a substring offset by a number of characters from the left (beginning) of the string.
-// s$ = LEFT$( string$, nbr )
-void fun_left(void)
-{
-	int i;
-	unsigned char *s;
-	getcsargs(&ep, 3);
-
-	if (argc != 3)
-		StandardError(2);
-	s = GetTempStrMemory(); // this will last for the life of the command
-	Mstrcpy(s, getstring(argv[0]));
-	i = getint(argv[2], 0, MAXSTRLEN);
-	if (i < *s)
-		*s = i; // truncate if it is less than the current string length
-	sret = s;
-	targ = T_STR;
-}
-
-// Return a substring of ?string$? with ?number-of-chars? from the right (end) of the string.
-// s$ = RIGHT$( string$, number-of-chars )
-void fun_right(void)
-{
-	int nbr;
-	unsigned char *s, *p1, *p2;
-	getcsargs(&ep, 3);
-
-	if (argc != 3)
-		StandardError(2);
-	s = getstring(argv[0]);
-	nbr = getint(argv[2], 0, MAXSTRLEN);
-	if (nbr > *s)
-		nbr = *s;			   // get the number of chars to copy
-	sret = GetTempStrMemory(); // this will last for the life of the command
-	p1 = sret;
-	p2 = s + (*s - nbr) + 1;
-	*p1++ = nbr; // inset the length of the returned string
-	while (nbr--)
-		*p1++ = *p2++; // and copy the characters
-	targ = T_STR;
 }
 
 // return the length of a string
@@ -1527,7 +1495,77 @@ void fun_string(void)
 	*sret = i;
 	targ = T_STR;
 }
+// Return a substring offset by a number of characters from the left (beginning) of the string.
+// s$ = LEFT$( string$, nbr )
+void fun_left(unsigned char *p, int i)
+{
+	unsigned char *s = GetTempStrMemory(); // this will last for the life of the command
+	Mstrcpy(s, p);
+	if (i < *s)
+		*s = i; // truncate if it is less than the current string length
+	sret = s;
+	targ = T_STR;
+}
 
+// Return a substring of ?string$? with ?number-of-chars? from the right (end) of the string.
+// s$ = RIGHT$( string$, number-of-chars )
+void fun_right(unsigned char *s, int nbr)
+{
+	unsigned char *p1, *p2;
+	if (nbr > *s)
+		nbr = *s;			   // get the number of chars to copy
+	sret = GetTempStrMemory(); // this will last for the life of the command
+	p1 = sret;
+	p2 = s + (*s - nbr) + 1;
+	*p1++ = nbr; // inset the length of the returned string
+	while (nbr--)
+		*p1++ = *p2++; // and copy the characters
+	targ = T_STR;
+}
+
+void fun_schange(void)
+{
+	unsigned char *s, *p;
+	int i;
+	getcsargs(&ep, 5);
+	if (*argv[0] == 'E')
+	{
+		if (argc != 5)
+			StandardError(2);
+		unsigned char *s=getstring(argv[2]);
+		int nbr=getint(argv[4], 0, MAXSTRLEN);
+		fun_left(s,nbr);
+		return;
+	}
+	else if (*argv[0] == 'R')
+	{
+		unsigned char *s=getstring(argv[2]);
+		int nbr=getint(argv[4], 0, MAXSTRLEN);
+		fun_right(s,nbr);
+		return;
+	}
+	else
+	{
+		if (argc != 3)
+			StandardError(2);
+
+		bool upper = *argv[0] == 'U';
+		s = getstring(argv[2]);
+		p = sret = GetTempStrMemory(); // this will last for the life of the command
+		i = *p++ = *s++;			   // get the length of the string and save in the destination
+		while (i--)
+		{
+			if (upper)
+				*p = mytoupper(*s);
+			else
+				*p = tolower(*s);
+			p++;
+			s++;
+		}
+	}
+	targ = T_STR;
+}
+/*
 // Returns string$ converted to uppercase characters.
 // s$ = UCASE$( string$ )
 void fun_ucase(void)
@@ -1565,7 +1603,7 @@ void fun_lcase(void)
 	}
 	targ = T_STR;
 }
-
+*/
 // function (which looks like a pre defined variable) to return the version number
 // it pulls apart the VERSION string to generate the number
 void fun_version(void)
@@ -1693,7 +1731,31 @@ void fun_acos(void)
  */
 // utility function to do the max/min comparison and return the value
 // it is only called by fun_max() and fun_min() below.
-void do_max_min(int cmp)
+void fun_max_min(void)
+{
+	int i;
+	MMFLOAT nbr, f;
+	getcsargs(&ep, (MAX_ARG_COUNT * 2) - 1);
+	if ((argc & 1) != 1)
+		SyntaxError();
+	;
+	bool cmp = (*argv[0] == 'A'); // true for max, false for min
+	if (cmp)
+		nbr = -FLT_MAX;
+	else
+		nbr = FLT_MAX;
+	for (i = 2; i < argc; i += 2)
+	{
+		f = getnumber(argv[i]);
+		if (cmp && f > nbr)
+			nbr = f;
+		if (!cmp && f < nbr)
+			nbr = f;
+	}
+	fret = nbr;
+	targ = T_NBR;
+}
+/*void do_max_min(int cmp)
 {
 	int i;
 	MMFLOAT nbr, f;
@@ -1716,7 +1778,7 @@ void do_max_min(int cmp)
 	fret = nbr;
 	targ = T_NBR;
 }
-/*  @endcond */
+//  @endcond
 
 void fun_max(void)
 {
@@ -1726,7 +1788,7 @@ void fun_max(void)
 void fun_min(void)
 {
 	do_max_min(0);
-}
+}*/
 #if LOWRAM
 void fun_ternary(void)
 {

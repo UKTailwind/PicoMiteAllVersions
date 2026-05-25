@@ -114,6 +114,26 @@ int TouchX, TouchY;
 volatile bool TouchDown = false;
 volatile bool TouchUp = false;
 volatile bool TouchState = false;
+/* Tracks which source owns the current TouchState=true. Set by the
+   mouse/click edge detector in PicoMite.c when it latches a down-edge,
+   cleared by the touch panel's edge detector. ProcessTouch uses it to
+   decide whether to overwrite TouchX/Y via GetTouch() (touch path) or
+   trust the already-latched values (mouse/click path). */
+volatile bool gui_click_from_mouse = false;
+
+#ifdef PICOMITEVGA
+/* VGA/HDMI builds drive GUI controls from the mouse rather than a
+   resistive/capacitive touch panel. Touch.c is not compiled on these
+   targets, so supply minimal stubs for the touch-screen interface that
+   the shared GUI code expects to link against. GetTouch() returning
+   TOUCH_ERROR is treated by ProcessTouch() as "no pen down" and
+   prevents the legacy touch-hit-test path from firing. */
+int TOUCH_GETIRQTRIS = 0;
+int GetTouch(int axis) { (void)axis; return TOUCH_ERROR; }
+/* Cursor implementation moved to Draw.c so it can be used on all
+   PICOMITEVGA builds (incl. RP2040 VGA which doesn't define
+   GUICONTROLS). The GUI CURSOR BASIC command lives in cmd_guiMX170. */
+#endif
 
 int last_x2, last_y2; // defaults used when creating controls
 MMFLOAT last_inc, last_min, last_max;
@@ -866,10 +886,12 @@ void cmd_gui(void)
     if ((p = checkstring(cmdline, (unsigned char *)"INTERRUPT")))
     {
         getcsargs(&p, 3);
-        if (Option.TOUCH_CS == 0)
-            error("Touch option not set");
-        if (!Option.TOUCH_XZERO && !Option.TOUCH_YZERO)
-            error("Touch not calibrated");
+        /* GUI INTERRUPT arms vectors fired by ProcessTouch when its
+           TouchDown/TouchUp flags latch. Those flags can be driven by
+           a touch panel (if configured + calibrated), by mouse motion,
+           or by GUI CLICK DOWN/UP. Don't require touch hardware just
+           to arm the vectors — if no input source is ever active the
+           interrupt simply never fires, which is the right no-op. */
         if (*argv[0] == '0' && !isdigit(*(argv[0] + 1)))
             GuiIntDownVector = GuiIntUpVector = NULL;
         else
@@ -1886,6 +1908,14 @@ void DrawKeyboard(int mode)
     int i;
     unsigned char *p;
 
+#ifdef GUICONTROLS
+    /* Pop-up keyboard for TEXTBOX / NUMBERBOX draws directly to screen
+       without going through DrawControl(). Hide the cursor first so its
+       save buffer isn't stale relative to the about-to-change pixels.
+       Next CursorRefresh repaints the cursor with a fresh save. */
+    CursorHide();
+#endif
+
     if (Ctrl[InvokingCtrl].type == CTRL_TEXTBOX)
     {
         nbr_buttons = 33;
@@ -2223,6 +2253,12 @@ void DrawFmtBox(int mode)
     int i, x1, y1, x2, y2;
     static unsigned char *pfmt, *p;
 
+#ifdef GUICONTROLS
+    /* Pop-up format keypad for FORMATBOX draws directly to screen
+       without going through DrawControl(). See note in DrawKeyboard(). */
+    CursorHide();
+#endif
+
     if (mode == KEY_OPEN)
     {
         KeyPadErase(false); // erase the background
@@ -2326,6 +2362,19 @@ void DrawFmtBox(int mode)
 void DrawControl(int r)
 {
     int fnt;
+#ifdef GUICONTROLS
+    /* Remove the mouse cursor from the screen before we redraw a
+       control. Two problems if we don't:
+       (1) The cursor's save buffer captured the OLD control image —
+           a later CursorErase would restore stale pixels on top of
+           the newly-drawn control.
+       (2) Control drawing paints opaque pixels over the cursor sprite
+           leaving partial cursor remnants until the next refresh.
+       Erasing first clears cursor_painted; the next CursorRefresh
+       tick (~10 ms) repaints the cursor on top of the new control
+       image with a fresh save buffer. */
+    CursorHide();
+#endif
     fnt = gui_font;
     SetFont(Ctrl[r].font);
     switch (Ctrl[r].type)
@@ -2391,7 +2440,16 @@ void ProcessTouch(void)
     //    if(!Option.MaxCtrls || !TOUCH_GETIRQTRIS)return;
     if (repeat)
     {
-        if (TOUCH_DOWN)
+        /* Spinner auto-repeat while held. Source depends on who
+           latched the down-edge: touch panel uses TOUCH_DOWN; mouse,
+           synthetic click and the GUI CLICK PIN are all gated by the
+           same OR. */
+        bool held;
+        if (gui_click_from_mouse)
+            held = (nunstruct[2].L || gui_click_synthetic_down || click_pin_pressed()) ? true : false;
+        else
+            held = TOUCH_DOWN;
+        if (held)
             if (TouchTimer < repeat)
                 return;
             else
@@ -2403,7 +2461,12 @@ void ProcessTouch(void)
     {
         if (waiting)
         {
-            if (TouchTimer < 50) // wait 50mS before a processing touch (allows the touch to settle)
+            /* 50 ms debounce. Touch panels bounce; a mouse button or a
+               synthetic GUI CLICK does not. Skipping the gate for the
+               non-touch sources also avoids racing cmd_gui_click's own
+               50 ms wait loop, which would otherwise expire just as
+               the dispatch becomes eligible. */
+            if (TouchTimer < 50 && !gui_click_from_mouse)
                 return;
             else
                 waiting = false;
@@ -2420,12 +2483,22 @@ void ProcessTouch(void)
     if (TouchDown)
     {
         // touch has just occurred
-        TouchX = GetTouch(GET_X_AXIS);
-        TouchY = GetTouch(GET_Y_AXIS);
+        if (gui_click_from_mouse)
+        {
+            /* Mouse / synthetic click: TouchX/TouchY were latched at
+               the down-edge in PicoMite.c — don't overwrite them. */
+        }
+        else
+        {
+            /* Touch panel: read the coordinates now via GetTouch.
+               If the pen has already lifted (TOUCH_ERROR), abort. */
+            TouchX = GetTouch(GET_X_AXIS);
+            TouchY = GetTouch(GET_Y_AXIS);
+        }
         LastRef = CurrentRef = 0;
         TouchUp = TouchDown = false;
-        if (TouchX == TOUCH_ERROR)
-            return; // abort if the pen was lifted
+        if (!gui_click_from_mouse && TouchX == TOUCH_ERROR)
+            return; // pen lifted before we read
         if (InvokingCtrl)
         { // the keyboard/keypad takes complete control when activated
             if (Ctrl[InvokingCtrl].type == CTRL_FMTBOX)
@@ -2683,6 +2756,14 @@ void fun_msgbox(void)
     long long int timeout;
     if (!Option.MaxCtrls)
         StandardError(13);
+    /* MsgBox blocks the BASIC main loop. If the click that triggered
+       us came from a synthetic GUI CLICK or a GUI CLICK PIN, the user
+       has no way to steer the cursor over the popup's buttons
+       (joystick / keyboard / pin handlers all live in the suspended
+       main loop), so MsgBox would deadlock. Refuse loudly instead —
+       this is how the user learns the popup needs touch or a mouse. */
+    if (gui_click_emulated)
+        error("MsgBox needs a real touch or mouse — cursor cannot be steered while MsgBox is open");
     getcsargs(&ep, 9);
     if (argc < 3)
         StandardError(2);
@@ -2739,6 +2820,12 @@ void fun_msgbox(void)
         ServiceInterrupts();
     } while (TouchState && mSecTimer < timeout);
 
+#ifdef GUICONTROLS
+    /* About to paint the modal box. Hide the cursor first so its
+       save buffer doesn't trap pixels that are about to change.
+       No-op on builds without an active cursor. */
+    CursorHide();
+#endif
     PopUpRedrawAll(0, true);
     SpecialDrawRBox(x1, y1, x2, y2, 25, gui_fcolour, gui_bcolour, CTRL_NORMAL);
 
@@ -2758,18 +2845,63 @@ void fun_msgbox(void)
     while (1)
     {
         ServiceInterrupts();
+        /* Click-source resolution:
+           - Touch panel reports a touch via GetTouch (returns
+             TOUCH_ERROR if not touched).
+           - Mouse / synthetic click: only count it while the left
+             button is held (otherwise hovering would dismiss).
+           Try touch first; fall back to mouse. On builds with no
+           touch panel, GetTouch is the stub that returns TOUCH_ERROR. */
         x = GetTouch(GET_X_AXIS);
         y = GetTouch(GET_Y_AXIS);
+        if (x == TOUCH_ERROR)
+        {
+            if (nunstruct[2].L || gui_click_synthetic_down)
+            {
+                x = nunstruct[2].ax;
+                y = nunstruct[2].ay;
+            }
+            else if (click_pin_pressed())
+            {
+                /* Click-pin source: coords come from the soft cursor,
+                   wherever the user has steered it. */
+                x = cursor_x;
+                y = cursor_y;
+            }
+            else
+            {
+                x = -1;
+                y = -1;
+            }
+        }
         for (i = 0; i < btnnbr; i++)
             if (x >= btnx1[i] && x <= btnx2[i] && y >= btny1 && y <= btny2)
                 break;
         if (i < btnnbr)
         {
+#ifdef GUICONTROLS
+            /* About to paint the "pressed" button state. */
+            CursorHide();
+#endif
             DrawBasicButton(btnx1[i], btny1, btnx2[i], btny2, BTN_SIDE_WIDTH, 0, gui_fcolour, CTRL_NORMAL);
             SpecialPrintString(btnx1[i] + btnwidth / 2 + BTN_CAPTION_SHIFT, btny1 + gui_font_height + BTN_CAPTION_SHIFT, JUSTIFY_CENTER, JUSTIFY_MIDDLE, ORIENT_NORMAL, gui_bcolour, gui_fcolour, &btn[i * MAXSTRLEN], CTRL_NORMAL);
             ClickTimer += CLICK_DURATION; // sound a "click"
-            while (GetTouch(GET_X_AXIS) != TOUCH_ERROR)
+            /* Wait for the click to be released. Touch panel, mouse,
+               synthetic GUI CLICK and the GUI CLICK PIN all need to
+               clear before we proceed. */
+            while (GetTouch(GET_X_AXIS) != TOUCH_ERROR
+                   || nunstruct[2].L
+                   || gui_click_synthetic_down
+                   || click_pin_pressed())
                 ServiceInterrupts();
+#ifdef GUICONTROLS
+            /* Now erasing the modal box. The cursor may have wandered
+               while the user held the button (the wait loop above runs
+               ServiceInterrupts → CursorRefresh). Hide it before the
+               cleanup paint so the next refresh re-saves a clean
+               background. */
+            CursorHide();
+#endif
             SpecialDrawRBox(x1, y1, x2, y2, 25, gui_bcolour, gui_bcolour, CTRL_NORMAL);
             PopUpRedrawAll(0, false);
             iret = i + 1;
@@ -2983,6 +3115,21 @@ void ResetGUI(void)
     last_y2 = 100;
     last_fcolour = gui_fcolour;
     last_bcolour = gui_bcolour;
+#ifdef PICOMITEVGA
+    /* SCREENMODE2/3 use a 4-bit RGB121 palette with no grey, so
+       ChangeBright() on a black button face produces black borders too
+       (ChangeBright early-exits on c <= 0). The default Option.DefaultBC
+       is BLACK, which gives an invisible button face. When defaults
+       haven't been overridden, pick palette colours that quantise to
+       three distinct shades for face / bright-border / dim-border —
+       CERULEAN face gives CERULEAN / COBALT / MYRTLE after RGB121
+       quantisation. Users can still override via GUI FCOLOUR /
+       GUI BCOLOUR. */
+    if (last_bcolour == BLACK)
+        last_bcolour = CERULEAN;
+    if (last_fcolour == last_bcolour)
+        last_fcolour = WHITE;
+#endif
     last_inc = 1;
     last_min = -FLT_MAX;
     last_max = FLT_MAX;

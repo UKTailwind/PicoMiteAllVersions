@@ -97,6 +97,8 @@ extern short CurrentRef; // Control reference if pen is down (0 if not on contro
 extern short LastRef;    // Last control touched
 extern short LastX;      // X coordinate when pen was lifted
 extern short LastY;      // Y coordinate when pen was lifted
+extern int TouchX;       // X coordinate latched at touch/click down-edge
+extern int TouchY;       // Y coordinate latched at touch/click down-edge
 
 /* ============================================================================
  * External variables - Control state
@@ -136,6 +138,7 @@ void CheckGuiTimeouts(void);
  * Function declarations - Touch processing
  * ============================================================================ */
 void ProcessTouch(void);
+
 
 #endif /* GUI_H_INCL */
 #endif /* !defined(INCLUDE_COMMAND_TABLE) && !defined(INCLUDE_TOKEN_TABLE) */

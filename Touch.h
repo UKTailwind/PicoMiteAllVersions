@@ -348,6 +348,7 @@
 extern volatile bool TouchState;
 extern volatile bool TouchDown;
 extern volatile bool TouchUp;
+extern volatile bool gui_click_from_mouse;
 extern int TOUCH_GETIRQTRIS;
 extern volatile unsigned int TouchIrqPortAddr;
 extern int TouchIrqPortBit;

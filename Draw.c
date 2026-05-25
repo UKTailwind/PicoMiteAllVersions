@@ -342,6 +342,33 @@ bool STCollisionFound = false;
 int sprite_hit_st = -1;
 int st_which_collided = -1;
 
+/* Sprite/cursor palette tables and char-to-index helper. Used by the
+   cursor overlay (PICOMITEVGA) AND by the legacy SPRITE LOAD command
+   (non-VGA). Defined unconditionally so both call sites compile. */
+// Mode 1 (alternate palette): ' '=0, 0-9, A-F map to specific colors
+static const uint32_t sprite_color_mode1[16] = {
+    BLACK, BLUE, MYRTLE, COBALT, MIDGREEN, CERULEAN, GREEN, CYAN,
+    RED, MAGENTA, RUST, FUCHSIA, BROWN, LILAC, YELLOW, WHITE};
+
+// Mode 0 (standard palette): ' '=0, 0-9, A-F map to specific colors
+static const uint32_t sprite_color_mode0[16] = {
+    BLACK, BLUE, GREEN, CYAN, RED, MAGENTA, YELLOW, WHITE,
+    MYRTLE, COBALT, MIDGREEN, CERULEAN, RUST, FUCHSIA, BROWN, LILAC};
+
+// Helper: sprite-file char ' ', '0'..'9', 'A'..'F' -> palette index 0..15, or -1 for transparent.
+static inline int spriteCharToColorIndex(unsigned char c)
+{
+    if (c == ' ')
+        return -1;
+    if (c >= '0' && c <= '9')
+        return c - '0';
+    if (c >= 'A' && c <= 'F')
+        return c - 'A' + 10;
+    if (c >= 'a' && c <= 'f')
+        return c - 'a' + 10;
+    return -1;
+}
+
 #ifdef PICOMITEVGA
 #ifndef HDMI
 uint32_t remap[256];
@@ -351,13 +378,1076 @@ uint32_t remap332[256];
 uint16_t remap256[256];
 #endif
 
+#ifndef GUICONTROLS
+/* On VGA/HDMI builds without GUI controls these globals live in Draw.c.
+   When GUICONTROLS is enabled (mouse-driven GUI on RP2350 VGA/HDMI),
+   GUI.c owns them — skip the Draw.c definitions to avoid duplicate
+   symbols at link time. */
 short gui_font_width, gui_font_height;
 int last_bcolour, last_fcolour;
 volatile int CursorTimer = 0; // used to time the flashing cursor
+#endif
 extern volatile int QVgaScanLine;
 bool mergedread = 0;
 int ScreenSize = 0;
+#ifdef GUICONTROLS
+extern int InvokingCtrl;
+#endif
+/* Close the PICOMITEVGA branch here. The cursor block below is wrapped
+   by its own (PICOMITEVGA || GUICONTROLS) condition so it's also
+   available on touch-LCD GUICONTROLS builds (PICORP2350 etc.). The
+   non-VGA branch (#else) is reopened after the cursor block. */
+#endif /* PICOMITEVGA — temporarily closed for the cursor block */
+
+#if defined(PICOMITEVGA) || defined(GUICONTROLS)
+/* ====================================================================
+ *  Mouse / virtual cursor overlay (all GUI-capable builds)
+ * --------------------------------------------------------------------
+ * Save-the-pixels-underneath sprite cursor that mimics the Colour
+ * Maximite 2's GUI CURSOR command set:
+ *
+ *   GUI CURSOR ON [cursorno [, x, y [, cursorcolour]]]
+ *   GUI CURSOR OFF
+ *   GUI CURSOR HIDE | SHOW
+ *   GUI CURSOR COLOUR cursorcolour
+ *   GUI CURSOR x, y
+ *   GUI CURSOR LINK MOUSE | UNLINK MOUSE
+ *
+ * Two built-in sprites are provided: 0 = arrow pointer (13x19, hot
+ * point at top-left (0,0)) and 1 = cross-hair (15x15, hot point at
+ * centre (7,7)). The hot point is the click-meaningful pixel — when
+ * the cursor "is at" (X, Y), that pixel lands at (X, Y) on screen and
+ * the bitmap is drawn at (X-hotX, Y-hotY).
+ *
+ * The implementation uses the existing ReadBuffer / DrawBuffer /
+ * DrawPixel function pointers so it's mode-agnostic — the mode-specific
+ * pixel packing is hidden behind those primitives. The cursor follows
+ * whatever WriteBuf currently is; cmd_framebuffer / closeframebuffer /
+ * cmd_cls call CursorErase() before flipping WriteBuf so the save
+ * buffer is never restored to the wrong target.
+ *
+ * State model:
+ *   cursor_enabled  -- ON (true) vs OFF (false)
+ *   cursor_hidden   -- HIDE/SHOW (only meaningful while enabled)
+ *   cursor_linked   -- LINK MOUSE / UNLINK MOUSE
+ *   cursor_no       -- 0 = arrow, 1 = cross
+ *   cursor_x/y      -- stored position (= hot-point position on screen)
+ *   cursor_color    -- COLOUR (used by cursor 0 and 1 only)
+ * ==================================================================== */
+
+/* --- Built-in cursor sprites ------------------------------------------ */
+
+#define ARROW_CURSOR_W 13
+#define ARROW_CURSOR_H 19
+static const uint16_t arrow_cursor_bits[ARROW_CURSOR_H] = {
+    0x0001, /* 7              */
+    0x0003, /* 77             */
+    0x0005, /* 7 7            */
+    0x0009, /* 7  7           */
+    0x0011, /* 7   7          */
+    0x0021, /* 7    7         */
+    0x0041, /* 7     7        */
+    0x0081, /* 7      7       */
+    0x0101, /* 7       7      */
+    0x0201, /* 7        7     */
+    0x0401, /* 7         7    */
+    0x0801, /* 7          7   */
+    0x1F81, /* 7      777777  */
+    0x0091, /* 7   7  7       */
+    0x0099, /* 7  77  7       */
+    0x0125, /* 7 7  7  7      */
+    0x0123, /* 77   7  7      */
+    0x0240, /*       7  7     */
+    0x03C0, /*       7777     */
+};
+
+#define CROSS_CURSOR_W 15
+#define CROSS_CURSOR_H 15
+static const uint16_t cross_cursor_bits[CROSS_CURSOR_H] = {
+    0x0080, /*        7        */
+    0x0080,
+    0x0080,
+    0x0080,
+    0x0080,
+    0x0080,
+    0x0080,
+    0x7FFF, /*  777777777777777 (centre, hot point at col 7) */
+    0x0080,
+    0x0080,
+    0x0080,
+    0x0080,
+    0x0080,
+    0x0080,
+    0x0080,
+};
+
+struct cursor_sprite
+{
+    const uint16_t *bits;
+    int w, h;
+    int hot_x, hot_y;
+};
+
+/* Maximum cursor sprite dimensions. Built-ins are arrow (13x19) and
+   cross (15x15); loaded user sprites are capped here. 24x24 leaves
+   headroom over the built-ins without paying for the full 32x32
+   save/sprite buffers (which dominated BSS). */
+#define MAX_CURSOR_W 24
+#define MAX_CURSOR_H 24
+#define NUM_BUILTIN_CURSORS 2
+#define USER_CURSOR_SLOT 2 /* cursor_no == 2 means user-loaded sprite */
+
+static const struct cursor_sprite builtin_cursors[NUM_BUILTIN_CURSORS] = {
+    /* 0: arrow pointer — hot point at the tip (0,0) */
+    {arrow_cursor_bits, ARROW_CURSOR_W, ARROW_CURSOR_H, 0, 0},
+    /* 1: cross-hair — hot point at the centre (7,7) */
+    {cross_cursor_bits, CROSS_CURSOR_W, CROSS_CURSOR_H, 7, 7},
+};
+
+/* --- User-loaded sprite (GUI CURSOR LOAD) ----------------------------
+   Stored one byte per pixel: 0xFF = transparent, 0..15 = palette index
+   (resolved at paint time via sprite_color_mode0[]). This is the same
+   palette/encoding as the existing SPRITE LOAD command, just with a
+   4-arg header (width, height, xoffset, yoffset) and exactly one
+   sprite in the file. */
+static struct
+{
+    bool loaded;
+    int w, h;
+    int hot_x, hot_y;
+    uint8_t pixels[MAX_CURSOR_W * MAX_CURSOR_H];
+} user_cursor = {false, 0, 0, 0, 0, {0}};
+
+/* --- Save buffer & paint state --------------------------------------- */
+
+/* Save buffer for pixels under the cursor. Allocated lazily from the
+   MMBasic heap when the cursor is first painted, so a build that never
+   enables the cursor pays zero RAM for it.
+   Size: MAX_CURSOR_W*H pixels × 3 bytes/pixel (RGB121 modes emit
+   24-bit RGB via ReadBuffer16/DrawBuffer16; RGB555/RGB332 emit less).
+   Lifetime: nulled by CursorOnHeapWipe() during ClearRuntime because
+   InitHeap(true) wipes the underlying allocation. */
+#define CURSOR_SAVE_BUF_BYTES (MAX_CURSOR_W * MAX_CURSOR_H * 3)
+static uint8_t *cursor_save_buf = NULL;
+
+static bool cursor_painted = false;        /* true while pixels are on screen */
+static int cursor_saved_x, cursor_saved_y; /* top-left of saved rect on screen */
+static int cursor_saved_w, cursor_saved_h;
+/* Last hot-point position we painted at; used to short-circuit
+   no-movement refreshes. */
+static int cursor_target_x = INT_MIN, cursor_target_y = INT_MIN;
+
+/* --- User-visible state ---------------------------------------------- */
+
+static bool cursor_enabled = false; /* ON/OFF */
+static bool cursor_hidden = false;  /* HIDE/SHOW (only relevant while enabled) */
+static bool cursor_linked = false;  /* LINK MOUSE / UNLINK MOUSE */
+static int cursor_no = 0;           /* 0 = arrow, 1 = cross */
+int cursor_x = 0;                   /* stored hot-point position */
+int cursor_y = 0;
+static int cursor_color = WHITE; /* applies to cursor 0/1 only */
+
+/* When true, refresh is skipped entirely. Set by cmd_cls / mode change
+   etc. so the cursor doesn't try to restore stale pixels after a bulk
+   screen operation. */
+volatile bool CursorSuspend = false;
+
+/* Synthetic left-mouse-button state. Set by GUI CLICK DOWN / UP. The
+   mS-timer edge detector ORs this with nunstruct[2].L when computing
+   the button state, so software-driven clicks coexist with a real
+   mouse — neither path's writes clobber the other. Zero overhead when
+   GUI CLICK isn't used. */
+volatile bool gui_click_synthetic_down = false;
+
+/* GUI CLICK PIN: a physical input pin acts as a click source, the
+   same way the touch IRQ or the mouse left button does. Lets the
+   user wire a joystick fire-button (or similar) to drive the GUI
+   even while BASIC is blocked inside MsgBox or a modal control.
+   click_pin == 0 means the feature is disabled. click_pin_inv
+   selects polarity: false = active-low (idle pulled up, pressed
+   reads 0); true = active-high (idle pulled down, pressed reads 1). */
+int  click_pin     = 0;
+bool click_pin_inv = false;
+
+/* True when the most recently latched click came from an emulated
+   source (synthetic GUI CLICK or GUI CLICK PIN) rather than a real
+   pointing device (touch panel or mouse). MsgBox refuses to open
+   when this is set — the user can't reach the popup's buttons
+   without a real pointer, so failing loudly beats hanging silently.
+   Set / cleared by the mS-timer ISR at every down-edge. */
+volatile bool gui_click_emulated = false;
+
+static inline bool cursor_primitives_ready(void)
+{
+    return (void *)DrawPixel != (void *)DisplayNotSet && (void *)DrawBuffer != (void *)DisplayNotSet && (void *)ReadBuffer != (void *)DisplayNotSet && HRes > 0 && VRes > 0;
+}
+
+/* Restore the pixels that were under the cursor and mark it not
+   painted. This is the *internal* hide — separate from the user's
+   HIDE/SHOW state. If the save buffer was freed (ClearRuntime wiped
+   the MMBasic heap), skip the restore — those pixels are gone with
+   the buffer; the next paint will re-save fresh ones. */
+void CursorErase(void)
+{
+    if (!cursor_painted)
+        return;
+    if (cursor_save_buf != NULL && cursor_saved_w > 0 && cursor_saved_h > 0 && cursor_primitives_ready())
+    {
+        DrawBuffer(cursor_saved_x, cursor_saved_y,
+                   cursor_saved_x + cursor_saved_w - 1,
+                   cursor_saved_y + cursor_saved_h - 1,
+                   cursor_save_buf);
+    }
+    cursor_painted = false;
+}
+
+/* Back-compat alias used by callers outside this file (cmd_cls,
+   cmd_framebuffer, closeframebuffer). They just want "wipe the cursor
+   off the current WriteBuf before I change it" — same as CursorErase. */
+void CursorHide(void) { CursorErase(); }
+
+/* Reset all cursor state. Called from ClearRuntime() in MMBasic.c
+   before InitHeap(true) wipes the BASIC heap. Matches MMBasic's
+   convention that RUN resets everything except saved options — the
+   user's program is expected to re-issue GUI CURSOR ON if it wants
+   one. Also drops the GetMemory()'d save buffer reference, which
+   would dangle once InitHeap(true) recycles the pool. */
+void CursorOnHeapWipe(void)
+{
+    /* Save-buffer was on the about-to-be-wiped BASIC heap. */
+    cursor_save_buf = NULL;
+    cursor_painted = false;
+    cursor_target_x = cursor_target_y = INT_MIN;
+
+    /* User-visible cursor state — reset to boot defaults. */
+    cursor_enabled = false;
+    cursor_hidden = false;
+    cursor_linked = false;
+    cursor_no = 0;
+    cursor_x = 0;
+    cursor_y = 0;
+    cursor_color = WHITE;
+
+    /* Forget any GUI CURSOR LOAD-ed sprite — its pixel data lives in
+       BSS and would survive, but selecting cursor 2 without an explicit
+       LOAD in the new program would be a surprise. Consistent with
+       MMBasic's reset-on-RUN convention. */
+    user_cursor.loaded = false;
+
+    /* Reset any synthetic-click state so a stuck GUI CLICK DOWN from
+       the previous program doesn't bleed into the next one. */
+    gui_click_synthetic_down = false;
+}
+
+/* Return the geometry of the currently-selected sprite. Returns
+   false if cursor_no points at an unloaded user slot. */
+static bool cursor_get_geometry(int *w, int *h, int *hot_x, int *hot_y)
+{
+    if (cursor_no >= 0 && cursor_no < NUM_BUILTIN_CURSORS)
+    {
+        const struct cursor_sprite *spr = &builtin_cursors[cursor_no];
+        *w = spr->w;
+        *h = spr->h;
+        *hot_x = spr->hot_x;
+        *hot_y = spr->hot_y;
+        return true;
+    }
+    if (cursor_no == USER_CURSOR_SLOT && user_cursor.loaded)
+    {
+        *w = user_cursor.w;
+        *h = user_cursor.h;
+        *hot_x = user_cursor.hot_x;
+        *hot_y = user_cursor.hot_y;
+        return true;
+    }
+    return false;
+}
+
+/* Sprite pixel colour at (sx, sy) — returns -1 for transparent, else
+   the 24-bit RGB to pass to DrawPixel. Built-ins are monochrome and
+   use cursor_color; user-loaded sprites carry their own palette. */
+static int cursor_get_sprite_pixel(int sx, int sy)
+{
+    if (cursor_no >= 0 && cursor_no < NUM_BUILTIN_CURSORS)
+    {
+        const struct cursor_sprite *spr = &builtin_cursors[cursor_no];
+        return (spr->bits[sy] & (1u << sx)) ? cursor_color : -1;
+    }
+    if (cursor_no == USER_CURSOR_SLOT && user_cursor.loaded)
+    {
+        uint8_t v = user_cursor.pixels[sy * MAX_CURSOR_W + sx];
+        if (v == 0xFF)
+            return -1;
+        return (int)sprite_color_mode0[v & 0x0F];
+    }
+    return -1;
+}
+
+/* Paint the current cursor sprite with its hot point at screen (x, y). */
+static void CursorPaintAt(int x, int y)
+{
+    if (!cursor_primitives_ready())
+        return;
+
+    int sw, sh, hot_x, hot_y;
+    if (!cursor_get_geometry(&sw, &sh, &hot_x, &hot_y))
+    {
+        cursor_painted = false;
+        return;
+    }
+
+    /* Lazy-allocate the save buffer from the MMBasic heap. Done here
+       (rather than at GUI CURSOR ON time) so a build that compiles in
+       the cursor code but never enables it pays no heap either, and so
+       the allocation is reclaimed cleanly when ClearRuntime() wipes
+       the heap on RUN (CursorOnHeapWipe nulls our reference). */
+    if (cursor_save_buf == NULL)
+    {
+        cursor_save_buf = (uint8_t *)GetMemory(CURSOR_SAVE_BUF_BYTES);
+        if (cursor_save_buf == NULL)
+        {
+            /* Out of heap — give up silently rather than failing the
+               BASIC program. The cursor just won't draw. */
+            cursor_painted = false;
+            return;
+        }
+    }
+
+    /* Sprite top-left after applying the hot-point offset. */
+    int sprite_x = x - hot_x;
+    int sprite_y = y - hot_y;
+
+    /* Clip the save rectangle to screen. */
+    int x2 = sprite_x + sw - 1;
+    int y2 = sprite_y + sh - 1;
+    int sx = sprite_x, sy = sprite_y;
+    if (sx < 0)
+        sx = 0;
+    if (sy < 0)
+        sy = 0;
+    if (x2 >= HRes)
+        x2 = HRes - 1;
+    if (y2 >= VRes)
+        y2 = VRes - 1;
+    cursor_saved_x = sx;
+    cursor_saved_y = sy;
+    cursor_saved_w = x2 - sx + 1;
+    cursor_saved_h = y2 - sy + 1;
+    if (cursor_saved_w <= 0 || cursor_saved_h <= 0)
+    {
+        cursor_painted = false;
+        return;
+    }
+    /* Save the pixels we are about to overwrite. */
+    ReadBuffer(cursor_saved_x, cursor_saved_y,
+               cursor_saved_x + cursor_saved_w - 1,
+               cursor_saved_y + cursor_saved_h - 1,
+               cursor_save_buf);
+    /* Draw the opaque cursor pixels. */
+    for (int cy = 0; cy < sh; cy++)
+    {
+        int py = sprite_y + cy;
+        if (py < 0 || py >= VRes)
+            continue;
+        for (int cx = 0; cx < sw; cx++)
+        {
+            int colour = cursor_get_sprite_pixel(cx, cy);
+            if (colour < 0)
+                continue; /* transparent */
+            int px = sprite_x + cx;
+            if (px < 0 || px >= HRes)
+                continue;
+            DrawPixel(px, py, colour);
+        }
+    }
+    cursor_painted = true;
+}
+
+/* Load a CMM2-style cursor sprite file.
+   File format (one sprite per file):
+     Line 1: "width, height, xoffset, yoffset"
+     Lines 2..N: <height> rows of <width> chars each, using the same
+                 palette as SPRITE LOAD ('0'..'9' / 'A'..'F' = colour
+                 indices 0..15, ' ' = transparent). Apostrophe lines
+                 anywhere are treated as comments.
+   On success, populates user_cursor and selects cursor_no = 2. */
+static void cursor_load_from_file(const char *fname)
+{
+    int fnbr = FindFreeFileNbr();
+    if (!InitSDCard())
+        return;
+
+    char fullname[STRINGSIZE];
+    strncpy(fullname, fname, sizeof(fullname) - 1);
+    fullname[sizeof(fullname) - 1] = 0;
+    AppendDefaultExtension(fullname, ".spr");
+    if (!BasicFileOpen(fullname, fnbr, FA_READ))
+        error("File not found");
+
+    unsigned char buff[256];
+    /* Header */
+    MMgetline(fnbr, (char *)buff);
+    while (buff[0] == 39)
+        MMgetline(fnbr, (char *)buff);
+
+    unsigned char *z = buff;
+    getargs(&z, 7, (unsigned char *)", ");
+    if (argc != 7)
+    {
+        FileClose(fnbr);
+        error("Cursor file header must be width, height, xoffset, yoffset");
+    }
+    int w = getinteger(argv[0]);
+    int h = getinteger(argv[2]);
+    int hx = getinteger(argv[4]);
+    int hy = getinteger(argv[6]);
+    if (w < 1 || w > MAX_CURSOR_W || h < 1 || h > MAX_CURSOR_H)
+    {
+        FileClose(fnbr);
+        error("Cursor size out of range (1..24 each axis)");
+    }
+    if (hx < 0 || hx >= w || hy < 0 || hy >= h)
+    {
+        FileClose(fnbr);
+        error("Cursor hot point outside sprite bounds");
+    }
+
+    /* Erase current cursor before we touch user_cursor.* — if cursor_no
+       was already 2, painted state's geometry refers to the old sprite. */
+    if (cursor_painted)
+        CursorErase();
+
+    /* Body: read h rows, each w characters wide. Pad short rows with
+       spaces (= transparent). Decode straight into user_cursor.pixels —
+       a 576-byte tmp buffer here used to bloat the stack pointlessly,
+       since the data was just memcpy'd across at the end. user_cursor
+       lives in BSS; .loaded is set last, so a mid-parse error leaves
+       the sprite marked not-loaded and the partial pixels harmless. */
+    memset(user_cursor.pixels, 0xFF, sizeof(user_cursor.pixels));
+    for (int y = 0; y < h; y++)
+    {
+        MMgetline(fnbr, (char *)buff);
+        while (buff[0] == 39)
+            MMgetline(fnbr, (char *)buff);
+        int len = (int)strlen((char *)buff);
+        if (len < w)
+            memset(&buff[len], ' ', w - len);
+        for (int x = 0; x < w; x++)
+        {
+            int idx = spriteCharToColorIndex(buff[x]);
+            user_cursor.pixels[y * MAX_CURSOR_W + x] =
+                (idx < 0) ? 0xFF : (uint8_t)idx;
+        }
+    }
+    FileClose(fnbr);
+
+    user_cursor.w = w;
+    user_cursor.h = h;
+    user_cursor.hot_x = hx;
+    user_cursor.hot_y = hy;
+    user_cursor.loaded = true;
+}
+
+/* Called from routinechecks() ~every 10ms. Repaints if anything has
+   moved; erases if state has become hidden/off; otherwise no-ops. */
+void CursorRefresh(void)
+{
+    if (CursorSuspend)
+        return;
+    /* When linked, the cursor tracks the mouse — update the stored
+       position from the live mouse state. This is the place where
+       mouse motion becomes cursor motion. */
+    if (cursor_enabled && cursor_linked)
+    {
+        cursor_x = (int)nunstruct[2].ax;
+        cursor_y = (int)nunstruct[2].ay;
+    }
+    /* Off or hidden: ensure no pixels are on screen. */
+    if (!cursor_enabled || cursor_hidden)
+    {
+        if (cursor_painted)
+            CursorErase();
+        return;
+    }
+    /* Visible: redraw only if the hot-point moved. */
+    if (cursor_painted && cursor_x == cursor_target_x && cursor_y == cursor_target_y)
+        return;
+    CursorErase();
+    cursor_target_x = cursor_x;
+    cursor_target_y = cursor_y;
+    CursorPaintAt(cursor_x, cursor_y);
+}
+
+/* Force the next CursorRefresh to repaint, even if the position
+   hasn't moved (e.g. after changing cursor_no or cursor_color). */
+static inline void cursor_invalidate(void)
+{
+    cursor_target_x = cursor_target_y = INT_MIN;
+}
+
+/* Sync the mouse state to the cursor's current position. Used by
+   LINK MOUSE (so cursor doesn't teleport on the first refresh) and
+   by ON (so the cursor starts at a known location). */
+static inline void cursor_sync_mouse_to_cursor(void)
+{
+    nunstruct[2].ax = cursor_x;
+    nunstruct[2].ay = cursor_y;
+}
+
+/* Is some kind of mouse currently attached/active?
+   - USB HID: HID[1].Device_type == 2 (set by USBKeyboard.c / KeyboardMap.c
+     when a HID mouse descriptor is enumerated).
+   - PS/2: mouse0 (set by initMouse0 in mouse.c on a successful reset).
+   PICOMITEBTH (BLE HID host) isn't a PICOMITEVGA variant, so not handled. */
+static bool cursor_have_mouse(void)
+{
+#ifdef USBKEYBOARD
+    return (HID[1].Device_type == 2);
 #else
+    return mouse0;
+#endif
+}
+
+/* Is the GUI CLICK PIN currently "pressed"? Called from the mS-timer
+   edge detector, from CLICK() / TOUCH() and from any wait loop that
+   needs to know whether a click is still being held. Hot path, kept
+   tiny — a single GPIO read plus a polarity flip. */
+bool click_pin_pressed(void)
+{
+    if (click_pin == 0)
+        return false;
+    int level = gpio_get(PinDef[click_pin].GPno);
+    return click_pin_inv ? (level != 0) : (level == 0);
+}
+
+/* ====================================================================
+ *  CLICK() function — mouse-driven equivalent of TOUCH() on
+ *  touch-screen builds. Mirrors the CMM2's CLICK() function.
+ *
+ *  CLICK(DOWN)    — 1 if the left mouse button is currently held down
+ *  CLICK(UP)      — 1 if the left mouse button is currently released
+ *  CLICK(LASTX)   — X coordinate of the last release (pen-up) event
+ *  CLICK(LASTY)   — Y coordinate of the last release (pen-up) event
+ *  CLICK(REF)     — control ref# currently being clicked, 0 if none
+ *  CLICK(LASTREF) — control ref# of the last completed click
+ *
+ *  CurrentRef / LastRef / LastX / LastY are populated by
+ *  ProcessTouch() in GUI.c when the mouse-button edge detector in
+ *  PicoMite.c fires. Reading them here is just exposing that state
+ *  to BASIC.
+ * ==================================================================== */
+#ifdef GUICONTROLS
+void fun_click(void)
+{
+    /* CLICK() is source-agnostic: it reports whether ANYTHING is
+       currently clicking. ORs three signals:
+         - touch panel: TOUCH_DOWN (only relevant if a touch panel
+           is wired, gated by TOUCH_GETIRQTRIS),
+         - real mouse: nunstruct[2].L,
+         - software-driven: gui_click_synthetic_down (GUI CLICK DOWN/UP).
+       This makes CLICK() and TOUCH() interchangeable for typical
+       GUI programs that don't care which input was used. TOUCH()
+       remains the touch-panel-specific accessor for code that needs
+       raw touch state. */
+    int btn = (nunstruct[2].L || gui_click_synthetic_down || click_pin_pressed()) ? 1 : 0;
+    if (TOUCH_GETIRQTRIS && TOUCH_DOWN)
+        btn = 1;
+    if (checkstring(ep, (unsigned char *)"DOWN"))
+        iret = btn;
+    else if (checkstring(ep, (unsigned char *)"UP"))
+        iret = !btn;
+    else if (checkstring(ep, (unsigned char *)"X"))
+        /* CLICK(X) / CLICK(Y) mirror TOUCH(X) / TOUCH(Y): when a click
+           is active, return the position from whichever source latched
+           it (touch panel via GetTouch, else cursor_x/y which tracks
+           mouse + synthetic). When nothing is down, return -1 so the
+           caller can guard with the same idiom used for touch. */
+        iret = btn ? (TOUCH_GETIRQTRIS && TOUCH_DOWN && !gui_click_from_mouse
+                          ? GetTouch(GET_X_AXIS)
+                          : cursor_x)
+                   : TOUCH_ERROR;
+    else if (checkstring(ep, (unsigned char *)"Y"))
+        iret = btn ? (TOUCH_GETIRQTRIS && TOUCH_DOWN && !gui_click_from_mouse
+                          ? GetTouch(GET_Y_AXIS)
+                          : cursor_y)
+                   : TOUCH_ERROR;
+    else if (checkstring(ep, (unsigned char *)"REF"))
+        iret = CurrentRef;
+    else if (checkstring(ep, (unsigned char *)"LASTREF"))
+        iret = LastRef;
+    else if (checkstring(ep, (unsigned char *)"LASTX"))
+        iret = LastX;
+    else if (checkstring(ep, (unsigned char *)"LASTY"))
+        iret = LastY;
+    else
+        SyntaxError();
+    targ = T_INT;
+}
+
+/* ====================================================================
+ *  TOUCH() function — historically touch-panel-only, now extended to
+ *  the same input-source coverage as CLICK() so a single BASIC program
+ *  can run on VGA/HDMI (mouse), touch-LCD (touch + optional mouse),
+ *  and touch-LCD-with-no-input (synthetic GUI CLICK).
+ *
+ *  Position semantics: when a click is currently active, return the
+ *  position from whichever source owns it (via gui_click_from_mouse,
+ *  set at the down-edge by the mS-timer detector). When nothing is
+ *  down, return TOUCH_ERROR (-1) — matches the existing idiom
+ *  programs use to gate on "is the user actually touching".
+ *
+ *  TOUCH() and CLICK() return the same values for the overlapping
+ *  subcommands. TOUCH() additionally exposes X2/Y2 multi-touch on
+ *  capacitive panels, which has no mouse equivalent.
+ * ==================================================================== */
+void fun_touch(void)
+{
+    int btn = (nunstruct[2].L || gui_click_synthetic_down || click_pin_pressed()) ? 1 : 0;
+    if (TOUCH_GETIRQTRIS && TOUCH_DOWN)
+        btn = 1;
+    if (checkstring(ep, (unsigned char *)"X"))
+        iret = btn ? (TOUCH_GETIRQTRIS && TOUCH_DOWN && !gui_click_from_mouse
+                          ? GetTouch(GET_X_AXIS)
+                          : cursor_x)
+                   : TOUCH_ERROR;
+    else if (checkstring(ep, (unsigned char *)"Y"))
+        iret = btn ? (TOUCH_GETIRQTRIS && TOUCH_DOWN && !gui_click_from_mouse
+                          ? GetTouch(GET_Y_AXIS)
+                          : cursor_y)
+                   : TOUCH_ERROR;
+    else if (checkstring(ep, (unsigned char *)"DOWN"))
+        iret = btn;
+    else if (checkstring(ep, (unsigned char *)"UP"))
+        iret = !btn;
+    else if (checkstring(ep, (unsigned char *)"REF"))
+        iret = CurrentRef;
+    else if (checkstring(ep, (unsigned char *)"LASTREF"))
+        iret = LastRef;
+    else if (checkstring(ep, (unsigned char *)"LASTX"))
+        iret = LastX;
+    else if (checkstring(ep, (unsigned char *)"LASTY"))
+        iret = LastY;
+#ifndef PICOMITEVGA
+    /* Capacitive multi-touch: second contact point. Only meaningful on
+       hardware that supports it; on builds with no touch panel
+       (PICOMITEVGA) the Option struct doesn't carry TOUCH_CAP at all. */
+    else if (Option.TOUCH_CAP && checkstring(ep, (unsigned char *)"X2"))
+        iret = GetTouch(GET_X_AXIS2);
+    else if (Option.TOUCH_CAP && checkstring(ep, (unsigned char *)"Y2"))
+        iret = GetTouch(GET_Y_AXIS2);
+#endif
+    else
+        SyntaxError();
+    targ = T_INT;
+}
+#endif
+
+/* Handle the GUI CURSOR subcommand. Returns true if cmdline matched
+   "CURSOR", so callers know to stop further dispatch. CMM2-compatible
+   syntax: ON [n[,x,y[,c]]] / OFF / HIDE / SHOW / COLOUR c /
+   LINK MOUSE / UNLINK MOUSE / LOAD "file" / x,y. */
+bool cursor_handle_gui_subcommand(unsigned char *cmdline_in)
+{
+    unsigned char *p, *q;
+    if ((p = checkstring(cmdline_in, (unsigned char *)"CURSOR")) == NULL)
+        return false;
+
+    /* --- OFF: fully disable, erase from screen ------------------ */
+    if (checkstring(p, (unsigned char *)"OFF"))
+    {
+        CursorErase();
+        cursor_enabled = false;
+        cursor_hidden = false;
+        cursor_linked = false;
+        cursor_invalidate();
+        return true;
+    }
+
+    /* --- HIDE: keep state, just stop drawing ------------------- */
+    if (checkstring(p, (unsigned char *)"HIDE"))
+    {
+        cursor_hidden = true;
+        /* CursorRefresh will erase on its next tick. */
+        return true;
+    }
+
+    /* --- SHOW: redraw a hidden cursor at its stored position ---- */
+    if (checkstring(p, (unsigned char *)"SHOW"))
+    {
+        cursor_hidden = false;
+        cursor_invalidate();
+        return true;
+    }
+
+    /* --- COLOUR <n>: recolour built-in cursors ---------------- */
+    if ((q = checkstring(p, (unsigned char *)"COLOUR")) || (q = checkstring(p, (unsigned char *)"COLOR")))
+    {
+        getcsargs(&q, 1);
+        if (argc != 1)
+            SyntaxError();
+        cursor_color = getint(argv[0], 0, WHITE);
+        cursor_invalidate(); /* repaint with new colour */
+        return true;
+    }
+
+    /* --- LINK MOUSE / UNLINK MOUSE ---------------------------- */
+    if (checkstring(p, (unsigned char *)"LINK MOUSE"))
+    {
+        /* Refuse to link unless a mouse is actually present —
+           otherwise the cursor would freeze at its current spot
+           because nunstruct[2] never updates, and the user might
+           assume the cursor is broken. */
+        if (!cursor_have_mouse())
+            error("No mouse connected");
+        /* Snap the mouse to where the cursor is, so the first
+           refresh after linking doesn't teleport the cursor. */
+        cursor_sync_mouse_to_cursor();
+        cursor_linked = true;
+        cursor_invalidate();
+        return true;
+    }
+    if (checkstring(p, (unsigned char *)"UNLINK MOUSE"))
+    {
+        cursor_linked = false;
+        /* Stored cursor_x/y stays where it was; cursor freezes. */
+        return true;
+    }
+
+    /* --- LOAD "fname": load a CMM2-format sprite ---------------- */
+    if ((q = checkstring(p, (unsigned char *)"LOAD")))
+    {
+        getcsargs(&q, 1);
+        if (argc != 1)
+            SyntaxError();
+        char *fname = (char *)getCstring(argv[0]);
+        cursor_load_from_file(fname);
+        /* Selecting the user sprite is the natural follow-up — match
+           CMM2 behaviour where the loaded sprite becomes cursor 2. */
+        if (cursor_painted)
+            CursorErase();
+        cursor_no = USER_CURSOR_SLOT;
+        cursor_invalidate();
+        return true;
+    }
+
+    /* --- ON [cursorno [, x, y [, cursorcolour]]] -------------- */
+    if ((q = checkstring(p, (unsigned char *)"ON")))
+    {
+        /* The cursor sprite needs ReadBuffer to save the pixels it
+           overwrites. Touch LCDs that don't support framebuffer
+           readback (no ReadBuffer implementation) can still use
+           GUI CURSOR x,y + GUI CLICK to drive controls without a
+           visible cursor — they just can't enable the sprite. */
+        if ((void *)ReadBuffer == (void *)DisplayNotSet)
+            error("Display does not support framebuffer readback");
+        int new_no = cursor_no;
+        int new_x = (HRes > 0) ? HRes / 2 : 0;
+        int new_y = (VRes > 0) ? VRes / 2 : 0;
+        int new_color = cursor_color;
+        bool centre = true;
+        /* cursor_no 0..1 = built-ins, 2 = user-loaded (only valid if
+           user_cursor.loaded). */
+        int max_no = user_cursor.loaded ? USER_CURSOR_SLOT
+                                        : (NUM_BUILTIN_CURSORS - 1);
+
+        if (*q != 0 && *q != '\'')
+        {
+            getcsargs(&q, 7);
+            /* Allowed shapes: <no> | <no>,<x>,<y> | <no>,<x>,<y>,<colour> */
+            if (!(argc == 1 || argc == 5 || argc == 7))
+                SyntaxError();
+            new_no = getint(argv[0], 0, max_no);
+            if (argc >= 5)
+            {
+                new_x = getint(argv[2], 0, (HRes > 0 ? HRes - 1 : 0x7FFFFFFF));
+                new_y = getint(argv[4], 0, (VRes > 0 ? VRes - 1 : 0x7FFFFFFF));
+                centre = false;
+            }
+            if (argc == 7)
+                new_color = getint(argv[6], 0, WHITE);
+        }
+        /* If we'd changed sprite while painted, the save-buffer's
+           geometry is wrong for the new sprite — erase cleanly first. */
+        if (cursor_painted && new_no != cursor_no)
+            CursorErase();
+        cursor_no = new_no;
+        cursor_x = new_x;
+        cursor_y = new_y;
+        cursor_color = new_color;
+        cursor_hidden = false;
+        cursor_enabled = true;
+        /* If the ON call placed the cursor explicitly, don't disturb
+           the mouse position. If we defaulted to centre, sync the
+           mouse there so the user has a known starting point. */
+        if (centre)
+            cursor_sync_mouse_to_cursor();
+        cursor_invalidate();
+        return true;
+    }
+
+    /* --- GUI CURSOR x, y --------------------------------------
+       Updates stored position. Does NOT toggle visibility — per
+       CMM2 spec, "Does not display the cursor if hidden but just
+       updates the location". Does NOT change LINK state — but
+       since CursorRefresh overwrites cursor_x/y from the mouse on
+       every tick while linked, a manual move while linked will be
+       overridden on the next refresh; warp the mouse too so it
+       sticks. */
+    getcsargs(&p, 3);
+    if (argc != 3)
+        SyntaxError();
+    cursor_x = getint(argv[0], 0, (HRes > 0 ? HRes - 1 : 0x7FFFFFFF));
+    cursor_y = getint(argv[2], 0, (VRes > 0 ? VRes - 1 : 0x7FFFFFFF));
+    if (cursor_linked)
+        cursor_sync_mouse_to_cursor();
+    cursor_invalidate();
+    return true;
+}
+
+#ifdef GUICONTROLS
+/* ====================================================================
+ *  GUI CLICK — synthesise a click event at the cursor position
+ * --------------------------------------------------------------------
+ * Allows the GUI to be driven from anything that can run BASIC code —
+ * GPIO buttons, analog joysticks, automation scripts, etc. — without
+ * a real mouse. The mS-timer edge detector ORs nunstruct[2].L with
+ * gui_click_synthetic_down, so software clicks and a physical mouse
+ * coexist cleanly.
+ *
+ *   GUI CLICK DOWN        — button down at the cursor (held)
+ *   GUI CLICK UP          — button up
+ *   GUI CLICK             — momentary click at the current cursor
+ *   GUI CLICK x, y        — move cursor to (x,y) + momentary click
+ *
+ * The two momentary forms are split into a 50 ms down wait + 80 ms
+ * up wait. Because MMBasic only dispatches interrupts between
+ * statements, the wait loops use cmd_pause's re-entry trick: when
+ * check_interrupt() queues a GUI interrupt, the wait sets
+ * InterruptReturn to its own command token and returns, so the
+ * executor runs the interrupt and IRET re-enters us at the next
+ * phase. See the long comment in the bare-CLICK branch below.
+ * ==================================================================== */
+bool click_handle_gui_subcommand(unsigned char *cmdline_in)
+{
+    unsigned char *p;
+    if ((p = checkstring(cmdline_in, (unsigned char *)"CLICK")) == NULL)
+        return false;
+
+    /* GUI CLICK PIN <pin> [, INV]
+     * GUI CLICK PIN OFF
+     *
+     * Designates a physical input pin as a click source. The
+     * mS-timer ISR polls the pin alongside the touch IRQ and the
+     * mouse left button, latching coordinates from the soft cursor
+     * on the down-edge. This lets the GUI be driven from a
+     * joystick fire-button (or similar) even while BASIC is blocked
+     * inside MsgBox or another modal control — the BASIC main loop
+     * never has to run for the click to register.
+     *
+     * Polarity:
+     *   default   active-low  (idle pulled up,   pressed reads 0)
+     *   , INV     active-high (idle pulled down, pressed reads 1)
+     *
+     * The pin must be OFF (unconfigured) when this is issued; we
+     * then claim it as a digital input with the appropriate pull.
+     * GUI CLICK PIN OFF releases the pin back to EXT_NOT_CONFIG.
+     *
+     * This subcommand only configures GPIO; it doesn't depend on
+     * the executor's between-command interrupt dispatch, so it's
+     * safe to call from inside an interrupt routine. Handled here,
+     * before the interrupt-context guard further down. */
+    {
+        unsigned char *q;
+        if ((q = checkstring(p, (unsigned char *)"PIN")) != NULL)
+        {
+            if (checkstring(q, (unsigned char *)"OFF"))
+            {
+                if (click_pin)
+                {
+                    ExtCfg(click_pin, EXT_NOT_CONFIG, 0);
+                    click_pin     = 0;
+                    click_pin_inv = false;
+                }
+                return true;
+            }
+
+            /* Force the user to release any existing click pin before
+               assigning a new one; otherwise re-issuing the command
+               with a different pin would leak the previous claim. */
+            if (click_pin != 0)
+                error("GUI CLICK PIN already set; use GUI CLICK PIN OFF first");
+
+            getcsargs(&q, 3);
+            if (argc != 1 && argc != 3)
+                SyntaxError();
+
+            int new_pin = getpinarg(argv[0]);
+            bool new_inv = false;
+            if (argc == 3)
+            {
+                if (checkstring(argv[2], (unsigned char *)"INV"))
+                    new_inv = true;
+                else
+                    SyntaxError();
+            }
+
+            /* Refuse to steal a pin already configured for something
+               else — the user must release it first. */
+            if (ExtCurrentConfig[new_pin] != EXT_NOT_CONFIG)
+                StandardErrorParam2(27, new_pin, new_pin);
+
+            /* Hand the pin to the digital-input subsystem with the
+               appropriate internal pull. Active-low → pull-up (idle
+               high, button to GND pulls it down). Active-high → the
+               PULLDOWN sequence mirrors how SETPIN .. DIN, PULLDOWN
+               sets the pin (TRISCLR+LATCLR+TRISSET on RP2350) so
+               the pin stays at zero when not driven. */
+            if (new_inv)
+            {
+#ifdef rp2350
+                PinSetBit(new_pin, TRISCLR);
+                PinSetBit(new_pin, LATCLR);
+                PinSetBit(new_pin, TRISSET);
+#endif
+                ExtCfg(new_pin, EXT_DIG_IN, CNPDSET);
+            }
+            else
+            {
+                ExtCfg(new_pin, EXT_DIG_IN, CNPUSET);
+            }
+
+            click_pin     = new_pin;
+            click_pin_inv = new_inv;
+            return true;
+        }
+    }
+
+    /* The remaining forms — GUI CLICK DOWN / UP and bare GUI CLICK —
+       all rely on the BASIC executor running between statements to
+       deliver the simulated click to any armed GUI INTERRUPT routine.
+       From inside an interrupt that dispatch is blocked
+       (checkdetailinterrupts short-circuits while InterruptReturn !=
+       NULL), so DOWN/UP cause the user's interrupt to recurse
+       silently once the current one IRETs, and the bare CLICK form
+       additionally overwrites InterruptReturn (via cmd_pause-style
+       re-entry) and corrupts the OUTER interrupt's return path.
+       Refuse loudly so the programmer notices early. */
+    if (InterruptReturn != NULL)
+        error("GUI CLICK / DOWN / UP cannot be used in an interrupt routine");
+
+    if (checkstring(p, (unsigned char *)"DOWN"))
+    {
+        /* The hit-test reads nunstruct[2].ax/.ay at the down-edge —
+           snap them to where the cursor is so the click goes to the
+           control under the visible pointer. */
+        nunstruct[2].ax = cursor_x;
+        nunstruct[2].ay = cursor_y;
+        gui_click_synthetic_down = true;
+        return true;
+    }
+    if (checkstring(p, (unsigned char *)"UP"))
+    {
+        gui_click_synthetic_down = false;
+        return true;
+    }
+
+    /* Bare GUI CLICK / GUI CLICK x, y — momentary forms.
+     *
+     * MMBasic only dispatches interrupts between statements. The
+     * obvious "set flag, busy-wait, clear flag" loop swallows any
+     * GUI interrupt queued during the wait — checkdetailinterrupts
+     * sets nextstmt to the interrupt vector while we're still inside
+     * the command, and by the time control returns to the executor
+     * the click has already been torn down so the queued dispatch
+     * goes nowhere visible.
+     *
+     * Borrow cmd_pause's trick: when check_interrupt() queues an
+     * interrupt during the wait, point InterruptReturn at our OWN
+     * command token and return. The executor then runs the queued
+     * interrupt; its IRET hands control back to us, and the static
+     * `phase` distinguishes a fresh entry (start the down phase)
+     * from a resume in the down wait (after the TouchDown interrupt
+     * ran) from a resume in the up wait (after TouchUp ran).
+     *
+     *   phase 0: fresh entry — parse args, start down phase
+     *   phase 1: down wait (synthetic_down = true)
+     *   phase 2: up   wait (synthetic_down = false)
+     * Reset to 0 once the up wait expires.
+     */
+    static int phase = 0;
+    static uint64_t until = 0;
+    extern int check_interrupt(void);
+
+    if (phase == 0)
+    {
+        if (*p != 0 && *p != '\'')
+        {
+            getcsargs(&p, 3);
+            if (argc != 3)
+                SyntaxError();
+            cursor_x = getint(argv[0], 0, (HRes > 0 ? HRes - 1 : 0x7FFFFFFF));
+            cursor_y = getint(argv[2], 0, (VRes > 0 ? VRes - 1 : 0x7FFFFFFF));
+            if (cursor_linked)
+                cursor_sync_mouse_to_cursor();
+            cursor_invalidate();
+        }
+        nunstruct[2].ax = cursor_x;
+        nunstruct[2].ay = cursor_y;
+        gui_click_synthetic_down = true;
+        until = time_us_64() + 50000;
+        phase = 1;
+    }
+
+    if (phase == 1)
+    {
+        while (time_us_64() < until)
+        {
+            CheckAbort();
+            if (check_interrupt())
+            {
+                /* Interrupt queued. Surrender so the executor runs
+                   it; IRET returns us here with phase still == 1.
+                   We resume the wait (or fall through to phase 2 if
+                   `until` has already passed). */
+                while (*cmdline && *cmdline != cmdtoken)
+                    cmdline--;
+                InterruptReturn = cmdline;
+                return true;
+            }
+        }
+        /* Down wait expired (interrupt fired and `until` passed, or
+           it never fired). Move to the up phase. */
+        gui_click_synthetic_down = false;
+        until = time_us_64() + 80000;
+        phase = 2;
+    }
+
+    if (phase == 2)
+    {
+        while (time_us_64() < until)
+        {
+            CheckAbort();
+            if (check_interrupt())
+            {
+                while (*cmdline && *cmdline != cmdtoken)
+                    cmdline--;
+                InterruptReturn = cmdline;
+                return true;
+            }
+        }
+        /* Up wait expired. Click finished — reset for the next one. */
+        phase = 0;
+    }
+
+    return true;
+}
+#endif /* GUICONTROLS */
+#endif /* PICOMITEVGA || GUICONTROLS — end of cursor block */
+
+#ifndef PICOMITEVGA
+/* Non-VGA branch (was previously the #else of the outer PICOMITEVGA
+   wrapper at the top of this section). The cursor block has been
+   pulled out so it can compile on touch-LCD GUICONTROLS builds. */
 volatile int ScrollStart;
 int SSD1963data = 0;
 int map[16] = {0};
@@ -380,7 +1470,7 @@ bool mergerunning = false;
 volatile bool mergedone = false;
 uint32_t mergetimer = 0;
 #endif
-#endif
+#endif /* !PICOMITEVGA */
 void cmd_ReadTriangle(unsigned char *p);
 void (*DrawRectangle)(int x1, int y1, int x2, int y2, int c) = (void (*)(int, int, int, int, int))DisplayNotSet;
 void (*DrawBitmap)(int x1, int y1, int width, int height, int scale, int fc, int bc, unsigned char *bitmap) = (void (*)(int, int, int, int, int, int, int, unsigned char *))DisplayNotSet;
@@ -445,6 +1535,19 @@ void MIPS16 cmd_guiMX170(void)
     unsigned char *p;
 
     CheckDisplay(); // display a bitmap stored in an integer or string
+#if defined(PICOMITEVGA) || defined(GUICONTROLS)
+    /* GUI CURSOR — handles ON [,colour] / OFF / MOUSE / x,y / etc.
+       Available on every build that has the cursor module compiled:
+       VGA/HDMI variants, and all touch-LCD GUICONTROLS builds. */
+    if (cursor_handle_gui_subcommand(cmdline))
+        return;
+#endif
+#ifdef GUICONTROLS
+    /* GUI CLICK — synthesise click events. Requires GUICONTROLS since
+       the only thing to click on is GUI controls. */
+    if (click_handle_gui_subcommand(cmdline))
+        return;
+#endif
     if ((p = checkstring(cmdline, (unsigned char *)"BITMAP")))
     {
         int x, y, fc, bc, h, w, scale, t, bytes;
@@ -5236,6 +6339,11 @@ void cmd_cls(void)
 
 #ifdef GUICONTROLS
     HideAllControls();
+    /* The mouse cursor's save-buffer is about to point at pixels that no
+       longer exist on screen. Mark it gone so the next CursorRefresh()
+       re-saves & re-draws cleanly instead of restoring stale pixels.
+       No-op when cursor isn't active. */
+    CursorHide();
 #endif
     skipspace(cmdline);
     if (!(*cmdline == 0 || *cmdline == '\''))
@@ -5369,30 +6477,10 @@ void fun_mmvres(void)
 extern BYTE BDEC_bReadHeader(BMPDECODER *pBmpDec, int fnbr);
 extern BYTE BMP_bDecode_memory(int x, int y, int xlen, int ylen, int fnbr, char *p);
 
-// Color lookup tables for sprite file loading
-// Mode 1 (alternate palette): ' '=0, 0-9, A-F map to specific colors
-static const uint32_t sprite_color_mode1[16] = {
-    BLACK, BLUE, MYRTLE, COBALT, MIDGREEN, CERULEAN, GREEN, CYAN,
-    RED, MAGENTA, RUST, FUCHSIA, BROWN, LILAC, YELLOW, WHITE};
-
-// Mode 0 (standard palette): ' '=0, 0-9, A-F map to specific colors
-static const uint32_t sprite_color_mode0[16] = {
-    BLACK, BLUE, GREEN, CYAN, RED, MAGENTA, YELLOW, WHITE,
-    MYRTLE, COBALT, MIDGREEN, CERULEAN, RUST, FUCHSIA, BROWN, LILAC};
-
-// Helper function to convert sprite file character to color index (0-15, or -1 for invalid)
-static inline int spriteCharToColorIndex(unsigned char c)
-{
-    if (c == ' ')
-        return -1; // transparent
-    if (c >= '0' && c <= '9')
-        return c - '0';
-    if (c >= 'A' && c <= 'F')
-        return c - 'A' + 10;
-    if (c >= 'a' && c <= 'f')
-        return c - 'a' + 10;
-    return -1; // invalid character treated as transparent
-}
+/* Sprite palette tables and spriteCharToColorIndex() were moved earlier
+   in this file (just above the cursor overlay block) so the cursor
+   code can share them. Definitions live there now; remove duplicates
+   here. */
 
 // Sprite pool allocator - allocates sprites in chunks of 3 per 256-byte page
 // Returns pointer to allocated sprite structure, or NULL on failure
@@ -7951,6 +9039,12 @@ void fun_sprite(void)
 #ifndef PICOMITEVGA
 void restorepanel(void)
 {
+#ifdef GUICONTROLS
+    /* Will rebind drawing primitives and (often) clear WriteBuf. Drop
+       the cursor's save-buffer reference first so a later restore
+       doesn't leak stale pixels onto the panel. */
+    CursorHide();
+#endif
     if (IS_VIRTUAL_DISPLAY(Option.DISPLAY_TYPE))
     {
         InitDisplayVirtual();
@@ -8067,6 +9161,11 @@ void setframebuffer(void)
 }
 void closeframebuffer(char layer)
 {
+#ifdef GUICONTROLS
+    /* About to flip WriteBuf and possibly free framebuffer memory.
+       Restore cursor pixels to the current WriteBuf first. */
+    CursorHide();
+#endif
 #ifdef PICOMITE
     if (mergerunning)
     {
@@ -8860,6 +9959,12 @@ void cmd_framebuffer(void)
     }
     else if ((p = checkstring(cmdline, (unsigned char *)"WRITE")))
     {
+#ifdef GUICONTROLS
+        /* Hide the cursor before WriteBuf flips. If the cursor's save
+           buffer references the old buffer, restoring later would
+           leak old pixels onto the new buffer. */
+        CursorHide();
+#endif
         if (checkstring(p, (unsigned char *)"N"))
         {
 #ifdef PICOMITE
@@ -12528,6 +13633,12 @@ void MIPS16 ResetDisplay(void)
     }
 #endif
 #endif
+#ifdef GUICONTROLS
+    /* Mouse-driven GUI on VGA/HDMI: initialise last_fcolour/last_bcolour
+       and the other defaults so the first GUI control isn't drawn as
+       black-on-black with zero dimensions. */
+    ResetGUI();
+#endif
 #else
 #ifdef GUICONTROLS
     ResetGUI();
@@ -13991,6 +15102,11 @@ void MIPS16 fun_3D(void)
 #ifdef PICOMITEVGA
 void closeframebuffer(char layer)
 {
+#ifdef PICOMITEVGA
+    /* About to flip WriteBuf and possibly free framebuffer memory.
+       Restore cursor pixels to the current WriteBuf first. */
+    CursorHide();
+#endif
     if (layer == 'A')
         WriteBuf = DisplayBuf;
     if (FrameBuf != DisplayBuf && (layer == 'A' || layer == 'F'))
@@ -14362,6 +15478,13 @@ void cmd_framebuffer(void)
     }
     else if ((p = checkstring(cmdline, (unsigned char *)"WRITE")))
     {
+#ifdef PICOMITEVGA
+        /* Restore cursor pixels to the current WriteBuf before flipping
+           it to a different layer/frame buffer. Otherwise the cursor
+           leaves a ghost on the old buffer and the next refresh saves
+           the wrong pixels on the new buffer. */
+        CursorHide();
+#endif
         if (checkstring(p, (unsigned char *)"N"))
             WriteBuf = DisplayBuf;
         else if (checkstring(p, (unsigned char *)"L"))

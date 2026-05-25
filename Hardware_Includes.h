@@ -585,13 +585,27 @@ void putConsole(int c, int flush);
 int getConsole(void);
 char SerialConsolePutC(char c, int flush);
 
+/*
+ * PICOMITEBT replaces USB CDC with an RFCOMM/SPP console. Existing call
+ * sites use tud_cdc_write_flush() to push CDC output out immediately;
+ * on PICOMITEBT we redirect that to the BT TX-ring flush. Declared here
+ * so all TUs that use tud_cdc_write_flush() see the redirection
+ * without each having to include BTConsole.h.
+ */
+#ifdef PICOMITEBT
+void bt_console_flush(void);
+#define tud_cdc_write_flush() bt_console_flush()
+#endif
+
 /* ============================================================================
  * Function declarations - Keyboard input
  * ============================================================================ */
 int MMInkey(void);
 int MMgetchar(void);
 char MMputchar(char c, int flush);
-
+extern volatile int keytimer;
+extern uint32_t repeattime;
+extern const int UKkeyValue[], USkeyValue[], DEkeyValue[], FRkeyValue[], ESkeyValue[], BEkeyValue[];
 /* ============================================================================
  * Function declarations - Program execution
  * ============================================================================ */
@@ -694,19 +708,19 @@ void web_async_check_error(void);
 #ifdef PICOMITEWEB_TLS
 /* TLS lifecycle. The opaque struct altcp_tls_config* is forward-declared
    rather than pulling lwip/altcp_tls.h into this header.
-     picomite_tls_init() — currently a no-op; retained for future hooks.
-     picomite_tls_get_client_config() — returns the lazily-created shared
-       client TLS config. With no CA loaded the config performs NO peer
-       verification (encrypted but not authenticated).
-     picomite_tls_set_ca(buf, len) — install a CA bundle (PEM with trailing
-       \0 in the len, or DER binary) and switch to MBEDTLS_SSL_VERIFY_REQUIRED.
-       Returns 0 on success, -1 on parse failure.
-     picomite_tls_clear_ca() — drop the CA and revert to no-verify default.
-     picomite_tls_verify_is_required() — true once a CA has been installed. */
+	 picomite_tls_init() — currently a no-op; retained for future hooks.
+	 picomite_tls_get_client_config() — returns the lazily-created shared
+	   client TLS config. With no CA loaded the config performs NO peer
+	   verification (encrypted but not authenticated).
+	 picomite_tls_set_ca(buf, len) — install a CA bundle (PEM with trailing
+	   \0 in the len, or DER binary) and switch to MBEDTLS_SSL_VERIFY_REQUIRED.
+	   Returns 0 on success, -1 on parse failure.
+	 picomite_tls_clear_ca() — drop the CA and revert to no-verify default.
+	 picomite_tls_verify_is_required() — true once a CA has been installed. */
 struct altcp_tls_config;
 void picomite_tls_init(void);
 struct altcp_tls_config *picomite_tls_get_client_config(void);
-int  picomite_tls_set_ca(const unsigned char *ca_buf, size_t ca_len);
+int picomite_tls_set_ca(const unsigned char *ca_buf, size_t ca_len);
 void picomite_tls_clear_ca(void);
 bool picomite_tls_verify_is_required(void);
 #endif
@@ -757,6 +771,16 @@ bool picomite_tls_verify_is_required(void);
 #ifdef rp2350
 #include "GUI.h"
 #endif
+#endif
+
+/* VGA / HDMI builds with mouse-driven GUI controls pull in the same
+   GUI/Touch headers as the touch-screen builds. Touch.h provides the
+   GET_X_AXIS / TOUCH_ERROR constants and the extern decls of the touch
+   state globals; on these builds the touch hardware drivers are not
+   compiled — GUI.c supplies minimal stubs. */
+#if defined(PICOMITEVGA) && defined(GUICONTROLS)
+#include "Touch.h"
+#include "GUI.h"
 #endif
 
 #include "GPS.h"

@@ -66,7 +66,9 @@ extern "C"
 #include "usb_host_files/tusb_config.h"
 #else
 #include "pico/unique_id.h"
+#ifndef PICOMITEBT
 #include "class/cdc/cdc_device.h"
+#endif
 #endif
 #ifndef rp2350
 #include "hardware/structs/ssi.h"
@@ -104,6 +106,7 @@ uint8_t PSRAMpin;
 #ifdef PICOMITEWEB
 #include "lwipopts.h"
 #include "pico/cyw43_arch.h"
+#include "pico/cyw43_driver.h"
 #include "lwip/pbuf.h"
 #include "lwip/tcp.h"
 #include "lwip/dns.h"
@@ -116,6 +119,16 @@ uint8_t PSRAMpin;
 #include "mbedtls/platform_time.h"
 #include "mbedtls/ssl.h"
 #endif
+#endif
+#ifdef PICOMITEBT
+#include "pico/cyw43_arch.h"
+#include "pico/cyw43_driver.h"
+#include "BTConsole.h"
+#endif
+#ifdef PICOMITEBTH
+#include "pico/cyw43_arch.h"
+#include "pico/cyw43_driver.h"
+#include "BTKeyboard.h"
 #endif
 #ifdef PICOMITERP2350
 #include "VGA222.h"
@@ -159,7 +172,8 @@ uint8_t PSRAMpin;
 #define MES_SIGNON "\rPicoMiteVGA MMBasic USB " CHIP " Edition V" VERSION "\r\n"
 #endif
     extern void hid_app_task(void);
-    volatile int keytimer = 0;
+    /* keytimer now lives in KeyboardMap.c (shared with the BLE-HID-host
+       build) -- previously defined here too. */
     extern void USB_bus_reset(void);
     bool USBenabled = false;
 #else
@@ -185,13 +199,18 @@ uint8_t PSRAMpin;
 #include "host/hcd.h"
 #define MES_SIGNON "\rPicoMite MMBasic USB " CHIP " Edition V" VERSION "\r\n"
     extern void hid_app_task(void);
-    volatile int keytimer = 0;
+    /* keytimer now lives in KeyboardMap.c (shared with the BLE-HID-host
+       build) -- previously defined here too. */
     extern void USB_bus_reset(void);
     bool USBenabled = false;
 #include "pico/multicore.h"
     mutex_t frameBufferMutex; // mutex to lock frame buffer
 #else
-#ifdef PICOMITEMIN
+#ifdef PICOMITEBT
+#define MES_SIGNON "\rPicoMiteBT MMBasic " CHIP " V" VERSION "\r\n"
+#elif defined(PICOMITEBTH)
+#define MES_SIGNON "\rPicoMiteBTH MMBasic " CHIP " V" VERSION "\r\n"
+#elif defined(PICOMITEMIN)
 #define MES_SIGNON "\rPicoMiteMin MMBasic " CHIP " V" VERSION "\r\n"
 #else
 #define MES_SIGNON "\rPicoMite MMBasic " CHIP " V" VERSION "\r\n"
@@ -463,11 +482,15 @@ uint8_t PSRAMpin;
         {39, 99, "VSYS", UNUSED, 99, 99},                                                                  // pin 39
         {40, 99, "VBUS", UNUSED, 99, 99},                                                                  // pin 40
 #if !defined(PICOMITEWEB) || defined(rp2350)
-#if defined(PICOMITEWEB) && defined(rp2350)
-        {41, 23, "GP23", UNUSED, 99, 99}, // pseudo pin 41 reserved for WEB interface
-        {42, 24, "GP24", UNUSED, 99, 99}, // pseudo pin 42 reserved for WEB interface
-        {43, 25, "GP25", UNUSED, 99, 99}, // pseudo pin 43 reserved for WEB interface
-        {44, 29, "GP29", UNUSED, 99, 99}, // pseudo pin 44 reserved for WEB interface
+#if (defined(PICOMITEWEB) || defined(PICOMITEBT) || defined(PICOMITEBTH)) && defined(rp2350)
+        /* GP23/24/25/29 wire the RP2350 to the CYW43439 wireless chip.
+           Mark them UNUSED so CheckPin() refuses to reset them in
+           ClearExternalIO — otherwise the SPI link breaks and
+           cyw43_arch_init() fails silently. */
+        {41, 23, "GP23", UNUSED, 99, 99}, // pseudo pin 41 reserved for WEB/BT/BTH interface
+        {42, 24, "GP24", UNUSED, 99, 99}, // pseudo pin 42 reserved for WEB/BT/BTH interface
+        {43, 25, "GP25", UNUSED, 99, 99}, // pseudo pin 43 reserved for WEB/BT/BTH interface
+        {44, 29, "GP29", UNUSED, 99, 99}, // pseudo pin 44 reserved for WEB/BT/BTH interface
 #else
         {41, 23, "GP23", DIGITAL_IN | DIGITAL_OUT | SPI0TX | I2C1SCL | PWM3B, 99, 131},             // pseudo pin 41
         {42, 24, "GP24", DIGITAL_IN | DIGITAL_OUT | SPI1RX | UART1TX | I2C0SDA | PWM4A, 99, 4},     // pseudo pin 42
@@ -578,14 +601,40 @@ uint8_t PSRAMpin;
         // Note: classicread and nunchuckread are global variables declared in I2C.c
         static uint64_t lastrun = 0;
         uint64_t timenow = time_us_64();
-        if (timenow - lastrun < 1000)
+        if (timenow - lastrun < 100)
             return;
         lastrun = timenow;
+#if defined(PICOMITEVGA) || defined(GUICONTROLS)
+        /* Mouse / virtual-cursor refresh. routinechecks() runs from the
+           prompt's getchar loop as well as during program execution, so
+           the cursor follows the mouse in both contexts. Throttled to
+           ~10 ms — refreshing on every routinechecks tick (~100 µs)
+           burns cycles redrawing the same pixels and slows the prompt
+           noticeably. CursorRefresh's own enabled/position checks short-
+           circuit when nothing has changed. Available on every build
+           where the cursor module compiles (VGA/HDMI, and touch-LCD
+           GUICONTROLS builds like PICORP2350). */
+        static uint64_t cursor_lastrun = 0;
+        if (timenow - cursor_lastrun >= 10000)
+        {
+            cursor_lastrun = timenow;
+            CursorRefresh();
+        }
+#endif
 #ifndef USBKEYBOARD
         static int keyread = 0;
+#ifndef PICOMITEBT
+        /* Used by the USB CDC RX poll below; unused on BT (BT uses
+           bt_console_rx_available()). */
         int count;
+#endif
+#ifndef PICOMITEBTH
+        /* PS/2 polling. Gated off for PICOMITEBTH: the BLE-HID-host
+           build doesn't support PS/2 keyboards (it would compete with
+           the BT keymap path and confuse OPTION KEYBOARD semantics). */
         if (Option.KeyboardConfig)
             CheckKeyboard();
+#endif
 #endif
 
         if (CurrentlyPlaying != P_NOTHING)
@@ -625,59 +674,97 @@ uint8_t PSRAMpin;
             hid_app_task();
         }
 #endif
-#ifndef USBKEYBOARD
-        if (tud_cdc_connected() &&
-            (Option.SerialConsole == 0 || Option.SerialConsole > 4) &&
-            Option.Telnet != -1 &&
-            (count = tud_cdc_available()))
+#ifdef PICOMITEBTH
+        /* Pump btstack/cyw43 from the keyboard-tick site too. HID
+           reports route into the console RX ring from inside the
+           packet handler (process_kbd_report path), so no extra
+           drain logic is needed here. */
+        bt_keyboard_poll();
+#endif
+#ifdef PICOMITEBT
+        /* Pump btstack/cyw43 and drain inbound RFCOMM bytes into the
+           standard console RX ring. Mirrors the USB CDC path. */
+        bt_console_poll();
+        if (bt_console_connected() &&
+            (Option.SerialConsole == 0 || Option.SerialConsole > 4))
         {
             uint32_t space = console_rx_buf_space();
-
-            // Ensure we leave at least 1 byte free to distinguish full from empty
-            if (space > 1)
+            while (space > 1 && bt_console_rx_available() > 0)
             {
-                uint8_t tempBuf[CFG_TUD_CDC_RX_BUFSIZE]; // USB CDC buffer size
-                uint32_t to_read = space - 1;            // Maximum we can safely buffer
-
-                // Limit to USB available data
-                if (to_read > count)
-                    to_read = count;
-
-                // Limit to temp buffer size
-                if (to_read > sizeof(tempBuf))
-                    to_read = sizeof(tempBuf);
-
-                // Read from USB with interrupts disabled to prevent race conditions
-                irq_set_enabled(USBCTRL_IRQ, false);
-                uint32_t actual = tud_cdc_read(tempBuf, to_read);
-                irq_set_enabled(USBCTRL_IRQ, true);
-
-                // Process received bytes
-                for (uint32_t i = 0; i < actual; i++)
+                int c = bt_console_getc();
+                if (c < 0)
+                    break;
+                if (BreakKey && c == BreakKey)
                 {
-                    int c = tempBuf[i];
-
-                    // Check for break key
-                    if (BreakKey && c == BreakKey)
-                    {
-                        MMAbort = true;
-                        ConsoleRxBufHead = ConsoleRxBufTail; // Flush buffer
-                        break;                               // Exit loop after abort
-                    }
-                    // Check for key interrupt (signal only, don't buffer)
-                    else if (c == keyselect && KeyInterrupt != NULL)
-                    {
-                        Keycomplete = true;
-                    }
-                    // Normal character - store in buffer
-                    else
-                    {
-                        ConsoleRxBuf[ConsoleRxBufHead] = c;
-                        ConsoleRxBufHead = (ConsoleRxBufHead + 1) % CONSOLE_RX_BUF_SIZE;
-                    }
+                    MMAbort = true;
+                    ConsoleRxBufHead = ConsoleRxBufTail;
+                    break;
+                }
+                else if (c == keyselect && KeyInterrupt != NULL)
+                {
+                    Keycomplete = true;
+                }
+                else
+                {
+                    ConsoleRxBuf[ConsoleRxBufHead] = c;
+                    ConsoleRxBufHead = (ConsoleRxBufHead + 1) % CONSOLE_RX_BUF_SIZE;
+                    space--;
                 }
             }
         }
+#elif !defined(USBKEYBOARD)
+    if (tud_cdc_connected() &&
+        (Option.SerialConsole == 0 || Option.SerialConsole > 4) &&
+        Option.Telnet != -1 &&
+        (count = tud_cdc_available()))
+    {
+        uint32_t space = console_rx_buf_space();
+
+        // Ensure we leave at least 1 byte free to distinguish full from empty
+        if (space > 1)
+        {
+            uint8_t tempBuf[CFG_TUD_CDC_RX_BUFSIZE]; // USB CDC buffer size
+            uint32_t to_read = space - 1;            // Maximum we can safely buffer
+
+            // Limit to USB available data
+            if (to_read > count)
+                to_read = count;
+
+            // Limit to temp buffer size
+            if (to_read > sizeof(tempBuf))
+                to_read = sizeof(tempBuf);
+
+            // Read from USB with interrupts disabled to prevent race conditions
+            irq_set_enabled(USBCTRL_IRQ, false);
+            uint32_t actual = tud_cdc_read(tempBuf, to_read);
+            irq_set_enabled(USBCTRL_IRQ, true);
+
+            // Process received bytes
+            for (uint32_t i = 0; i < actual; i++)
+            {
+                int c = tempBuf[i];
+
+                // Check for break key
+                if (BreakKey && c == BreakKey)
+                {
+                    MMAbort = true;
+                    ConsoleRxBufHead = ConsoleRxBufTail; // Flush buffer
+                    break;                               // Exit loop after abort
+                }
+                // Check for key interrupt (signal only, don't buffer)
+                else if (c == keyselect && KeyInterrupt != NULL)
+                {
+                    Keycomplete = true;
+                }
+                // Normal character - store in buffer
+                else
+                {
+                    ConsoleRxBuf[ConsoleRxBufHead] = c;
+                    ConsoleRxBufHead = (ConsoleRxBufHead + 1) % CONSOLE_RX_BUF_SIZE;
+                }
+            }
+        }
+    }
 #endif
 
         // === Display buffer refresh (RP2350) ===
@@ -790,6 +877,50 @@ uint8_t PSRAMpin;
 #ifdef rp2350
         stepper_poll_events();
 #endif
+#ifdef PICOMITEBTH
+        /* Pump btstack/cyw43 from the main loop. No bytes-to-drain
+           wrapper like PICOMITEBT — HID reports route directly into
+           the console RX ring via process_kbd_report() from inside
+           the packet handler. */
+        bt_keyboard_poll();
+#endif
+#ifdef PICOMITEBT
+        /* Service cyw43/btstack work from the main thread at full
+           console-read rate. Without this, pending work scheduled by
+           the cyw43 SPI IRQ has to wait for the alarm callback or
+           the next routinechecks tick (which is throttled). XMODEM
+           ACKs and rapid bidirectional traffic need polling much
+           more frequently than every 1 ms. Also drains any newly-
+           received BLE bytes into ConsoleRxBuf so the read below
+           sees them immediately. */
+        bt_console_poll();
+        if (bt_console_connected())
+        {
+            uint32_t space = console_rx_buf_space();
+            while (space > 1 && bt_console_rx_available() > 0)
+            {
+                int b = bt_console_getc();
+                if (b < 0)
+                    break;
+                if (BreakKey && b == BreakKey)
+                {
+                    MMAbort = true;
+                    ConsoleRxBufHead = ConsoleRxBufTail;
+                    break;
+                }
+                else if (b == keyselect && KeyInterrupt != NULL)
+                {
+                    Keycomplete = true;
+                }
+                else
+                {
+                    ConsoleRxBuf[ConsoleRxBufHead] = b;
+                    ConsoleRxBufHead = (ConsoleRxBufHead + 1) % CONSOLE_RX_BUF_SIZE;
+                    space--;
+                }
+            }
+        }
+#endif
         CheckAbort();
         if (ConsoleRxBufHead != ConsoleRxBufTail)
         { // if the queue has something in it
@@ -820,25 +951,32 @@ uint8_t PSRAMpin;
         if (Option.Telnet != -1)
         {
 #endif
-#ifndef USBKEYBOARD
+#ifdef PICOMITEBT
             if (Option.SerialConsole == 0 || Option.SerialConsole > 4)
             {
-                if (tud_cdc_connected() && (tud_cdc_get_line_state() & 0x01))
-                {
-                    while (!tud_cdc_write_available())
-                    {
-                        busy_wait_us(250);
-                        if (!(tud_cdc_connected() && (tud_cdc_get_line_state() & 0x01)))
-                            break;
-                    }
-                    tud_cdc_write_char(c);
-                    if (flush)
-                    {
-                        // fflush(stdout);
-                        tud_cdc_write_flush();
-                    }
-                }
+                bt_console_putc((uint8_t)c);
+                if (flush)
+                    bt_console_flush();
             }
+#elif !defined(USBKEYBOARD)
+    if (Option.SerialConsole == 0 || Option.SerialConsole > 4)
+    {
+        if (tud_cdc_connected() && (tud_cdc_get_line_state() & 0x01))
+        {
+            while (!tud_cdc_write_available())
+            {
+                busy_wait_us(250);
+                if (!(tud_cdc_connected() && (tud_cdc_get_line_state() & 0x01)))
+                    break;
+            }
+            tud_cdc_write_char(c);
+            if (flush)
+            {
+                // fflush(stdout);
+                tud_cdc_write_flush();
+            }
+        }
+    }
 #endif
             if (Option.SerialConsole)
             {
@@ -912,7 +1050,7 @@ int __not_in_flash_func(MMInkey)(void)
         }
 
         c = getConsole();
-#ifndef USBKEYBOARD
+#if !defined(USBKEYBOARD) && !defined(PICOMITEBTH)
         if (c == -1)
             CheckKeyboard();
 #endif
@@ -1976,14 +2114,63 @@ int __not_in_flash_func(MMInkey)(void)
         if (CheckGuiFlag)
             CheckGuiTimeouts();
 
+        /* Touch panel edge detector. Only fires when TOUCH_GETIRQTRIS
+           is set (real touch panel configured). Records ownership so
+           the mouse/click detector below doesn't see a touch press as
+           "mouse should release". */
         if (TOUCH_GETIRQTRIS)
         {
             bool pen_down = TOUCH_DOWN;
             if (pen_down && !TouchState)
             {
                 TouchState = TouchDown = true;
+                gui_click_from_mouse = false;
+                gui_click_emulated = false; /* real pointing device */
             }
-            else if (!pen_down && TouchState)
+            else if (!pen_down && TouchState && !gui_click_from_mouse)
+            {
+                TouchState = false;
+                TouchUp = true;
+            }
+        }
+        /* Mouse / synthetic-click / click-pin edge detector. Runs on
+           every GUICONTROLS build (touch-LCD too, so a USB/PS-2 mouse
+           can drive controls alongside the touch panel). Latches
+           TouchX/Y at the down-edge: from nunstruct[2].ax/.ay for
+           mouse and BASIC-driven GUI CLICK, or from cursor_x/cursor_y
+           for a GUI CLICK PIN (the user has been steering the soft
+           cursor with arrow keys / joystick — that's where the click
+           lands). ProcessTouch reads gui_click_from_mouse to know it
+           should trust the latched values rather than calling
+           GetTouch(). */
+        if (Ctrl != NULL)
+        {
+            bool pin_held = click_pin_pressed();
+            bool btn = (nunstruct[2].L || gui_click_synthetic_down || pin_held)
+                           ? true
+                           : false;
+            if (btn && !TouchState)
+            {
+                if (pin_held && !nunstruct[2].L && !gui_click_synthetic_down)
+                {
+                    TouchX = cursor_x;
+                    TouchY = cursor_y;
+                }
+                else
+                {
+                    TouchX = nunstruct[2].ax;
+                    TouchY = nunstruct[2].ay;
+                }
+                TouchState = TouchDown = true;
+                gui_click_from_mouse = true;
+                /* MsgBox needs a real pointing device to be usable.
+                   nunstruct[2].L is true only when a real mouse is
+                   driving the click; the other two contributors
+                   (synthetic GUI CLICK from BASIC, GUI CLICK PIN)
+                   can't move the cursor while MsgBox blocks. */
+                gui_click_emulated = !nunstruct[2].L;
+            }
+            else if (!btn && TouchState && gui_click_from_mouse)
             {
                 TouchState = false;
                 TouchUp = true;
@@ -3238,7 +3425,7 @@ int __not_in_flash_func(MMInkey)(void)
                     __dmb();
                     switch (DISPLAY_TYPE)
                     {
-                    case SCREENMODE1: // 1024x768x2 colour with tiles
+                    case SCREENMODE1: // 1024x600x2 colour with tiles
                     {
                         uint8_t *p = (uint8_t *)HDMIlines[line_to_load];
                         uint8_t *fcol_w = tilefcols_w + load_line / ytileheight * X_TILE, *bcol_w = tilebcols_w + load_line / ytileheight * X_TILE; // get the relevant tile
@@ -3322,7 +3509,7 @@ int __not_in_flash_func(MMInkey)(void)
                         }
                     }
                     break;
-                    case SCREENMODE2: // 256 x 192 x 4bit-colour mapped to 256
+                    case SCREENMODE2: // 256 x 150 x 4bit-colour mapped to 256
                     {
                         uint32_t *p = (uint32_t *)HDMIlines[line_to_load];
                         uint8_t l, d, s;
@@ -3368,7 +3555,7 @@ int __not_in_flash_func(MMInkey)(void)
                         }
                     }
                     break;
-                    case SCREENMODE3: // 512 x 384 x 4bit-colour mapped to 256
+                    case SCREENMODE3: // 512 x 300 x 4bit-colour mapped to 256
                     {
                         int pp = (Line_dup)*MODE_H_X_ACTIVE_PIXELS / 4;
                         uint16_t *p = (uint16_t *)HDMIlines[line_to_load];
@@ -3398,7 +3585,7 @@ int __not_in_flash_func(MMInkey)(void)
                         }
                     }
                     break;
-                    case SCREENMODE5: // 256 x 192 x 8bit-colour
+                    case SCREENMODE5: // 256 x 150 x 8bit-colour
                     {
                         uint8_t *p = (uint8_t *)HDMIlines[line_to_load];
                         uint8_t l, d, s;
@@ -5493,7 +5680,7 @@ uint32_t testPSRAM(void)
         ticks_per_second = Option.CPU_Speed * 1000;
         // The serial clock won't vary from this point onward, so we can configure
         // the UART etc.
-#ifndef USBKEYBOARD
+#if !defined(USBKEYBOARD) && !defined(PICOMITEBT)
         stdio_set_translate_crlf(&stdio_usb, false);
 #endif
         LoadOptions();
@@ -5521,20 +5708,72 @@ uint32_t testPSRAM(void)
         DISPLAY_TYPE = Option.DISPLAY_TYPE;
         // negative timeout means exact delay (rather than delay between callbacks)
         OptionErrorSkip = false;
-#ifndef USBKEYBOARD
-        if (!(Option.SerialConsole == 1 || Option.SerialConsole == 2) || Option.Telnet == -1)
-        {
-            uint64_t t = time_us_64();
-            while (1)
-            {
-                if (tud_cdc_connected())
-                    break;
-                if (time_us_64() - t > 500000)
-                    break;
-            }
-        }
+#ifdef PICOMITEBT
+        /* No CDC peer to wait for on BT. The actual cyw43/btstack init is
+           done later (same place WEB calls cyw43_arch_init), once the
+           rest of the hardware is up. Boot output is buffered in the BT
+           TX ring until then. */
         uSec(1000000);
         initKeyboard();
+#elif defined(PICOMITEBTH)
+    /* BTH still waits for the USB CDC console peer like the non-USB-
+       host PICOMITE branch — but does NOT call initKeyboard() because
+       PS/2 keyboards aren't supported on this variant. Keyboard input
+       comes via the BLE-HID-host path (BTKeyboard.c). */
+    if (!(Option.SerialConsole == 1 || Option.SerialConsole == 2) || Option.Telnet == -1)
+    {
+        uint64_t t = time_us_64();
+        while (1)
+        {
+            if (tud_cdc_connected())
+                break;
+            if (time_us_64() - t > 500000)
+                break;
+        }
+    }
+    uSec(1000000);
+#elif !defined(USBKEYBOARD)
+    if (!(Option.SerialConsole == 1 || Option.SerialConsole == 2) || Option.Telnet == -1)
+    {
+        uint64_t t = time_us_64();
+        while (1)
+        {
+            if (tud_cdc_connected())
+                break;
+            if (time_us_64() - t > 500000)
+                break;
+        }
+    }
+    uSec(1000000);
+    initKeyboard();
+#endif
+#ifdef PICOMITEBT
+        /* Same PIO clock divider scaling as WEB — the cyw43 SPI link
+           is shared between WiFi and BT, so the divider matters
+           regardless of which radio we're using. */
+        {
+            uint32_t cyw43_div = (Option.CPU_Speed + 79999) / 80000;
+            if (cyw43_div < 2)
+                cyw43_div = 2;
+            cyw43_set_pio_clkdiv_int_frac8(cyw43_div, 0);
+        }
+        if (cyw43_arch_init() == 0)
+        {
+            bt_console_init();
+        }
+#endif
+#ifdef PICOMITEBTH
+        /* Same PIO clock divider scaling as PICOMITEBT / WEB. */
+        {
+            uint32_t cyw43_div = (Option.CPU_Speed + 79999) / 80000;
+            if (cyw43_div < 2)
+                cyw43_div = 2;
+            cyw43_set_pio_clkdiv_int_frac8(cyw43_div, 0);
+        }
+        if (cyw43_arch_init() == 0)
+        {
+            bt_keyboard_init();
+        }
 #endif
         InitBasic();
 #ifndef PICOMITEVGA
@@ -5640,6 +5879,14 @@ uint32_t testPSRAM(void)
 #else
 #ifdef PICOMITEWEB
         banner[23] = (rp2350a ? 'A' : 'B');
+#elif defined(PICOMITEBT)
+        /* "PicoMiteBT" is 2 chars longer than "PicoMite", so the
+           A/B insertion point shifts by 2: banner[26] is the space
+           between "RP2350" and "V" in our signon. */
+        banner[26] = (rp2350a ? 'A' : 'B');
+#elif defined(PICOMITEBTH)
+        /* "PicoMiteBTH" is 3 chars longer than "PicoMite". */
+        banner[27] = (rp2350a ? 'A' : 'B');
 #else
         banner[24] = (rp2350a ? 'A' : 'B');
 #endif
@@ -5784,6 +6031,19 @@ uint32_t testPSRAM(void)
                 ClearProgram(true);
             }
 #ifdef PICOMITEWEB
+            // Scale the cyw43 PIO clock divider with clk_sys so the SPI link to
+            // the wireless chip stays within its 50 MHz rating when the user
+            // overclocks via OPTION CPU_Speed. SPI rate = clk_sys / (2*div);
+            // ceil(cpu_khz/80000) targets <=40 MHz SPI with headroom. Floor at
+            // 2 to match the SDK default at stock clocks (125/150 MHz).
+            {
+                uint32_t cyw43_div = (Option.CPU_Speed + 79999) / 80000;
+                if (cyw43_div < 2)
+                    cyw43_div = 2;
+                if (cyw43_div & 1)
+                    cyw43_div++; // must be even
+                cyw43_set_pio_clkdiv_int_frac8(cyw43_div, 0);
+            }
             if (cyw43_arch_init_with_country(wifi_country_to_cyw43(Option.wifi_country_code)) == 0)
             {
                 startupcomplete = 1;

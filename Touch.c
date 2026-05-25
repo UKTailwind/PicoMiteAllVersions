@@ -353,15 +353,14 @@ int __not_in_flash_func(GetTouch)(int y)
     int i = TOUCH_ERROR;
     TOUCH_GETIRQTRIS = 0;
 
-    // Validate configuration
+    // No touch panel configured / not calibrated — report "no touch"
+    // rather than erroring. BASIC programs that mix mouse/CLICK and
+    // touch input can poll TOUCH(X)/TOUCH(Y) on any build without
+    // first checking whether the panel is wired up.
     if (Option.TOUCH_CS == 0 && Option.TOUCH_IRQ == 0)
-    {
-        error("Touch option not set");
-    }
+        return TOUCH_ERROR;
     if (!Option.TOUCH_XZERO && !Option.TOUCH_YZERO)
-    {
-        error("Touch not calibrated");
-    }
+        return TOUCH_ERROR;
 
     // Check if pen is down
     if (PinRead(Option.TOUCH_IRQ))
@@ -641,71 +640,31 @@ void __not_in_flash_func(TDelay)(void)
     shortpause(T);
 }
 
-// ========================================
-// MMBasic TOUCH() Function
-// ========================================
+/* On GUICONTROLS builds, fun_touch() lives in Draw.c — it has to
+   compile on PICOMITEVGA+GUICONTROLS (where there's no touch panel but
+   mouse / GUI CLICK drive the same semantics), and Touch.c isn't part
+   of the VGA/HDMI build. The Draw.c version is source-aware via the
+   gui_click_from_mouse ownership flag.
 
-/**
- * MMBasic TOUCH() function implementation
- */
+   On builds WITHOUT GUICONTROLS, none of that state exists — this
+   file's simpler touch-panel-only implementation is the right one. */
+#ifndef GUICONTROLS
 void fun_touch(void)
 {
     if (checkstring(ep, (unsigned char *)"X"))
-    {
         iret = GetTouch(GET_X_AXIS);
-    }
     else if (checkstring(ep, (unsigned char *)"Y"))
-    {
         iret = GetTouch(GET_Y_AXIS);
-    }
     else if (checkstring(ep, (unsigned char *)"DOWN"))
-    {
         iret = TOUCH_DOWN;
-    }
     else if (checkstring(ep, (unsigned char *)"UP"))
-    {
         iret = !TOUCH_DOWN;
-    }
-#ifdef GUICONTROLS
-    else if (checkstring(ep, (unsigned char *)"REF"))
-    {
-        iret = CurrentRef;
-    }
-    else if (checkstring(ep, (unsigned char *)"LASTREF"))
-    {
-        iret = LastRef;
-    }
-    else if (checkstring(ep, (unsigned char *)"LASTX"))
-    {
-        iret = LastX;
-    }
-    else if (checkstring(ep, (unsigned char *)"LASTY"))
-    {
-        iret = LastY;
-    }
-#endif
+    else if (Option.TOUCH_CAP && checkstring(ep, (unsigned char *)"X2"))
+        iret = GetTouch(GET_X_AXIS2);
+    else if (Option.TOUCH_CAP && checkstring(ep, (unsigned char *)"Y2"))
+        iret = GetTouch(GET_Y_AXIS2);
     else
-    {
-        if (Option.TOUCH_CAP)
-        {
-            if (checkstring(ep, (unsigned char *)"X2"))
-            {
-                iret = GetTouch(GET_X_AXIS2);
-            }
-            else if (checkstring(ep, (unsigned char *)"Y2"))
-            {
-                iret = GetTouch(GET_Y_AXIS2);
-            }
-            else
-            {
-                SyntaxError();
-            }
-        }
-        else
-        {
-            SyntaxError();
-        }
-    }
-
+        SyntaxError();
     targ = T_INT;
 }
+#endif

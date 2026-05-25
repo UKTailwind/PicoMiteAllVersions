@@ -205,9 +205,9 @@ enum trace_opcode
     OP_RND_0,   /* Rnd (no-arg): calls fun_rnd(), pushes NBR result        */
 
     /* 2-arg intrinsics: consume NBR[sp-2] and NBR[sp-1], push one NBR    */
-    OP_ATAN2,   /* atan2(y, x) -> NBR; output scaled by optionangle in degmode */
-    OP_MAX_NBR, /* max(a, b)   -> NBR                                      */
-    OP_MIN_NBR, /* min(a, b)   -> NBR                                      */
+    OP_ATAN2, /* atan2(y, x) -> NBR; output scaled by optionangle in degmode */
+              //    OP_MAX_NBR, /* max(a, b)   -> NBR                                      */
+              //    OP_MIN_NBR, /* min(a, b)   -> NBR                                      */
 
     /* store TOS to a global scalar slot */
     OP_STORE_GVAR_NBR,
@@ -1409,16 +1409,16 @@ static int classify_intrinsic2(unsigned char c, uint8_t *opcode)
         *opcode = OP_ATAN2;
         return 1;
     }
-    if (f == fun_max)
-    {
-        *opcode = OP_MAX_NBR;
-        return 1;
-    }
-    if (f == fun_min)
-    {
-        *opcode = OP_MIN_NBR;
-        return 1;
-    }
+    /*    if (f == fun_max)
+        {
+            *opcode = OP_MAX_NBR;
+            return 1;
+        }
+        if (f == fun_min)
+        {
+            *opcode = OP_MIN_NBR;
+            return 1;
+        }*/
     return 0;
 }
 
@@ -2890,20 +2890,20 @@ static int replay_common(struct cache_entry *e, int *out_bool)
                 fstk[sp - 2] *= optionangle;
             sp--;
             break;
-        case OP_MAX_NBR:
-            if (sp < 2 || tag[sp - 2] != T_NBR || tag[sp - 1] != T_NBR)
-                return 0;
-            if (fstk[sp - 1] > fstk[sp - 2])
-                fstk[sp - 2] = fstk[sp - 1];
-            sp--;
-            break;
-        case OP_MIN_NBR:
-            if (sp < 2 || tag[sp - 2] != T_NBR || tag[sp - 1] != T_NBR)
-                return 0;
-            if (fstk[sp - 1] < fstk[sp - 2])
-                fstk[sp - 2] = fstk[sp - 1];
-            sp--;
-            break;
+            /*        case OP_MAX_NBR:
+                        if (sp < 2 || tag[sp - 2] != T_NBR || tag[sp - 1] != T_NBR)
+                            return 0;
+                        if (fstk[sp - 1] > fstk[sp - 2])
+                            fstk[sp - 2] = fstk[sp - 1];
+                        sp--;
+                        break;
+                    case OP_MIN_NBR:
+                        if (sp < 2 || tag[sp - 2] != T_NBR || tag[sp - 1] != T_NBR)
+                            return 0;
+                        if (fstk[sp - 1] < fstk[sp - 2])
+                            fstk[sp - 2] = fstk[sp - 1];
+                        sp--;
+                        break;*/
 
         case OP_STORE_GVAR_NBR:
             if (sp < 1 || tag[sp - 1] != T_NBR)

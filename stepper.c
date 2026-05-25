@@ -1235,6 +1235,21 @@ static bool stepper_report_latched_trips(void)
 {
     bool estop_reported = false;
 
+    /* Defensive: these latches can only be set by the PWM IRQ handler
+       which is enabled by stepper_open(). If the stepper isn't
+       initialised, an asserted latch here means something else has
+       written to that BSS address (e.g. heap-overlap-into-BSS — seen
+       once when HEAP_MEMORY_SIZE was set too large). Quietly clear and
+       return rather than spamming the console with bogus trip
+       messages every keypress. */
+    if (!stepper_initialized)
+    {
+        stepper_limit_trip_latched = false;
+        stepper_limit_trip_mask = 0;
+        stepper_estop_trip_latched = false;
+        return false;
+    }
+
     if (stepper_limit_trip_latched)
     {
         uint64_t mask;

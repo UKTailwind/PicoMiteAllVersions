@@ -2012,7 +2012,7 @@ process:
                 ExtCurrentConfig[pin] = value;
             else if (value == EXT_NOT_CONFIG)
             {
-                ExtCurrentConfig[pin] = EXT_BOOT_RESERVED;
+
                 for (i = 0; i < NBRINTERRUPTS; i++)
                     if (inttbl[i].pin == pin)
                         inttbl[i].pin = 0; // disable the software interrupt on this pin
@@ -4353,6 +4353,10 @@ void fun_dev(void)
             iret = nunstruct[n].R;
         else if (checkstring(argv[2], (unsigned char *)"B"))
             iret = nunstruct[n].x0;
+        else if (checkstring(argv[2], (unsigned char *)"H"))
+            /* Hat-switch direction (BLE gamepad path populates this).
+               0..7 = N, NE, E, SE, S, SW, W, NW; 0xFF = idle. */
+            iret = nunstruct[n].y0;
         else if (checkstring(argv[2], (unsigned char *)"GX"))
             iret = nunstruct[n].gyro[0];
         else if (checkstring(argv[2], (unsigned char *)"GY"))
@@ -5775,7 +5779,9 @@ void MIPS16 ClearExternalIO(void)
             ExtCfg(58, EXT_ANA_IN, 0);
     }
 #endif
-#ifndef PICOMITEWEB
+#if !defined(PICOMITEWEB) && !defined(PICOMITEBT)
+    /* Pins 41/42/44 are the wireless interface on Pico W / Pico 2 W —
+       skip the default ExtCfg for those when running WEB or BT. */
     if (!Option.AllPins)
     {
         if (CheckPin(41, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED))
@@ -5953,6 +5959,18 @@ void MIPS16 ClearExternalIO(void)
     gui_int_up = false;
     GuiIntDownVector = NULL;
     GuiIntUpVector = NULL;
+    /* Release any pin claimed by GUI CLICK PIN — ClearExternalIO is
+       walking the pin table back to EXT_NOT_CONFIG, so we'd dangle
+       otherwise. */
+    if (click_pin)
+    {
+        click_pin     = 0;
+        click_pin_inv = false;
+    }
+    /* Stale "last click was emulated" from a previous program would
+       make MsgBox refuse to open in the next program until a real
+       touch/mouse click fires. Reset to neutral. */
+    gui_click_emulated = false;
 #endif
     dmarunning = false;
     ADCDualBuffering = false;
@@ -6170,7 +6188,12 @@ void MIPS16 __not_in_flash_func(IRHandler)(void)
 
 void __not_in_flash_func(gpio_callback)(uint gpio, uint32_t events)
 {
-#ifndef USBKEYBOARD
+#if !defined(USBKEYBOARD) && !defined(PICOMITEBTH)
+    /* PS/2 keyboard / mouse change-notification interrupt dispatch.
+       Gated off for PICOMITEBTH for the same reason as the matching
+       block in PicoMite.c: the BLE-HID-host build doesn't allow PS/2
+       keyboards, so the clock-line edge interrupt should not be
+       routed through the PS/2 state machine. */
     static uint64_t data;
     data = gpio_get_all64();
     if (Option.KEYBOARD_CLOCK)

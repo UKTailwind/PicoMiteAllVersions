@@ -57,7 +57,7 @@ extern int stepper_query_active(void);
 #include "pico/multicore.h"
 #include "VGA222.h"
 #endif
-#ifndef USBKEYBOARD
+#if !defined(USBKEYBOARD) && !defined(PICOMITEBT)
 #include "class/cdc/cdc_device.h"
 #endif
 
@@ -2085,7 +2085,8 @@ void MIPS16 cmd_library(void)
         // to the following T_NEWLINE (or end-of-program marker).
         {
             unsigned char *fix = MemBuff;
-            while (*fix == T_NEWLINE) {
+            while (*fix == T_NEWLINE)
+            {
                 unsigned char *next = fix + T_NEWLINE_HDR;
                 while (!(next[-1] == 0 && (next[0] == T_NEWLINE || next[0] == 0)))
                     next++;
@@ -2647,7 +2648,7 @@ void MIPS16 printoptions(void)
     if (Option.special == 1)
         PO2Str("PICO PLUS 2", "ON");
 #endif
-#ifdef USBKEYBOARD
+#if defined(USBKEYBOARD) || defined(PICOMITEBTH)
     if (Option.mousespeed != 0.0f)
     {
         PO("MOUSE SENSITIVITY ");
@@ -2658,7 +2659,7 @@ void MIPS16 printoptions(void)
     {
         PO("KEYBOARD");
         MMPrintString((char *)KBrdList[(int)Option.USBKeyboard]);
-        if (Option.capslock || Option.numlock != 1 || Option.repeat != 0b00101100)
+        if (Option.capslock || Option.numlock != 1 || Option.RepeatStart != 600 || Option.RepeatRate != 150)
         {
             PIntComma(Option.capslock);
             PIntComma(Option.numlock);
@@ -2919,10 +2920,6 @@ void MIPS16 printoptions(void)
 #endif
         PRet();
     }
-#ifdef GUICONTROLS
-    if (Option.MaxCtrls)
-        PO2Int("GUI CONTROLS", Option.MaxCtrls - 1);
-#endif
     if (strcmp((char *)Option.platform, "PicoCalc") == 0)
     {
         if (Option.BACKLIGHT_KBD)
@@ -3016,6 +3013,14 @@ void MIPS16 printoptions(void)
             MMPrintString("\r\n");
         }
     }
+#endif
+#ifdef GUICONTROLS
+    /* Report GUI CONTROLS count on every build that compiles the
+       feature in — including PICOMITEVGA (VGA/HDMI RP2350), which
+       previously skipped this line because the print sat inside the
+       non-VGA branch above. */
+    if (Option.MaxCtrls)
+        PO2Int("GUI CONTROLS", Option.MaxCtrls - 1);
 #endif
 #ifndef PICOMITEVGA
     if (Option.SD_CS)
@@ -3297,7 +3302,12 @@ void fun_keydown(void)
 void MIPS16 cmd_update(void)
 {
     uint gpio_mask = 0u;
+#ifdef PICOMITEBT
+    /* No USB CDC interface in BT build — nothing to disable, just reboot. */
+    reset_usb_boot(gpio_mask, 0u);
+#else
     reset_usb_boot(gpio_mask, PICO_STDIO_USB_RESET_BOOTSEL_INTERFACE_DISABLE_MASK);
+#endif
 }
 #endif
 void MIPS16 disable_systemspi(void)
@@ -4029,7 +4039,7 @@ void MIPS16 configure(unsigned char *p, bool noask)
             Option.NoHeartbeat = 0;
             Option.heartbeatpin = PINMAP[25];
             Option.DISPLAY_CONSOLE = 1;
-            Option.continuation = '_';
+            //            Option.continuation = '_';
             Option.LCD_CD = Option.LCD_Reset = Option.LCD_CS = 0;
             Option.TOUCH_SWAPXY = 1;
             Option.TOUCH_XZERO = 163;
@@ -4910,7 +4920,7 @@ void MIPS16 cmd_option(void)
         return;
     }
 #endif
-#ifdef USBKEYBOARD
+#if defined(USBKEYBOARD) || defined(PICOMITEBTH)
     tp = checkstring(cmdline, (unsigned char *)"KEYBOARD REPEAT");
     if (tp)
     {
@@ -4920,6 +4930,8 @@ void MIPS16 cmd_option(void)
         SaveOptions();
         return;
     }
+#endif
+#ifdef USBKEYBOARD
     tp = checkstring(cmdline, (unsigned char *)"MOUSE SENSITIVITY");
     if (tp)
     {
@@ -5015,7 +5027,11 @@ void MIPS16 cmd_option(void)
     {
         if (CurrentLinePtr)
             StandardError(10);
-#ifndef USBKEYBOARD
+/* PICOMITEBTH takes the same code path as USBKEYBOARD here: the BLE
+   HID host accepts the same set of layout names, and stores the
+   selection in Option.USBKeyboard. The PS/2-specific clock/data pin
+   plumbing is not applicable to either of those transports. */
+#if !defined(USBKEYBOARD) && !defined(PICOMITEBTH)
         if (checkstring(tp, (unsigned char *)"DISABLE"))
         {
             Option.KeyboardConfig = NO_KEYBOARD;
@@ -5030,7 +5046,7 @@ void MIPS16 cmd_option(void)
         {
 #endif
             getcsargs(&tp, 9);
-#ifndef USBKEYBOARD
+#if !defined(USBKEYBOARD) && !defined(PICOMITEBTH)
             if (!Option.KEYBOARD_CLOCK)
             {
                 Option.KEYBOARD_CLOCK = KEYBOARDCLOCK;
@@ -5080,7 +5096,7 @@ void MIPS16 cmd_option(void)
             ;
             Option.capslock = 0;
             Option.numlock = 1;
-#ifndef USBKEYBOARD
+#if !defined(USBKEYBOARD) && !defined(PICOMITEBTH)
             int rs = 0b00100000;
             int rr = 0b00001100;
             if (Option.KeyboardConfig < CONFIG_I2C)
@@ -5113,7 +5129,7 @@ void MIPS16 cmd_option(void)
             SaveOptions();
             SoftReset(SOFT_RESET);
         }
-#ifndef USBKEYBOARD
+#if !defined(USBKEYBOARD) && !defined(PICOMITEBTH)
     }
 #endif
 
@@ -5592,7 +5608,7 @@ void MIPS16 cmd_option(void)
         if (CurrentLinePtr)
             StandardError(10);
         Option.NoScroll = 0;
-        if (!(Option.DISPLAY_TYPE == ST7789B || Option.DISPLAY_TYPE == ILI9488 || Option.DISPLAY_TYPE == ST7365P || Option.DISPLAY_TYPE == ST7796SP || Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE == ILI9488P || Option.DISPLAY_TYPE == ILI9341 || Option.DISPLAY_TYPE >= VGADISPLAY))
+        if (!(Option.DISPLAY_TYPE == ST7365P || Option.DISPLAY_TYPE == ST7789B || Option.DISPLAY_TYPE == ILI9488 || Option.DISPLAY_TYPE == ST7365P || Option.DISPLAY_TYPE == ST7796SP || Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE == ILI9488P || Option.DISPLAY_TYPE == ILI9341 || Option.DISPLAY_TYPE >= VGADISPLAY))
             Option.NoScroll = 1;
         if (!(Option.DISPLAY_ORIENTATION == DISPLAY_LANDSCAPE) && Option.DISPLAY_TYPE == SSDTYPE)
             error("Landscape only");
@@ -7084,6 +7100,10 @@ void MIPS16 fun_device(void)
 #ifdef PICOMITE
 #ifdef USBKEYBOARD
     strcpy((char *)sret, "PicoMiteUSB");
+#elif defined(PICOMITEBT)
+    strcpy((char *)sret, "PicoMiteBT");
+#elif defined(PICOMITEBTH)
+    strcpy((char *)sret, "PicoMiteBTH");
 #else
     strcpy((char *)sret, "PicoMite");
 #endif
@@ -7286,8 +7306,9 @@ void MIPS16 fun_info(void)
                     error((char *)FErrorMsg[20]); // setup the SD card
                 FATFS *fs;
                 DWORD fre_clust;
-                /* Get volume information and free clusters of drive 1 */
-                f_getfree("0:", &fre_clust, &fs);
+                /* Query the current FatFS volume (B: for SD, C: for USB) */
+                const char *vol = (FatFSFileSystem == 2) ? "C:" : "B:";
+                f_getfree(vol, &fre_clust, &fs);
                 /* Get total sectors and free sectors */
                 iret = (uint64_t)(fs->n_fatent - 2) * (uint64_t)fs->csize * (uint64_t)FF_MAX_SS;
             }
@@ -7382,8 +7403,9 @@ void MIPS16 fun_info(void)
                     error((char *)FErrorMsg[20]); // setup the SD card
                 FATFS *fs;
                 DWORD fre_clust;
-                /* Get volume information and free clusters of drive 1 */
-                f_getfree("0:", &fre_clust, &fs);
+                /* Query the current FatFS volume (B: for SD, C: for USB) */
+                const char *vol = (FatFSFileSystem == 2) ? "C:" : "B:";
+                f_getfree(vol, &fre_clust, &fs);
                 /* Get total sectors and free sectors */
                 iret = (uint64_t)fre_clust * (uint64_t)fs->csize * (uint64_t)FF_MAX_SS;
             }
@@ -7586,7 +7608,7 @@ void MIPS16 fun_info(void)
         }
         else
         {
-            sprintf((char *)sret, "%d", CountLines(CurrentLinePtr));
+            sprintf((char *)sret, "%d", CountLines(CurrentLinePtr) + 1);
         }
         CtoM(sret);
         targ = T_STR;
@@ -7752,7 +7774,7 @@ void MIPS16 fun_info(void)
         }
         else if (checkstring(tp, (unsigned char *)"KEYBOARD"))
         {
-#ifdef USBKEYBOARD
+#if defined(USBKEYBOARD) || defined(PICOMITEBTH)
             strcpy((char *)sret, (char *)KBrdList[(int)Option.USBKeyboard]);
 #else
             strcpy((char *)sret, (char *)KBrdList[(int)Option.KeyboardConfig]);
@@ -9241,6 +9263,9 @@ int __not_in_flash_func(check_interrupt)(void)
             CheckGui(); // This implements a LED flash
     }
 #endif
+    /* Cursor refresh lives in routinechecks() — it fires from the
+       prompt's getchar loop too, so the cursor tracks the mouse even
+       when no program is running. */
     if (!InterruptUsed)
         return 0; // quick exit if there are no interrupts set
     if (InterruptReturn != NULL || CurrentLinePtr == NULL)

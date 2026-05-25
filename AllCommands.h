@@ -329,23 +329,23 @@ void fun_cos(void);
 void fun_deg(void);
 void fun_exp(void);
 void fun_fix(void);
-void fun_hex(void);
+// void fun_hex(void);
 void fun_inkey(void);
 void fun_instr(void);
 void fun_int(void);
-void fun_lcase(void);
-void fun_left(void);
+// void fun_lcase(void);
+// void fun_left(void);
 void fun_len(void);
 void fun_log(void);
 void fun_errno(void);
 void fun_errmsg(void);
 void fun_mid(void);
-void fun_oct(void);
+void fun_base(void);
 void fun_peek(void);
 void fun_pi(void);
 void fun_pos(void);
 void fun_rad(void);
-void fun_right(void);
+// void fun_right(void);
 void fun_rnd(void);
 void fun_sgn(void);
 void fun_sin(void);
@@ -355,15 +355,17 @@ void fun_str(void);
 void fun_string(void);
 void fun_tab(void);
 void fun_tan(void);
-void fun_ucase(void);
+// void fun_ucase(void);
+void fun_schange(void);
 void fun_val(void);
 void fun_eval(void);
 void fun_version(void);
 void fun_asin(void);
 void fun_acos(void);
 void fun_field(void);
-void fun_max(void);
-void fun_min(void);
+// void fun_max(void);
+// void fun_min(void);
+void fun_max_min(void);
 void fun_bin2str(void);
 void fun_str2bin(void);
 void fun_test(void);
@@ -402,6 +404,9 @@ void fun_trim(void);
 void fun_dev(void);
 void fun_map(void);
 void fun_touch(void);
+#ifdef GUICONTROLS
+void fun_click(void);
+#endif
 void fun_linputstr(void);
 void fun_frame(void);
 #endif /* !defined(INCLUDE_COMMAND_TABLE) && !defined(INCLUDE_TOKEN_TABLE) */
@@ -719,7 +724,8 @@ void fun_frame(void);
 	{(unsigned char *)"ASin(", T_FUN | T_NBR, 0, fun_asin},
 	{(unsigned char *)"Atn(", T_FUN | T_NBR, 0, fun_atn},
 	{(unsigned char *)"Atan2(", T_FUN | T_NBR, 0, fun_atan2},
-	{(unsigned char *)"Bin$(", T_FUN | T_STR, 0, fun_bin},
+	{(unsigned char *)"Bit(", T_FUN | T_INT, 0, fun_bit},
+	//	{(unsigned char *)"Bin$(", T_FUN | T_STR, 0, fun_bin},
 	{(unsigned char *)"Bound(", T_FUN | T_INT, 0, fun_bound},
 	{(unsigned char *)"Choice(", T_FUN | T_STR | T_INT | T_NBR, 0, fun_ternary},
 	{(unsigned char *)"Chr$(", T_FUN | T_STR, 0, fun_chr},
@@ -729,22 +735,27 @@ void fun_frame(void);
 	{(unsigned char *)"Exp(", T_FUN | T_NBR, 0, fun_exp},
 	{(unsigned char *)"Field$(", T_FUN | T_STR, 0, fun_field},
 	{(unsigned char *)"Fix(", T_FUN | T_INT, 0, fun_fix},
-	{(unsigned char *)"Hex$(", T_FUN | T_STR, 0, fun_hex},
+	{(unsigned char *)"Trim$(", T_FUN | T_STR, 0, fun_trim},
+	//	{(unsigned char *)"Hex$(", T_FUN | T_STR, 0, fun_hex},
 	{(unsigned char *)"Inkey$", T_FNA | T_STR, 0, fun_inkey},
 	{(unsigned char *)"Instr(", T_FUN | T_INT, 0, fun_instr},
 	{(unsigned char *)"Int(", T_FUN | T_INT, 0, fun_int},
-	{(unsigned char *)"LCase$(", T_FUN | T_STR, 0, fun_lcase},
-	{(unsigned char *)"Left$(", T_FUN | T_STR, 0, fun_left},
+	//	{(unsigned char *)"LCase$(", T_FUN | T_STR, 0, fun_lcase},
+	{(unsigned char *)"SChange$(", T_FUN | T_STR, 0, fun_schange},
+	//	{(unsigned char *)"Left$(", T_FUN | T_STR, 0, fun_left},
+	{(unsigned char *)"DateTime$(", T_FUN | T_STR, 0, fun_datetime},
 	{(unsigned char *)"Len(", T_FUN | T_INT, 0, fun_len},
 	{(unsigned char *)"Log(", T_FUN | T_NBR, 0, fun_log},
 	{(unsigned char *)"Mid$(", T_FUN | T_STR, 0, fun_mid},
 	{(unsigned char *)"TEMPR(", T_FUN | T_NBR, 0, fun_ds18b20},
 	{(unsigned char *)"SPI(", T_FUN | T_INT, 0, fun_spi},
-	{(unsigned char *)"Oct$(", T_FUN | T_STR, 0, fun_oct},
+	{(unsigned char *)"base$(", T_FUN | T_STR, 0, fun_base},
 	{(unsigned char *)"LInput(", T_FUN | T_INT, 0, fun_linputstr},
 	{(unsigned char *)"Pi", T_FNA | T_NBR, 0, fun_pi},
+	{(unsigned char *)"Pos", T_FNA | T_INT, 0, fun_pos},
 	{(unsigned char *)"Rad(", T_FUN | T_NBR, 0, fun_rad},
-	{(unsigned char *)"Right$(", T_FUN | T_STR, 0, fun_right},
+	//	{(unsigned char *)"Right$(", T_FUN | T_STR, 0, fun_right},
+	{(unsigned char *)"Epoch(", T_FUN | T_INT, 0, fun_epoch},
 	{(unsigned char *)"Rnd(", T_FUN | T_NBR, 0, fun_rnd}, //	{(unsigned char *)"Rnd", T_FNA | T_NBR, 0, fun_rnd},  // this must come after Rnd(
 	{(unsigned char *)"Rnd", T_FNA | T_NBR, 0, fun_rnd},  // this must come before Rnd - without bracket
 	{(unsigned char *)"Sgn(", T_FUN | T_INT, 0, fun_sgn},
@@ -755,11 +766,14 @@ void fun_frame(void);
 	{(unsigned char *)"String$(", T_FUN | T_STR, 0, fun_string},
 	{(unsigned char *)"Tab(", T_FUN | T_STR, 0, fun_tab},
 	{(unsigned char *)"Tan(", T_FUN | T_NBR, 0, fun_tan},
-	{(unsigned char *)"UCase$(", T_FUN | T_STR, 0, fun_ucase},
+	//	{(unsigned char *)"UCase$(", T_FUN | T_STR, 0, fun_ucase},
+	{(unsigned char *)"KeyDown(", T_FUN | T_INT, 0, fun_keydown},
 	{(unsigned char *)"Val(", T_FUN | T_NBR | T_INT, 0, fun_val},
 	{(unsigned char *)"Eval(", T_FUN | T_NBR | T_INT | T_STR, 0, fun_eval},
-	{(unsigned char *)"Max(", T_FUN | T_NBR, 0, fun_max},
-	{(unsigned char *)"Min(", T_FUN | T_NBR, 0, fun_min},
+	//	{(unsigned char *)"Max(", T_FUN | T_NBR, 0, fun_max},
+	//	{(unsigned char *)"Min(", T_FUN | T_NBR, 0, fun_min},
+	{(unsigned char *)"TopBottom(", T_FUN | T_NBR, 0, fun_max_min},
+	{(unsigned char *)"Format$(", T_FUN | T_STR, 0, fun_format},
 	{(unsigned char *)"Bin2str$(", T_FUN | T_STR, 0, fun_bin2str},
 	{(unsigned char *)"Str2bin(", T_FUN | T_NBR | T_INT, 0, fun_str2bin},
 	{(unsigned char *)"Call(", T_FUN | T_STR | T_INT | T_NBR, 0, fun_call},
@@ -804,19 +818,22 @@ void fun_frame(void);
 	{(unsigned char *)"Time$", T_FNA | T_STR, 0, fun_time},
 	{(unsigned char *)"sprite(", T_FUN | T_INT | T_NBR, 0, fun_sprite},
 	{(unsigned char *)"Flag(", T_FUN | T_INT, 0, fun_flag},
-	{(unsigned char *)"Epoch(", T_FUN | T_INT, 0, fun_epoch},
-	{(unsigned char *)"DateTime$(", T_FUN | T_STR, 0, fun_datetime},
 	{(unsigned char *)"MM.Info(", T_FUN | T_INT | T_NBR | T_STR, 0, fun_info},
-	{(unsigned char *)"Format$(", T_FUN | T_STR, 0, fun_format},
 	{(unsigned char *)"~(", T_FUN | T_INT | T_NBR | T_STR, 0, fun_tilde},
-	{(unsigned char *)"KeyDown(", T_FUN | T_INT, 0, fun_keydown},
 #ifdef PICOMITEVGA
 #if !(defined(PICOMITEWEB) || defined(PICOMITEMIN))
 	{(unsigned char *)"DRAW3D(", T_FUN | T_INT, 0, fun_3D},
 #endif
 	{(unsigned char *)"GetScanLine", T_FNA | T_INT, 0, fun_getscanline},
 	{(unsigned char *)"Map(", T_FUN | T_INT, 0, fun_map},
-#else
+#endif
+	/* TOUCH() is now source-aware: on builds without a physical
+	   touch panel (PICOMITEVGA + GUICONTROLS) it reads cursor/mouse
+	   state, so a single BASIC GUI program can poll TOUCH(X)/(Y)/
+	   (REF)/(LASTREF) and run unchanged across touch-LCD and
+	   VGA/HDMI targets. Implementation lives in Draw.c next to
+	   fun_click and is gated by the same condition. */
+#if !defined(PICOMITEVGA) || defined(GUICONTROLS)
 	{(unsigned char *)"Touch(", T_FUN | T_INT, 0, fun_touch},
 #endif
 #ifdef PICOMITEWEB
@@ -825,6 +842,10 @@ void fun_frame(void);
 #ifdef GUICONTROLS
 	{(unsigned char *)"MsgBox(", T_FUN | T_INT, 0, fun_msgbox},
 	{(unsigned char *)"CtrlVal(", T_FUN | T_NBR | T_STR, 0, fun_ctrlval},
+	/* CLICK() — mouse/synthetic-click equivalent of TOUCH() for GUI
+	   controls. Available on every GUICONTROLS build (mouse-driven on
+	   VGA/HDMI, mouse-or-touch on PICORP2350 etc.). */
+	{(unsigned char *)"Click(", T_FUN | T_INT, 0, fun_click},
 #endif
 #if PICOMITERP2350
 	{(unsigned char *)"Map(", T_FUN | T_INT, 0, fun_map},
@@ -841,8 +862,6 @@ void fun_frame(void);
 #if !(defined(PICOMITEWEB))
 	{(unsigned char *)"Tilemap(", T_FUN | T_INT, 0, fun_tilemap},
 #endif
-	{(unsigned char *)"Trim$(", T_FUN | T_STR, 0, fun_trim},
-	{(unsigned char *)"Bit(", T_FUN | T_INT, 0, fun_bit},
 
 {
 	(unsigned char *)"", 0, 0, cmd_null

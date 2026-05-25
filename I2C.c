@@ -1306,15 +1306,22 @@ void i2cSend(unsigned char *p)
   int useVarBranch = (sendlen > 1 && argc == 7);
   if (sendlen == 1 && argc == 7)
   {
-    ptr = findvar(argv[6], V_NOFIND_NULL | V_EMPTY_OK);
-    if (ptr != NULL)
+    if (!isnamestart(*argv[6]))
     {
-      int t = g_vartbl[g_VarIndex].type;
-      if (((t & T_STR) && g_vartbl[g_VarIndex].dims[0] == 0) ||
-          ((t & (T_NBR | T_INT)) && g_vartbl[g_VarIndex].dims[0] > 0 && g_vartbl[g_VarIndex].dims[1] == 0))
-        useVarBranch = 1;
-      else
-        ptr = NULL;
+      useVarBranch = 0;
+    }
+    else
+    {
+      ptr = findvar(argv[6], V_NOFIND_NULL | V_EMPTY_OK);
+      if (ptr != NULL)
+      {
+        int t = g_vartbl[g_VarIndex].type;
+        if (((t & T_STR) && g_vartbl[g_VarIndex].dims[0] == 0) ||
+            ((t & (T_NBR | T_INT)) && g_vartbl[g_VarIndex].dims[0] > 0 && g_vartbl[g_VarIndex].dims[1] == 0))
+          useVarBranch = 1;
+        else
+          ptr = NULL;
+      }
     }
   }
 
@@ -1411,15 +1418,22 @@ void i2cSendSlave(unsigned char *p, int channel)
   int useVarBranch = (sendlen > 1 && argc == 3);
   if (sendlen == 1 && argc == 3)
   {
-    ptr = findvar(argv[2], V_NOFIND_NULL | V_EMPTY_OK);
-    if (ptr != NULL)
+    if (!isnamestart(*argv[2]))
     {
-      int t = g_vartbl[g_VarIndex].type;
-      if (((t & T_STR) && g_vartbl[g_VarIndex].dims[0] == 0) ||
-          ((t & (T_NBR | T_INT)) && g_vartbl[g_VarIndex].dims[0] > 0 && g_vartbl[g_VarIndex].dims[1] == 0))
-        useVarBranch = 1;
-      else
-        ptr = NULL;
+      useVarBranch = 0;
+    }
+    else
+    {
+      ptr = findvar(argv[2], V_NOFIND_NULL | V_EMPTY_OK);
+      if (ptr != NULL)
+      {
+        int t = g_vartbl[g_VarIndex].type;
+        if (((t & T_STR) && g_vartbl[g_VarIndex].dims[0] == 0) ||
+            ((t & (T_NBR | T_INT)) && g_vartbl[g_VarIndex].dims[0] > 0 && g_vartbl[g_VarIndex].dims[1] == 0))
+          useVarBranch = 1;
+        else
+          ptr = NULL;
+      }
     }
   }
 
@@ -1524,15 +1538,22 @@ void i2c2Send(unsigned char *p)
   int useVarBranch = (sendlen > 1 && argc == 7);
   if (sendlen == 1 && argc == 7)
   {
-    ptr = findvar(argv[6], V_NOFIND_NULL | V_EMPTY_OK);
-    if (ptr != NULL)
+    if (!isnamestart(*argv[6]))
     {
-      int t = g_vartbl[g_VarIndex].type;
-      if (((t & T_STR) && g_vartbl[g_VarIndex].dims[0] == 0) ||
-          ((t & (T_NBR | T_INT)) && g_vartbl[g_VarIndex].dims[0] > 0 && g_vartbl[g_VarIndex].dims[1] == 0))
-        useVarBranch = 1;
-      else
-        ptr = NULL;
+      useVarBranch = 0;
+    }
+    else
+    {
+      ptr = findvar(argv[6], V_NOFIND_NULL | V_EMPTY_OK);
+      if (ptr != NULL)
+      {
+        int t = g_vartbl[g_VarIndex].type;
+        if (((t & T_STR) && g_vartbl[g_VarIndex].dims[0] == 0) ||
+            ((t & (T_NBR | T_INT)) && g_vartbl[g_VarIndex].dims[0] > 0 && g_vartbl[g_VarIndex].dims[1] == 0))
+          useVarBranch = 1;
+        else
+          ptr = NULL;
+      }
     }
   }
 

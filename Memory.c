@@ -40,6 +40,16 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "Hardware_Includes.h"
 #include "hardware/dma.h"
 #include "hardware/pio_instructions.h"
+
+/* Surface FLASH_TARGET_OFFSET as a link-time absolute symbol so the
+   post-build check script (GetHighestHexAddress.py) can read the resolved
+   value from PicoMite.elf.map without re-parsing configuration.h's nested
+   #ifdefs. Costs no flash bytes — .set produces an absolute symbol. */
+#define _FWLIM_STR(x) #x
+#define _FWLIM_XSTR(x) _FWLIM_STR(x)
+__asm__(".global _fw_flash_target_offset\n"
+        ".set    _fw_flash_target_offset, " _FWLIM_XSTR(FLASH_TARGET_OFFSET));
+
 #define ASMMAX 6400 // maximum number of bytes that can be copied or set by assembler routines
 #define MAXCPY 3200 // tuned maximum number of bytes to copy using ZCOPY
 

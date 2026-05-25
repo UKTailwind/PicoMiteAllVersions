@@ -56,7 +56,7 @@ extern mutex_t frameBufferMutex;
 #ifdef rp2350
 #include "hardware/structs/qmi.h"
 #endif
-#ifndef USBKEYBOARD
+#if !defined(USBKEYBOARD) && !defined(PICOMITEBT)
 #include "class/cdc/cdc_device.h"
 #endif
 
@@ -6660,6 +6660,43 @@ void ResetOptions(bool startup)
 #endif
 #ifdef PICOMITEWEB
     Option.ServerResponceTime = 5000;
+#endif
+#ifdef PICOMITEBT
+    /* PICOMITEBT is headless — no display, no keyboard, no SD by
+       default. GP25 is the wireless CS pin and can't be used as the
+       heartbeat GPIO; the BT build blinks the CYW43's onboard LED via
+       bt_console_poll() instead, so disable the regular heartbeat.
+       Force CPU_Speed to 200 MHz on reset — anything lower destabilises
+       BLE under sustained traffic (matches MIN_CPU in configuration.h). */
+    Option.NoHeartbeat = 1;
+    Option.SerialConsole = 0;  /* 0 = console over BT (replaces CDC) */
+    Option.CPU_Speed = 200000;
+#endif
+#ifdef PICOMITEBTH
+    /* PICOMITEBTH keeps the USB CDC console but the keyboard input
+       source is a BLE HID device (BTKeyboard.c). The PS/2 keyboard
+       path is disabled at compile time (see PicoMite.c) and via the
+       OPTION KEYBOARD command (see MM_Misc.c), so Option.KeyboardConfig
+       stays at NO_KEYBOARD from the !USBKEYBOARD branch above. The
+       BLE-side layout is selected via Option.USBKeyboard, same field
+       the USB-host build uses — defaulting to US matches the existing
+       USB-host defaults. RepeatStart/RepeatRate were already set at
+       the top of ResetOptions, so we don't re-set them here. Also:
+       GP25 is the wireless CS pin so the regular heartbeat GPIO can't
+       be used; bt_keyboard_poll() blinks the CYW43 on-module LED
+       instead. Same 200 MHz CPU floor as PICOMITEBT (matches MIN_CPU). */
+    Option.USBKeyboard  = CONFIG_US;
+    Option.capslock     = 0;
+    Option.numlock      = 1;
+    Option.NoHeartbeat  = 1;
+    Option.CPU_Speed    = 200000;
+#endif
+#if defined(PICOMITEBT) || defined(PICOMITEBTH)
+    /* btstack TLV uses flash-erase-state semantics (0xFF = empty).
+       The ResetOptions caller zeroed the whole Option struct, so the
+       TLV banks look like garbage; init to 0xFF so btstack treats
+       them as fresh on first boot. */
+    memset(Option.bt_tlv, 0xFF, sizeof(Option.bt_tlv));
 #endif
     Option.AUDIO_SLICE = 99;
     Option.SDspeed = 12;

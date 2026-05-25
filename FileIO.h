@@ -191,8 +191,18 @@ extern "C"
         char dummy[12];
 #endif
 
-                /* GUI or HDMI configuration */
-#ifdef GUICONTROLS
+                /* GUI or HDMI configuration.
+                   Layout rules (the saved-flash struct must stay
+                   byte-compatible with prior firmwares for each variant):
+                   * Touch-screen builds (GUICONTROLS, !PICOMITEVGA): this
+                     4-byte slot holds MaxCtrls + spare3[3]. Unchanged.
+                   * Legacy HDMI/VGA builds (PICOMITEVGA, !GUICONTROLS):
+                     this slot holds the HDMI lane mapping. Unchanged.
+                   * New mouse-GUI VGA/HDMI builds (both flags): we keep
+                     the HDMI lane mapping in this slot for binary
+                     compatibility, and stash MaxCtrls in the first byte
+                     of extensions[] further down. */
+#if defined(GUICONTROLS) && !defined(PICOMITEVGA)
                 uint8_t MaxCtrls;
                 unsigned char spare3[3];
 #else
@@ -335,7 +345,28 @@ extern "C"
                 unsigned int GPSBaud;            // *EB*
                 unsigned char pins[8];           // General use storage for CFunctions
                 unsigned char wifi_country_code; //
+#if defined(GUICONTROLS) && defined(PICOMITEVGA)
+                /* On mouse-GUI VGA/HDMI builds MaxCtrls rides at the
+                   front of extensions[] because the offset-88 slot is
+                   kept for the HDMI lane mapping (see above). Total
+                   region size stays 79 bytes so the surrounding flash
+                   layout (and the 7-XMODEM-block size) is unchanged. */
+                uint8_t MaxCtrls;
+                unsigned char extensions[78];    // 896 bytes == 7 XMODEM blocks
+#else
                 unsigned char extensions[79];    // 896 bytes == 7 XMODEM blocks
+#endif
+
+#if defined(PICOMITEBT) || defined(PICOMITEBTH)
+                /* BLE bond storage. Two virtual flash banks of 1 KB each
+                   backing the btstack TLV — keeps the LTK alive across
+                   reboots by riding along with SaveOptions(). Living
+                   inside Option means MMBasic's flash layout treats it
+                   as part of the protected 4 KB options sector and
+                   won't ever overwrite it. PICOMITEBTH stores bonded-
+                   keyboard LTKs in the same field. */
+                unsigned char bt_tlv[2048];
+#endif
 
                 /* NOTE: To enable older CFunctions to run, any new options MUST be added at the end of the list */
         } __attribute__((packed));

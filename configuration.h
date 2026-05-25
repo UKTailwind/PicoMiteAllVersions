@@ -52,26 +52,26 @@ extern "C"
 #define MAX_CPU Freq378P
 #define MIN_CPU FreqX
 #ifdef USBKEYBOARD
-#define FLASH_TARGET_OFFSET (1040 * 1024)
-#define HEAP_MEMORY_SIZE (160 * 1024)
-#define MagicKey 0x82321F85
+#define FLASH_TARGET_OFFSET (1056 * 1024)
+#define HEAP_MEMORY_SIZE (156 * 1024)
+#define MagicKey 0xD340BBCD
 #else
-#define MagicKey 0x12175CED
-#define FLASH_TARGET_OFFSET (992 * 1024)
-#define HEAP_MEMORY_SIZE (164 * 1024)
+#define MagicKey 0xD1F6F86C
+#define FLASH_TARGET_OFFSET (1024 * 1024)
+#define HEAP_MEMORY_SIZE (160 * 1024)
 #endif
 #else // rp2350 VGA
 #define MAXMODES 3
 #define MAX_CPU 378000
 #define MIN_CPU 252000
 #ifdef USBKEYBOARD
+#define FLASH_TARGET_OFFSET (1040 * 1024)
+#define HEAP_MEMORY_SIZE (164 * 1024)
+#define MagicKey 0x4C73A942
+#else
 #define FLASH_TARGET_OFFSET (1008 * 1024)
 #define HEAP_MEMORY_SIZE (168 * 1024)
-#define MagicKey 0x789124B3
-#else
-#define FLASH_TARGET_OFFSET (976 * 1024)
-#define HEAP_MEMORY_SIZE (168 * 1024)
-#define MagicKey 0x42283587
+#define MagicKey 0xDAEA58BA
 #endif
 #endif
 
@@ -86,12 +86,12 @@ extern "C"
 #define MIN_CPU 252000
 #ifdef USBKEYBOARD
 #define FLASH_TARGET_OFFSET (848 * 1024)
-#define MagicKey 0x356469F4
+#define MagicKey 0xCD8778E7
 #define HEAP_MEMORY_SIZE (100 * 1024)
 #else
 #define FLASH_TARGET_OFFSET (816 * 1024)
 #define HEAP_MEMORY_SIZE (100 * 1024)
-#define MagicKey 0xD4201AF5
+#define MagicKey 0x3193CA54
 #endif
 
 #endif
@@ -187,11 +187,11 @@ extern "C"
  * ============================================================================ */
 #ifdef PICOMITEWEB
 #define MaxPcb 8
-#define MAX_CPU 252000
+#define MAX_CPU 396000
 #define MIN_CPU 126000
 
 #ifdef rp2350
-#define MagicKey 0x978128E6
+#define MagicKey 0xBB91433A
 #define MAXSUBFUN 512
 #define MAXGLOBALVARS 512 // Configurable split
 #define MAXLOCALVARS 256
@@ -207,7 +207,7 @@ extern "C"
 #define HEAP_MEMORY_SIZE (192 * 1024)
 #define FLASH_TARGET_OFFSET (1424 * 1024)
 #else
-#define MagicKey 0x927945E6
+#define MagicKey 0x6AA79987
 #define MAXSUBFUN 256
 #define MAXGLOBALVARS 240 // Configurable split
 #define MAXLOCALVARS 240
@@ -235,13 +235,48 @@ extern "C"
 #define MAXSUBFUN 512
 
 #ifdef USBKEYBOARD
-#define MagicKey 0x52211A65
-#define FLASH_TARGET_OFFSET (1104 * 1024)
-#define HEAP_MEMORY_SIZE (304 * 1024)
+#define MagicKey 0x029A7245
+#define FLASH_TARGET_OFFSET (1120 * 1024)
+/* Was 304 KB. Reduced by 4 KB to make headroom for the BSS growth
+   from the cursor module (~650 bytes for user_cursor.pixels +
+   state) and the click/cursor ownership tracking. Heap and BSS
+   share the same SRAM block; growing BSS past the boundary
+   silently corrupts heap-adjacent statics (see memory note
+   "heap-bss-overlap-on-rp2350"). */
+#define HEAP_MEMORY_SIZE (300 * 1024)
+#elif defined(PICOMITEBT)
+/* PICOMITEBT replaces USB CDC console with BLE Nordic UART Service over
+   CYW43439. The CYW43 + btstack stack can't reliably keep up at very
+   low CPU speeds during heavy bidirectional traffic (AutoSave, large
+   pastes); enforce 200 MHz as the practical floor and cap at 396 MHz
+   which is well within RP2350-A overclocking headroom. Bump MagicKey
+   whenever default Option layout or CPU bounds change so cached
+   options from older firmware get rewritten on next boot via
+   ResetOptions(). */
+#undef MIN_CPU
+#define MIN_CPU 200000
+#undef MAX_CPU
+#define MAX_CPU 396000
+#define MagicKey 0x90E5E945
+#define FLASH_TARGET_OFFSET (1376 * 1024)
+#define HEAP_MEMORY_SIZE (272 * 1024)
+#elif defined(PICOMITEBTH)
+/* PICOMITEBTH = PicoMite + USB CDC console + BLE HID host. Same CYW43
+   + btstack memory pressure as PICOMITEBT, so mirror its CPU floor and
+   flash/heap split. Distinct MagicKey ensures cached options from
+   PICOMITEBT (or any earlier firmware) get rewritten on first boot. */
+#undef MIN_CPU
+#define MIN_CPU 200000
+#undef MAX_CPU
+#define MAX_CPU 396000
+#define MagicKey 0x6FACAA50
+#define FLASH_TARGET_OFFSET (1408 * 1024)
+#define HEAP_MEMORY_SIZE (256 * 1024)
 #else
-#define FLASH_TARGET_OFFSET (1072 * 1024)
-#define HEAP_MEMORY_SIZE (304 * 1024)
-#define MagicKey 0x989626B4
+#define FLASH_TARGET_OFFSET (1088 * 1024)
+/* See note above PICOUSBRP2350 HEAP_MEMORY_SIZE. */
+#define HEAP_MEMORY_SIZE (300 * 1024)
+#define MagicKey 0x29645F8B
 #endif
 
 #else                     // RP2040
@@ -252,18 +287,18 @@ extern "C"
 #define MAXSUBFUN 256
 
 #ifdef USBKEYBOARD
-#define MagicKey 0x0E878DDA
+#define MagicKey 0xEE897110
 #define FLASH_TARGET_OFFSET (912 * 1024)
 #define HEAP_MEMORY_SIZE (132 * 1024)
 #else
 #ifdef PICOMITEMIN
 #define FLASH_TARGET_OFFSET (704 * 1024)
-#define MagicKey 0xF1F127C5
+#define MagicKey 0x452EC40A
 #define HEAP_MEMORY_SIZE (132 * 1024)
 #else
 #define HEAP_MEMORY_SIZE (120 * 1024)
 #define FLASH_TARGET_OFFSET (912 * 1024)
-#define MagicKey 0x142127C5
+#define MagicKey 0x5E503A67
 #endif
 #endif
 #endif
@@ -556,6 +591,7 @@ extern "C"
 #define LOWRAM (!defined(rp2350) && (defined(PICOMITEVGA) || defined(PICOMITEWEB)))
 #define PICOMITERP2350 (defined(PICOMITE) && defined(rp2350))
 #define WEBRP2350 (defined(rp2350) && defined(PICOMITEWEB))
+#define BTRP2350 (defined(rp2350) && defined(PICOMITEBT))
 #define PICOCALC ((defined(PICOMITE) || defined(PICOMITEWEB)) && !defined(USBKEYBOARD))
    /* ============================================================================
     * Type definitions - MM operations enum
@@ -595,7 +631,6 @@ extern "C"
 #ifndef PICOMITEWEB
       MMSUPPLY,
 #endif
-      MMPOS,
       MMEND
    } Operation;
 

@@ -672,8 +672,8 @@ void MIPS16 InitBasic(void)
 #endif
     heapend = (uint32_t)&__heap_start + PICO_HEAP_SIZE;
     //  SInt(CommandTableSize);
-    //  SIntComma(TokenTableSize);
-    //  SSPrintString("\r\n");
+//   SIntComma(TokenTableSize);
+//    SSPrintString("\r\n");
 }
 // test the stack for overflow - this is a NULL function in the DOS version
 static inline void TestStackOverflow(void)
@@ -1235,6 +1235,15 @@ void MIPS16 tokenise(int console)
         STR_REPLACE((char *)inpbuf, "=<", "<=", 3);
         STR_REPLACE((char *)inpbuf, "SPRITE MEMORY", "BLIT MEMORY", 0);
         STR_REPLACE((char *)inpbuf, "PEEK(BYTE", "PEEK(INT8", 0);
+        STR_REPLACE((char *)inpbuf, "BIN$(", "BASE$(2,", 2);
+        STR_REPLACE((char *)inpbuf, "OCT$(", "BASE$(8,", 2);
+        STR_REPLACE((char *)inpbuf, "HEX$(", "BASE$(16,", 2);
+        STR_REPLACE((char *)inpbuf, "LCASE$(", "SCHANGE$(L,", 2);
+        STR_REPLACE((char *)inpbuf, "UCASE$(", "SCHANGE$(U,", 2);
+        STR_REPLACE((char *)inpbuf, "MIN(", "TOPBOTTOM(I,", 2);
+        STR_REPLACE((char *)inpbuf, "MAX(", "TOPBOTTOM(A,", 2);
+        STR_REPLACE((char *)inpbuf, "LEFT$(", "SCHANGE$(E,", 2);
+        STR_REPLACE((char *)inpbuf, "RIGHT$(", "SCHANGE$(R,", 2);
     }
     // setup the input and output buffers
     p = inpbuf;
@@ -2165,10 +2174,10 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, in
         error("Too many nested SUB/FUN");
     errorstack[gosubindex] = CallersLinePtr;
     gosubstack[gosubindex++] = isfun ? NULL : nextstmt; // NULL signifies that this is returned to by ending ExecuteProgram()
-    // Acquire argval-area buffers. The fast path points each local at the
-    // matching file-scope static array (no allocation, no offset arithmetic,
-    // no large memset). The slow path — an arg-eval recursion overlap —
-    // allocates each buffer individually from the heap.
+                                                        // Acquire argval-area buffers. The fast path points each local at the
+                                                        // matching file-scope static array (no allocation, no offset arithmetic,
+                                                        // no large memset). The slow path — an arg-eval recursion overlap —
+                                                        // allocates each buffer individually from the heap.
 #ifdef rp2350
     if (!defsubfun_static_in_use)
     {
@@ -5519,13 +5528,20 @@ void MIPS16 LCD_error(int line_num, const char *line_txt, const char *error_msg)
 // this uses longjump to skip back to the command input and cleanup the stack
 void MIPS16 error(char *msg, ...)
 {
-    char *p, *tp, tstr[STRINGSIZE * 2];
+    /* tstr was historically STRINGSIZE*2 (512 B) to leave room for
+       worst-case format expansion before the message is truncated to
+       MAXERRMSG (64 B). In practice no caller chains multiple '$'
+       substitutions of full-length strings — the realistic ceiling is
+       one '$' of STRINGSIZE bytes plus literal glue. Halving the
+       buffer saves 256 B from the deepest stack frame on every error
+       path, which matters on the RP2350 builds where stack is tight. */
+    char *p, *tp, tstr[STRINGSIZE];
     va_list ap;
     ScrewUpTimer = 0;
     // first build the error message in the global string MMErrMsg
     if (MMerrno == 0)
         MMerrno = 16;                // indicate an error
-    memset(tstr, 0, STRINGSIZE * 2); // clear any previous string
+    memset(tstr, 0, sizeof(tstr)); // clear any previous string
     if (*msg)
     {
         va_start(ap, msg);
@@ -5608,7 +5624,7 @@ void MIPS16 error(char *msg, ...)
         WriteBuf = (unsigned char *)FRAMEBUFFER;
         DisplayBuf = (unsigned char *)FRAMEBUFFER;
 #else
-            restorepanel();
+        restorepanel();
 #endif // we now have CurrentLinePtr pointing to the start of the line
         SetFont(PromptFont);
         gui_fcolour = PromptFC;
@@ -5632,11 +5648,11 @@ void MIPS16 error(char *msg, ...)
                 PromptFont = (2 << 4) | 1;
             }
 #else
-                if (gui_font_width > 8)
-                {
-                    SetFont(1);
-                    PromptFont = 1;
-                }
+            if (gui_font_width > 8)
+            {
+                SetFont(1);
+                PromptFont = 1;
+            }
 #endif
         }
         if (DISPLAY_TYPE == Option.DISPLAY_TYPE)
@@ -5708,25 +5724,32 @@ void MIPS16 error(char *msg, ...)
     // Print the line.
     if (!suppress_error_output && line_num != -2)
     {
+        /* Print prefix and source line as separate calls so the source
+           line (up to STRINGSIZE bytes) doesn't have to fit into tstr
+           alongside the prefix — keeps tstr small without truncating
+           the user's line. */
         if (line_num == -1)
         {
-            sprintf(tstr, "[LIBRARY] %s\r\n", p);
+            MMPrintString("[LIBRARY] ");
         }
         else
         {
-            sprintf(tstr, "[%d] %s\r\n", line_num, p);
+            char prefix[16];
+            snprintf(prefix, sizeof(prefix), "[%d] ", line_num + 1);
+            MMPrintString(prefix);
         }
-        MMPrintString(tstr);
+        MMPrintString(p);
+        MMPrintString("\r\n");
     }
 
     // Print the error message.
     if (!suppress_error_output && *MMErrMsg)
     {
-        sprintf(tstr, "Error : %s\r\n", MMErrMsg);
+        snprintf(tstr, sizeof(tstr), "Error : %s\r\n", MMErrMsg);
     }
     else if (!suppress_error_output)
     {
-        sprintf(tstr, "Error");
+        snprintf(tstr, sizeof(tstr), "Error");
     }
     if (!suppress_error_output)
         MMPrintString(tstr);
@@ -5754,7 +5777,7 @@ void MIPS16 error(char *msg, ...)
         if (line_num > 0 && fm_last_launched_bas[0])
         {
             fm_error_location_valid = 1;
-            fm_error_line = line_num;
+            fm_error_line = line_num + 1;
             fm_error_char = StartEditChar;
             strncpy(fm_error_file, fm_last_launched_bas, sizeof(fm_error_file) - 1);
             fm_error_file[sizeof(fm_error_file) - 1] = 0;
@@ -6100,7 +6123,7 @@ Various routines to clear memory or the interpreter's state
 #if defined(PICOMITEWEB) && !defined(rp2350)
 void MIPS32 ClearVars(int level, bool all)
 #else
-    void MIPS32 __not_in_flash_func(ClearVars)(int level, bool all)
+void MIPS32 __not_in_flash_func(ClearVars)(int level, bool all)
 #endif
 {
     int i, newhashpointer, hashcurrent, hashnext;
@@ -6120,7 +6143,7 @@ void MIPS32 ClearVars(int level, bool all)
 #ifdef STRUCTENABLED
                 if (((g_vartbl[hashcurrent].type & T_STR) || g_vartbl[hashcurrent].dims[0] != 0 || (g_vartbl[hashcurrent].type & T_STRUCT)) && !(g_vartbl[hashcurrent].type & T_PTR) && ((uint32_t)g_vartbl[hashcurrent].val.s < (uint32_t)MMHeap + heap_memory_size) && ((uint32_t)g_vartbl[hashcurrent].val.s > (uint32_t)MMHeap))
 #else
-                    if (((g_vartbl[hashcurrent].type & T_STR) || g_vartbl[hashcurrent].dims[0] != 0) && !(g_vartbl[hashcurrent].type & T_PTR) && ((uint32_t)g_vartbl[hashcurrent].val.s < (uint32_t)MMHeap + heap_memory_size) && ((uint32_t)g_vartbl[hashcurrent].val.s > (uint32_t)MMHeap))
+                if (((g_vartbl[hashcurrent].type & T_STR) || g_vartbl[hashcurrent].dims[0] != 0) && !(g_vartbl[hashcurrent].type & T_PTR) && ((uint32_t)g_vartbl[hashcurrent].val.s < (uint32_t)MMHeap + heap_memory_size) && ((uint32_t)g_vartbl[hashcurrent].val.s > (uint32_t)MMHeap))
 #endif
                 {
                     FreeMemorySafe((void **)&g_vartbl[hashcurrent].val.s);
@@ -6157,7 +6180,7 @@ void MIPS32 ClearVars(int level, bool all)
 #ifdef STRUCTENABLED
             if (((g_vartbl[i].type & T_STR) || g_vartbl[i].dims[0] != 0 || (g_vartbl[i].type & T_STRUCT)) && !(g_vartbl[i].type & T_PTR))
 #else
-                if (((g_vartbl[i].type & T_STR) || g_vartbl[i].dims[0] != 0) && !(g_vartbl[i].type & T_PTR))
+            if (((g_vartbl[i].type & T_STR) || g_vartbl[i].dims[0] != 0) && !(g_vartbl[i].type & T_PTR))
 #endif
             {
                 if ((uint32_t)g_vartbl[i].val.s > (uint32_t)MMHeap && (uint32_t)g_vartbl[i].val.s < (uint32_t)MMHeap + heap_memory_size)
@@ -6283,7 +6306,7 @@ uint32_t erase(char *p, bool nofree)
 #ifdef STRUCTENABLED
         if (((g_vartbl[j].type & T_STR) || g_vartbl[j].dims[0] != 0 || (g_vartbl[j].type & T_STRUCT)) && !(g_vartbl[j].type & T_PTR))
 #else
-            if (((g_vartbl[j].type & T_STR) || g_vartbl[j].dims[0] != 0) && !(g_vartbl[j].type & T_PTR))
+        if (((g_vartbl[j].type & T_STR) || g_vartbl[j].dims[0] != 0) && !(g_vartbl[j].type & T_PTR))
 #endif
         {
             addr = (uint32_t)g_vartbl[j].val.s; // ADDED: get address once
@@ -6442,6 +6465,15 @@ void MIPS16 ClearRuntime(bool all)
 #if !(defined(PICOMITEWEB) || defined(PICOMITEMIN))
     turtle_free(); // Free turtle state before heap is wiped
 #endif
+#if defined(PICOMITEVGA) || defined(GUICONTROLS)
+    /* The mouse-cursor's save buffer is GetMemory()'d from the BASIC
+       heap. InitHeap(true) below recycles that pool, so we must drop
+       our reference first — otherwise the next CursorErase would
+       restore stale pixels from a buffer the heap has handed back to
+       a user variable. CursorOnHeapWipe() also clears cursor_painted
+       so the next refresh starts from a clean state. */
+    CursorOnHeapWipe();
+#endif
     InitHeap(true);
 #ifdef STRUCTENABLED
     // After InitHeap, all heap memory tracking is reset. The g_structtbl pointers
@@ -6504,8 +6536,8 @@ void MIPS16 ClearProgram(bool psram)
 int FloatToInt32(MMFLOAT x)
 {
 #else
-    int __not_in_flash_func(FloatToInt32)(MMFLOAT x)
-    {
+int __not_in_flash_func(FloatToInt32)(MMFLOAT x)
+{
 #endif
     if (x < LONG_MIN - 0.5 || x > LONG_MAX + 0.5)
         error("Number too large");
@@ -6516,8 +6548,8 @@ int FloatToInt32(MMFLOAT x)
 long long int FloatToInt64(MMFLOAT x)
 {
 #else
-    long long int __not_in_flash_func(FloatToInt64)(MMFLOAT x)
-    {
+long long int __not_in_flash_func(FloatToInt64)(MMFLOAT x)
+{
 #endif
     if (x < (-(0x7fffffffffffffffLL) - 1) - 0.5 || x > 0x7fffffffffffffffLL + 0.5)
         error("Number too large");

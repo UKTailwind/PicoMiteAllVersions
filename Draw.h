@@ -364,6 +364,28 @@ extern void (*ReadBLITBuffer)(int x1, int y1, int x2, int y2, unsigned char *c);
 extern void (*ReadBufferFast)(int x1, int y1, int x2, int y2, unsigned char *c);
 
 /* ============================================================================
+ * Mouse / virtual cursor overlay (PICOMITEVGA, all variants)
+ * Implementation lives in Draw.c so it's compiled on every VGA/HDMI
+ * build regardless of GUICONTROLS. Controlled from BASIC via GUI CURSOR.
+ * ============================================================================ */
+#if defined(PICOMITEVGA) || defined(GUICONTROLS)
+void CursorHide(void);
+void CursorRefresh(void);
+void CursorOnHeapWipe(void);   /* called by ClearRuntime before InitHeap(true) */
+bool cursor_handle_gui_subcommand(unsigned char *cmdline_in);
+extern volatile bool CursorSuspend;
+#ifdef GUICONTROLS
+bool click_handle_gui_subcommand(unsigned char *cmdline_in);
+extern volatile bool gui_click_synthetic_down;
+bool click_pin_pressed(void);
+extern int  click_pin;       /* 0 when no click pin assigned */
+extern bool click_pin_inv;
+extern volatile bool gui_click_emulated;
+extern int  cursor_x, cursor_y;
+#endif
+#endif
+
+/* ============================================================================
  * Function declarations - Basic drawing primitives
  * ============================================================================ */
 void DrawLine(int x1, int y1, int x2, int y2, int w, int c);
