@@ -3196,8 +3196,17 @@ void MIPS16 error(char *msg, ...) {
     if(OptionErrorSkip) longjmp(ErrNext, 1);                       // if OPTION ERROR SKIP/IGNORE is in force
     hal_display_merge_abort();
 
+    int saved_prompt_font = PromptFont;
+    int saved_prompt_fc = PromptFC;
+    int saved_prompt_bc = PromptBC;
+
     LoadOptions();                                                  // make sure that the option struct is in a clean state
     ApplyDefaultConsoleColours();
+    PromptFont = saved_prompt_font;
+    PromptFC = saved_prompt_fc;
+    PromptBC = saved_prompt_bc;
+    gui_fcolour = PromptFC;
+    gui_bcolour = PromptBC;
     OptionConsole=1;
     if(Option.DISPLAY_CONSOLE) {
         OptionConsole=3;
