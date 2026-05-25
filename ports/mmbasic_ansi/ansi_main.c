@@ -12,6 +12,7 @@
  *   mmbasic_ansi                    → interactive REPL
  *   mmbasic_ansi program.bas        → run .bas file via the VM
  *   mmbasic_ansi --interp prog.bas  → run via the legacy interpreter
+ *   mmbasic_ansi --no-graphics      → plain terminal/stdout console
  *   mmbasic_ansi --resolution WxH   → override framebuffer size
  *                                      (default 320x320)
  */
@@ -41,6 +42,7 @@ char *getcwd(char *buf, size_t size);
 #include "host_time.h"
 #include "ansi_mode.h"
 #include "ansi_terminal.h"
+#include "ansi_terminal_resize.h"
 #include "ansi_display.h"
 
 extern int host_sim_slowdown_us;
@@ -56,6 +58,8 @@ extern const char *host_sd_root;
 extern void MMBasic_PrintBanner(void);
 extern unsigned char OptionConsole;
 extern short gui_font_width, gui_font_height;
+extern void host_options_snapshot(void);
+extern void (*host_runtime_poll_hook)(void);
 
 /* Framebuffer backing for programs loaded into ProgMemory. Mirrors
  * host_main.c's flash_prog_buf — first half zeroed (program), second
@@ -81,6 +85,12 @@ void (*host_output_hook)(const char *text, int len) = NULL;
 static void ansi_swallow(const char *text, int len) {
     (void)text; (void)len;
 }
+
+static void ansi_stdout(const char *text, int len) {
+    fwrite(text, 1, (size_t)len, stdout);
+}
+
+static int ansi_no_graphics_mode = 0;
 
 /* ----------------------------------------------------------------- */
 /* Source loading */
@@ -130,6 +140,44 @@ static void configure_display(int width, int height) {
     Option.DefaultBC = 0x000000;
 }
 
+static void configure_text_console(int cols, int rows) {
+    Option.DISPLAY_CONSOLE = 0;
+    OptionConsole = 1;                /* UART/stdout only. */
+
+    if (cols <= 0) cols = 80;
+    if (rows <= 0) rows = 24;
+    if (cols > 127) cols = 127;
+    if (rows > 127) rows = 127;
+
+    gui_font = 0x01;
+    gui_font_width = 8;
+    gui_font_height = 12;
+    Option.Width  = cols;
+    Option.Height = rows;
+    Option.Tab    = 4;
+    Option.DefaultFont = 0x01;
+    Option.ColourCode = 0;
+}
+
+static void update_text_console_size(int force) {
+    if (!ansi_no_graphics_mode) return;
+    if (!force && !ansi_terminal_resized) return;
+
+    int rows = 0, cols = 0;
+    if (ansi_terminal_get_size(&rows, &cols) != 0) return;
+
+    int old_width = Option.Width;
+    int old_height = Option.Height;
+    configure_text_console(cols, rows);
+    if (Option.Width != old_width || Option.Height != old_height) {
+        host_options_snapshot();
+    }
+}
+
+static void ansi_runtime_poll_hook(void) {
+    update_text_console_size(0);
+}
+
 /* ----------------------------------------------------------------- */
 /* Bring-up + tear-down shared between REPL and script modes.        */
 /* ----------------------------------------------------------------- */
@@ -145,13 +193,28 @@ static const mm_runtime_adapter ansi_boot_adapter = {
     .memory_backing_init = ansi_memory_backing_init,
 };
 
-static int ansi_boot(int width, int height) {
+static int ansi_boot(int width, int height, int no_graphics, int interactive) {
     if (mmbasic_runtime_init_common(&ansi_boot_adapter,
             MMBASIC_RUNTIME_INIT_FLAG_LOAD_OPTIONS |
             MMBASIC_RUNTIME_INIT_FLAG_INIT_BASIC |
             MMBASIC_RUNTIME_INIT_FLAG_INIT_HEAP |
             MMBASIC_RUNTIME_INIT_FLAG_CLEAR_ERROR) != 0) {
         return -1;
+    }
+
+    if (no_graphics) {
+        ansi_no_graphics_mode = 1;
+        configure_text_console(80, 24);
+
+        mmbasic_runtime_port_begin();
+        host_output_hook = ansi_stdout;
+        host_runtime_poll_hook = ansi_runtime_poll_hook;
+        update_text_console_size(1);
+        if (interactive) ansi_terminal_install_resize_handler();
+        MMBasic_PrintBanner();
+        fflush(stdout);
+        if (interactive) host_raw_mode_enter();
+        return 0;
     }
 
     configure_display(width, height);
@@ -280,6 +343,7 @@ int main(int argc, char **argv) {
     int  cli_repeat_start = 0, cli_repeat_rate = 0;   /* 0 = leave OS in charge */
     int  cli_slowdown_us  = -1;                       /* -1 = leave default */
     int  cli_memory_kb    = 0;                        /* 0 = leave default */
+    int  no_graphics      = 0;
     unsigned int cli_modes_mask = 0;
 
     for (int i = 1; i < argc; ++i) {
@@ -331,10 +395,13 @@ int main(int argc, char **argv) {
             use_interpreter = 1;
         } else if (strcmp(argv[i], "--vm") == 0) {
             use_interpreter = 0;
+        } else if (strcmp(argv[i], "--no-graphics") == 0) {
+            no_graphics = 1;
         } else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
             printf("Usage: %s [options] [program.bas]\n", argv[0]);
             printf("\n");
             printf("Options:\n");
+            printf("  --no-graphics          Plain terminal/stdout console; no half-block renderer.\n");
             printf("  --resolution WxH        Framebuffer size (default: auto-fit terminal).\n");
             printf("  --modes N:WxH,...       Override MODE-N table entries (1..%d).\n", ansi_mode_max());
             printf("                          e.g. --modes 1:320x200,2:640x480\n");
@@ -376,6 +443,19 @@ int main(int argc, char **argv) {
     /* --repeat: arms the per-key rate limiter in host_keyrepeat. */
     if (cli_repeat_start && cli_repeat_rate) {
         host_keyrepeat_configure(cli_repeat_start, cli_repeat_rate);
+    }
+
+    if (no_graphics) {
+        if (ansi_boot(width, height, no_graphics, filename == NULL) != 0) return 1;
+
+        int rc;
+        if (filename) {
+            rc = run_script(filename, use_interpreter);
+        } else {
+            rc = run_repl();
+        }
+
+        return rc;
     }
 
     /* Read terminal size up front. We always need it, either to
@@ -434,7 +514,7 @@ int main(int argc, char **argv) {
         }
     }
 
-    if (ansi_boot(width, height) != 0) return 1;
+    if (ansi_boot(width, height, no_graphics, filename == NULL) != 0) return 1;
 
     int rc;
     if (filename) {

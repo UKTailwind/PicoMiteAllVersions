@@ -459,6 +459,7 @@ static void host_runtime_check_timeout(void) {
 
 extern void ProcessWeb(int mode);
 extern int host_tcp_interrupt_pending(void);
+void (*host_runtime_poll_hook)(void) = NULL;
 
 static inline CommandToken host_commandtbl_decode(const unsigned char *p) {
     return ((CommandToken)(p[0] & 0x7f)) | ((CommandToken)(p[1] & 0x7f) << 7);
@@ -471,6 +472,7 @@ static void host_runtime_network_service(void) {
 static void host_runtime_service(void) {
     static int in_service;
     host_runtime_check_timeout();
+    if (host_runtime_poll_hook) host_runtime_poll_hook();
     mmbasic_runtime_poll_service_once(&in_service, host_runtime_network_service);
 }
 
