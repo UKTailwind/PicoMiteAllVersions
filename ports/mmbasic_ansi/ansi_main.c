@@ -156,7 +156,6 @@ static void configure_text_console(int cols, int rows) {
     Option.Height = rows;
     Option.Tab    = 4;
     Option.DefaultFont = 0x01;
-    Option.ColourCode = 0;
 }
 
 static void update_text_console_size(int force) {
@@ -205,6 +204,7 @@ static int ansi_boot(int width, int height, int no_graphics, int interactive) {
     if (no_graphics) {
         ansi_no_graphics_mode = 1;
         configure_text_console(80, 24);
+        Option.ColourCode = 1;
 
         mmbasic_runtime_port_begin();
         host_output_hook = ansi_stdout;
