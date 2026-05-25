@@ -10,10 +10,9 @@
 #      clear "skipped — run on CI" note.
 #   6. buildall.sh (14 device variants).
 #
-# A build failure is fatal: the script stops immediately because
-# skipping the dependent test suite would silently mask regressions.
-# Independent stages (e.g. ansi build vs device buildall) still run
-# so you get a complete picture in one pass.
+# Failures are recorded and reported at the end. Dependent tests are
+# skipped when their prerequisite build fails; independent stages
+# still run so you get a complete picture in one pass.
 #
 # Run from anywhere. Output is verbose enough to diagnose failures
 # without re-running individual stages.
@@ -43,17 +42,24 @@ run_section() {
 run_section "HAL purity" "$ROOT/tools/check_hal_purity.sh"
 
 # ---- 2. host_native build + tests --------------------------------------
-run_section "host_native build" bash -c "cd '$ROOT/ports/host_native' && ./build.sh"
-run_section "host_native tests (run_tests.sh)" \
-    bash -c "cd '$ROOT/ports/host_native' && SKIP_HAL_PURITY=1 ./run_tests.sh"
-run_section "host_native NEW smoke (porttools)" \
-    python3 "$ROOT/porttools/host_new_smoke.py" --no-build
+if run_section "host_native build" bash -c "cd '$ROOT/ports/host_native' && ./build.sh"; then
+    run_section "host_native tests (run_tests.sh)" \
+        bash -c "cd '$ROOT/ports/host_native' && SKIP_HAL_PURITY=1 ./run_tests.sh"
+    run_section "host_native NEW smoke (porttools)" \
+        python3 "$ROOT/porttools/host_new_smoke.py" --no-build
+else
+    SECTIONS+=("SKIP: host_native tests (build failed)")
+    SECTIONS+=("SKIP: host_native NEW smoke (build failed)")
+fi
 
 # ---- 3. mmbasic_stdio build + tests ------------------------------------
-run_section "mmbasic_stdio build" \
-    bash -c "cd '$ROOT/ports/mmbasic_stdio' && make"
-run_section "mmbasic_stdio tests (smoke corpus)" \
-    bash -c "cd '$ROOT/ports/mmbasic_stdio/tests' && ./run_tests.sh"
+if run_section "mmbasic_stdio build" \
+    bash -c "cd '$ROOT/ports/mmbasic_stdio' && make"; then
+    run_section "mmbasic_stdio tests (smoke corpus)" \
+        bash -c "cd '$ROOT/ports/mmbasic_stdio/tests' && ./run_tests.sh"
+else
+    SECTIONS+=("SKIP: mmbasic_stdio tests (build failed)")
+fi
 
 # ---- 4. mmbasic_ansi build (no test suite) -----------------------------
 run_section "mmbasic_ansi build" \
