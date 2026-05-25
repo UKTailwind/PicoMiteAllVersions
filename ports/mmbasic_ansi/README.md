@@ -28,6 +28,17 @@ Produces `./mmbasic_ansi`.
 Requires a TTY on both stdin and stdout; the binary refuses to run in
 a pipe.
 
+### macOS download note
+
+If macOS reports that the downloaded binary cannot be opened, clear the
+quarantine attribute on the whole unzipped folder and make the binary
+executable:
+
+```
+xattr -dr com.apple.quarantine mmbasic_ansi-macos-universal
+chmod +x mmbasic_ansi-macos-universal/mmbasic_ansi
+```
+
 ### Options
 
 | Flag | Meaning |
