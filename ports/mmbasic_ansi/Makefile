@@ -64,6 +64,15 @@ else
 LDFLAGS           := -lm -lpthread
 HOST_TERMINAL_SRC := host_terminal.c
 ANSI_RESIZE_SRC   := ansi_terminal_resize_posix.c
+
+ifeq ($(UNAME_S),Darwin)
+  UNIVERSAL ?= 1
+  ifeq ($(UNIVERSAL),1)
+    CFLAGS  += -arch x86_64 -arch arm64
+    LDFLAGS += -arch x86_64 -arch arm64
+  endif
+endif
+
 endif
 
 # Core MMBasic (same list as host_native — keeps core/mmbasic/Editor.c + REPL + Prompt
