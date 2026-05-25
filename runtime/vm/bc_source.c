@@ -1125,6 +1125,19 @@ static void source_emit_store_converted(BCCompiler *cs, uint16_t slot,
     bc_emit_store_var(cs, slot, vtype, is_local);
 }
 
+static void source_emit_default_store(BCCompiler *cs, uint16_t slot, uint8_t vtype,
+                                      int is_local) {
+    if (vtype == T_STR) {
+        uint16_t idx = bc_add_constant_string(cs, (const uint8_t *)"", 0);
+        bc_emit_byte(cs, OP_PUSH_STR);
+        bc_emit_u16(cs, idx);
+        bc_emit_store_var(cs, slot, vtype, is_local);
+    } else {
+        bc_emit_byte(cs, OP_PUSH_ZERO);
+        source_emit_store_converted(cs, slot, vtype, T_INT, is_local);
+    }
+}
+
 static void source_emit_int_conversion(BCCompiler *cs, uint8_t type) {
     if (type == T_NBR) bc_emit_byte(cs, OP_CVT_F2I);
     else if (type != T_INT) bc_set_error(cs, "Expected numeric expression");
@@ -3562,6 +3575,8 @@ static void source_compile_dim(BCSourceFrontend *fe, BCCompiler *cs, const char 
                     return;
                 }
                 source_emit_store_converted(cs, slot, vtype, etype, 0);
+            } else {
+                source_emit_default_store(cs, slot, vtype, 0);
             }
         }
 

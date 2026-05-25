@@ -82,6 +82,7 @@ static void sync_vm_to_mmbasic(BCVMState *vm) {
         if (!slot->name[0] || !isnamestart((unsigned char)slot->name[0])) continue;
         if (vm->arrays[i].data || slot->is_array) continue;
         if (slot->type == T_STRUCT) continue;   // handled by the struct-only pass below
+
         if (!slot->is_const && (!vm->global_valid || !vm->global_valid[i])) continue;
 
         unsigned char namebuf[MAXVARLEN + 2];
