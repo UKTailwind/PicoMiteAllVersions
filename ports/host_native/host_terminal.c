@@ -76,11 +76,17 @@ void host_raw_mode_enter(void) {
 
     struct termios raw = host_orig_termios;
     /* Disable line buffering, echo, and CR->NL translation. Keep ISIG so
-     * Ctrl-C still raises SIGINT (the default terminates the process, which
-     * is fine for now; a follow-up can trap it and set MMAbort). */
+     * Ctrl-C still raises SIGINT, but pass Ctrl-Z through as byte 0x1A
+     * instead of letting the terminal suspend the process. */
     raw.c_lflag &= ~(ICANON | ECHO);
     raw.c_iflag &= ~(IXON | ICRNL | INLCR);
     raw.c_oflag &= ~OPOST;
+#ifdef VSUSP
+    raw.c_cc[VSUSP] = _POSIX_VDISABLE;
+#endif
+#ifdef VDSUSP
+    raw.c_cc[VDSUSP] = _POSIX_VDISABLE;
+#endif
     raw.c_cc[VMIN] = 0;
     raw.c_cc[VTIME] = 0;
     if (tcsetattr(STDIN_FILENO, TCSANOW, &raw) != 0) return;

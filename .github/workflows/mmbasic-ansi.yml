@@ -66,13 +66,23 @@ jobs:
             make
             mingw-w64-ucrt-x86_64-gcc
 
-      - name: Install Linux build deps
+      - name: Build mmbasic_ansi (portable Linux)
         if: matrix.os == 'ubuntu-latest'
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends build-essential
+          docker run --rm \
+            -v "$PWD:/work" \
+            -w /work \
+            quay.io/pypa/manylinux2014_x86_64 \
+            /bin/bash -lc '
+              set -eux
+              cd ports/mmbasic_ansi
+              make clean
+              make -j$(nproc)
+              objdump -T mmbasic_ansi | grep -o "GLIBC_[0-9.]*" | sort -Vu | tail -1
+            '
 
       - name: Build mmbasic_ansi
+        if: matrix.os != 'ubuntu-latest'
         working-directory: ports/mmbasic_ansi
         run: make -j$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 2)
 

@@ -817,7 +817,7 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
               case CTRLKEY('Q'):   // Save and exit
               case F1:             // Save and exit
               case CTRLKEY('W'):   // Save, exit and run
-              case F2:             // Save, exit and run
+              case F2: {           // Save, exit and run
 //                            if(Option.continuation){
                                 int line=0;
                                 int i=find_longest_line_length((char *)EdBuff, &line);
@@ -901,7 +901,8 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
                             nextstmt = ProgMemory;
                             hal_keyboard_clear_repeat_state();
                             return;
- 
+              }
+
               // Search
               case CTRLKEY('R'):
               case F3:    GetInputString((unsigned char *)"Find (Use SHIFT-F3 to repeat): ");
