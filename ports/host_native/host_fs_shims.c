@@ -27,6 +27,7 @@
 #include "Hardware_Includes.h"
 #include "host_compat.h"
 #include "host_fs.h"
+#include "options_ini.h"
 #include "runtime/runtime.h"
 
 /* FatFS's FF_MAX_LFN is 63 — fine for the 8.3-style FAT world, but
@@ -527,6 +528,10 @@ lfs_soff_t lfs_file_size(lfs_t *lfs, lfs_file_t *fp) {
  * for the CFunction terminator, and 0xFF is correct "erased" semantics.
  * ======================================================================= */
 static uint8_t host_flash_option_buf[sizeof(struct option_s)];
+static uint8_t host_default_option_buf[sizeof(struct option_s)];
+static int host_options_capturing_defaults;
+static int host_options_ini_enabled;
+static char host_options_ini_path[HOST_PATH_MAX];
 /* Sized to mirror the device's full flash slot region (see header above).
  * Non-static because flash_range_* in this same translation unit forward-
  * declares it; defining it here keeps initialization in one place. */
@@ -536,11 +541,139 @@ const uint8_t *flash_target_contents = host_flash_target_buf;
 __attribute__((constructor))
 static void host_flash_contents_init(void) {
     memset(host_flash_option_buf, 0x00, sizeof(host_flash_option_buf));
+    memset(host_default_option_buf, 0x00, sizeof(host_default_option_buf));
     memset(host_flash_target_buf, 0xFF, sizeof(host_flash_target_buf));
+    host_options_ini_path[0] = 0;
+}
+
+static int host_is_runtime_derived_option(const char *name, void *ctx)
+{
+    (void)ctx;
+    return strcasecmp(name, "Height") == 0 ||
+           strcasecmp(name, "Width") == 0 ||
+           strcasecmp(name, "DISPLAY_TYPE") == 0 ||
+           strcasecmp(name, "DISPLAY_CONSOLE") == 0;
+}
+
+static void host_options_populate_defaults(void)
+{
+    memset(&Option, 0, sizeof(Option));
+    Option.Magic = MagicKey;
+    Option.Height = SCREENHEIGHT;
+    Option.Width = SCREENWIDTH;
+    Option.Tab = 4;
+    Option.DefaultFont = 0x01;
+    Option.BackLightLevel = 100;
+    Option.Baudrate = CONSOLE_BAUDRATE;
+    Option.PROG_FLASH_SIZE = MAX_PROG_SIZE;
+    Option.ColourCode = 1;
+    Option.RepeatStart = 600;
+    Option.RepeatRate = 150;
+    Option.AUDIO_SLICE = 99;
+    Option.SDspeed = 12;
+    Option.DISPLAY_ORIENTATION = DISPLAY_LANDSCAPE;
+    Option.DefaultFC = WHITE;
+    Option.DefaultBC = BLACK;
+    Option.LCDVOP = 0xB1;
+    Option.INT1pin = 9;
+    Option.INT2pin = 10;
+    Option.INT3pin = 11;
+    Option.INT4pin = 12;
+    Option.numlock = 1;
+    Option.repeat = 0b101100;
+    Option.VGA_HSYNC = 21;
+    Option.VGA_BLUE = 24;
+    Option.heartbeatpin = 43;
+}
+
+static void host_options_capture_defaults(void)
+{
+    if (host_options_capturing_defaults) return;
+    struct option_s saved;
+    memcpy(&saved, &Option, sizeof(saved));
+    host_options_capturing_defaults = 1;
+    host_options_populate_defaults();
+    memcpy(host_default_option_buf, &Option, sizeof(Option));
+    memcpy(&Option, &saved, sizeof(Option));
+    host_options_capturing_defaults = 0;
+}
+
+static void host_options_load_ini(void)
+{
+    host_options_capture_defaults();
+    memcpy(host_flash_option_buf, host_default_option_buf, sizeof(host_flash_option_buf));
+    if (!host_options_ini_enabled || !host_options_ini_path[0]) return;
+
+    FILE *fp = fopen(host_options_ini_path, "rb");
+    if (!fp) return;
+    static char buf[65536];
+    size_t got = fread(buf, 1, sizeof(buf) - 1, fp);
+    if (ferror(fp)) {
+        fclose(fp);
+        return;
+    }
+    fclose(fp);
+    buf[got] = 0;
+    mm_options_ini_parse(buf, host_flash_option_buf, mm_options_ini_is_sparse(buf),
+                         NULL, NULL);
+}
+
+static int host_write_ini_line(void *ctx, const char *line)
+{
+    FILE *fp = (FILE *)ctx;
+    return fwrite(line, 1, strlen(line), fp) == strlen(line) ? 0 : -1;
+}
+
+static void host_options_write_ini(void)
+{
+    if (!host_options_ini_enabled || !host_options_ini_path[0]) return;
+    host_options_capture_defaults();
+
+    if (!mm_options_ini_has_changes(host_flash_option_buf, host_default_option_buf,
+                                    host_is_runtime_derived_option, NULL)) {
+        remove(host_options_ini_path);
+        return;
+    }
+
+    FILE *fp = fopen(host_options_ini_path, "wb");
+    if (!fp) return;
+    host_write_ini_line(fp, "# MMBasic host options\r\n");
+    host_write_ini_line(fp, "# Only values that differ from host defaults are written.\r\n");
+    host_write_ini_line(fp, "# Edit as key=value. Hex values may use 0xNN or &HNN.\r\n\r\n");
+    mm_options_ini_write_changed(host_flash_option_buf, host_default_option_buf,
+                                 host_is_runtime_derived_option, NULL,
+                                 host_write_ini_line, fp);
+    fclose(fp);
+}
+
+void host_options_set_executable_path(const char *argv0)
+{
+    const char *slash = NULL;
+    if (argv0) {
+        const char *s1 = strrchr(argv0, '/');
+        const char *s2 = strrchr(argv0, '\\');
+        if (s1 && s2) slash = (s1 > s2) ? s1 : s2;
+        else slash = s1 ? s1 : s2;
+    }
+    if (slash) {
+        size_t dir_len = (size_t)(slash - argv0) + 1;
+        if (dir_len + strlen("options.ini") >= sizeof(host_options_ini_path)) {
+            snprintf(host_options_ini_path, sizeof(host_options_ini_path), "options.ini");
+        } else {
+            memcpy(host_options_ini_path, argv0, dir_len);
+            strcpy(host_options_ini_path + dir_len, "options.ini");
+        }
+    } else {
+        snprintf(host_options_ini_path, sizeof(host_options_ini_path), "options.ini");
+    }
+    host_options_ini_enabled = 1;
+    host_options_load_ini();
 }
 
 void host_options_snapshot(void) {
+    if (host_options_capturing_defaults) return;
     memcpy(host_flash_option_buf, &Option, sizeof(Option));
+    host_options_write_ini();
 }
 
 /* pico_lfs_cfg lives in drivers/pico_flash/pico_flash_lfs.c on device,

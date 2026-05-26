@@ -18,6 +18,7 @@
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
+#include "host_fs.h"
 #include "runtime/runtime.h"
 
 /* Read an entire file (or stdin if path is "-" or NULL) into a newly
@@ -77,6 +78,8 @@ static const mm_runtime_adapter stdio_runtime_adapter = {
 };
 
 int main(int argc, char **argv) {
+    host_options_set_executable_path(argc > 0 ? argv[0] : NULL);
+
     const char *path = (argc >= 2) ? argv[1] : NULL;
     char *source = read_all(path);
     if (!source) return 2;

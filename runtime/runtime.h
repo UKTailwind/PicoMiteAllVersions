@@ -88,6 +88,7 @@ typedef struct mm_runtime_console_adapter {
 } mm_runtime_console_adapter;
 
 #define MM_RUNTIME_CONSOLE_FLAG_KEEP_STDIN_LF  (1u << 0)
+#define MM_RUNTIME_CONSOLE_FLAG_RAW_CTRL_D_INPUT (1u << 1)
 
 void mmbasic_runtime_console_set_adapter(const mm_runtime_console_adapter *adapter);
 const mm_runtime_console_adapter *mmbasic_runtime_console_get_adapter(void);

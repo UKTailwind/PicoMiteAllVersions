@@ -37,6 +37,7 @@ char *getcwd(char *buf, size_t size);
 #include "bytecode.h"
 #include "runtime/runtime.h"
 
+#include "host_fs.h"
 #include "host_fb.h"
 #include "host_keyrepeat.h"
 #include "host_terminal.h"
@@ -151,8 +152,6 @@ static void configure_display(int width, int height) {
     Option.Height = height / gui_font_height;
     Option.Tab    = 4;
     Option.DefaultFont = 0x01;
-    Option.ColourCode = 1;
-
     /* PicoCalc green phosphor palette. */
     extern int gui_fcolour, gui_bcolour;
     gui_fcolour = 0x00FF00;
@@ -227,7 +226,6 @@ static int ansi_boot(int width, int height, int console_only, int interactive) {
     if (console_only) {
         ansi_console_only_mode = 1;
         configure_text_console(80, 24);
-        Option.ColourCode = 1;
         Option.DefaultFC = 0xFFFFFF;
         Option.DefaultBC = 0x000000;
         extern int gui_fcolour, gui_bcolour;
@@ -365,6 +363,8 @@ static int framebuffer_fits_terminal(int w, int h, int cols, int rows) {
 }
 
 int main(int argc, char **argv) {
+    host_options_set_executable_path(argc > 0 ? argv[0] : NULL);
+
     int width = 0, height = 0;            /* 0 = auto-fit terminal */
     int use_interpreter = 0;
     const char *filename = NULL;
