@@ -31,6 +31,7 @@ char *getcwd(char *buf, size_t size);
 #include "vm_sys_file.h"
 #include "vm_host_fat.h"
 #include "hardware/flash.h"
+#include "host_fs.h"
 #include "runtime/runtime.h"
 
 /* All needed externs come from Hardware_Includes.h / MMBasic.h */
@@ -437,6 +438,8 @@ static int run_repl(void) {
 }
 
 int main(int argc, char **argv) {
+    host_options_set_executable_path(argc > 0 ? argv[0] : NULL);
+
     HostMode mode = MODE_SOURCE_COMPARE;
     int timeout_ms = 0;
     const char *screenshot_path = NULL;
@@ -586,6 +589,7 @@ int main(int argc, char **argv) {
 
     /* Initialize the MMBasic runtime */
     mmbasic_runtime_init_common(&host_boot_adapter,
+                                MMBASIC_RUNTIME_INIT_FLAG_LOAD_OPTIONS |
                                 MMBASIC_RUNTIME_INIT_FLAG_INIT_BASIC);
     bc_opt_level = opt_level;
     host_runtime_configure(timeout_ms, screenshot_path);

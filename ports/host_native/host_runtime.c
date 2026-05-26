@@ -472,6 +472,9 @@ static void host_runtime_network_service(void) {
 static void host_runtime_service(void) {
     static int in_service;
     host_runtime_check_timeout();
+    if (host_raw_mode_is_active() && host_poll_break_key(BreakKey)) {
+        MMAbort = true;
+    }
     if (host_runtime_poll_hook) host_runtime_poll_hook();
     mmbasic_runtime_poll_service_once(&in_service, host_runtime_network_service);
 }
@@ -585,6 +588,8 @@ static const mm_runtime_console_adapter host_console_adapter = {
     .name = "host",
 #ifdef MMBASIC_STDIO
     .flags = MM_RUNTIME_CONSOLE_FLAG_KEEP_STDIN_LF,
+#elif defined(MMBASIC_ANSI)
+    .flags = MM_RUNTIME_CONSOLE_FLAG_RAW_CTRL_D_INPUT,
 #endif
     .service = host_runtime_service,
     .scripted_key = host_runtime_keys_consume,
@@ -612,8 +617,61 @@ static const mm_runtime_console_adapter host_console_adapter = {
  * putConsole → MMputchar via the same dispatch, untouched. */
 void MMfopen(unsigned char *fname, unsigned char *mode, int fnbr) { (void)fname; (void)mode; (void)fnbr; }
 void MMfclose(int fnbr) { FileClose(fnbr); }
+
+static void host_option_line(const char *name, const char *value) {
+    MMPrintString("OPTION ");
+    MMPrintString((char *)name);
+    MMPrintString(" ");
+    MMPrintString((char *)value);
+    MMPrintString("\r\n");
+}
+
+static void host_option_line_int(const char *name, int value) {
+    char buf[32];
+    snprintf(buf, sizeof buf, "%d", value);
+    host_option_line(name, buf);
+}
+
+static const char *host_option_case_name(void) {
+    switch (Option.Listcase) {
+        case CONFIG_LOWER: return "LOWER";
+        case CONFIG_UPPER: return "UPPER";
+        case CONFIG_TITLE:
+        default: return "TITLE";
+    }
+}
+
+static const char *host_option_console_name(void) {
+    switch (OptionConsole) {
+        case 0: return "NONE";
+        case 1: return "SERIAL";
+        case 2: return "SCREEN";
+        case 3:
+        default: return "BOTH";
+    }
+}
+
 void printoptions(void) {
     extern void port_web_print_options(void);
+    char buf[64];
+
+    MMPrintString("MMBasic options\r\n");
+    host_option_line("COLOURCODE", Option.ColourCode ? "ON" : "OFF");
+    host_option_line("CASE", host_option_case_name());
+    host_option_line_int("TAB", Option.Tab);
+    snprintf(buf, sizeof buf, "%d,%d", (int)Option.Height, (int)Option.Width);
+    host_option_line("DISPLAY", buf);
+    host_option_line("CONSOLE", host_option_console_name());
+    if (Option.continuation) host_option_line("CONTINUATION LINES", "ON");
+    if (*Option.F1key) host_option_line("F1", (const char *)Option.F1key);
+    if (*Option.F5key) host_option_line("F5", (const char *)Option.F5key);
+    if (*Option.F6key) host_option_line("F6", (const char *)Option.F6key);
+    if (*Option.F7key) host_option_line("F7", (const char *)Option.F7key);
+    if (*Option.F8key) host_option_line("F8", (const char *)Option.F8key);
+    if (*Option.F9key) host_option_line("F9", (const char *)Option.F9key);
+    if (*Option.platform && *Option.platform != 0xFF) {
+        host_option_line("PLATFORM", (const char *)Option.platform);
+    }
     port_web_print_options();
 }
 // getConsole lives in runtime/runtime_console_input_noop.c — shared.

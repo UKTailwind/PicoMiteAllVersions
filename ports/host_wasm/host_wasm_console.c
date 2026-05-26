@@ -113,6 +113,23 @@ void host_push_back_byte(int c) {
     wasm_pending_byte = c;
 }
 
+int host_poll_break_key(int break_key) {
+    if (break_key <= 0) return 0;
+    if (wasm_pending_byte == break_key) {
+        wasm_pending_byte = -1;
+        wasm_key_ring_tail = wasm_key_ring_head;
+        return 1;
+    }
+    for (unsigned i = wasm_key_ring_tail; i != wasm_key_ring_head; i = (i + 1) & (WASM_KEY_RING_SIZE - 1)) {
+        if (wasm_key_ring[i] == break_key) {
+            wasm_pending_byte = -1;
+            wasm_key_ring_tail = wasm_key_ring_head;
+            return 1;
+        }
+    }
+    return 0;
+}
+
 /* Framebuffer size in glyphs — used by LIST / cmd_files pagination and
  * by Option.Width/Height. The native --sim comment in host_main.c notes
  * the framebuffer IS the console at 40x20 (8x12 glyphs on 320x240); we
