@@ -86,7 +86,7 @@ CORE_SRCS = core/mmbasic/MMBasic.c core/mmbasic/Commands.c core/mmbasic/Function
             shared/gfx/gfx_box_shared.c shared/gfx/gfx_circle_shared.c shared/gfx/gfx_line_shared.c \
             shared/gfx/gfx_pixel_shared.c shared/gfx/gfx_cls_shared.c shared/gfx/gfx_text_shared.c \
             shared/gfx/gfx_console_shared.c \
-            shared/mmbasic/mm_misc_shared.c core/mmbasic/OptionCommands.c \
+            shared/mmbasic/mm_misc_shared.c shared/mmbasic/options_ini.c core/mmbasic/OptionCommands.c \
             display_state.c pin_state.c option_state.c audio_state.c \
             mm_net_interrupts.c \
             mm_net_http.c \

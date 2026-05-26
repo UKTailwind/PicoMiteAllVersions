@@ -10,6 +10,7 @@ int  host_raw_mode_is_active(void);
 int  host_read_byte_nonblock(void);
 int  host_read_byte_blocking_ms(int ms);
 void host_push_back_byte(int c);
+int  host_poll_break_key(int break_key);
 
 /* Query the current terminal size. Returns 0 on success and writes rows/cols;
  * returns -1 if size can't be determined. */

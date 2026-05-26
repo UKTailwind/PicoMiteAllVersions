@@ -52,6 +52,10 @@ int host_fs_rmdir(const char *path);
 int host_fs_chdir(const char *path);
 int host_fs_getcwd(char *out, int out_cap);
 
+/* Use argv[0] to place host options.ini next to the executable, then
+ * load it into the simulated flash option block before LoadOptions(). */
+void host_options_set_executable_path(const char *argv0);
+
 #ifdef __cplusplus
 }
 #endif

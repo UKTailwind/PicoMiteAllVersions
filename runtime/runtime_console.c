@@ -145,7 +145,9 @@ int MMInkey(void)
     if (console_raw_mode_active()) {
         int c = console_read_byte_nonblock();
         if (c < 0) return -1;
-        if (c == 4 && !editactive) {
+        if (c == 4 && !editactive &&
+            !(console_adapter &&
+              (console_adapter->flags & MM_RUNTIME_CONSOLE_FLAG_RAW_CTRL_D_INPUT))) {
             if (console_adapter && console_adapter->on_ctrl_d) {
                 console_adapter->on_ctrl_d();
             } else {
