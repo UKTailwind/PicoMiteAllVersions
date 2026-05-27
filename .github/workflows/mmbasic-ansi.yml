@@ -41,6 +41,10 @@ jobs:
             label: linux-x64
             shell: bash
             binary: mmbasic_ansi
+          - os: ubuntu-24.04-arm
+            label: linux-arm64
+            shell: bash
+            binary: mmbasic_ansi
           - os: macos-latest
             label: macos-universal
             shell: bash
@@ -66,7 +70,7 @@ jobs:
             make
             mingw-w64-ucrt-x86_64-gcc
 
-      - name: Build mmbasic_ansi (portable Linux)
+      - name: Build mmbasic_ansi (portable Linux x64)
         if: matrix.os == 'ubuntu-latest'
         run: |
           docker run --rm \
@@ -81,8 +85,23 @@ jobs:
               objdump -T mmbasic_ansi | grep -o "GLIBC_[0-9.]*" | sort -Vu | tail -1
             '
 
+      - name: Build mmbasic_ansi (portable Linux arm64)
+        if: matrix.os == 'ubuntu-24.04-arm'
+        run: |
+          docker run --rm \
+            -v "$PWD:/work" \
+            -w /work \
+            quay.io/pypa/manylinux2014_aarch64 \
+            /bin/bash -lc '
+              set -eux
+              cd ports/mmbasic_ansi
+              make clean
+              make -j$(nproc)
+              objdump -T mmbasic_ansi | grep -o "GLIBC_[0-9.]*" | sort -Vu | tail -1
+            '
+
       - name: Build mmbasic_ansi
-        if: matrix.os != 'ubuntu-latest'
+        if: matrix.os != 'ubuntu-latest' && matrix.os != 'ubuntu-24.04-arm'
         working-directory: ports/mmbasic_ansi
         run: |
           make clean
@@ -170,6 +189,7 @@ jobs:
           | Platform | File |
           |---|---|
           | Linux x64 | \`mmbasic_ansi-linux-x64.zip\` |
+          | Linux arm64 | \`mmbasic_ansi-linux-arm64.zip\` |
           | macOS universal | \`mmbasic_ansi-macos-universal.zip\` |
           | Windows x64 | \`mmbasic_ansi-windows-x64.zip\` |
 

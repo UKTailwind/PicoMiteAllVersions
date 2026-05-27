@@ -31,7 +31,7 @@ static struct termios host_orig_termios;
 static int host_raw_mode_active = 0;
 static int host_stdin_saved_flags = 0;
 
-#define HOST_PENDING_CAP 64
+#define HOST_PENDING_CAP 16384
 static unsigned char host_pending_bytes[HOST_PENDING_CAP];
 static int host_pending_head = 0;
 static int host_pending_count = 0;
