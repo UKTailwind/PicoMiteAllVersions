@@ -3368,7 +3368,6 @@ void fun_map(void)
 void cmd_map(void)
 {
 	unsigned char *p;
-	//    if(Option.CPU_Speed==126000)error("CPUSPEED >= 252000 for colour mapping");
 	if (!(DISPLAY_TYPE >= NEXTGEN))
 		error("Invalid for this display");
 	if ((p = checkstring(cmdline, (unsigned char *)"RESET")))

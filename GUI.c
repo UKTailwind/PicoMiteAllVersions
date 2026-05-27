@@ -127,9 +127,24 @@ volatile bool gui_click_from_mouse = false;
    targets, so supply minimal stubs for the touch-screen interface that
    the shared GUI code expects to link against. GetTouch() returning
    TOUCH_ERROR is treated by ProcessTouch() as "no pen down" and
-   prevents the legacy touch-hit-test path from firing. */
+   prevents the legacy touch-hit-test path from firing.
+   When a USB multi-touch screen is plugged in (USES_USB_HOST builds),
+   the stub returns contact 0's scaled coordinates instead, making the
+   USB touch indistinguishable from a resistive panel to the shared
+   GUI code. */
 int TOUCH_GETIRQTRIS = 0;
-int GetTouch(int axis) { (void)axis; return TOUCH_ERROR; }
+int GetTouch(int axis)
+{
+#ifdef USBKEYBOARD
+    if (usb_touch_active)
+    {
+        if (axis == GET_X_AXIS) return usb_touch_x;
+        if (axis == GET_Y_AXIS) return usb_touch_y;
+    }
+#endif
+    (void)axis;
+    return TOUCH_ERROR;
+}
 /* Cursor implementation moved to Draw.c so it can be used on all
    PICOMITEVGA builds (incl. RP2040 VGA which doesn't define
    GUICONTROLS). The GUI CURSOR BASIC command lives in cmd_guiMX170. */
@@ -2448,7 +2463,11 @@ void ProcessTouch(void)
         if (gui_click_from_mouse)
             held = (nunstruct[2].L || gui_click_synthetic_down || click_pin_pressed()) ? true : false;
         else
-            held = TOUCH_DOWN;
+            held = TOUCH_DOWN
+#ifdef USBKEYBOARD
+                   || usb_touch_active
+#endif
+                   ;
         if (held)
             if (TouchTimer < repeat)
                 return;

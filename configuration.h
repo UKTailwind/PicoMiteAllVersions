@@ -52,9 +52,25 @@ extern "C"
 #define MAX_CPU Freq378P
 #define MIN_CPU FreqX
 #ifdef USBKEYBOARD
+#ifdef PICOMITEHDMIBTH
+/* HDMIBTH: HDMIUSB-style display stack + CYW43 wireless + BLE HID
+   host. The CYW43 firmware blob (~220 KB linked via the IS_BTH
+   block) pushes the firmware image well past HDMIUSB's 1056 KB
+   limit, so FLASH_TARGET_OFFSET matches PICOMITEBTH's 1408 KB.
+   HEAP_MEMORY_SIZE = 180 KB — reclaimed from the framebuffer-pool
+   shrink (HDMIBTH only needs 96000 B vs HDMIUSB's 153600 B). Leaves
+   ~11 KB RAM margin after BSS + PICO_HEAP_SIZE (0x4000) + stack
+   (0x4000); shrink if a future BSS bump narrows it further
+   (see [[heap-bss-overlap-on-rp2350]]). Bump MagicKey when Option
+   layout or defaults change. */
+#define FLASH_TARGET_OFFSET (1392 * 1024)
+#define HEAP_MEMORY_SIZE (180 * 1024)
+#define MagicKey 0x4DB1F60E
+#else
 #define FLASH_TARGET_OFFSET (1056 * 1024)
 #define HEAP_MEMORY_SIZE (156 * 1024)
 #define MagicKey 0xD340BBCD
+#endif
 #else
 #define MagicKey 0xD1F6F86C
 #define FLASH_TARGET_OFFSET (1024 * 1024)
@@ -154,6 +170,17 @@ extern "C"
 #define MODE3SIZE_X ((MODE_H_X_ACTIVE_PIXELS / 2) * (MODE_V_X_ACTIVE_LINES / 2) / 2)
 #define MODE5SIZE_X ((MODE_H_X_ACTIVE_PIXELS / 4) * (MODE_V_X_ACTIVE_LINES / 4))
 
+#ifdef PICOMITEHDMIBTH
+/* Permanent framebuffer pool extension inside AllMemory[]. Sized to
+   the largest layout the build can produce in mode 1: the
+   1024x600x1bpp bitmap (MODE1SIZE_X = 76800) plus the tilefcols_w
+   and tilebcols_w arrays that settiles() writes immediately after
+   the framebuffer (1 byte per 8x8 cell, two arrays = 2 * 128 * 75 =
+   19200). Total = 96000 bytes vs. 153600 for the default HDMI pool. */
+#define FRAMEBUFFER_POOL_SIZE \
+   (MODE1SIZE_X + 2 * ((MODE_H_X_ACTIVE_PIXELS / 8) * (MODE_V_X_ACTIVE_LINES / 8)))
+#endif
+
 /* VGA display mode definitions - 800x480 */
 #define MODE_H_Y_ACTIVE_PIXELS 800
 #define MODE_V_Y_ACTIVE_LINES 480
@@ -172,13 +199,28 @@ extern "C"
 #define Freq848 336000
 #define Freq400 283200
 #define FreqY 333000
-#define FreqX 250000
-
+#define FreqX 252000
+#define FreqDefault 200000
+   typedef enum
+   {
+      R0 = 0,
+      R1280x720 = 1,
+      R640x480f315 = 2,
+      R640x480f252 = 3,
+      R640x480f378 = 4,
+      R1024x768 = 5,
+      R800x600 = 6,
+      R848x480 = 7,
+      R720x400 = 8,
+      R800x480 = 9,
+      R1024x600 = 10
+   } Resolution_TypeDef;
+   static const int CPUFreqs[] = {FreqDefault, Freq720P, Freq480P, Freq252P, Freq378P, FreqXGA, FreqSVGA, Freq848, Freq400, FreqY, FreqX};
 /* Display capability macros */
-#define FullColour (Option.CPU_Speed == Freq252P || Option.CPU_Speed == Freq378P || \
-                    Option.CPU_Speed == Freq480P || Option.CPU_Speed == Freq400)
-#define MediumRes (Option.CPU_Speed == FreqSVGA || Option.CPU_Speed == Freq848 || \
-                   Option.CPU_Speed == FreqY || Option.CPU_Speed == FreqX)
+#define FullColour (Option.Resolution == R640x480f252 || Option.Resolution == R640x480f378 || \
+                    Option.Resolution == R640x480f315 || Option.Resolution == R720x400)
+#define MediumRes (Option.Resolution == R800x600 || Option.Resolution == R848x480 || \
+                   Option.Resolution == R800x480 || Option.Resolution == R1024x600)
 
 #endif /* PICOMITEVGA */
 

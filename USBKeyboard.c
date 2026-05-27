@@ -167,6 +167,29 @@ void tuh_umount_cb(uint8_t dev_addr)
 
 #define MAX_REPORT 4
 volatile struct s_HID HID[4] = {0};
+
+/* USB multi-touch -> generic "touch panel" integration.
+   usb_touch_present is true between mount and umount of a touch device;
+   usb_touch_active goes true on every report whose contact 0 has tip==1.
+   usb_touch_x / usb_touch_y always hold contact 0's screen-scaled
+   coordinates. The timer-callback edge detector (PicoMite.c) reads these
+   alongside TOUCH_DOWN so the GUI control machinery doesn't care whether
+   the input came from a resistive/capacitive panel or a USB touchscreen.
+   GetTouch() in GUI.c returns them when the resistive panel is absent.
+
+   usb_touch_last_us tracks the wall-clock of the most recent report
+   that set usb_touch_active = true. The 1 ms timer callback in
+   PicoMite.c uses it as a no-report watchdog: some touch controllers
+   (notably the one used in the Pimoroni Pico Plus 2W test rig) fail
+   to send a release report (count=0 / tip=0) under specific timing
+   patterns, leaving usb_touch_active stuck true. Without the
+   watchdog ProcessTouch's static `repeat` for spinners then never
+   clears and the GUI machinery thinks the touch is held forever. */
+volatile bool usb_touch_present = false;
+volatile bool usb_touch_active = false;
+volatile int16_t usb_touch_x = 0;
+volatile int16_t usb_touch_y = 0;
+volatile uint64_t usb_touch_last_us = 0;
 typedef struct TU_ATTR_PACKED
 {
 	uint8_t x, y, z, rz; // joystick
@@ -543,6 +566,426 @@ mouse_report_type_t get_mouse_type(const uint8_t *desc_report, uint16_t desc_len
 	mouse_info_t info;
 	return analyze_mouse_descriptor(desc_report, desc_len, &info);
 }
+
+/* ============================================================================
+ * USB multi-touch HID — descriptor parser + report analyser
+ * ============================================================================
+ * Targets the Windows-Precision-Touchscreen-style descriptor layout that
+ * essentially every multi-touch USB controller ships with: a Touch
+ * Screen application collection (Digitizer page 0x0D / usage 0x04)
+ * containing N Finger logical collections (usage 0x22), each declaring
+ * Tip Switch (0x42), In Range (0x32), Contact Identifier (0x51), X
+ * (Generic Desktop 0x30), Y (0x31). A top-level Contact Count (0x54)
+ * carries the per-report live-contact count.
+ *
+ * The parser walks the descriptor once at enumeration to capture
+ * field offsets; the analyser then extracts contact data from each
+ * input report by bit-offset rather than re-parsing.
+ */
+
+/* Bit-aligned read from a byte buffer. bit_count up to 32. */
+static uint32_t touch_read_bits(const uint8_t *bytes, uint16_t bit_offset, uint8_t bit_count)
+{
+	uint32_t result = 0;
+	for (uint8_t i = 0; i < bit_count; i++)
+	{
+		uint16_t b = bit_offset + i;
+		if (bytes[b >> 3] & (1u << (b & 7)))
+		{
+			result |= (1u << i);
+		}
+	}
+	return result;
+}
+
+/**
+ * Walk a HID report descriptor looking for the Windows Touch layout.
+ * Returns true and fills *info if the descriptor describes a touch
+ * screen with at least one Finger collection; otherwise returns false
+ * and leaves *info zeroed.
+ */
+bool analyze_touch_descriptor(const uint8_t *desc_report, uint16_t desc_len, touch_info_t *info)
+{
+	if (!desc_report || !info || desc_len == 0)
+		return false;
+
+	memset(info, 0, sizeof(*info));
+
+	/* Parser state. */
+	uint8_t usage_page = 0;
+	uint16_t last_usage = 0;   /* most recent Local Usage item */
+	uint8_t report_size = 0;   /* Global Report Size */
+	uint8_t report_count = 0;  /* Global Report Count */
+	int32_t logical_max = 0;   /* Global Logical Maximum (last value seen) */
+	uint16_t bit_position = 0; /* bit offset within current Report ID's report */
+	int collection_depth = 0;
+
+	/* Report-ID tracking. A typical Precision Touchscreen descriptor
+	   declares multiple Report IDs (ID 1 for touch Input, ID 4 for
+	   Feature mode-select, etc.). Each Report ID has its own report
+	   transmitted independently with the ID byte prepended. We need
+	   to track which ID contains the Finger collections and only
+	   accumulate bit positions / capture field offsets while parsing
+	   THAT report's items. */
+	int current_report_id = 0; /* 0 = no Report ID encountered yet */
+	int finger_report_id = -1; /* ID we want to capture, locked at first Finger */
+
+	/* Finger-collection tracking. */
+	bool in_finger = false;
+	int finger_start_depth = -1;
+	uint16_t finger_start_bit = 0;
+	uint8_t finger_count = 0;
+	bool saw_touchscreen_root = false;
+
+	for (uint16_t i = 0; i < desc_len;)
+	{
+		uint8_t prefix = desc_report[i++];
+		uint8_t bSize = prefix & 0x03;
+		uint8_t bType = (prefix >> 2) & 0x03;
+		uint8_t bTag = (prefix >> 4) & 0x0F;
+
+		uint32_t data = 0;
+		for (uint8_t j = 0; j < bSize && (i + j) < desc_len; j++)
+			data |= ((uint32_t)desc_report[i + j]) << (j * 8);
+		i += bSize;
+
+		if (bType == 1) /* Global */
+		{
+			switch (bTag)
+			{
+			case 0:
+				usage_page = data & 0xFF;
+				break;
+			case 2:
+				logical_max = (int32_t)data;
+				break; /* Logical Maximum */
+			case 7:
+				report_size = data & 0xFF;
+				break; /* Report Size */
+			case 8:	   /* Report ID */
+				info->uses_report_id = true;
+				current_report_id = data & 0xFF;
+				/* New Report ID starts a fresh report — reset the
+				   bit-position counter. Each Report ID's report is
+				   transmitted independently. */
+				bit_position = 0;
+				break;
+			case 9:
+				report_count = data & 0xFF;
+				break; /* Report Count */
+			}
+		}
+		else if (bType == 2) /* Local */
+		{
+			if (bTag == 0)
+				last_usage = data & 0xFFFF; /* Usage */
+		}
+		else if (bType == 0) /* Main */
+		{
+			if (bTag == 10) /* Collection */
+			{
+				collection_depth++;
+				/* The application collection tells us this is a touch
+				   screen. Required for valid=true at the end. */
+				if (collection_depth == 1 && usage_page == 0x0D && last_usage == 0x04)
+					saw_touchscreen_root = true;
+				/* Finger collection — capture start bit, then descend
+				   so per-contact fields populate relative offsets.
+				   Lock finger_report_id to the Report ID that hosts
+				   the first Finger we see; ignore Fingers in other
+				   Report IDs (e.g. Feature-report duplicates). */
+				if (usage_page == 0x0D && last_usage == 0x22 && !in_finger)
+				{
+					if (finger_report_id == -1)
+					{
+						finger_report_id = current_report_id;
+						info->report_id = (uint8_t)current_report_id;
+					}
+					if (current_report_id == finger_report_id)
+					{
+						in_finger = true;
+						finger_start_depth = collection_depth;
+						finger_start_bit = bit_position;
+					}
+				}
+			}
+			else if (bTag == 12) /* End Collection */
+			{
+				if (in_finger && collection_depth == finger_start_depth)
+				{
+					if (finger_count == 0)
+					{
+						info->contact_stride_bits =
+							bit_position - finger_start_bit;
+						info->first_contact_bit_offset = finger_start_bit;
+					}
+					finger_count++;
+					in_finger = false;
+				}
+				collection_depth--;
+			}
+			else if (bTag == 8) /* Input */
+			{
+				uint16_t field_bits = (uint16_t)report_size * report_count;
+
+				/* Only capture field offsets when we're in the Report
+				   ID that owns the Finger collections. Before any
+				   Finger has been seen we capture everything (the
+				   first Finger we encounter will lock the ID). */
+				bool capture = (finger_report_id == -1) || (current_report_id == finger_report_id);
+
+				if (capture && in_finger && finger_count == 0)
+				{
+					/* Capture field offsets relative to start of contact
+					   block. Only record the first finger's layout — the
+					   stride takes care of the rest. */
+					uint16_t rel = bit_position - finger_start_bit;
+					if (usage_page == 0x0D)
+					{
+						if (last_usage == 0x42)
+							info->tip_switch_bit_offset = rel;
+						else if (last_usage == 0x32)
+							info->in_range_bit_offset = rel;
+						else if (last_usage == 0x51)
+						{
+							info->contact_id_bit_offset = rel;
+							info->contact_id_bits = report_size;
+						}
+					}
+					else if (usage_page == 0x01) /* Generic Desktop */
+					{
+						if (last_usage == 0x30)
+						{
+							info->x_bit_offset = rel;
+							info->x_bits = report_size;
+							info->x_logical_max = logical_max;
+						}
+						else if (last_usage == 0x31)
+						{
+							info->y_bit_offset = rel;
+							info->y_bits = report_size;
+							info->y_logical_max = logical_max;
+						}
+					}
+				}
+				else if (capture && !in_finger)
+				{
+					/* Top-level (within touch report): Contact Count
+					   is the only field we need; Scan Time, button
+					   indicators etc. are ignored. */
+					if (usage_page == 0x0D && last_usage == 0x54)
+					{
+						info->contact_count_bit_offset = bit_position;
+						info->contact_count_bits = report_size;
+					}
+				}
+
+				bit_position += field_bits;
+				/* Local usage items are 'consumed' by the next Main item. */
+				last_usage = 0;
+			}
+			else if (bTag == 9) /* Output / Feature */
+			{
+				/* Still need to consume bit_position for Feature/Output
+				   reports that share the same Report ID — but only
+				   Input bits matter for the live report layout. */
+				last_usage = 0;
+			}
+			else if (bTag == 11) /* Feature */
+			{
+				last_usage = 0;
+			}
+		}
+	}
+
+	/* Total Input report length for the Finger-bearing Report ID,
+	   rounded up to a byte, plus the report-ID byte if present.
+	   bit_position holds whatever the last Report ID's accumulated
+	   length was — if the descriptor ended on a non-finger report, we
+	   may have a stale value. Recompute from first_contact_bit_offset
+	   + max_contacts * stride + post-contacts fields (just the
+	   contact-count bit) as a safer estimate. */
+	if (finger_count > 0)
+	{
+		uint16_t after_contacts = info->first_contact_bit_offset + finger_count * info->contact_stride_bits;
+		uint16_t after_cc = info->contact_count_bit_offset + info->contact_count_bits;
+		uint16_t end_bits = (after_contacts > after_cc) ? after_contacts : after_cc;
+		info->report_length_bytes = (end_bits + 7) / 8;
+		if (info->uses_report_id)
+			info->report_length_bytes += 1;
+	}
+	info->max_contacts = finger_count;
+
+	info->valid = (saw_touchscreen_root && finger_count > 0 && info->x_bits > 0 && info->y_bits > 0);
+	return info->valid;
+}
+
+/**
+ * Decode an Input report into a touch_report_t, using offsets captured
+ * by analyze_touch_descriptor(). `report` is the raw bytes as TinyUSB
+ * delivers them (which include the report-ID byte iff the device
+ * uses report IDs). Returns true if the report was decoded.
+ */
+bool process_touch_report(const uint8_t *report, uint16_t len,
+						  const touch_info_t *info, touch_report_t *out)
+{
+	if (!report || !info || !out || !info->valid)
+		return false;
+
+	const uint8_t *bytes = report;
+	uint16_t payload_len = len;
+
+	/* If the device uses report IDs, the first byte is the report ID.
+	   Reports for other report IDs (config / feature mirrors) should
+	   be ignored — the analyser is keyed to one report-ID layout. */
+	if (info->uses_report_id)
+	{
+		if (payload_len < 1 || bytes[0] != info->report_id)
+		{
+			out->count = 0;
+			return false;
+		}
+		bytes++;
+		payload_len--;
+	}
+
+	uint8_t raw_count = touch_read_bits(bytes,
+										info->contact_count_bit_offset,
+										info->contact_count_bits);
+	if (raw_count > info->max_contacts)
+		raw_count = info->max_contacts;
+	if (raw_count > MAX_TOUCH_CONTACTS)
+		raw_count = MAX_TOUCH_CONTACTS;
+	out->count = raw_count;
+
+	for (uint8_t c = 0; c < raw_count; c++)
+	{
+		uint16_t base = info->first_contact_bit_offset + (uint16_t)c * info->contact_stride_bits;
+		touch_contact_t *tc = &out->contacts[c];
+		tc->tip = touch_read_bits(bytes, base + info->tip_switch_bit_offset, 1) != 0;
+		tc->in_range = touch_read_bits(bytes, base + info->in_range_bit_offset, 1) != 0;
+		tc->id = (uint8_t)touch_read_bits(bytes, base + info->contact_id_bit_offset,
+										  info->contact_id_bits);
+		uint32_t raw_x = touch_read_bits(bytes, base + info->x_bit_offset, info->x_bits);
+		uint32_t raw_y = touch_read_bits(bytes, base + info->y_bit_offset, info->y_bits);
+		/* Scale device-logical coords (0..x_logical_max / 0..y_logical_max)
+		   to the current display-mode coords (HRes / VRes). Devices
+		   typically report values 0..(logical_max-1) inclusive, so
+		   dividing by logical_max produces a value 0..HRes-1 / 0..VRes-1
+		   that aligns with screen-pixel addressing used by everything
+		   else (DrawPixel, BLIT, GUI hit-tests). On mode change (e.g.
+		   SCREEN 2 on HDMIBTH drops HRes from 1024 to 256) the next
+		   report decodes against the new dimensions automatically.
+		   Clip raw to logical_max so a device briefly reporting beyond
+		   its declared range can't produce scaled > HRes-1. If the
+		   display isn't initialised yet (HRes/VRes==0), fall back to
+		   the raw value. */
+		if (info->x_logical_max > 0 && HRes > 0)
+		{
+			if (raw_x > (uint32_t)info->x_logical_max)
+				raw_x = info->x_logical_max;
+			tc->x = (int16_t)((raw_x * (uint32_t)HRes) / (uint32_t)info->x_logical_max);
+			if (tc->x >= HRes)
+				tc->x = HRes - 1;
+		}
+		else
+		{
+			tc->x = (int16_t)raw_x;
+		}
+		if (info->y_logical_max > 0 && VRes > 0)
+		{
+			if (raw_y > (uint32_t)info->y_logical_max)
+				raw_y = info->y_logical_max;
+			tc->y = (int16_t)((raw_y * (uint32_t)VRes) / (uint32_t)info->y_logical_max);
+			if (tc->y >= VRes)
+				tc->y = VRes - 1;
+		}
+		else
+		{
+			tc->y = (int16_t)raw_y;
+		}
+	}
+
+	/* Drive the generic touch-panel state from contact 0. The timer-
+	   callback edge detector in PicoMite.c watches usb_touch_active to
+	   raise TouchDown/TouchUp; GetTouch() in GUI.c reads x/y from here.
+	   A contact reported with tip=0 (hover) does NOT count as "pressed".
+	   Stamp the timestamp on EVERY report (including count=0 releases)
+	   so the watchdog only fires when reports actually stop arriving. */
+	usb_touch_last_us = time_us_64();
+	//	bool was_active = usb_touch_active;
+	if (raw_count > 0 && out->contacts[0].tip)
+	{
+		usb_touch_x = out->contacts[0].x;
+		usb_touch_y = out->contacts[0].y;
+		usb_touch_active = true;
+	}
+	else
+	{
+		usb_touch_active = false;
+	}
+	/* TEMPORARY diagnostic — print on every tip transition (not on
+	   every report) so we can see exactly when down/up edges land.
+	   NOT gated by !CurrentLinePtr so this works even while a BASIC
+	   interrupt sub is running. */
+	/*	if (usb_touch_active != was_active)
+		{
+			SSPrintString(usb_touch_active ? "T:DOWN " : "T:UP   ");
+			SSPrintString("count=");
+			SInt(out->count);
+			if (out->count > 0)
+			{
+				SSPrintString(" id=");
+				SInt(out->contacts[0].id);
+				SSPrintString(" tip=");
+				SInt(out->contacts[0].tip ? 1 : 0);
+				SSPrintString(" x=");
+				SInt(out->contacts[0].x);
+				SSPrintString(" y=");
+				SInt(out->contacts[0].y);
+			}
+			SRet();
+		}*/
+	return true;
+}
+
+/**
+ * Print touch_info for debugging at enumeration. Mirrors print_mouse_info.
+ */
+void print_touch_info(const touch_info_t *info)
+{
+	if (CurrentLinePtr)
+		return;
+	MMPrintString("Multi-touch Screen detected\r\n");
+	MMPrintString("  Max contacts: ");
+	PInt(info->max_contacts);
+	PRet();
+	MMPrintString("  X range: 0..");
+	PInt(info->x_logical_max);
+	MMPrintString(" (");
+	PInt(info->x_bits);
+	MMPrintString(" bits)\r\n");
+	MMPrintString("  Y range: 0..");
+	PInt(info->y_logical_max);
+	MMPrintString(" (");
+	PInt(info->y_bits);
+	MMPrintString(" bits)\r\n");
+	MMPrintString("  Report length: ");
+	PInt(info->report_length_bytes);
+	MMPrintString(" bytes");
+	if (info->uses_report_id)
+	{
+		MMPrintString(" (Report ID ");
+		PInt(info->report_id);
+		MMPrintString(")");
+	}
+	PRet();
+}
+
+/* TOUCH Device_type — same numbering scheme as PS4/PS3/SNES/XBOX/UNKNOWN. */
+#ifndef TOUCH
+#define TOUCH 133
+#endif
 
 /* process_kbd_report is declared in KeyboardMap.h. */
 
@@ -1125,6 +1568,55 @@ void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const *desc_re
 	}
 	if (itf_protocol == HID_ITF_PROTOCOL_NONE)
 	{
+		/* Multi-touch USB digitizers enumerate as HID_ITF_PROTOCOL_NONE
+		   with a Touch Screen application collection in their report
+		   descriptor. Test for that BEFORE the gamepad VID/PID matches —
+		   touch screens don't match any of those and would otherwise
+		   fall through to is_generic and be misidentified as a SNES
+		   gamepad. Touch is routed to slot 3 (channel 4) by default;
+		   if channel 4 is already taken, fall back to whatever
+		   FindFreeSlot picked. */
+		{
+			touch_info_t tinfo;
+			if (desc_report && desc_len > 0 && analyze_touch_descriptor(desc_report, desc_len, &tinfo))
+			{
+				int touch_slot = (HID[3].active && slot != 3) ? slot : 3;
+				HID[touch_slot].Device_address = dev_addr;
+				HID[touch_slot].Device_instance = instance;
+				HID[touch_slot].Device_type = TOUCH;
+				memcpy((void *)&HID[touch_slot].touch_info, &tinfo,
+					   sizeof(touch_info_t));
+				memset((void *)&HID[touch_slot].touch_report, 0,
+					   sizeof(touch_report_t));
+				HID[touch_slot].report_rate = 5; /* fast polling — fingers move */
+				HID[touch_slot].report_timer = -(10 + (touch_slot + 2) * 500);
+				HID[touch_slot].active = true;
+				HID[touch_slot].report_requested = false;
+				/* Drive generic touch-panel state from this device. */
+				usb_touch_present = true;
+				usb_touch_active = false;
+				/* Switch out of boot protocol so we get the multi-touch
+				   report layout instead of the BIOS-mode boot-mouse
+				   compatibility report (some touch screens default to
+				   that for BIOS / pre-boot environments). */
+				tuh_hid_set_protocol(dev_addr, instance, HID_PROTOCOL_REPORT);
+				if (!CurrentLinePtr)
+				{
+					MMPrintString("Multi-touch Screen Connected on channel ");
+					PInt(touch_slot + 1);
+					MMPrintString(" (");
+					PInt(tinfo.max_contacts);
+					MMPrintString(" contacts, ");
+					PInt(tinfo.x_logical_max);
+					MMPrintString("x");
+					PInt(tinfo.y_logical_max);
+					MMPrintString(")\r\n> ");
+				}
+				PlayMemWav(ezyZip_wav, EZYZIP_WAV_SIZE);
+				Current_USB_devices++;
+				return;
+			}
+		}
 		//		hid_info[instance].report_count = tuh_hid_parse_report_descriptor(hid_info[instance].report_info, MAX_REPORT, desc_report, desc_len);
 		// Sony DualShock 4 [CUH-ZCT2x]
 		if (is_sony_ds4(dev_addr))
@@ -1204,28 +1696,33 @@ void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const *desc_re
 		}
 		else
 		{
-			/*			MMPrintString("Unknown Device Connected on channel ");PInt(slot+1);
-						MMPrintString(" (pid=&H");PIntH(pid);
-						MMPrintString(", vid=&H");PIntH(vid);MMPrintString(")");
-						MMPrintString("\r\n> ");
-						HID[slot].Device_address = dev_addr;
-						HID[slot].Device_instance = instance;
-						HID[slot].report_timer=-(10+(slot+2)*500);
-						HID[slot].active=false;
-						HID[slot].report_rate=20; //mSec between reports
-						HID[slot].Device_type=UNKNOWN;
-						HID[slot].active=true;
-						HID[slot].report_requested=false;*/
-			/*			for(int i=0;i< desc_len;i+=2){
-							putConsole('0',0);
-							putConsole('x',0);
-							PIntH(desc_report[i]);
-							putConsole(' ',0);
-							putConsole('0',0);
-							putConsole('x',0);
-							PIntH(desc_report[i+1]);
-							PRet();
-						}*/
+			MMPrintString("Unknown Device Connected on channel ");
+			PInt(slot + 1);
+			MMPrintString(" (pid=&H");
+			PIntH(pid);
+			MMPrintString(", vid=&H");
+			PIntH(vid);
+			MMPrintString(")");
+			MMPrintString("\r\n> ");
+			HID[slot].Device_address = dev_addr;
+			HID[slot].Device_instance = instance;
+			HID[slot].report_timer = -(10 + (slot + 2) * 500);
+			HID[slot].active = false;
+			HID[slot].report_rate = 20; // mSec between reports
+			HID[slot].Device_type = UNKNOWN;
+			HID[slot].active = true;
+			HID[slot].report_requested = false;
+			for (int i = 0; i < desc_len; i += 2)
+			{
+				putConsole('0', 0);
+				putConsole('x', 0);
+				PIntH(desc_report[i]);
+				putConsole(' ', 0);
+				putConsole('0', 0);
+				putConsole('x', 0);
+				PIntH(desc_report[i + 1]);
+				PRet();
+			}
 			return;
 		}
 	}
@@ -1277,6 +1774,14 @@ void tuh_hid_umount_cb(uint8_t dev_addr, uint8_t instance)
 				MMPrintString("Generic Gamepad Disconnected\r\n> ");
 			break;
 		}
+		else if (instance == HID[i].Device_instance && dev_addr == HID[i].Device_address && HID[i].Device_type == TOUCH)
+		{
+			usb_touch_present = false;
+			usb_touch_active = false;
+			if (!CurrentLinePtr)
+				MMPrintString("Multi-touch Screen Disconnected\r\n> ");
+			break;
+		}
 		else if (instance == HID[i].Device_instance && dev_addr == HID[i].Device_address && HID[i].Device_type == UNKNOWN)
 		{
 			if (!CurrentLinePtr)
@@ -1322,7 +1827,13 @@ void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance, uint8_t cons
 
 	default:
 		//		MMPrintString("HID receive boot gamepad report\r\n");
-		if (is_sony_ds4(dev_addr))
+		if (HID[n].Device_type == TOUCH)
+		{
+			process_touch_report(report, len,
+								 (const touch_info_t *)&HID[n].touch_info,
+								 (touch_report_t *)&HID[n].touch_report);
+		}
+		else if (is_sony_ds4(dev_addr))
 		{
 			process_sony_ds4(report, len, n + 1);
 		}

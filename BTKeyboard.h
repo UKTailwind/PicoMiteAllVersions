@@ -14,7 +14,7 @@
 #ifndef BTKEYBOARD_H
 #define BTKEYBOARD_H
 
-#ifdef PICOMITEBTH
+#if defined(PICOMITEBTH) || defined(PICOMITEHDMIBTH)
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -40,5 +40,5 @@ bool bt_keyboard_ready(void);
 }
 #endif
 
-#endif /* PICOMITEBTH */
+#endif /* PICOMITEBTH || PICOMITEHDMIBTH */
 #endif /* BTKEYBOARD_H */

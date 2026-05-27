@@ -5779,9 +5779,12 @@ void MIPS16 ClearExternalIO(void)
             ExtCfg(58, EXT_ANA_IN, 0);
     }
 #endif
-#if !defined(PICOMITEWEB) && !defined(PICOMITEBT)
+#if !defined(PICOMITEWEB) && !defined(PICOMITEBT) && !defined(PICOMITEHDMIBTH)
     /* Pins 41/42/44 are the wireless interface on Pico W / Pico 2 W —
-       skip the default ExtCfg for those when running WEB or BT. */
+       skip the default ExtCfg for those when running WEB / BT /
+       HDMIBTH. (PICOMITEBTH currently relies on CheckPin returning
+       false for the UNUSED pseudo-pins to skip these blocks; add it
+       to the exclusion list if a regression appears.) */
     if (!Option.AllPins)
     {
         if (CheckPin(41, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED))

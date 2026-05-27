@@ -197,10 +197,13 @@ static int is_root_volume_path(const char *path)
 bool HasExtension(const char *fname)
 {
     const char *p = fname + strlen(fname);
-    while (p > fname) {
+    while (p > fname)
+    {
         p--;
-        if (*p == '/' || *p == '\\') return false;
-        if (*p == '.') return true;
+        if (*p == '/' || *p == '\\')
+            return false;
+        if (*p == '.')
+            return true;
     }
     return false;
 }
@@ -208,7 +211,8 @@ bool HasExtension(const char *fname)
 // Append `ext` to `fname` if the filename does not already carry an extension.
 void AppendDefaultExtension(char *fname, const char *ext)
 {
-    if (!HasExtension(fname)) strcat(fname, ext);
+    if (!HasExtension(fname))
+        strcat(fname, ext);
 }
 
 int FatFSFileSystemSave = 0;
@@ -1418,7 +1422,7 @@ void MIPS16 cmd_flash(void)
 
         /* add .uf2 extension if no extension given — check after any drive prefix */
         char *fn_resolved = (char *)GetTempStrMemory();
-        strcpy(fn_resolved, fname);                   /* keep drive prefix intact */
+        strcpy(fn_resolved, fname); /* keep drive prefix intact */
         AppendDefaultExtension(fn_resolved, ".uf2");
 
         /* --- open source file for reading --------------------------------- */
@@ -6612,13 +6616,21 @@ void ResetOptions(bool startup)
     //    Option.VGAFC = 0xFFFF;
     Option.X_TILE = 80;
     Option.Y_TILE = 40;
-    Option.CPU_Speed = Freq252P;
+    Option.Resolution = R640x480f315;
+    Option.CPU_Speed = CPUFreqs[Option.Resolution];
 #ifdef USBKEYBOARD
 #ifdef HDMI
     Option.HDMIclock = 2;
     Option.HDMId0 = 0;
     Option.HDMId1 = 6;
     Option.HDMId2 = 4;
+#ifdef PICOMITEHDMIBTH
+    /* HDMIBTH targets fixed 1024x600 mode. FreqX (250 MHz) is the
+       CPU_Speed paired with that DVI timing. Other resolutions will
+       be stripped out in a later step. */
+    Option.Resolution = R1024x600;
+    Option.CPU_Speed = CPUFreqs[Option.Resolution];
+#endif
 #endif
     Option.USBKeyboard = CONFIG_US;
     Option.SerialConsole = 2;
@@ -6669,7 +6681,7 @@ void ResetOptions(bool startup)
        Force CPU_Speed to 200 MHz on reset — anything lower destabilises
        BLE under sustained traffic (matches MIN_CPU in configuration.h). */
     Option.NoHeartbeat = 1;
-    Option.SerialConsole = 0;  /* 0 = console over BT (replaces CDC) */
+    Option.SerialConsole = 0; /* 0 = console over BT (replaces CDC) */
     Option.CPU_Speed = 200000;
 #endif
 #ifdef PICOMITEBTH
@@ -6685,13 +6697,22 @@ void ResetOptions(bool startup)
        GP25 is the wireless CS pin so the regular heartbeat GPIO can't
        be used; bt_keyboard_poll() blinks the CYW43 on-module LED
        instead. Same 200 MHz CPU floor as PICOMITEBT (matches MIN_CPU). */
-    Option.USBKeyboard  = CONFIG_US;
-    Option.capslock     = 0;
-    Option.numlock      = 1;
-    Option.NoHeartbeat  = 1;
-    Option.CPU_Speed    = 200000;
+    Option.USBKeyboard = CONFIG_US;
+    Option.capslock = 0;
+    Option.numlock = 1;
+    Option.NoHeartbeat = 1;
+    Option.CPU_Speed = 200000;
 #endif
-#if defined(PICOMITEBT) || defined(PICOMITEBTH)
+#ifdef PICOMITEHDMIBTH
+    /* HDMIBTH: same BTKeyboard heartbeat path as PICOMITEBTH — GP25
+       is the CYW43 CS line so the regular GPIO heartbeat is unusable;
+       bt_keyboard_poll() blinks the on-module LED instead. The HDMI
+       USBKEYBOARD branch above already set Option.USBKeyboard etc.,
+       so only NoHeartbeat needs override here. CPU_Speed default
+       (FreqX = 250 MHz) is set elsewhere in the HDMIBTH branch. */
+    Option.NoHeartbeat = 1;
+#endif
+#if defined(PICOMITEBT) || defined(PICOMITEBTH) || defined(PICOMITEHDMIBTH)
     /* btstack TLV uses flash-erase-state semantics (0xFF = empty).
        The ResetOptions caller zeroed the whole Option struct, so the
        TLV banks look like garbage; init to 0xFF so btstack treats
@@ -6724,6 +6745,13 @@ void ResetOptions(bool startup)
     if (!rp2350a)
     {
 #if !defined(PICOMITEWEB)
+        /* RP2350-B (QFN-80) is the PGA2350 / Pico Plus 2 package which
+           has no on-board GPIO LED, so the regular gpio heartbeat is
+           suppressed. PICOMITEWEB drives the LED via cyw43_arch and
+           keeps NoHeartbeat=0 so its ProcessWeb-based poll runs. For
+           PICOMITEBTH / PICOMITEHDMIBTH the NoHeartbeat=1 default is
+           set explicitly above and the bt_keyboard_poll() path drives
+           the CYW43 LED unconditionally (ignores NoHeartbeat). */
         Option.NoHeartbeat = 1;
 #endif
         Option.AllPins = 1;

@@ -2993,10 +2993,10 @@ void InitReservedIO(void)
 		}
 	}
 
-#if !defined(PICOMITEWEB) && !defined(PICOMITEBT)
+#if !defined(PICOMITEWEB) && !defined(PICOMITEBT) && !defined(PICOMITEHDMIBTH)
 	/* GP23 is the cyw43 WL_ON line on Pico W / Pico 2 W — don't drive
-	   it manually in WEB or BT builds. CheckPin would refuse anyway
-	   (UNUSED), but be explicit. */
+	   it manually in WEB / BT / HDMIBTH builds. CheckPin would refuse
+	   anyway (UNUSED), but be explicit. */
 #ifdef rp2350
 	if (rp2350a)
 	{

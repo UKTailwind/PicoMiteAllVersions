@@ -6,7 +6,7 @@ set "start_time=%time%"
 echo Build started at: %start_time%
 echo.
 
-set "fixed_string=V6.03.00RC12"
+set "fixed_string=V6.03.00RC14"
 set "extension=.uf2"
 set "directory=../"
 set "generator=NMake Makefiles"
@@ -44,7 +44,8 @@ call :build_targets ^
     "PICOBTRP2350:PicoMiteRP2350BT" ^
     "PICOBTHRP2350:PicoMiteRP2350BTH" ^
     "HDMI:PicoMiteHDMI" ^
-    "HDMIUSB:PicoMiteHDMIUSB"
+    "HDMIUSB:PicoMiteHDMIUSB" ^
+    "HDMIBTH:PicoMiteHDMIBTH"
 if errorlevel 1 goto :fail
 
 call :deactivate_build_dir "buildRP2350L"

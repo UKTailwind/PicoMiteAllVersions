@@ -252,6 +252,64 @@ typedef struct TU_ATTR_PACKED_16
 	int8_t wheel; /**< Current delta wheel movement on the mouse. */
 	int8_t pan;	  // using AC Pan
 } hid_gaming_mouse_report_t;
+
+/* ============================================================================
+ * Type definitions - USB multi-touch digitizer
+ * ============================================================================
+ * Windows Precision Touchscreen / generic multi-touch HID. Captured from
+ * the report descriptor at enumeration; process_touch_report() then uses
+ * these offsets to decode each input report.
+ */
+#define MAX_TOUCH_CONTACTS 10  /* HID spec allows more but 10 is the
+                                  practical cap for consumer screens */
+
+typedef struct
+{
+	bool valid;                          /* descriptor looked like a touch screen */
+	bool uses_report_id;
+	uint8_t report_id;                   /* touch reports often share endpoint with config */
+	uint16_t report_length_bytes;        /* total report length (incl. report-id byte) */
+	uint8_t max_contacts;                /* number of Finger collections found */
+
+	/* Contact Count (Digitizer usage 0x54) — appears once per report. */
+	uint16_t contact_count_bit_offset;   /* relative to start of report payload */
+	uint8_t contact_count_bits;
+
+	/* The descriptor declares N identical "Finger" collections back-to-
+	   back. We capture the first one's layout and the stride to step
+	   between subsequent contacts. */
+	uint16_t first_contact_bit_offset;
+	uint16_t contact_stride_bits;
+
+	/* Offsets WITHIN a single contact block (relative to its start). */
+	uint8_t tip_switch_bit_offset;
+	uint8_t in_range_bit_offset;
+	uint8_t contact_id_bit_offset;
+	uint8_t contact_id_bits;
+	uint8_t x_bit_offset;
+	uint8_t x_bits;
+	uint8_t y_bit_offset;
+	uint8_t y_bits;
+
+	int32_t x_logical_max;               /* for scaling raw → display coords */
+	int32_t y_logical_max;
+} touch_info_t;
+
+typedef struct
+{
+	int16_t x;           /* raw logical X (0..x_logical_max) */
+	int16_t y;           /* raw logical Y (0..y_logical_max) */
+	uint8_t id;          /* contact identifier, stable across reports for one finger */
+	bool tip;            /* finger touching surface */
+	bool in_range;       /* finger detected (may be hovering) */
+} touch_contact_t;
+
+typedef struct
+{
+	uint8_t count;                                    /* live contacts in this report */
+	touch_contact_t contacts[MAX_TOUCH_CONTACTS];
+} touch_report_t;
+
 /* ============================================================================
  * Type definitions - HID device
  * ============================================================================ */
@@ -274,6 +332,8 @@ typedef struct s_HID
 	uint8_t report[65];
 	mouse_report_type_t mouse_type;
 	mouse_info_t mouse_info;
+	touch_info_t touch_info;
+	touch_report_t touch_report;  /* most-recently decoded report */
 } a_HID;
 
 /* ============================================================================
@@ -429,6 +489,17 @@ extern struct tagMTRand *g_myrand;
  * External variables - HID devices
  * ============================================================================ */
 extern volatile struct s_HID HID[4];
+
+/* USB multi-touch -> generic touch-panel state. Defined in USBKeyboard.c;
+   only valid when the USB-host stack is linked (USES_USB_HOST builds).
+   Other variants must not reference them. */
+#ifdef USBKEYBOARD
+extern volatile bool usb_touch_present;
+extern volatile bool usb_touch_active;
+extern volatile int16_t usb_touch_x;
+extern volatile int16_t usb_touch_y;
+extern volatile uint64_t usb_touch_last_us;
+#endif
 
 #ifdef USBKEYBOARD
 extern uint8_t Current_USB_devices;

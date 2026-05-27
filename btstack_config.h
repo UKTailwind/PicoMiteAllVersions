@@ -41,7 +41,7 @@
 #define ENABLE_LE_PERIPHERAL
 #endif
 
-#ifdef PICOMITEBTH
+#if defined(PICOMITEBTH) || defined(PICOMITEHDMIBTH)
 /* BLE role: we are a central (scanner + GATT client) so we can
    discover a keyboard's HID Service, subscribe to input-report
    notifications, and write LED output reports.
@@ -65,7 +65,7 @@
    pairings with PC + phone + spare hosts (BT) or with multiple
    keyboards (BTH) without one evicting another. */
 #define MAX_NR_LE_DEVICE_DB_ENTRIES 4
-#ifdef PICOMITEBTH
+#if defined(PICOMITEBTH) || defined(PICOMITEHDMIBTH)
 /* GATT client + HIDS client tables for the HID-host role. */
 #define MAX_NR_GATT_CLIENTS 1
 #define MAX_NR_HIDS_CLIENTS 1

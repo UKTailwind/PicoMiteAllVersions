@@ -125,7 +125,13 @@ uint8_t PSRAMpin;
 #include "pico/cyw43_driver.h"
 #include "BTConsole.h"
 #endif
-#ifdef PICOMITEBTH
+#if defined(PICOMITEBTH) || defined(PICOMITEHDMIBTH)
+/* PICOMITEBTH and PICOMITEHDMIBTH both use the BLE HID-host stack
+   (BTKeyboard.c) for keyboard input and to keep the CYW43 LED
+   heartbeat alive — pico_cyw43_arch_none alone has no async pump, so
+   cyw43_arch_gpio_put hangs after the first call. btstack's workers
+   keep the async_context alive, and bt_keyboard_poll() drives the
+   heartbeat from main-thread context. */
 #include "pico/cyw43_arch.h"
 #include "pico/cyw43_driver.h"
 #include "BTKeyboard.h"
@@ -167,7 +173,11 @@ uint8_t PSRAMpin;
 #endif
 #ifdef USBKEYBOARD
 #ifdef HDMI
+#ifdef PICOMITEHDMIBTH
+#define MES_SIGNON "\rPicoMiteHDMIBTH MMBasic USB " CHIP " Edition V" VERSION "\r\n"
+#else
 #define MES_SIGNON "\rPicoMiteHDMI MMBasic USB " CHIP " Edition V" VERSION "\r\n"
+#endif
 #else
 #define MES_SIGNON "\rPicoMiteVGA MMBasic USB " CHIP " Edition V" VERSION "\r\n"
 #endif
@@ -481,22 +491,24 @@ uint8_t PSRAMpin;
         {38, 99, "GND", UNUSED, 99, 99},                                                                   // pin 38
         {39, 99, "VSYS", UNUSED, 99, 99},                                                                  // pin 39
         {40, 99, "VBUS", UNUSED, 99, 99},                                                                  // pin 40
-#if !defined(PICOMITEWEB) || defined(rp2350)
-#if (defined(PICOMITEWEB) || defined(PICOMITEBT) || defined(PICOMITEBTH)) && defined(rp2350)
-        /* GP23/24/25/29 wire the RP2350 to the CYW43439 wireless chip.
-           Mark them UNUSED so CheckPin() refuses to reset them in
-           ClearExternalIO — otherwise the SPI link breaks and
-           cyw43_arch_init() fails silently. */
-        {41, 23, "GP23", UNUSED, 99, 99}, // pseudo pin 41 reserved for WEB/BT/BTH interface
-        {42, 24, "GP24", UNUSED, 99, 99}, // pseudo pin 42 reserved for WEB/BT/BTH interface
-        {43, 25, "GP25", UNUSED, 99, 99}, // pseudo pin 43 reserved for WEB/BT/BTH interface
-        {44, 29, "GP29", UNUSED, 99, 99}, // pseudo pin 44 reserved for WEB/BT/BTH interface
+#if (defined(PICOMITEWEB) && defined(rp2350)) || defined(PICOMITEBT) || defined(PICOMITEBTH) || defined(PICOMITEHDMIBTH)
+        /* GP23/24/25/29 wire to the CYW43439 wireless chip on Pico W /
+           Pico 2 W (and Pimoroni Pico Plus 2W). Mark them UNUSED so
+           CheckPin() refuses to reset them in ClearExternalIO —
+           otherwise the SPI link breaks and cyw43_arch_init() fails
+           silently. Applies to RP2040 and RP2350 CYW43 builds alike;
+           the previous &&defined(rp2350) qualifier left WebMite RP2040
+           without the pseudo-pins, exposing GP23-29 to whatever code
+           paths reach them. */
+        {41, 23, "GP23", UNUSED, 99, 99}, // pseudo pin 41 reserved for WEB/BT/BTH/HDMIBTH interface
+        {42, 24, "GP24", UNUSED, 99, 99}, // pseudo pin 42 reserved for WEB/BT/BTH/HDMIBTH interface
+        {43, 25, "GP25", UNUSED, 99, 99}, // pseudo pin 43 reserved for WEB/BT/BTH/HDMIBTH interface
+        {44, 29, "GP29", UNUSED, 99, 99}, // pseudo pin 44 reserved for WEB/BT/BTH/HDMIBTH interface
 #else
-        {41, 23, "GP23", DIGITAL_IN | DIGITAL_OUT | SPI0TX | I2C1SCL | PWM3B, 99, 131},             // pseudo pin 41
-        {42, 24, "GP24", DIGITAL_IN | DIGITAL_OUT | SPI1RX | UART1TX | I2C0SDA | PWM4A, 99, 4},     // pseudo pin 42
-        {43, 25, "GP25", DIGITAL_IN | DIGITAL_OUT | UART1RX | I2C0SCL | PWM4B, 99, 132},            // pseudo pin 43
-        {44, 29, "GP29", DIGITAL_IN | DIGITAL_OUT | ANALOG_IN | UART0RX | I2C0SCL | PWM6B, 3, 134}, // pseudo pin 44
-#endif
+    {41, 23, "GP23", DIGITAL_IN | DIGITAL_OUT | SPI0TX | I2C1SCL | PWM3B, 99, 131},             // pseudo pin 41
+    {42, 24, "GP24", DIGITAL_IN | DIGITAL_OUT | SPI1RX | UART1TX | I2C0SDA | PWM4A, 99, 4},     // pseudo pin 42
+    {43, 25, "GP25", DIGITAL_IN | DIGITAL_OUT | UART1RX | I2C0SCL | PWM4B, 99, 132},            // pseudo pin 43
+    {44, 29, "GP29", DIGITAL_IN | DIGITAL_OUT | ANALOG_IN | UART0RX | I2C0SCL | PWM6B, 3, 134}, // pseudo pin 44
 #endif
 #ifdef rp2350
         {45, 30, "GP30", DIGITAL_IN | DIGITAL_OUT | SPI1SCK | I2C1SDA | PWM7A, 99, 7},                       // pseudo pin 45
@@ -674,11 +686,12 @@ uint8_t PSRAMpin;
             hid_app_task();
         }
 #endif
-#ifdef PICOMITEBTH
+#if defined(PICOMITEBTH) || defined(PICOMITEHDMIBTH)
         /* Pump btstack/cyw43 from the keyboard-tick site too. HID
            reports route into the console RX ring from inside the
            packet handler (process_kbd_report path), so no extra
-           drain logic is needed here. */
+           drain logic is needed here. Also drives the CYW43 LED
+           heartbeat — see bt_keyboard_poll() in BTKeyboard.c. */
         bt_keyboard_poll();
 #endif
 #ifdef PICOMITEBT
@@ -877,7 +890,7 @@ uint8_t PSRAMpin;
 #ifdef rp2350
         stepper_poll_events();
 #endif
-#ifdef PICOMITEBTH
+#if defined(PICOMITEBTH) || defined(PICOMITEHDMIBTH)
         /* Pump btstack/cyw43 from the main loop. No bytes-to-drain
            wrapper like PICOMITEBT — HID reports route directly into
            the console RX ring via process_kbd_report() from inside
@@ -2114,23 +2127,51 @@ int __not_in_flash_func(MMInkey)(void)
         if (CheckGuiFlag)
             CheckGuiTimeouts();
 
-        /* Touch panel edge detector. Only fires when TOUCH_GETIRQTRIS
-           is set (real touch panel configured). Records ownership so
-           the mouse/click detector below doesn't see a touch press as
-           "mouse should release". */
-        if (TOUCH_GETIRQTRIS)
+        /* Touch panel edge detector. Fires for either a wired
+           resistive/capacitive panel (TOUCH_GETIRQTRIS && TOUCH_DOWN)
+           or a USB touch screen (usb_touch_active). Records ownership
+           so the mouse/click detector below doesn't see a touch press
+           as "mouse should release". GetTouch() (or its stub in GUI.c)
+           returns whichever source is currently active when
+           ProcessTouch reads coords. */
         {
-            bool pen_down = TOUCH_DOWN;
-            if (pen_down && !TouchState)
+            bool panel_armed = TOUCH_GETIRQTRIS;
+#ifdef USBKEYBOARD
+            bool usb_armed = usb_touch_present;
+            /* USB-touch no-report watchdog. Some controllers omit the
+               release report (count=0 / tip=0) under specific timing —
+               the lift goes undetected, usb_touch_active stays stuck
+               true, and ProcessTouch's static `repeat` (for spinners)
+               never clears. Force-release if no report has arrived for
+               100 ms. Typical reporting rates are 100-200 Hz while a
+               finger is on the surface, so 100 ms is ~10-20 missed
+               reports — well past any normal jitter. */
+            if (usb_armed && usb_touch_active
+                && (time_us_64() - usb_touch_last_us) > 100000ULL)
             {
-                TouchState = TouchDown = true;
-                gui_click_from_mouse = false;
-                gui_click_emulated = false; /* real pointing device */
+                usb_touch_active = false;
             }
-            else if (!pen_down && TouchState && !gui_click_from_mouse)
+#else
+            bool usb_armed = false;
+#endif
+            if (panel_armed || usb_armed)
             {
-                TouchState = false;
-                TouchUp = true;
+                bool pen_down = (panel_armed && TOUCH_DOWN)
+#ifdef USBKEYBOARD
+                                || usb_touch_active
+#endif
+                                ;
+                if (pen_down && !TouchState)
+                {
+                    TouchState = TouchDown = true;
+                    gui_click_from_mouse = false;
+                    gui_click_emulated = false; /* real pointing device */
+                }
+                else if (!pen_down && TouchState && !gui_click_from_mouse)
+                {
+                    TouchState = false;
+                    TouchUp = true;
+                }
             }
         }
         /* Mouse / synthetic-click / click-pin edge detector. Runs on
@@ -2260,7 +2301,13 @@ int __not_in_flash_func(MMInkey)(void)
             // keep an occasional eye on heap usage so that we can check for the stack hitting the heap
             // used by TestStackOverflow()
 
-#ifndef PICOMITEWEB
+#if !defined(PICOMITEWEB) && !defined(PICOMITEHDMIBTH)
+            /* HDMIBTH: default Option.heartbeatpin=43 (GP25) is the
+               CYW43 chip select line. Even though ExtCurrentConfig[43]
+               should stay EXT_NOT_CONFIG (the gpio_init in External.c
+               is gated off for HDMIBTH), keep the IRQ-context toggle
+               out entirely — the heartbeat is driven from main thread
+               via cyw43_arch_gpio_put in routinechecks(). */
             if (ExtCurrentConfig[PinDef[HEARTBEATpin].pin] == EXT_HEARTBEAT)
                 gpio_xor_mask64((uint64_t)1 << PinDef[HEARTBEATpin].GPno);
 #endif
@@ -2856,7 +2903,7 @@ int __not_in_flash_func(MMInkey)(void)
             QVGA_VBACK = 33;  // V back porch
             QVGA_VTOT = 525;  // total scanlines (= QVGA_VSYNC + QVGA_VBACK + QVGA_VACT + QVGA_VFRONT)
         }
-        else if (Option.CPU_Speed == Freq848)
+        else if (Option.Resolution == R848x480)
         {
             QVGA_TOTAL = 1088 * 5; // total clock ticks (= QVGA_HSYNC + QVGA_BP + WIDTH*QVGA_CPP[1600] + QVGA_FP)
             QVGA_HSYNC = 112 * 5;  // horizontal sync clock ticks
@@ -2870,7 +2917,7 @@ int __not_in_flash_func(MMInkey)(void)
             QVGA_VBACK = 23; // V back porch
             QVGA_VTOT = 517; // total scanlines (= QVGA_VSYNC + QVGA_VBACK + QVGA_VACT + QVGA_VFRONT)
         }
-        else if (Option.CPU_Speed == FreqSVGA)
+        else if (Option.Resolution == R800x600)
         {
             QVGA_TOTAL = 1024 * 5; // total clock ticks (= QVGA_HSYNC + QVGA_BP + WIDTH*QVGA_CPP[1600] + QVGA_FP)
             QVGA_HSYNC = 72 * 5;   // horizontal sync clock ticks
@@ -2884,7 +2931,7 @@ int __not_in_flash_func(MMInkey)(void)
             QVGA_VBACK = 22; // V back porch
             QVGA_VTOT = 625; // total scanlines (= QVGA_VSYNC + QVGA_VBACK + QVGA_VACT + QVGA_VFRONT)
         }
-        else if (Option.CPU_Speed == Freq400)
+        else if (Option.Resolution == R720x400)
         {
             QVGA_TOTAL = 900 * 5; // total clock ticks (= QVGA_HSYNC + QVGA_BP + WIDTH*QVGA_CPP[1600] + QVGA_FP)
             QVGA_HSYNC = 108 * 5; // horizontal sync clock ticks
@@ -2933,7 +2980,7 @@ int __not_in_flash_func(MMInkey)(void)
         pio_sm_set_consecutive_pindirs(QVGA_PIO, QVGA_SM, QVGA_GPIO_HSYNC, 2, true);
 
         // negate HSYNC and VSYNC output
-        if (!(Option.CPU_Speed == Freq848 || Option.CPU_Speed == FreqSVGA))
+        if (!(Option.Resolution == R848x480 || Option.Resolution == R800x600))
         {
             gpio_set_outover(QVGA_GPIO_HSYNC, GPIO_OVERRIDE_INVERT);
             gpio_set_outover(QVGA_GPIO_VSYNC, GPIO_OVERRIDE_INVERT);
@@ -3628,6 +3675,12 @@ int __not_in_flash_func(MMInkey)(void)
             }
         }
     }
+#ifndef PICOMITEHDMIBTH
+    /* HDMIBTH locks the display to 1024x600 (FreqX). The four scanout
+       loops below cover the other timings (640x480 / 720x400 / 720p /
+       SVGA / 848x480 / 800x480 / XGA / 1280x720) and are each
+       __not_in_flash_func, so they consume RAM permanently in builds
+       that include them. Strip from HDMIBTH to reclaim that space. */
     void MIPS32 __not_in_flash_func(HDMIloop1)(void)
     {
         int last_line = 2, load_line, line_to_load, Line_dup, Line_quad;
@@ -4413,6 +4466,7 @@ int __not_in_flash_func(MMInkey)(void)
             }
         }
     }
+#endif /* !PICOMITEHDMIBTH — end of stripped HDMIloop0/1/2/3 block */
     void mapreset(void)
     {
         for (int i = 0; i < 256; i++)
@@ -4426,7 +4480,32 @@ int __not_in_flash_func(MMInkey)(void)
     void HDMICore(void)
     {
         mapreset();
-        if (Option.CPU_Speed == FreqXGA)
+#ifdef PICOMITEHDMIBTH
+        /* HDMIBTH is locked to 1024x600 (FreqX). Skip the if/else chain
+           and the unused MODE_*_L/W/V/8/4/Y/S timing constants — they'd
+           still compile to flash because they're used elsewhere, but
+           the dead branches go away. */
+        MODE_H_SYNC_POLARITY = MODE_H_X_SYNC_POLARITY;
+        MODE_ACTIVE_LINES = MODE_V_X_ACTIVE_LINES;
+        MODE_ACTIVE_PIXELS = MODE_H_X_ACTIVE_PIXELS;
+        MODE_V_TOTAL_LINES = MODE_V_X_TOTAL_LINES;
+        MODE_H_ACTIVE_PIXELS = MODE_H_X_ACTIVE_PIXELS;
+        MODE_H_FRONT_PORCH = MODE_H_X_FRONT_PORCH;
+        MODE_H_SYNC_WIDTH = MODE_H_X_SYNC_WIDTH;
+        MODE_H_BACK_PORCH = MODE_H_X_BACK_PORCH;
+        MODE_V_SYNC_POLARITY = MODE_V_X_SYNC_POLARITY;
+        MODE_V_ACTIVE_LINES = MODE_V_X_ACTIVE_LINES;
+        MODE_V_FRONT_PORCH = MODE_V_X_FRONT_PORCH;
+        MODE_V_SYNC_WIDTH = MODE_V_X_SYNC_WIDTH;
+        MODE_V_BACK_PORCH = MODE_V_X_BACK_PORCH;
+        MODE1SIZE = MODE1SIZE_X;
+        MODE2SIZE = MODE2SIZE_X;
+        MODE3SIZE = MODE3SIZE_X;
+        MODE4SIZE = 0L;
+        MODE5SIZE = MODE5SIZE_X;
+        PIXELS_PER_WORD = 4;
+#else
+        if (Option.Resolution == R1024x768)
         {
             MODE_H_SYNC_POLARITY = MODE_H_L_SYNC_POLARITY;
             MODE_ACTIVE_LINES = MODE_V_L_ACTIVE_LINES;
@@ -4448,7 +4527,7 @@ int __not_in_flash_func(MMInkey)(void)
             MODE5SIZE = MODE5SIZE_L;
             PIXELS_PER_WORD = 4;
         }
-        else if (Option.CPU_Speed == Freq720P)
+        else if (Option.Resolution == R1280x720)
         {
             MODE_H_SYNC_POLARITY = MODE_H_W_SYNC_POLARITY;
             MODE_ACTIVE_LINES = MODE_V_W_ACTIVE_LINES;
@@ -4470,7 +4549,7 @@ int __not_in_flash_func(MMInkey)(void)
             MODE5SIZE = MODE5SIZE_W;
             PIXELS_PER_WORD = 4;
         }
-        else if (Option.CPU_Speed == FreqSVGA)
+        else if (Option.Resolution == R800x600)
         {
             MODE_H_SYNC_POLARITY = MODE_H_V_SYNC_POLARITY;
             MODE_ACTIVE_LINES = MODE_V_V_ACTIVE_LINES;
@@ -4491,7 +4570,7 @@ int __not_in_flash_func(MMInkey)(void)
             MODE5SIZE = MODE5SIZE_V;
             PIXELS_PER_WORD = 4;
         }
-        else if (Option.CPU_Speed == Freq848)
+        else if (Option.Resolution == R848x480)
         {
             MODE_H_SYNC_POLARITY = MODE_H_8_SYNC_POLARITY;
             MODE_ACTIVE_LINES = MODE_V_8_ACTIVE_LINES;
@@ -4512,7 +4591,7 @@ int __not_in_flash_func(MMInkey)(void)
             MODE5SIZE = MODE5SIZE_8;
             PIXELS_PER_WORD = 4;
         }
-        else if (Option.CPU_Speed == Freq400)
+        else if (Option.Resolution == R720x400)
         {
             MODE_H_SYNC_POLARITY = MODE_H_4_SYNC_POLARITY;
             MODE_ACTIVE_LINES = MODE_V_4_ACTIVE_LINES;
@@ -4534,7 +4613,7 @@ int __not_in_flash_func(MMInkey)(void)
             MODE5SIZE = MODE5SIZE_4;
             PIXELS_PER_WORD = 2;
         }
-        else if (Option.CPU_Speed == FreqX)
+        else if (Option.Resolution == R1024x600)
         {
             MODE_H_SYNC_POLARITY = MODE_H_X_SYNC_POLARITY;
             MODE_ACTIVE_LINES = MODE_V_X_ACTIVE_LINES;
@@ -4556,7 +4635,7 @@ int __not_in_flash_func(MMInkey)(void)
             MODE5SIZE = MODE5SIZE_X;
             PIXELS_PER_WORD = 4;
         }
-        else if (Option.CPU_Speed == FreqY)
+        else if (Option.Resolution == R800x480)
         {
             MODE_H_SYNC_POLARITY = MODE_H_Y_SYNC_POLARITY;
             MODE_ACTIVE_LINES = MODE_V_Y_ACTIVE_LINES;
@@ -4599,6 +4678,7 @@ int __not_in_flash_func(MMInkey)(void)
             MODE5SIZE = MODE5SIZE_S;
             PIXELS_PER_WORD = 2;
         }
+#endif /* !PICOMITEHDMIBTH — end of full resolution dispatch */
         vgaloop1 = MODE_H_ACTIVE_PIXELS;
         vgaloop2 = MODE_H_ACTIVE_PIXELS / 2;
         vgaloop4 = MODE_H_ACTIVE_PIXELS / 4;
@@ -4765,16 +4845,23 @@ int __not_in_flash_func(MMInkey)(void)
 
         //    bus_ctrl_hw->priority = 1;
         dma_channel_start(DMACH_PING);
-        if (Option.CPU_Speed == Freq480P || Option.CPU_Speed == Freq378P || Option.CPU_Speed == Freq252P || Option.CPU_Speed == Freq400)
+#ifdef PICOMITEHDMIBTH
+        /* HDMIBTH only supports FreqX (1024x600), so call the scanout
+           loop directly. The other four loops are not compiled in this
+           build (see #ifndef PICOMITEHDMIBTH wrapper above). */
+        HDMIloopX();
+#else
+        if (Option.Resolution == R640x480f315 || Option.Resolution == R640x480f378 || Option.Resolution == R640x480f252 || Option.Resolution == R720x400)
             HDMIloop0();
-        else if (Option.CPU_Speed == Freq720P)
+        else if (Option.Resolution == R1280x720)
             HDMIloop1();
-        else if (Option.CPU_Speed == FreqXGA)
+        else if (Option.Resolution == R1024x768)
             HDMIloop2();
-        else if (Option.CPU_Speed == FreqX)
+        else if (Option.Resolution == R1024x600)
             HDMIloopX();
         else
             HDMIloop3();
+#endif
     }
     void settiles(void)
     {
@@ -5441,7 +5528,7 @@ uint32_t testPSRAM(void)
             SaveOptions();
         }
 #else
-    if (!(Option.CPU_Speed == Freq720P || Option.CPU_Speed == Freq378P || Option.CPU_Speed == Freq252P || Option.CPU_Speed == Freq848 || Option.CPU_Speed == Freq400 || Option.CPU_Speed == FreqSVGA || Option.CPU_Speed == Freq480P || Option.CPU_Speed == FreqXGA || Option.CPU_Speed == FreqX || Option.CPU_Speed == FreqY))
+    if (!(Option.Resolution == R1280x720 || Option.Resolution == R640x480f378 || Option.Resolution == R640x480f252 || Option.Resolution == R848x480 || Option.Resolution == R720x400 || Option.Resolution == R800x600 || Option.Resolution == R640x480f315 || Option.Resolution == R1024x768 || Option.Resolution == R1024x600 || Option.Resolution == R800x480))
     {
         Option.CPU_Speed = Freq480P;
         SaveOptions();
@@ -5507,11 +5594,7 @@ uint32_t testPSRAM(void)
             qmi_hw->m[0].timing = 0x40006204; // COOLDOWN=1, RXDELAY=2, MIN_DESELECT=6, CLKDIV=4
         sleep_ms(2);
 #endif
-#if defined(HDMI) && defined(rp2350)
-        set_sys_clock_khz(Option.CPU_Speed == FreqX ? 252000 : Option.CPU_Speed, false);
-#else
-    set_sys_clock_khz(Option.CPU_Speed, false);
-#endif
+        set_sys_clock_khz(Option.CPU_Speed, false);
 // NB: set_sys_clock can change the pad configuration so we need to redo it
 #ifdef rp2350
         pads_qspi_hw->io[0] = 0x67;
@@ -5586,34 +5669,42 @@ uint32_t testPSRAM(void)
     }
 #endif
 #ifdef HDMI
-    if ((FullColour || MediumRes) && !(Option.CPU_Speed == FreqX))
+#ifndef PICOMITEHDMIBTH
+    /* HDMIBTH is locked to FreqX (1024x600). The HSTX clock_configure
+       and the per-resolution heap/framebuffer resize blocks below are
+       all dead for HDMIBTH — and the +320*240*2 literal in the resize
+       formula would now overrun the 96000-byte pool that
+       FRAMEBUFFER_POOL_SIZE allocates. Gated out so the code is
+       absent rather than relying on the runtime CPU_Speed check. */
+    if ((FullColour || MediumRes) && !(Option.Resolution == R1024x600))
     {
         clock_configure(
             clk_hstx,
-            0,                                                            // No glitchless mux
-            CLOCKS_CLK_PERI_CTRL_AUXSRC_VALUE_CLKSRC_PLL_SYS,             // System PLL on AUX mux
-            Option.CPU_Speed * 1000,                                      // Input frequency
-            Option.CPU_Speed * (Option.CPU_Speed == Freq378P ? 332 : 500) // Output (must be same as no divider)
+            0,                                                                 // No glitchless mux
+            CLOCKS_CLK_PERI_CTRL_AUXSRC_VALUE_CLKSRC_PLL_SYS,                  // System PLL on AUX mux
+            Option.CPU_Speed * 1000,                                           // Input frequency
+            Option.CPU_Speed * (Option.Resolution == R640x480f378 ? 332 : 500) // Output (must be same as no divider)
         );
     }
-    if (Option.CPU_Speed == FreqSVGA)
+    if (Option.Resolution == R800x600)
     { // adjust the size of the heap
         framebuffersize = 400 * 300 * 2;
         heap_memory_size = HEAP_MEMORY_SIZE - framebuffersize + 320 * 240 * 2;
         FRAMEBUFFER = AllMemory + heap_memory_size + 256;
     }
-    if (Option.CPU_Speed == Freq848)
+    if (Option.Resolution == R848x480)
     { // adjust the size of the heap
         framebuffersize = 424 * 240 * 2;
         heap_memory_size = HEAP_MEMORY_SIZE - framebuffersize + 320 * 240 * 2;
         FRAMEBUFFER = AllMemory + heap_memory_size + 256;
     }
-    if (Option.CPU_Speed == FreqY)
+    if (Option.Resolution == R800x480)
     { // adjust the size of the heap
         framebuffersize = 400 * 240 * 2;
         heap_memory_size = HEAP_MEMORY_SIZE - framebuffersize + 320 * 240 * 2;
         FRAMEBUFFER = AllMemory + heap_memory_size + 256;
     }
+#endif /* !PICOMITEHDMIBTH */
 #endif
 
 #endif
@@ -5640,14 +5731,14 @@ uint32_t testPSRAM(void)
         _excep_code = excep;
 #ifdef PICOMITEVGA
 #ifndef HDMI
-        if (Option.CPU_Speed == Freq252P || Option.CPU_Speed == Freq480P || Option.CPU_Speed == Freq848 || Option.CPU_Speed == Freq400 || Option.CPU_Speed == FreqSVGA)
+        if (Option.Resolution == R640x480f252 || Option.Resolution == R640x480f315 || Option.Resolution == R848x480 || Option.Resolution == R720x400 || Option.Resolution == R800x600)
             QVGA_CLKDIV = 2;
-        else if (Option.CPU_Speed == 378000)
+        else if (Option.Resolution == R640x480f378)
             QVGA_CLKDIV = 3;
         else
             QVGA_CLKDIV = 1;
 #ifdef rp2350
-        if (Option.CPU_Speed == Freq848)
+        if (Option.Resolution == R848x480)
         { // adjust the size of the heap
             framebuffersize = 424 * 240 * 2;
             heap_memory_size = HEAP_MEMORY_SIZE - framebuffersize + 320 * 240 * 2;
@@ -5659,7 +5750,7 @@ uint32_t testPSRAM(void)
             MODE2SIZE = MODE2SIZE_8;
             HRes = 848;
         }
-        if (Option.CPU_Speed == FreqSVGA)
+        if (Option.Resolution == R800x600)
         { // adjust the size of the heap
             framebuffersize = 400 * 300 * 2;
             heap_memory_size = HEAP_MEMORY_SIZE - framebuffersize + 320 * 240 * 2;
@@ -5762,7 +5853,18 @@ uint32_t testPSRAM(void)
             bt_console_init();
         }
 #endif
-#ifdef PICOMITEBTH
+#if defined(PICOMITEBTH) || defined(PICOMITEHDMIBTH)
+#ifdef PICOMITEHDMIBTH
+        /* HDMICore hardcodes DMACH_PING=0 / DMACH_PONG=1 (see the HDMI
+           scanout block above). CYW43's bus_pio_spi grabs two unused
+           DMA channels at cyw43_arch_init() time via
+           dma_claim_unused_channel — which would pick 0 and 1 first.
+           Reserve them here so CYW43 falls through to channels 2/3 and
+           HDMI's later DMA setup doesn't tear down the cyw43 SPI link.
+           PICOMITEBTH has no HDMI so this isn't needed there. */
+        dma_channel_claim(0);
+        dma_channel_claim(1);
+#endif
         /* Same PIO clock divider scaling as PICOMITEBT / WEB. */
         {
             uint32_t cyw43_div = (Option.CPU_Speed + 79999) / 80000;
@@ -5862,7 +5964,14 @@ uint32_t testPSRAM(void)
 #ifdef PICOMITEVGA
 #ifdef HDMI
 #ifdef USBKEYBOARD
+#ifdef PICOMITEHDMIBTH
+        /* "PicoMiteHDMIBTH" is 3 chars longer than "PicoMiteHDMI", so
+           the A/B insertion point shifts by 3: banner[35] is the
+           trailing space inside the CHIP macro "RP2350 ". */
+        banner[35] = (rp2350a ? 'A' : 'B');
+#else
         banner[32] = (rp2350a ? 'A' : 'B');
+#endif
 #else
         banner[28] = (rp2350a ? 'A' : 'B');
 #endif

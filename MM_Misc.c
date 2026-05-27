@@ -2721,22 +2721,28 @@ void MIPS16 printoptions(void)
     if (Option.AllPins)
         PO2Str("PICO", "OFF");
 #ifdef PICOMITEVGA
-    if (Option.CPU_Speed == Freq720P)
+#ifdef PICOMITEHDMIBTH
+    /* Locked to FreqX (1024x600) — emit a single line instead of the
+       full resolution cascade. */
+    PO2StrInt("RESOLUTION", "1024x600", Option.CPU_Speed);
+#else
+    if (Option.Resolution == R1280x720)
         PO2StrInt("RESOLUTION", "1280x720", Option.CPU_Speed);
-    if (Option.CPU_Speed == FreqXGA)
+    if (Option.Resolution == R1024x768)
         PO2StrInt("RESOLUTION", "1024x768", Option.CPU_Speed);
-    if (Option.CPU_Speed == FreqSVGA)
+    if (Option.Resolution == R800x600)
         PO2StrInt("RESOLUTION", "800x600", Option.CPU_Speed);
-    if (Option.CPU_Speed == Freq848)
+    if (Option.Resolution == R848x480)
         PO2StrInt("RESOLUTION", "848x480", Option.CPU_Speed);
-    if (Option.CPU_Speed == Freq400)
+    if (Option.Resolution == R720x400)
         PO2StrInt("RESOLUTION", "720x400", Option.CPU_Speed);
-    if (Option.CPU_Speed == FreqX)
+    if (Option.Resolution == R1024x600)
         PO2StrInt("RESOLUTION", "1024x600", Option.CPU_Speed);
-    if (Option.CPU_Speed == FreqY)
+    if (Option.Resolution == R800x480)
         PO2StrInt("RESOLUTION", "800x480", Option.CPU_Speed);
-    if (Option.CPU_Speed == Freq480P || Option.CPU_Speed == Freq252P || Option.CPU_Speed == Freq378P)
+    if (Option.Resolution == R640x480f315 || Option.Resolution == R640x480f252 || Option.Resolution == R640x480f378)
         PO2StrInt("RESOLUTION", "640x480", Option.CPU_Speed);
+#endif
     if (Option.DISPLAY_TYPE != SCREENMODE1)
         PO2Int("DEFAULT MODE", Option.DISPLAY_TYPE - SCREENMODE1 + 1);
     if (Option.Height != 40 || Option.Width != 80)
@@ -3691,7 +3697,7 @@ void MIPS16 configure(unsigned char *p, bool noask)
         if (checkstring(p, (unsigned char *)"CMM1.5"))
         {
             format = testMODBUFF(true, 512, false);
-            Option.CPU_Speed = 252000;
+            Option.CPU_Speed = CPUFreqs[R640x480f252];
             Option.AllPins = 1;
             Option.ColourCode = 1;
             Option.SYSTEM_I2C_SDA = PINMAP[14];
@@ -3718,7 +3724,7 @@ void MIPS16 configure(unsigned char *p, bool noask)
         if (checkstring(p, (unsigned char *)"PICOMITEVGA V1.1"))
         {
             format = testMODBUFF(true, 512, false);
-            Option.CPU_Speed = 252000;
+            Option.CPU_Speed = CPUFreqs[R640x480f252];
             Option.AllPins = 1;
             Option.ColourCode = 1;
             Option.SYSTEM_I2C_SDA = PINMAP[14];
@@ -3743,7 +3749,7 @@ void MIPS16 configure(unsigned char *p, bool noask)
         if (checkstring(p, (unsigned char *)"PICOMITEVGA V1.0"))
         {
             format = testMODBUFF(true, 512, false);
-            Option.CPU_Speed = 252000;
+            Option.CPU_Speed = CPUFreqs[R640x480f252];
             Option.AllPins = 1;
             Option.ColourCode = 1;
             Option.SYSTEM_I2C_SDA = PINMAP[14];
@@ -3767,7 +3773,7 @@ void MIPS16 configure(unsigned char *p, bool noask)
         if (checkstring(p, (unsigned char *)"VGA DESIGN 1"))
         {
             format = testMODBUFF(false, 0, false);
-            Option.CPU_Speed = 252000;
+            Option.CPU_Speed = CPUFreqs[R640x480f252];
             Option.ColourCode = 1;
             Option.SYSTEM_CLK = PINMAP[10];
             Option.SYSTEM_MOSI = PINMAP[11];
@@ -3784,7 +3790,7 @@ void MIPS16 configure(unsigned char *p, bool noask)
         if (checkstring(p, (unsigned char *)"VGA DESIGN 2"))
         {
             format = testMODBUFF(true, 192, false);
-            Option.CPU_Speed = 252000;
+            Option.CPU_Speed = CPUFreqs[R640x480f252];
             Option.ColourCode = 1;
             Option.SYSTEM_I2C_SDA = PINMAP[14];
             Option.SYSTEM_I2C_SCL = PINMAP[15];
@@ -5528,7 +5534,13 @@ void MIPS16 cmd_option(void)
             Option.NoHeartbeat = 1;
         else
         {
-#ifdef PICOMITEWEB
+#if defined(PICOMITEWEB) || defined(PICOMITEBT) || defined(PICOMITEBTH) || defined(PICOMITEHDMIBTH)
+            /* CYW43-bearing builds — the heartbeat LED is on the
+               wireless chip, not a GPIO, so OPTION HEARTBEAT ON/OFF
+               only toggles Option.NoHeartbeat. The polling functions
+               (ProcessWeb / bt_keyboard_poll / bt_console_poll) honour
+               that flag and either drive the chip LED or leave it
+               dark. No pin to reconfigure. */
             if (checkstring(tp, (unsigned char *)"ON") || checkstring(tp, (unsigned char *)"ENABLE"))
                 Option.NoHeartbeat = 0;
             else
@@ -5869,6 +5881,11 @@ void MIPS16 cmd_option(void)
 #endif
 
 #ifdef PICOMITEVGA
+#ifndef PICOMITEHDMIBTH
+    /* OPTION RESOLUTION is dead on HDMIBTH — the build is locked to
+       1024x600 (FreqX). Gated out so the command isn't even parsed,
+       which also strips the cascade of resolution-string matchers
+       and the SoftReset path from flash. */
     tp = checkstring(cmdline, (unsigned char *)"RESOLUTION");
     if (tp)
     {
@@ -5879,83 +5896,78 @@ void MIPS16 cmd_option(void)
         {
             if (argc == 3)
             {
-#ifdef HDMI
                 int i = getint(argv[2], Freq252P, Freq378P);
                 if (!(i == Freq252P || i == Freq480P || i == Freq378P))
                     error("Invalid speed");
-#else
-                int i = getint(argv[2], Freq252P, Freq378P);
-                if (!(i == Freq252P || i == Freq480P || i == Freq378P))
-                    error("Invalid speed");
-#endif
-                Option.CPU_Speed = i;
+                if (i == Freq252P)
+                    Option.Resolution = R640x480f252;
+                else if (i == Freq480P)
+                    Option.Resolution = R640x480f315;
+                else
+                    Option.Resolution = R640x480f378;
             }
             else
-                Option.CPU_Speed = Freq252P;
-            Option.DISPLAY_TYPE = SCREENMODE1;
+                Option.Resolution = R640x480f252;
+
             Option.DefaultFont = 1;
         }
 #ifdef HDMI
         else if (checkstring(argv[0], (unsigned char *)"1280") || checkstring(argv[0], (unsigned char *)"1280x720"))
         {
-            Option.CPU_Speed = Freq720P;
-            Option.DISPLAY_TYPE = SCREENMODE1;
+            Option.Resolution = R1280x720;
             Option.DefaultFont = (2 << 4) | 1;
         }
         else if (checkstring(argv[0], (unsigned char *)"1024") || checkstring(argv[0], (unsigned char *)"1024x768"))
         {
-            Option.CPU_Speed = FreqXGA;
-            Option.DISPLAY_TYPE = SCREENMODE1;
+            Option.Resolution = R1024x768;
             Option.DefaultFont = (2 << 4) | 1;
         }
         else if (checkstring(argv[0], (unsigned char *)"1024x600"))
         {
-            Option.CPU_Speed = FreqX;
-            Option.DISPLAY_TYPE = SCREENMODE1;
+            Option.Resolution = R1024x600;
             Option.DefaultFont = 1;
         }
         else if (checkstring(argv[0], (unsigned char *)"800x480"))
         {
-            Option.CPU_Speed = FreqY;
-            Option.DISPLAY_TYPE = SCREENMODE1;
+            Option.Resolution = R800x480;
             Option.DefaultFont = 1;
         }
 #endif
 #ifdef rp2350
         else if (checkstring(argv[0], (unsigned char *)"800") || checkstring(argv[0], (unsigned char *)"800x600"))
         {
-            Option.CPU_Speed = FreqSVGA;
-            Option.DISPLAY_TYPE = SCREENMODE1;
+            Option.Resolution = R800x600;
             Option.DefaultFont = 1;
         }
 
         else if (checkstring(argv[0], (unsigned char *)"848") || checkstring(argv[0], (unsigned char *)"848x480"))
         {
-            Option.CPU_Speed = Freq848;
-            Option.DISPLAY_TYPE = SCREENMODE1;
+            Option.Resolution = R848x480;
             Option.DefaultFont = 1;
         }
 #endif
         else if (checkstring(argv[0], (unsigned char *)"720") || checkstring(argv[0], (unsigned char *)"720x400"))
         {
-            Option.CPU_Speed = Freq400;
-            Option.DISPLAY_TYPE = SCREENMODE1;
+            Option.Resolution = R720x400;
             Option.DefaultFont = 1;
         }
         else
             SyntaxError();
         ;
 #ifndef HDMI
-        Option.X_TILE = (Option.CPU_Speed == Freq848 ? 106 : Option.CPU_Speed == Freq400 ? 90
-                                                         : Option.CPU_Speed == FreqSVGA  ? 100
-                                                                                         : 80);
-        Option.Y_TILE = (Option.CPU_Speed == Freq400 ? 33 : Option.CPU_Speed == FreqSVGA ? 50
-                                                                                         : 40);
+        Option.X_TILE = (Option.Resolution == R848x480 ? 106 : Option.Resolution == R720x400 ? 90
+                                                           : Option.Resolution == R800x600   ? 100
+                                                                                             : 80);
+        Option.Y_TILE = (Option.Resolution == R720x400 ? 33 : Option.Resolution == R800x600 ? 50
+                                                                                            : 40);
 #endif
+        Option.DISPLAY_TYPE = SCREENMODE1;
+        Option.CPU_Speed = CPUFreqs[Option.Resolution];
         SaveOptions();
         SoftReset(SOFT_RESET);
         return;
     }
+#endif /* !PICOMITEHDMIBTH — end of OPTION RESOLUTION gate */
 #ifndef HDMI
     tp = checkstring(cmdline, (unsigned char *)"VGA PINS");
     if (tp)
@@ -7085,7 +7097,11 @@ void MIPS16 fun_device(void)
 #ifdef PICOMITEVGA
 #ifdef USBKEYBOARD
 #ifdef HDMI
+#ifdef PICOMITEHDMIBTH
+    strcpy((char *)sret, "PicoMiteHDMIBTH");
+#else
     strcpy((char *)sret, "PicoMiteHDMIUSB");
+#endif
 #else
     strcpy((char *)sret, "PicoMiteVGAUSB");
 #endif
@@ -7851,7 +7867,7 @@ void MIPS16 fun_info(void)
             char code, *ptr;
             char *string = GetTempStrMemory();
             skipspace(tp);
-#ifdef PICOMITEWEB
+#if defined(PICOMITEWEB) || defined(PICOMITEBT) || defined(PICOMITEBTH) || defined(PICOMITEHDMIBTH)
             iret = 0;
             if ((tp[0] == 'G' || tp[0] == 'g') && (tp[1] == 'P' || tp[1] == 'p') && tp[2] == '2' && tp[3] == '3')
                 iret = 41;
@@ -7902,7 +7918,7 @@ void MIPS16 fun_info(void)
             {
                 strcpy(string, (char *)tp);
             }
-#ifdef PICOMITEWEB
+#if defined(PICOMITEWEB) || defined(PICOMITEBT) || defined(PICOMITEBTH) || defined(PICOMITEHDMIBTH)
             iret = 0;
             if ((string[0] == 'G' || string[0] == 'g') && (string[1] == 'P' || string[1] == 'p') && string[2] == '2' && string[3] == '3')
                 iret = 41;
@@ -7950,7 +7966,12 @@ void MIPS16 fun_info(void)
             pin = getinteger((unsigned char *)string);
             if (!code)
                 pin = codemap(pin);
-#ifdef PICOMITEWEB
+#if defined(PICOMITEWEB) || defined(PICOMITEBT) || defined(PICOMITEBTH) || defined(PICOMITEHDMIBTH)
+            /* GP23/24/25/29 are CYW43-wireless on every cyw43-bearing
+               variant (Pico W / Pico 2 W / Pimoroni Pico Plus 2W).
+               Previously only PICOMITEWEB matched, so MM.INFO(PIN n)
+               on those pins returned "invalid" on BT/BTH/HDMIBTH even
+               though the pins are reserved there too. */
             if (pin >= 41 && pin <= 44)
             {
                 iret = pin;
@@ -8056,7 +8077,9 @@ void MIPS16 fun_info(void)
                 return;
             }
 #endif
-#ifdef PICOMITEWEB
+#if defined(PICOMITEWEB) || defined(PICOMITEBT) || defined(PICOMITEBTH) || defined(PICOMITEHDMIBTH)
+            /* Same widening as the iret block above — CYW43 pins are
+               reserved on every cyw43-bearing variant. */
             if (pin >= 41 && pin <= 44)
             {
                 strcpy((char *)sret, "Boot Reserved : CYW43");

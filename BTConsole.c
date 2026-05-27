@@ -522,6 +522,18 @@ void bt_console_poll(void)
 
         uint64_t now = time_us_64();
 
+        /* OPTION HEARTBEAT OFF — same gate as BTKeyboard.c. Turn the
+           LED off on transition then leave it alone. */
+        if (Option.NoHeartbeat)
+        {
+            if (led_state != 0)
+            {
+                led_state = 0;
+                cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
+            }
+            return;
+        }
+
         uint32_t interval =
             bt_console_connected()
                 ? 250000

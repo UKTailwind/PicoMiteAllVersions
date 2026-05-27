@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.13)
 
 # Valid builds are PICO, PICOUSB, PICOMIN, VGA, VGAUSB, WEB,
 # PICORP2350, PICOUSBRP2350, VGARP2350, VGAUSBRP2350, WEBRP2350, HDMI, HDMIUSB,
-# PICOBTRP2350, PICOBTHRP2350.
+# PICOBTRP2350, PICOBTHRP2350, HDMIBTH.
 set(VALID_COMPILE_VARIANTS
 	PICO
 	PICOUSB
@@ -19,13 +19,15 @@ set(VALID_COMPILE_VARIANTS
 	HDMIUSB
 	PICOBTRP2350
 	PICOBTHRP2350
+	HDMIBTH
 )
 
 # VS Code uses this default when COMPILE is not supplied explicitly.
-#if(NOT DEFINED COMPILE)
-set(COMPILE HDMIUSB
-)
-#endif()
+# Guard restored: without it, this set() shadows the -DCOMPILE=X passed
+# by buildpicomite.bat and every variant silently builds as the default.
+if(NOT DEFINED COMPILE)
+	set(COMPILE HDMIUSB)
+endif()
 
 list(FIND VALID_COMPILE_VARIANTS "${COMPILE}" COMPILE_INDEX)
 if(COMPILE_INDEX EQUAL -1)
@@ -138,17 +140,22 @@ set(RP2350_VARIANTS
 	PICOUSBRP2350
 	PICOBTRP2350
 	PICOBTHRP2350
+	HDMIBTH
 )
 
 set(BT_VARIANTS
 	PICOBTRP2350
 )
 
-# BT-host variants: pull in cyw43 BT firmware, link btstack, but keep the
-# standard USB-CDC console (BT is an extra keyboard input source, not a
-# console replacement).
+# BT-host variants: pull in cyw43 BT firmware, link btstack, and provide
+# bt_keyboard_init / bt_keyboard_poll (BTKeyboard.c). HDMIBTH reuses the
+# same BT-host stack — pico_cyw43_arch_none alone has no async pump, so
+# cyw43_arch_gpio_put hangs after the first call. With btstack in the
+# picture the async_context is kept alive by btstack's workers, and
+# bt_keyboard_poll() drives both the chip and the heartbeat.
 set(BTH_VARIANTS
 	PICOBTHRP2350
+	HDMIBTH
 )
 
 set(WEB_VARIANTS
@@ -172,6 +179,7 @@ set(USB_HOST_VARIANTS
 	VGAUSB
 	VGAUSBRP2350
 	HDMIUSB
+	HDMIBTH
 )
 
 set(UPNG_VARIANTS
@@ -184,6 +192,7 @@ set(UPNG_VARIANTS
 	PICOUSBRP2350
 	PICOBTRP2350
 	PICOBTHRP2350
+	HDMIBTH
 )
 
 set(RAYCASTER_VARIANTS
@@ -195,6 +204,7 @@ set(RAYCASTER_VARIANTS
 	PICOUSBRP2350
 	PICOBTRP2350
 	PICOBTHRP2350
+	HDMIBTH
 )
 
 set(VGA_PIO_VARIANTS
@@ -214,6 +224,7 @@ set(VGA_VARIANTS
 set(HDMI_VARIANTS
 	HDMI
 	HDMIUSB
+	HDMIBTH
 )
 
 set(PICOMITE_VARIANTS
@@ -246,6 +257,7 @@ set(PICO_RAND_VARIANTS
 	PICOUSBRP2350
 	PICOBTRP2350
 	PICOBTHRP2350
+	HDMIBTH
 )
 set(USES_CACHE_VARIANTS
 	HDMIUSB
@@ -257,6 +269,7 @@ set(USES_CACHE_VARIANTS
 	HDMI
 	PICOBTRP2350
 	PICOBTHRP2350
+	HDMIBTH
 )
 compile_is_in(IS_RP2350 ${RP2350_VARIANTS})
 compile_is_in(IS_WEB ${WEB_VARIANTS})
@@ -307,6 +320,10 @@ if(IS_RP2350)
 		set(WEBRP2350_BOARD pico2_w CACHE STRING "Board definition used for WEBRP2350 build")
 		set(PICO_BOARD ${WEBRP2350_BOARD})
 	elseif(IS_BT OR IS_BTH)
+		set(PICO_BOARD pico2_w)
+	elseif(COMPILE STREQUAL "HDMIBTH")
+		# Pimoroni Pico Plus 2W: same CYW43 wiring as Pico 2 W
+		# (GP23/24/25/29) plus the Pimoroni HDMI/PSRAM breakout pins.
 		set(PICO_BOARD pico2_w)
 	else()
 		set(PICO_BOARD pimoroni_pga2350)
@@ -509,10 +526,13 @@ if(IS_PICOMITE AND NOT IS_BT AND NOT IS_BTH)
 	)
 endif()
 
-if(IS_BT OR IS_BTH)
+if((IS_BT OR IS_BTH) AND NOT COMPILE STREQUAL "HDMIBTH")
 	# IS_BT / IS_BTH each supply their own PICO_HEAP_SIZE / PICO_CORE0_STACK_SIZE
 	# / GUICONTROLS below; PICOMITE is still defined here so the existing
-	# PicoMite RP2350 code paths fire.
+	# PicoMite RP2350 code paths fire. Excluded for HDMIBTH because that
+	# variant is a PICOMITEVGA build (HDMI scanout, framebuffer modes,
+	# GUI controls) — defining PICOMITE alongside PICOMITEVGA double-
+	# declares globals (USBenabled, ScrollStart, …) and breaks the build.
 	target_compile_definitions(PicoMite PRIVATE PICOMITE)
 endif()
 
@@ -540,12 +560,34 @@ endif()
 
 if(IS_HDMI)
 	# HDMI is RP2350-only.
+	# PICO_HEAP_SIZE / PICO_CORE0_STACK_SIZE are set per-variant below
+	# — HDMIBTH needs 0x4000 each like PICOMITEBT/BTH (cyw43 driver +
+	# async_context + libc allocations push past the 0x800 / 0x2000 the
+	# bare HDMI builds use).
 	target_compile_definitions(PicoMite PRIVATE
 		PICOMITEVGA
 		HDMI
-		PICO_HEAP_SIZE=0x800
-		PICO_CORE0_STACK_SIZE=0x2000
 		GUICONTROLS
+	)
+	if(NOT COMPILE STREQUAL "HDMIBTH")
+		target_compile_definitions(PicoMite PRIVATE
+			PICO_HEAP_SIZE=0x800
+			PICO_CORE0_STACK_SIZE=0x2000
+		)
+	endif()
+endif()
+
+if(COMPILE STREQUAL "HDMIBTH")
+	# HDMIBTH = HDMIUSB + BLE HID host (Bluetooth keyboard + heartbeat
+	# LED on the CYW43 chip). HDMIBTH is in BTH_VARIANTS so IS_BTH
+	# fires — that block pulls in BTKeyboard.c, links pico_btstack_ble /
+	# pico_btstack_cyw43 / pico_cyw43_arch_none, and sets the shared
+	# defines (CYW43_ENABLE_BLUETOOTH, CYW43_PIO_CLOCK_DIV_DYNAMIC,
+	# heap=0x4000, stack=0x4000, GUICONTROLS). This block only adds
+	# the HDMIBTH-specific identity.
+	target_compile_definitions(PicoMite PRIVATE
+		PICOMITEHDMIBTH
+		CYW43_HOST_NAME=\"PicoMiteHDMIBTH\"
 	)
 endif()
 
@@ -604,21 +646,28 @@ if(IS_BT)
 endif()
 
 if(IS_BTH)
-	# PICOMITEBTH = PicoMite + BLE HID host. Keeps the USB CDC console
-	# (defined by the default branch above) and adds cyw43/btstack as a
-	# keyboard input source. See BTKeyboard.c for the host-side bridge
-	# into process_kbd_report().
+	# BTH = PicoMite-style build + BLE HID host. Shared defines below
+	# apply to all BTH variants (currently PICOBTHRP2350 and HDMIBTH).
 	target_compile_definitions(PicoMite PRIVATE
-		PICOMITEBTH
 		CYW43_ENABLE_BLUETOOTH=1
 		CYW43_PIO_CLOCK_DIV_DYNAMIC=1
-		CYW43_HOST_NAME=\"PicoMiteBTH\"
 		PICO_HEAP_SIZE=0x4000
 		PICO_CORE0_STACK_SIZE=0x4000
 		GUICONTROLS
 	)
 	# btstack_config.h lives at project root.
 	target_include_directories(PicoMite PRIVATE ${CMAKE_CURRENT_LIST_DIR})
+
+	# PICOMITEBTH-specific build identity: keep this gated so HDMIBTH
+	# does NOT get the PICOMITEBTH define (HDMIBTH has its own marker
+	# PICOMITEHDMIBTH and signon banner, and the two MES_SIGNON
+	# definitions would collide if both fired).
+	if(COMPILE STREQUAL "PICOBTHRP2350")
+		target_compile_definitions(PicoMite PRIVATE
+			PICOMITEBTH
+			CYW43_HOST_NAME=\"PicoMiteBTH\"
+		)
+	endif()
 endif()
 
 target_link_options(PicoMite PRIVATE

@@ -126,7 +126,11 @@ bool PIO0 = true;
 #else
 bool PIO0 = false;
 #endif
+#ifdef PICOMITEHDMIBTH
+bool PIO1 = false;
+#else
 bool PIO1 = true;
+#endif
 bool PIO2 = true;
 #else
 bool PIO0 = false;

@@ -18,7 +18,7 @@
  * MAC + address type.
  */
 
-#ifdef PICOMITEBTH
+#if defined(PICOMITEBTH) || defined(PICOMITEHDMIBTH)
 
 #include "BTKeyboard.h"
 
@@ -1750,6 +1750,20 @@ void bt_keyboard_poll(void)
         static int led_state;
         uint64_t now = time_us_64();
 
+        /* OPTION HEARTBEAT OFF — user wants the LED dark. Turn it off
+           once on the transition, then skip the toggle entirely. The
+           led_state mirror means we won't call gpio_put again until
+           OPTION HEARTBEAT ON flips it back. */
+        if (Option.NoHeartbeat)
+        {
+            if (led_state != 0)
+            {
+                led_state = 0;
+                cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
+            }
+            return;
+        }
+
         /* LED cadence telegraphs HCI / link state at a glance:
              500 ms — HCI still booting
              250 ms — HCI up, no keyboard link
@@ -2463,4 +2477,4 @@ bool bth_try_handle_gamepad_report(const uint8_t *val, uint16_t vlen)
     bth_gamepad_publish(&gamepad_info, &gamepad_report, 3);
     return true;
 }
-#endif /* PICOMITEBTH */
+#endif /* PICOMITEBTH || PICOMITEHDMIBTH */

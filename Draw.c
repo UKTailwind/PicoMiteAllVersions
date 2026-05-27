@@ -566,7 +566,7 @@ volatile bool gui_click_synthetic_down = false;
    click_pin == 0 means the feature is disabled. click_pin_inv
    selects polarity: false = active-low (idle pulled up, pressed
    reads 0); true = active-high (idle pulled down, pressed reads 1). */
-int  click_pin     = 0;
+int click_pin = 0;
 bool click_pin_inv = false;
 
 /* True when the most recently latched click came from an emulated
@@ -1005,13 +1005,34 @@ void fun_touch(void)
     int btn = (nunstruct[2].L || gui_click_synthetic_down || click_pin_pressed()) ? 1 : 0;
     if (TOUCH_GETIRQTRIS && TOUCH_DOWN)
         btn = 1;
+#ifdef USBKEYBOARD
+    /* USB multi-touch acts as a third source for the touch button:
+       contact 0 with tip=1 is treated the same as resistive pen-down.
+       When active, TOUCH(X)/TOUCH(Y) return the scaled USB coords via
+       GetTouch's USB-aware path (GUI.c). */
+    if (usb_touch_active)
+        btn = 1;
+#endif
+    /* Source of X/Y when the button is held:
+         - hardware panel down and not in mouse-driven state  -> GetTouch()
+         - USB touch active                                   -> GetTouch() (returns usb_touch_x/y)
+         - everything else                                    -> cursor_x/y (mouse, GUI CLICK)
+       The "real pointing device" check needs to fire for either
+       physical panel or USB touch so we don't fall through to cursor
+       coordinates while the user's finger is on the screen. */
+    bool from_panel = (TOUCH_GETIRQTRIS && TOUCH_DOWN && !gui_click_from_mouse);
+#ifdef USBKEYBOARD
+    bool from_usb = usb_touch_active && !gui_click_from_mouse;
+#else
+    bool from_usb = false;
+#endif
     if (checkstring(ep, (unsigned char *)"X"))
-        iret = btn ? (TOUCH_GETIRQTRIS && TOUCH_DOWN && !gui_click_from_mouse
+        iret = btn ? ((from_panel || from_usb)
                           ? GetTouch(GET_X_AXIS)
                           : cursor_x)
                    : TOUCH_ERROR;
     else if (checkstring(ep, (unsigned char *)"Y"))
-        iret = btn ? (TOUCH_GETIRQTRIS && TOUCH_DOWN && !gui_click_from_mouse
+        iret = btn ? ((from_panel || from_usb)
                           ? GetTouch(GET_Y_AXIS)
                           : cursor_y)
                    : TOUCH_ERROR;
@@ -1265,7 +1286,7 @@ bool click_handle_gui_subcommand(unsigned char *cmdline_in)
                 if (click_pin)
                 {
                     ExtCfg(click_pin, EXT_NOT_CONFIG, 0);
-                    click_pin     = 0;
+                    click_pin = 0;
                     click_pin_inv = false;
                 }
                 return true;
@@ -1316,7 +1337,7 @@ bool click_handle_gui_subcommand(unsigned char *cmdline_in)
                 ExtCfg(new_pin, EXT_DIG_IN, CNPUSET);
             }
 
-            click_pin     = new_pin;
+            click_pin = new_pin;
             click_pin_inv = new_inv;
             return true;
         }
@@ -13291,42 +13312,42 @@ void MIPS16 InitDisplayVirtual(void)
 #ifdef HDMI
 void fun_getscanline(void)
 {
-    if (Option.CPU_Speed == Freq720P)
+    if (Option.Resolution == R1280x720)
     {
         iret = v_scanline - 30;
         if (iret < 0)
             iret += 750;
         targ = T_INT;
     }
-    else if (Option.CPU_Speed == Freq480P)
+    else if (Option.Resolution == R640x480f315)
     {
         iret = v_scanline - 20;
         if (iret < 0)
             iret += 500;
         targ = T_INT;
     }
-    else if (Option.CPU_Speed == FreqXGA)
+    else if (Option.Resolution == R1024x768)
     {
         iret = v_scanline - 38;
         if (iret < 0)
             iret += 806;
         targ = T_INT;
     }
-    else if (Option.CPU_Speed == FreqSVGA)
+    else if (Option.Resolution == R800x600)
     {
         iret = v_scanline - 25;
         if (iret < 0)
             iret += 625;
         targ = T_INT;
     }
-    else if (Option.CPU_Speed == Freq252P || Option.CPU_Speed == Freq378P)
+    else if (Option.Resolution == R640x480f252 || Option.Resolution == R640x480f378)
     {
         iret = v_scanline - 45;
         if (iret < 0)
             iret += 525;
         targ = T_INT;
     }
-    else if (Option.CPU_Speed == Freq848)
+    else if (Option.Resolution == R848x480)
     {
         iret = v_scanline - 37;
         if (iret < 0)
@@ -13494,45 +13515,45 @@ void MIPS16 ResetDisplay(void)
     PromptBC = Option.DefaultBC;
 #ifdef PICOMITEVGA
 #ifdef rp2350
-    if (Option.CPU_Speed == Freq848)
+    if (Option.Resolution == R848x480)
         HRes = ((DISPLAY_TYPE == SCREENMODE1 || DISPLAY_TYPE == SCREENMODE3) ? 848 : 424);
-    else if (Option.CPU_Speed == Freq400)
+    else if (Option.Resolution == R720x400)
         HRes = ((DISPLAY_TYPE == SCREENMODE1 || DISPLAY_TYPE == SCREENMODE3) ? 720 : 360);
-    else if (Option.CPU_Speed == FreqSVGA || Option.CPU_Speed == FreqY)
+    else if (Option.Resolution == R800x600 || Option.Resolution == R800x480)
         HRes = ((DISPLAY_TYPE == SCREENMODE1 || DISPLAY_TYPE == SCREENMODE3) ? 800 : 400);
     else
         HRes = ((DISPLAY_TYPE == SCREENMODE1 || DISPLAY_TYPE == SCREENMODE3) ? 640 : 320);
 #else
-    if (Option.CPU_Speed == Freq400)
+    if (Option.Resolution == R720x400)
         HRes = ((DISPLAY_TYPE == SCREENMODE1 || DISPLAY_TYPE == SCREENMODE3) ? 720 : 360);
     else
         HRes = ((DISPLAY_TYPE == SCREENMODE1 || DISPLAY_TYPE == SCREENMODE3) ? 640 : 320);
 #endif
-    if (Option.CPU_Speed == Freq400)
+    if (Option.Resolution == R720x400)
         VRes = ((DISPLAY_TYPE == SCREENMODE1 || DISPLAY_TYPE == SCREENMODE3) ? 400 : 200);
 #ifdef rp2350
-    else if (Option.CPU_Speed == FreqSVGA)
+    else if (Option.Resolution == R800x600)
         VRes = ((DISPLAY_TYPE == SCREENMODE1 || DISPLAY_TYPE == SCREENMODE3) ? 600 : 300);
 #endif
     else
         VRes = ((DISPLAY_TYPE == SCREENMODE1 || DISPLAY_TYPE == SCREENMODE3) ? 480 : 240);
 #ifdef HDMI
-    if (Option.CPU_Speed == Freq720P)
+    if (Option.Resolution == R1280x720)
     {
         HRes = (DISPLAY_TYPE == SCREENMODE1 ? 1280 : ((DISPLAY_TYPE == SCREENMODE2 || DISPLAY_TYPE == SCREENMODE5) ? 320 : 640));
         VRes = (DISPLAY_TYPE == SCREENMODE1 ? 720 : ((DISPLAY_TYPE == SCREENMODE2 || DISPLAY_TYPE == SCREENMODE5) ? 180 : 360));
     }
-    else if (Option.CPU_Speed == FreqXGA)
+    else if (Option.Resolution == R1024x768)
     {
         HRes = (DISPLAY_TYPE == SCREENMODE1 ? 1024 : ((DISPLAY_TYPE == SCREENMODE2 || DISPLAY_TYPE == SCREENMODE5) ? 256 : 512));
         VRes = (DISPLAY_TYPE == SCREENMODE1 ? 768 : ((DISPLAY_TYPE == SCREENMODE2 || DISPLAY_TYPE == SCREENMODE5) ? 192 : 384));
     }
-    else if (Option.CPU_Speed == FreqSVGA)
+    else if (Option.Resolution == R800x600)
     {
         HRes = ((DISPLAY_TYPE == SCREENMODE1 || DISPLAY_TYPE == SCREENMODE3) ? 800 : 400);
         VRes = ((DISPLAY_TYPE == SCREENMODE1 || DISPLAY_TYPE == SCREENMODE3) ? 600 : 300);
     }
-    else if (Option.CPU_Speed == FreqX)
+    else if (Option.Resolution == R1024x600)
     {
         HRes = (DISPLAY_TYPE == SCREENMODE1 ? 1024 : ((DISPLAY_TYPE == SCREENMODE2 || DISPLAY_TYPE == SCREENMODE5) ? 256 : 512));
         VRes = (DISPLAY_TYPE == SCREENMODE1 ? 600 : ((DISPLAY_TYPE == SCREENMODE2 || DISPLAY_TYPE == SCREENMODE5) ? 150 : 300));
@@ -15230,35 +15251,31 @@ void closeframebuffer(char layer)
 void cmd_framebuffer(void)
 {
     /*
-    RP2040 version support just modes 1 and 2
-    RP2350 vversions support modes 1 to 5
-    All modes can have a framebuffer and a layer buffer but only modes 2 and 5 automatically display the layer buffer over the top of the main display
-    In all other cases it is just another framebuffer that can be used to build up images to be copied to the main display
-    For VGA/HDMI Layer buffers and framebuffers have exactly the same resolution as the main display (unlike TFT displays)
-    For RP2350 Modes 1 and 2 both buffers are in the allocated Video Memory (640x240 bytes == 320x240x2)
-    For RP2350 Mode 5 the layer buffer is in the allocated video memory
-    All other buffers are allocated out of variable space using GetMemory
-    NB: for RP2350 with PSRAM buffers may be allocated in the slower external memory
-    Buffer sizes are:
-    Normal:
-        #define MODE1SIZE_S  VMaxH*VMaxV/8
-        #define MODE2SIZE_S  320*240/2
-        #define MODE3SIZE_S  VMaxH*VMaxV/2
-        #define MODE4SIZE_S  320*240*2
-        #define MODE5SIZE_S  320*240
+    RP2040 supports just modes 1 and 2. RP2350 supports modes 1-5.
 
-    Widescreen:
-        #define MODE1SIZE_W  1280 *720 /8
-        #define MODE2SIZE_W  (1280/4) * (720/4)/2
-        #define MODE3SIZE_W  (1280/2) * (720/2)/2
-        #define MODE5SIZE_W  (1280/4) * (720/4)
+    Every mode can have a framebuffer (CREATE) and a layer buffer
+    (LAYER); only modes 2 and 5 composite the layer over the main
+    display automatically — in other modes the layer is just another
+    offscreen surface to BLIT from. For VGA/HDMI all buffers have the
+    same resolution as the main display (unlike SPI TFT panels).
 
-    XGA:
-        #define MODE1SIZE_W  `1024 *768 /8
-        #define MODE2SIZE_W  (1024/4) * (768/4)/2
-        #define MODE3SIZE_W  (1024/2) * (768/2)/2
-        #define MODE5SIZE_W  (1024/4) * (768/4)
+    Memory: each build statically allocates a framebuffer pool sized
+    for its display layout (see Memory.c — typically the largest
+    framebuffer plus, for VGA/HDMI mode 1, the tile-colour arrays).
+    cmd_framebuffer's allocator tries to place extra buffers inside
+    that pool when the per-mode ScreenSize × N fits within
+    framebuffersize, otherwise it falls back to GetMemory() which
+    pulls from the MMBasic heap. The exact resolution / pool budget
+    is build-specific; resolution-specific tables that used to live
+    here got stale and were removed — read the Memory.c declarations
+    of AllMemory[] and framebuffersize for the current build's
+    layout.
 
+    On RP2350 builds with PSRAM enabled, GetMemory() may return a
+    pointer into external PSRAM; the LAYER / LAYER TOP commands
+    explicitly reject that for modes that need tightly-coupled RAM
+    bandwidth (SCREENMODE3, SCREENMODE5, and the post-allocation
+    check below).
     */
     unsigned char *p;
 #ifdef rp2350
