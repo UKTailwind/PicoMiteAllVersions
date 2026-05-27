@@ -3278,6 +3278,15 @@ readin:;
     uint64_t lastchartime = hal_time_us_64();
     while ((c = MMInkey()) != 0x1a && c != F1 && c != F2)
     { // while waiting for the end of text char
+        if ((BreakKey && c == BreakKey) || MMAbort)
+        {
+            MMAbort = false;
+            MMPrintString("\r\n");
+            ConsoleRxBufTail = ConsoleRxBufHead;
+            ClearTempMemory();
+            memset(tknbuf, 0, STRINGSIZE);
+            return;
+        }
         if (!first && noecho && hal_time_us_64() - lastchartime > 100000)
         {
             MMPrintString("Enter ctrl-Z, F1, or F2 to exit\r\n");
@@ -3330,12 +3339,11 @@ readin:;
 
 
     *p = 0; // terminate the string in RAM
-    while (getConsole() != -1)
-        ; // clear any rubbish in the input
-          //    ClearSavedVars();                                               // clear any saved variables
+    ConsoleRxBufTail = ConsoleRxBufHead;
     SaveProgramToFlash(buf, true);
     ClearSavedVars(); // clear any saved variables
     ClearTempMemory();
+    memset(tknbuf, 0, STRINGSIZE);
     if (c == F2)
     {
         ClearVars(0,true);
