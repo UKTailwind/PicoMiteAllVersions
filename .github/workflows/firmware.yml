@@ -29,9 +29,10 @@ permissions:
   contents: read
 
 jobs:
-  # Full compile gate. Mirrors the local buildall.sh; every supported
-  # port must build clean before release artifacts are uploaded for the
-  # PicoCalc variants.
+  # Full compile gate AND artifact source. Mirrors the local buildall.sh;
+  # every supported port must build clean, then every target's .uf2 is
+  # harvested from build_all/ and uploaded for the release job. One Pico
+  # SDK checkout covers all variants — no per-target matrix fan-out.
   buildall:
     runs-on: ubuntu-latest
     steps:
@@ -64,81 +65,40 @@ jobs:
           SKIP_HAL_PURITY: '1'
         run: ./buildall.sh
 
-  build:
-    needs: buildall
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - target: picocalc_rp2040
-            label:  picocalc-rp2040
-          - target: picocalc_wifi_rp2040
-            label:  picocalc-wifi-rp2040
-          - target: picocalc_rp2350
-            label:  picocalc-rp2350
-          - target: picocalc_wifi_rp2350
-            label:  picocalc-wifi-rp2350
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install arm-none-eabi toolchain
-        # Pinned to 14.2.Rel1 to match the local toolchain; Ubuntu's
-        # gcc-arm-none-eabi 13.2.1 produces ~4 KB larger binaries that
-        # push RP2040 VGA over the RAM limit.
-        uses: carlosperate/arm-none-eabi-gcc-action@v1
-        with:
-          release: '14.2.Rel1'
-
-      - name: Install build dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-              cmake ninja-build python3 build-essential
-
-      - name: Check out Pico SDK
-        uses: actions/checkout@v4
-        with:
-          repository: raspberrypi/pico-sdk
-          ref: 2.1.1
-          path: pico-sdk
-          submodules: recursive
-      - name: Patch Pico SDK for newer host GCC
-        run: bash tools/patch_pico_sdk_gcc15.sh "${{ github.workspace }}/pico-sdk"
-
-      - name: Build
-        # Explicit PORT names select the PicoCalc hardware variants; no
-        # compiler flags are needed to opt into PicoCalc support.
-        env:
-          PICO_SDK_PATH: ${{ github.workspace }}/pico-sdk
-        run: |
-          mkdir -p build
-          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DPORT=${{ matrix.target }}
-          ninja -C build
-          ./tools/check_flash_layout.sh --target ${{ matrix.target }} --build-dir build
-
-      - name: Stage artifacts
+      - name: Stage firmware artifacts
+        # Every target's executable is named PicoMite, so build_all/<target>/
+        # PicoMite.uf2 would collide when flattened. Rename each by its
+        # build_all/ directory name (the canonical buildall TARGET).
         run: |
           mkdir -p artifacts
-          uf2=$(find build -maxdepth 2 -name '*.uf2' | head -1)
-          if [ -z "$uf2" ]; then
-            echo "no .uf2 produced" >&2
-            find build -name '*.elf' -maxdepth 2 -print
+          for d in build_all/*/; do
+            t=$(basename "$d")
+            uf2=$(find "$d" -maxdepth 2 -name '*.uf2' | head -1)
+            if [ -n "$uf2" ]; then
+              cp -v "$uf2" "artifacts/PicoMite-${t}.uf2"
+            else
+              echo "no .uf2 for target $t" >&2
+            fi
+          done
+          ls -la artifacts
+          expected=$(find build_all -maxdepth 1 -mindepth 1 -type d | wc -l)
+          count=$(find artifacts -name '*.uf2' | wc -l)
+          echo "Staged $count of $expected firmware images"
+          if [ "$count" -ne "$expected" ]; then
+            echo "Expected $expected .uf2 images, got $count" >&2
             exit 1
           fi
-          cp "$uf2" "artifacts/PicoMite-${{ matrix.label }}.uf2"
-          ls -la artifacts
 
       - uses: actions/upload-artifact@v4
         with:
-          name: PicoMite-${{ matrix.label }}
-          path: artifacts/PicoMite-${{ matrix.label }}.uf2
+          name: firmware-uf2
+          path: artifacts/*.uf2
           if-no-files-found: error
 
   release:
-    # Publish PicoCalc .uf2s as raw downloads on a rolling 'latest'
-    # release after matrix builds succeed. No zip wrapper, direct links.
-    needs: build
+    # Publish every device .uf2 as raw downloads on a rolling 'latest'
+    # release after the build gate succeeds. No zip wrapper, direct links.
+    needs: buildall
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
@@ -150,13 +110,8 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          path: artifacts
-
-      - name: Stage release assets
-        run: |
-          mkdir -p release
-          find artifacts -name '*.uf2' -exec cp -v {} release/ \;
-          ls -la release
+          name: firmware-uf2
+          path: release
 
       - name: Upsert 'latest' release
         env:
@@ -166,23 +121,24 @@ jobs:
           date=$(git log -1 --format=%cI)
           summary=$(git log -1 --format='%s')
 
-          cat > notes.md <<EOF
-          Rolling build from \`main\`.
-
-          **Commit:** [\`$sha\`](https://github.com/${{ github.repository }}/commit/${{ github.sha }}) — $summary
-          **Built:** $date
-
-          ### Downloads
-
-          | Target | File |
-          |---|---|
-          | PicoCalc RP2040 | \`PicoMite-picocalc-rp2040.uf2\` |
-          | PicoCalc Pico W | \`PicoMite-picocalc-wifi-rp2040.uf2\` |
-          | PicoCalc RP2350 | \`PicoMite-picocalc-rp2350.uf2\` |
-          | PicoCalc Pico 2 W | \`PicoMite-picocalc-wifi-rp2350.uf2\` |
-
-          Web build: <https://jvanderberg.github.io/PicoMiteAllVersions/>
-          EOF
+          # Generate the download table from whatever was actually staged,
+          # so it never drifts from buildall.sh's TARGETS list.
+          {
+            echo "Rolling build from \`main\`."
+            echo ""
+            echo "**Commit:** [\`$sha\`](https://github.com/${{ github.repository }}/commit/${{ github.sha }}) — $summary"
+            echo "**Built:** $date"
+            echo ""
+            echo "### Downloads"
+            echo ""
+            echo "| File |"
+            echo "|---|"
+            for f in $(ls release/*.uf2 | sort); do
+              echo "| \`$(basename "$f")\` |"
+            done
+            echo ""
+            echo "Web build: <https://jvanderberg.github.io/PicoMiteAllVersions/>"
+          } > notes.md
 
           # 'gh release edit' doesn't replace assets cleanly; simplest
           # is delete-then-recreate so stale uf2s from previous commits
