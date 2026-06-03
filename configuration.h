@@ -67,7 +67,7 @@ extern "C"
 #define HEAP_MEMORY_SIZE (180 * 1024)
 #define MagicKey 0x4DB1F60E
 #else
-#define FLASH_TARGET_OFFSET (1056 * 1024)
+#define FLASH_TARGET_OFFSET (1072 * 1024)
 #define HEAP_MEMORY_SIZE (156 * 1024)
 #define MagicKey 0xD340BBCD
 #endif
@@ -81,11 +81,11 @@ extern "C"
 #define MAX_CPU 378000
 #define MIN_CPU 252000
 #ifdef USBKEYBOARD
-#define FLASH_TARGET_OFFSET (1040 * 1024)
+#define FLASH_TARGET_OFFSET (1056 * 1024)
 #define HEAP_MEMORY_SIZE (164 * 1024)
 #define MagicKey 0x4C73A942
 #else
-#define FLASH_TARGET_OFFSET (1008 * 1024)
+#define FLASH_TARGET_OFFSET (1024 * 1024)
 #define HEAP_MEMORY_SIZE (168 * 1024)
 #define MagicKey 0xDAEA58BA
 #endif
@@ -213,14 +213,30 @@ extern "C"
       R848x480 = 7,
       R720x400 = 8,
       R800x480 = 9,
-      R1024x600 = 10
+      R1024x600 = 10,
+#ifdef PICOMITEHDMIBTH
+      /* HDMIBTH-only: a "special" 640x480 that is RGB332 (8-bit) rather
+         than the normal full-colour RGB555 640x480. It shares the
+         1024x600 8-bit tile pipeline so it costs no extra framebuffer
+         and is deliberately kept OUT of the FullColour macro. Selected
+         at runtime by the RESOLUTION command (no reboot). */
+      R640x480x8 = 11,
+#endif
    } Resolution_TypeDef;
    static const int CPUFreqs[] = {FreqDefault, Freq720P, Freq480P, Freq252P, Freq378P, FreqXGA, FreqSVGA, Freq848, Freq400, FreqY, FreqX};
 /* Display capability macros */
 #define FullColour (Option.Resolution == R640x480f252 || Option.Resolution == R640x480f378 || \
                     Option.Resolution == R640x480f315 || Option.Resolution == R720x400)
+#ifdef PICOMITEHDMIBTH
+/* R640x480x8 behaves like 1024x600 (8-bit/RGB332, tile-based) so it is
+   treated as a MediumRes mode for font/tile-height selection. */
+#define MediumRes (Option.Resolution == R800x600 || Option.Resolution == R848x480 ||  \
+                   Option.Resolution == R800x480 || Option.Resolution == R1024x600 || \
+                   Option.Resolution == R640x480x8)
+#else
 #define MediumRes (Option.Resolution == R800x600 || Option.Resolution == R848x480 || \
                    Option.Resolution == R800x480 || Option.Resolution == R1024x600)
+#endif
 
 #endif /* PICOMITEVGA */
 
@@ -330,7 +346,7 @@ extern "C"
 
 #ifdef USBKEYBOARD
 #define MagicKey 0xEE897110
-#define FLASH_TARGET_OFFSET (912 * 1024)
+#define FLASH_TARGET_OFFSET (928 * 1024)
 #define HEAP_MEMORY_SIZE (132 * 1024)
 #else
 #ifdef PICOMITEMIN

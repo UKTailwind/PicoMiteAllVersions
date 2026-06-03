@@ -1282,8 +1282,7 @@ void i2c2Disable(unsigned char *p)
 void i2cSend(unsigned char *p)
 {
   int addr, i2c_options, sendlen, i;
-  void *ptr = NULL;
-  unsigned char *cptr = NULL;
+  unsigned int buf[256];
 
   getcsargs(&p, MAX_ARG_COUNT);
   if (!(argc & 0x01) || (argc < 7))
@@ -1300,89 +1299,10 @@ void i2cSend(unsigned char *p)
   I2C_Addr = addr;
   sendlen = getint(argv[4], 1, 256);
 
-  // With sendlen==1 the last arg is ambiguous: a single byte literal/expression OR a single-byte
-  // string/array variable. Probe argv[6]; if it resolves to a usable string/array variable, take
-  // the variable branch. Otherwise treat the arg(s) as numeric expressions.
-  int useVarBranch = (sendlen > 1 && argc == 7);
-  if (sendlen == 1 && argc == 7)
-  {
-    if (!isnamestart(*argv[6]))
-    {
-      useVarBranch = 0;
-    }
-    else
-    {
-      ptr = findvar(argv[6], V_NOFIND_NULL | V_EMPTY_OK);
-      if (ptr != NULL)
-      {
-        int t = g_vartbl[g_VarIndex].type;
-        if (((t & T_STR) && g_vartbl[g_VarIndex].dims[0] == 0) ||
-            ((t & (T_NBR | T_INT)) && g_vartbl[g_VarIndex].dims[0] > 0 && g_vartbl[g_VarIndex].dims[1] == 0))
-          useVarBranch = 1;
-        else
-          ptr = NULL;
-      }
-    }
-  }
+  GetCommsTxData(argv, argc, 6, sendlen, buf);
+  for (i = 0; i < sendlen; i++)
+    I2C_Send_Buffer[i] = (unsigned char)buf[i];
 
-  if (!useVarBranch)
-  { // numeric expressions for data
-    if (sendlen != ((argc - 5) >> 1))
-      StandardError(2);
-    for (i = 0; i < sendlen; i++)
-    {
-      I2C_Send_Buffer[i] = getinteger(argv[i + i + 6]);
-    }
-  }
-  else
-  { // an array of MMFLOAT, integer or a string
-    if (ptr == NULL)
-      ptr = findvar(argv[6], V_NOFIND_NULL | V_EMPTY_OK);
-    if (ptr == NULL)
-      StandardError(6);
-    CHECK_STRUCT_MEMBER_ARRAY(); // Struct member arrays not supported here
-    if ((g_vartbl[g_VarIndex].type & T_STR) && g_vartbl[g_VarIndex].dims[0] == 0)
-    { // string
-      if (sendlen > 255)
-        StandardError(21);
-      cptr = (unsigned char *)ptr;
-      cptr++; // skip the length byte in a MMBasic string
-      for (i = 0; i < sendlen; i++)
-      {
-        I2C_Send_Buffer[i] = (int)(*(cptr + i));
-      }
-    }
-    else if ((g_vartbl[g_VarIndex].type & T_NBR) && g_vartbl[g_VarIndex].dims[0] > 0 && g_vartbl[g_VarIndex].dims[1] == 0)
-    { // numeric array
-      if ((((MMFLOAT *)ptr - g_vartbl[g_VarIndex].val.fa) + sendlen) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase))
-      {
-        StandardError(28);
-      }
-      else
-      {
-        for (i = 0; i < sendlen; i++)
-        {
-          I2C_Send_Buffer[i] = (int)(*((MMFLOAT *)ptr + i));
-        }
-      }
-    }
-    else if ((g_vartbl[g_VarIndex].type & T_INT) && g_vartbl[g_VarIndex].dims[0] > 0 && g_vartbl[g_VarIndex].dims[1] == 0)
-    { // integer array
-      if ((((long long int *)ptr - g_vartbl[g_VarIndex].val.ia) + sendlen) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase))
-      {
-        StandardError(28);
-      }
-      else
-      {
-        for (i = 0; i < sendlen; i++)
-        {
-          I2C_Send_Buffer[i] = (int)(*((long long int *)ptr + i));
-        }
-      }
-    }
-    else
-      StandardError(6);
-  }
   I2C_Sendlen = sendlen;
   I2C_Rcvlen = 0;
 
@@ -1392,107 +1312,21 @@ void i2cSend(unsigned char *p)
 void i2cSendSlave(unsigned char *p, int channel)
 {
   int sendlen, i;
-  void *ptr = NULL;
-  unsigned char *cptr = NULL;
+  unsigned int buf[256];
   getcsargs(&p, MAX_ARG_COUNT);
-  if (!(argc >= 3))
+  if (!(argc & 0x01) || (argc < 3))
     SyntaxError();
   if (!((I2C_Status & I2C_Status_Slave && channel == 0) || (I2C2_Status & I2C_Status_Slave && channel == 1)))
     error("I2C slave not open");
-  unsigned char *bbuff;
-  if (channel == 0)
-  {
-    bbuff = I2C_Send_Buffer;
-  }
-  else
-  {
-    bbuff = I2C_Send_Buffer;
-  }
+  unsigned char *bbuff = I2C_Send_Buffer;
   sendlen = getinteger(argv[0]);
   if (sendlen < 1 || sendlen > 255)
     StandardError(21);
 
-  // With sendlen==1 the last arg is ambiguous: a single byte literal/expression OR a single-byte
-  // string/array variable. Probe argv[2]; if it resolves to a usable string/array variable, take
-  // the variable branch. Otherwise treat the arg(s) as numeric expressions.
-  int useVarBranch = (sendlen > 1 && argc == 3);
-  if (sendlen == 1 && argc == 3)
-  {
-    if (!isnamestart(*argv[2]))
-    {
-      useVarBranch = 0;
-    }
-    else
-    {
-      ptr = findvar(argv[2], V_NOFIND_NULL | V_EMPTY_OK);
-      if (ptr != NULL)
-      {
-        int t = g_vartbl[g_VarIndex].type;
-        if (((t & T_STR) && g_vartbl[g_VarIndex].dims[0] == 0) ||
-            ((t & (T_NBR | T_INT)) && g_vartbl[g_VarIndex].dims[0] > 0 && g_vartbl[g_VarIndex].dims[1] == 0))
-          useVarBranch = 1;
-        else
-          ptr = NULL;
-      }
-    }
-  }
+  GetCommsTxData(argv, argc, 2, sendlen, buf);
+  for (i = 0; i < sendlen; i++)
+    bbuff[i] = (unsigned char)buf[i];
 
-  if (!useVarBranch)
-  { // numeric expressions for data
-    if (sendlen != ((argc - 1) >> 1))
-      StandardError(2);
-    for (i = 0; i < sendlen; i++)
-    {
-      bbuff[i] = getinteger(argv[i + i + 2]);
-    }
-  }
-  else
-  { // an array of MMFLOAT, integer or a string
-    if (ptr == NULL)
-      ptr = findvar(argv[2], V_NOFIND_NULL | V_EMPTY_OK);
-    if (ptr == NULL)
-      StandardError(6);
-    CHECK_STRUCT_MEMBER_ARRAY(); // Struct member arrays not supported here
-    if ((g_vartbl[g_VarIndex].type & T_STR) && g_vartbl[g_VarIndex].dims[0] == 0)
-    { // string
-      cptr = (unsigned char *)ptr;
-      cptr++; // skip the length byte in a MMBasic string
-      for (i = 0; i < sendlen; i++)
-      {
-        bbuff[i] = (int)(*(cptr + i));
-      }
-    }
-    else if ((g_vartbl[g_VarIndex].type & T_NBR) && g_vartbl[g_VarIndex].dims[0] > 0 && g_vartbl[g_VarIndex].dims[1] == 0)
-    { // numeric array
-      if ((((MMFLOAT *)ptr - g_vartbl[g_VarIndex].val.fa) + sendlen) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase))
-      {
-        StandardError(28);
-      }
-      else
-      {
-        for (i = 0; i < sendlen; i++)
-        {
-          bbuff[i] = (int)(*((MMFLOAT *)ptr + i));
-        }
-      }
-    }
-    else if ((g_vartbl[g_VarIndex].type & T_INT) && g_vartbl[g_VarIndex].dims[0] > 0 && g_vartbl[g_VarIndex].dims[1] == 0)
-    { // integer array
-      if ((((long long int *)ptr - g_vartbl[g_VarIndex].val.ia) + sendlen) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase))
-      {
-        StandardError(28);
-      }
-      else
-      {
-        for (i = 0; i < sendlen; i++)
-        {
-          bbuff[i] = (int)(*((long long int *)ptr + i));
-        }
-      }
-    }
-    else
-      StandardError(6);
-  }
   i2c_inst_t *i2c = (channel == 0) ? i2c0 : i2c1;
   // Clear any stale STOP / TX_ABRT from a previous transaction so we don't bail out immediately.
   (void)i2c->hw->clr_stop_det;
@@ -1514,8 +1348,7 @@ void i2cSendSlave(unsigned char *p, int channel)
 void i2c2Send(unsigned char *p)
 {
   int addr, i2c2_options, sendlen, i;
-  void *ptr = NULL;
-  unsigned char *cptr = NULL;
+  unsigned int buf[256];
 
   getcsargs(&p, MAX_ARG_COUNT);
   if (!(argc & 0x01) || (argc < 7))
@@ -1532,89 +1365,10 @@ void i2c2Send(unsigned char *p)
   I2C2_Addr = addr;
   sendlen = getint(argv[4], 1, 256);
 
-  // With sendlen==1 the last arg is ambiguous: a single byte literal/expression OR a single-byte
-  // string/array variable. Probe argv[6]; if it resolves to a usable string/array variable, take
-  // the variable branch. Otherwise treat the arg(s) as numeric expressions.
-  int useVarBranch = (sendlen > 1 && argc == 7);
-  if (sendlen == 1 && argc == 7)
-  {
-    if (!isnamestart(*argv[6]))
-    {
-      useVarBranch = 0;
-    }
-    else
-    {
-      ptr = findvar(argv[6], V_NOFIND_NULL | V_EMPTY_OK);
-      if (ptr != NULL)
-      {
-        int t = g_vartbl[g_VarIndex].type;
-        if (((t & T_STR) && g_vartbl[g_VarIndex].dims[0] == 0) ||
-            ((t & (T_NBR | T_INT)) && g_vartbl[g_VarIndex].dims[0] > 0 && g_vartbl[g_VarIndex].dims[1] == 0))
-          useVarBranch = 1;
-        else
-          ptr = NULL;
-      }
-    }
-  }
+  GetCommsTxData(argv, argc, 6, sendlen, buf);
+  for (i = 0; i < sendlen; i++)
+    I2C_Send_Buffer[i] = (unsigned char)buf[i];
 
-  if (!useVarBranch)
-  { // numeric expressions for data
-    if (sendlen != ((argc - 5) >> 1))
-      StandardError(2);
-    for (i = 0; i < sendlen; i++)
-    {
-      I2C_Send_Buffer[i] = getinteger(argv[i + i + 6]);
-    }
-  }
-  else
-  { // an array of MMFLOAT, integer or a string
-    if (ptr == NULL)
-      ptr = findvar(argv[6], V_NOFIND_NULL | V_EMPTY_OK);
-    if (ptr == NULL)
-      StandardError(6);
-    CHECK_STRUCT_MEMBER_ARRAY(); // Struct member arrays not supported here
-    if ((g_vartbl[g_VarIndex].type & T_STR) && g_vartbl[g_VarIndex].dims[0] == 0)
-    { // string
-      if (sendlen > 255)
-        StandardError(21);
-      cptr = (unsigned char *)ptr;
-      cptr++; // skip the length byte in a MMBasic string
-      for (i = 0; i < sendlen; i++)
-      {
-        I2C_Send_Buffer[i] = (int)(*(cptr + i));
-      }
-    }
-    else if ((g_vartbl[g_VarIndex].type & T_NBR) && g_vartbl[g_VarIndex].dims[0] > 0 && g_vartbl[g_VarIndex].dims[1] == 0)
-    { // numeric array
-      if ((((MMFLOAT *)ptr - g_vartbl[g_VarIndex].val.fa) + sendlen) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase))
-      {
-        StandardError(28);
-      }
-      else
-      {
-        for (i = 0; i < sendlen; i++)
-        {
-          I2C_Send_Buffer[i] = (int)(*((MMFLOAT *)ptr + i));
-        }
-      }
-    }
-    else if ((g_vartbl[g_VarIndex].type & T_INT) && g_vartbl[g_VarIndex].dims[0] > 0 && g_vartbl[g_VarIndex].dims[1] == 0)
-    { // integer array
-      if ((((long long int *)ptr - g_vartbl[g_VarIndex].val.ia) + sendlen) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase))
-      {
-        StandardError(28);
-      }
-      else
-      {
-        for (i = 0; i < sendlen; i++)
-        {
-          I2C_Send_Buffer[i] = (int)(*((long long int *)ptr + i));
-        }
-      }
-    }
-    else
-      StandardError(6);
-  }
   I2C2_Sendlen = sendlen;
   I2C2_Rcvlen = 0;
 
@@ -1660,10 +1414,10 @@ void i2c2Check(unsigned char *p)
 // receive data from an I2C slave - master mode
 void i2cReceive(unsigned char *p)
 {
-  int addr, i2c_options, rcvlen;
-  void *ptr = NULL;
-  getcsargs(&p, 7);
-  if (argc != 7)
+  int addr, i2c_options, rcvlen, i;
+  CommsRxDest dest;
+  getcsargs(&p, MAX_ARG_COUNT);
+  if (!(argc & 0x01) || (argc < 7))
     SyntaxError();
   if (!I2C_enabled)
     error("I2C not open");
@@ -1679,78 +1433,25 @@ void i2cReceive(unsigned char *p)
   rcvlen = getinteger(argv[4]);
   if (rcvlen < 1)
     StandardError(21);
-  ptr = findvar(argv[6], V_FIND | V_EMPTY_OK);
-  if (g_vartbl[g_VarIndex].type & T_CONST)
-    StandardError(22);
-  if (ptr == NULL)
-    StandardError(6);
-  CHECK_STRUCT_MEMBER_ARRAY(); // Struct member arrays not supported here
-  if (g_vartbl[g_VarIndex].type & T_NBR)
-  {
-    if (g_vartbl[g_VarIndex].dims[1] != 0)
-      StandardError(6);
-    if (g_vartbl[g_VarIndex].dims[0] <= 0)
-    { // Not an array
-      if (rcvlen != 1)
-        StandardError(6);
-    }
-    else
-    { // An array
-      if ((((MMFLOAT *)ptr - g_vartbl[g_VarIndex].val.fa) + rcvlen) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase))
-        StandardError(32);
-    }
-    I2C_Rcvbuf_Float = (MMFLOAT *)ptr;
-  }
-  else if (g_vartbl[g_VarIndex].type & T_INT)
-  {
-    if (g_vartbl[g_VarIndex].dims[1] != 0)
-      StandardError(6);
-    if (g_vartbl[g_VarIndex].dims[0] <= 0)
-    { // Not an array
-      if (rcvlen != 1)
-        StandardError(6);
-    }
-    else
-    { // An array
-      if ((((long long int *)ptr - g_vartbl[g_VarIndex].val.ia) + rcvlen) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase))
-        StandardError(32);
-    }
-    I2C_Rcvbuf_Int = (long long int *)ptr;
-  }
-  else if (g_vartbl[g_VarIndex].type & T_STR)
-  {
-    if (rcvlen < 1 || rcvlen > 255)
-      StandardError(21);
-    if (g_vartbl[g_VarIndex].dims[0] != 0)
-      StandardError(6);
-    *(char *)ptr = rcvlen;
-    I2C_Rcvbuf_String = (char *)ptr + 1;
-  }
-  else
-    StandardError(6);
+  GetCommsRxDest(argv, argc, 6, rcvlen, &dest);
   I2C_Rcvlen = rcvlen;
-
   I2C_Sendlen = 0;
-  char *buff = GetTempMainMemory(rcvlen > 255 ? rcvlen + 2 : STRINGSIZE);
-  //	PInt((uint32_t)I2C_Rcvbuf_String);
-  i2c_masterCommand(1, (unsigned char *)buff, 1); // Foreground - update mmI2Cvalue
-  //	PIntComma(rcvlen);
-  //	PInt((uint32_t)I2C_Rcvbuf_String);PRet();
-  //	if(g_vartbl[g_VarIndex].type & T_STR)*(char *)ptr = rcvlen;
+  // Receive the raw bytes into a temp buffer (the static I2C_Rcvbuf_* pointers are left NULL so
+  // i2c_masterCommand fills only the supplied buffer), then distribute via PutCommsRxData.
+  unsigned char *raw = GetTempMainMemory(rcvlen);
+  unsigned int *buf = GetTempMainMemory(rcvlen * sizeof(unsigned int));
+  i2c_masterCommand(1, raw, 1); // Foreground - update mmI2Cvalue
+  for (i = 0; i < rcvlen; i++)
+    buf[i] = raw[i];
+  PutCommsRxData(&dest, buf);
 }
 void i2cReceiveSlave(unsigned char *p, int channel)
 {
-  int rcvlen;
+  int rcvlen, count = 0, i;
   void *ptr = NULL;
   MMFLOAT *rcvdlenFloat = NULL;
   long long int *rcvdlenInt = NULL;
-  int count = 0;
-  I2C_Rcvbuf_Float = NULL;
-  I2C_Rcvbuf_Int = NULL;
-  I2C_Rcvbuf_String = NULL;
-  I2C2_Rcvbuf_Float = NULL;
-  I2C2_Rcvbuf_Int = NULL;
-  I2C2_Rcvbuf_String = NULL;
+  CommsRxDest dest;
   getcsargs(&p, 5);
   if (argc != 5)
     SyntaxError();
@@ -1759,53 +1460,9 @@ void i2cReceiveSlave(unsigned char *p, int channel)
   rcvlen = getinteger(argv[0]);
   if (rcvlen < 1 || rcvlen > 255)
     StandardError(21);
-  ptr = findvar(argv[2], V_FIND | V_EMPTY_OK);
-  if (g_vartbl[g_VarIndex].type & T_CONST)
-    StandardError(22);
-  if (ptr == NULL)
-    StandardError(6);
-  CHECK_STRUCT_MEMBER_ARRAY(); // Struct member arrays not supported here
-  if (g_vartbl[g_VarIndex].type & T_NBR)
-  {
-    if (g_vartbl[g_VarIndex].dims[1] != 0)
-      StandardError(6);
-    if (g_vartbl[g_VarIndex].dims[0] <= 0)
-    { // Not an array
-      if (rcvlen != 1)
-        StandardError(6);
-    }
-    else
-    { // An array
-      if ((((MMFLOAT *)ptr - g_vartbl[g_VarIndex].val.fa) + rcvlen) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase))
-        StandardError(32);
-    }
-    I2C_Rcvbuf_Float = (MMFLOAT *)ptr;
-  }
-  else if (g_vartbl[g_VarIndex].type & T_INT)
-  {
-    if (g_vartbl[g_VarIndex].dims[1] != 0)
-      StandardError(6);
-    if (g_vartbl[g_VarIndex].dims[0] <= 0)
-    { // Not an array
-      if (rcvlen != 1)
-        StandardError(6);
-    }
-    else
-    { // An array
-      if ((((long long int *)ptr - g_vartbl[g_VarIndex].val.ia) + rcvlen) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase))
-        StandardError(32);
-    }
-    I2C_Rcvbuf_Int = (long long int *)ptr;
-  }
-  else if (g_vartbl[g_VarIndex].type & T_STR)
-  {
-    if (g_vartbl[g_VarIndex].dims[0] != 0)
-      StandardError(6);
-    *(char *)ptr = rcvlen;
-    I2C_Rcvbuf_String = (char *)ptr + 1;
-  }
-  else
-    StandardError(6);
+  // Validate the single receive buffer at argv[2]. Pass argc==3 so the buffer is treated as a
+  // single destination (the trailing rcvdlen output at argv[4] is resolved separately below).
+  GetCommsRxDest(argv, 3, 2, rcvlen, &dest);
   ptr = findvar(argv[4], V_FIND);
   if (g_vartbl[g_VarIndex].type & T_CONST)
     StandardError(22);
@@ -1836,24 +1493,16 @@ void i2cReceiveSlave(unsigned char *p, int channel)
     }
   }
   (void)i2c->hw->clr_stop_det;
-  for (int i = 0; i < count; i++)
-  {
-    if (I2C_Rcvbuf_String != NULL)
-    {
-      *I2C_Rcvbuf_String = bbuff[i];
-      I2C_Rcvbuf_String++;
-    }
-    if (I2C_Rcvbuf_Float != NULL)
-    {
-      *I2C_Rcvbuf_Float = bbuff[i];
-      I2C_Rcvbuf_Float++;
-    }
-    if (I2C_Rcvbuf_Int != NULL)
-    {
-      *I2C_Rcvbuf_Int = bbuff[i];
-      I2C_Rcvbuf_Int++;
-    }
-  }
+
+  // Store only the bytes actually received (count, which may be fewer than rcvlen).
+  unsigned int tmp[256];
+  for (i = 0; i < count; i++)
+    tmp[i] = bbuff[i];
+  dest.len = count;
+  if (dest.kind == COMMS_RXD_STRING)
+    ((char *)dest.ptr)[-1] = (char)count; // shorten the string to the number of bytes received
+  PutCommsRxData(&dest, tmp);
+
   if (!(rcvdlenFloat == NULL))
     *rcvdlenFloat = (MMFLOAT)count;
   else
@@ -1867,10 +1516,10 @@ void i2cReceiveSlave(unsigned char *p, int channel)
 // receive data from an I2C slave - master mode
 void i2c2Receive(unsigned char *p)
 {
-  int addr, i2c2_options, rcvlen;
-  void *ptr = NULL;
-  getcsargs(&p, 7);
-  if (argc != 7)
+  int addr, i2c2_options, rcvlen, i;
+  CommsRxDest dest;
+  getcsargs(&p, MAX_ARG_COUNT);
+  if (!(argc & 0x01) || (argc < 7))
     SyntaxError();
   if (!I2C2_enabled)
     error("I2C not open");
@@ -1886,61 +1535,17 @@ void i2c2Receive(unsigned char *p)
   rcvlen = getinteger(argv[4]);
   if (rcvlen < 1)
     StandardError(21);
-  ptr = findvar(argv[6], V_FIND | V_EMPTY_OK);
-  if (g_vartbl[g_VarIndex].type & T_CONST)
-    StandardError(22);
-  if (ptr == NULL)
-    StandardError(6);
-  CHECK_STRUCT_MEMBER_ARRAY(); // Struct member arrays not supported here
-  if (g_vartbl[g_VarIndex].type & T_NBR)
-  {
-    if (g_vartbl[g_VarIndex].dims[1] != 0)
-      StandardError(6);
-    if (g_vartbl[g_VarIndex].dims[0] <= 0)
-    { // Not an array
-      if (rcvlen != 1)
-        StandardError(6);
-    }
-    else
-    { // An array
-      if ((((MMFLOAT *)ptr - g_vartbl[g_VarIndex].val.fa) + rcvlen) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase))
-        StandardError(32);
-    }
-    I2C2_Rcvbuf_Float = (MMFLOAT *)ptr;
-  }
-  else if (g_vartbl[g_VarIndex].type & T_INT)
-  {
-    if (g_vartbl[g_VarIndex].dims[1] != 0)
-      StandardError(6);
-    if (g_vartbl[g_VarIndex].dims[0] <= 0)
-    { // Not an array
-      if (rcvlen != 1)
-        StandardError(6);
-    }
-    else
-    { // An array
-      if ((((long long int *)ptr - g_vartbl[g_VarIndex].val.ia) + rcvlen) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase))
-        StandardError(32);
-    }
-    I2C2_Rcvbuf_Int = (long long int *)ptr;
-  }
-  else if (g_vartbl[g_VarIndex].type & T_STR)
-  {
-    if (rcvlen < 1 || rcvlen > 255)
-      StandardError(21);
-    if (g_vartbl[g_VarIndex].dims[0] != 0)
-      StandardError(6);
-    *(char *)ptr = rcvlen;
-    I2C2_Rcvbuf_String = (char *)ptr + 1;
-  }
-  else
-    StandardError(6);
+  GetCommsRxDest(argv, argc, 6, rcvlen, &dest);
   I2C2_Rcvlen = rcvlen;
-
   I2C2_Sendlen = 0;
-
-  char *buff = GetTempMainMemory(rcvlen > 255 ? rcvlen + 2 : STRINGSIZE);
-  i2c2_masterCommand(1, (unsigned char *)buff, 1); // Foreground - update mmI2Cvalue
+  // Receive the raw bytes into a temp buffer (the static I2C2_Rcvbuf_* pointers are left NULL so
+  // i2c2_masterCommand fills only the supplied buffer), then distribute via PutCommsRxData.
+  unsigned char *raw = GetTempMainMemory(rcvlen);
+  unsigned int *buf = GetTempMainMemory(rcvlen * sizeof(unsigned int));
+  i2c2_masterCommand(1, raw, 1); // Foreground - update mmI2Cvalue
+  for (i = 0; i < rcvlen; i++)
+    buf[i] = raw[i];
+  PutCommsRxData(&dest, buf);
 }
 
 /**************************************************************************************************

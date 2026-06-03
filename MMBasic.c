@@ -6559,6 +6559,187 @@ long long int __not_in_flash_func(FloatToInt64)(MMFLOAT x)
         return (x >= 0 ? (long long int)(x + 0.5) : (long long int)(x - 0.5));
 }
 
+/***************************************************************************************************
+ Common data marshalling for the I2C, SPI and ONEWIRE READ/WRITE commands.
+ See the header comment in MMBasic.h for the three accepted argument forms.
+ 'argv'/'argc' are the caller's getcsargs() results, 'dataidx' is the argv index of the first data
+ argument and 'len' is the declared number of items.
+****************************************************************************************************/
+
+// Gather 'len' values to transmit into buf[0..len-1].
+void GetCommsTxData(unsigned char *argv[], int argc, int dataidx, int len, unsigned int *buf)
+{
+    void *ptr = NULL;
+    int i;
+    int useVar = 0;
+
+    // A single data argument may be a string variable or a whole array referenced with empty
+    // brackets.  Anything else (a list, a single expression, a single array element) is handled
+    // as a list of expressions below.
+    if (argc == dataidx + 1 && isnamestart(*argv[dataidx]))
+    {
+        ptr = findvar(argv[dataidx], V_NOFIND_NULL | V_EMPTY_OK);
+        if (ptr != NULL)
+        {
+            int t = g_vartbl[g_VarIndex].type;
+            if (((t & T_STR) && g_vartbl[g_VarIndex].dims[0] == 0) ||
+                (emptyarray && (t & (T_NBR | T_INT)) && g_vartbl[g_VarIndex].dims[0] > 0 && g_vartbl[g_VarIndex].dims[1] == 0))
+                useVar = 1;
+            else
+                ptr = NULL;
+        }
+    }
+
+    if (!useVar)
+    { // a list of expressions (also covers a single scalar or a single array element)
+        if (len != ((argc - dataidx + 1) >> 1))
+            StandardError(2);
+        for (i = 0; i < len; i++)
+            buf[i] = getinteger(argv[dataidx + i + i]);
+        return;
+    }
+
+    CHECK_STRUCT_MEMBER_ARRAY(); // Struct member arrays not supported here
+    if (g_vartbl[g_VarIndex].type & T_STR)
+    { // string variable
+        unsigned char *cptr = (unsigned char *)ptr;
+        if (*cptr < len)
+            StandardError(28);
+        cptr++; // skip the length byte in a MMBasic string
+        for (i = 0; i < len; i++)
+            buf[i] = cptr[i];
+    }
+    else if (g_vartbl[g_VarIndex].type & T_NBR)
+    { // float array
+        if ((((MMFLOAT *)ptr - g_vartbl[g_VarIndex].val.fa) + len) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase))
+            StandardError(28);
+        for (i = 0; i < len; i++)
+            buf[i] = FloatToInt32(*((MMFLOAT *)ptr + i));
+    }
+    else
+    { // integer array
+        if ((((long long int *)ptr - g_vartbl[g_VarIndex].val.ia) + len) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase))
+            StandardError(28);
+        for (i = 0; i < len; i++)
+            buf[i] = (unsigned int)(*((long long int *)ptr + i));
+    }
+}
+
+// Validate the destination(s) for 'len' received values and record them in 'dest'.
+void GetCommsRxDest(unsigned char *argv[], int argc, int dataidx, int len, CommsRxDest *dest)
+{
+    void *ptr;
+    dest->len = len;
+
+    if (argc > dataidx + 1)
+    { // a list of individual lvalues, one per received item (array elements allowed)
+        if (len != ((argc - dataidx + 1) >> 1))
+            StandardError(2);
+        // Resolve each target now; variable storage is stable for the life of the command, whereas
+        // argv (and its backing argbuf) may be freed before the values are stored.
+        dest->list = GetTempMemory(len * sizeof(CommsRxItem));
+        for (int i = 0; i < len; i++)
+        {
+            void *vp = findvar(argv[dataidx + i + i], V_FIND | V_EMPTY_OK);
+            if (g_vartbl[g_VarIndex].type & T_CONST)
+                StandardError(22);
+            if (emptyarray) // a whole array is not a valid single list item
+                StandardError(6);
+            if (!(g_vartbl[g_VarIndex].type & (T_NBR | T_INT)))
+                StandardError(6);
+            dest->list[i].ptr = vp;
+            dest->list[i].isint = (g_vartbl[g_VarIndex].type & T_INT) ? 1 : 0;
+        }
+        dest->kind = COMMS_RXD_LIST;
+        return;
+    }
+
+    // a single argument: a string, a whole array (empty brackets) or a single scalar / element
+    ptr = findvar(argv[dataidx], V_FIND | V_EMPTY_OK);
+    if (g_vartbl[g_VarIndex].type & T_CONST)
+        StandardError(22);
+    if (ptr == NULL)
+        StandardError(6);
+    CHECK_STRUCT_MEMBER_ARRAY(); // Struct member arrays not supported here
+
+    if (g_vartbl[g_VarIndex].type & T_STR)
+    {
+        if (len < 1 || len > 255)
+            StandardError(21);
+        if (g_vartbl[g_VarIndex].dims[0] != 0)
+            StandardError(6);
+        *(char *)ptr = len;
+        dest->kind = COMMS_RXD_STRING;
+        dest->ptr = (char *)ptr + 1; // skip the length byte
+    }
+    else if (g_vartbl[g_VarIndex].type & T_NBR)
+    {
+        if (g_vartbl[g_VarIndex].dims[1] != 0)
+            StandardError(6);
+        if (emptyarray)
+        { // a whole array
+            if ((((MMFLOAT *)ptr - g_vartbl[g_VarIndex].val.fa) + len) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase))
+                StandardError(32);
+        }
+        else
+        { // a single scalar or array element
+            if (len != 1)
+                StandardError(6);
+        }
+        dest->kind = COMMS_RXD_FLOAT;
+        dest->ptr = ptr;
+    }
+    else if (g_vartbl[g_VarIndex].type & T_INT)
+    {
+        if (g_vartbl[g_VarIndex].dims[1] != 0)
+            StandardError(6);
+        if (emptyarray)
+        {
+            if ((((long long int *)ptr - g_vartbl[g_VarIndex].val.ia) + len) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase))
+                StandardError(32);
+        }
+        else
+        {
+            if (len != 1)
+                StandardError(6);
+        }
+        dest->kind = COMMS_RXD_INT;
+        dest->ptr = ptr;
+    }
+    else
+        StandardError(6);
+}
+
+// Scatter 'len' raw received values from buf[] into the destination described by 'dest'.
+void PutCommsRxData(CommsRxDest *dest, unsigned int *buf)
+{
+    int i;
+    switch (dest->kind)
+    {
+    case COMMS_RXD_FLOAT:
+        for (i = 0; i < dest->len; i++)
+            ((MMFLOAT *)dest->ptr)[i] = (MMFLOAT)buf[i];
+        break;
+    case COMMS_RXD_INT:
+        for (i = 0; i < dest->len; i++)
+            ((long long int *)dest->ptr)[i] = (long long int)buf[i];
+        break;
+    case COMMS_RXD_STRING:
+        for (i = 0; i < dest->len; i++)
+            ((char *)dest->ptr)[i] = (char)buf[i];
+        break;
+    case COMMS_RXD_LIST:
+        for (i = 0; i < dest->len; i++)
+        {
+            if (dest->list[i].isint)
+                *((long long int *)dest->list[i].ptr) = (long long int)buf[i];
+            else
+                *((MMFLOAT *)dest->list[i].ptr) = (MMFLOAT)buf[i];
+        }
+        break;
+    }
+}
+
 // make a string uppercase
 void __not_in_flash_func(makeupper)(unsigned char *p)
 {

@@ -530,6 +530,36 @@ long long int FloatToInt64(MMFLOAT x);
      * ============================================================================ */
     void makeargs(unsigned char **tp, int maxargs, unsigned char *argbuf, unsigned char *argv[], int *argc, unsigned char *delim);
     void MakeCommaSeparatedArgs(unsigned char **tp, int maxargs, unsigned char *argbuf, unsigned char *argv[], int *argc);
+
+    /* ============================================================================
+     * Common data marshalling for the I2C / SPI / ONEWIRE READ/WRITE commands.
+     * The caller runs getcsargs() and validates its own leading fixed arguments,
+     * then passes its local argv/argc plus 'dataidx' (the argv index of the first
+     * data argument) and 'len' (the declared number of items to transfer).
+     * All variants accept the same three forms:
+     *   1. a list of individual expressions / lvalues (count == len, array elements allowed)
+     *   2. a single numeric or integer array referenced with empty brackets  e.g. array()
+     *   3. a single string variable long enough to supply / hold len bytes
+     * ============================================================================ */
+#define COMMS_RXD_FLOAT 0
+#define COMMS_RXD_INT 1
+#define COMMS_RXD_STRING 2
+#define COMMS_RXD_LIST 3
+    typedef struct s_CommsRxItem
+    {
+        void *ptr; // storage for one target variable / array element
+        int isint; // 1 = integer (long long int) target, 0 = float (MMFLOAT) target
+    } CommsRxItem;
+    typedef struct s_CommsRxDest
+    {
+        int kind;          // one of COMMS_RXD_*
+        void *ptr;         // FLOAT/INT/STRING: base pointer (STRING already past the length byte)
+        CommsRxItem *list; // LIST: array of 'len' resolved targets (temp memory, lives for the command)
+        int len;           // number of items
+    } CommsRxDest;
+    void GetCommsTxData(unsigned char *argv[], int argc, int dataidx, int len, unsigned int *buf);
+    void GetCommsRxDest(unsigned char *argv[], int argc, int dataidx, int len, CommsRxDest *dest);
+    void PutCommsRxData(CommsRxDest *dest, unsigned int *buf);
     void *DoExpression(unsigned char *p, int *t);
     unsigned char *evaluate(unsigned char *p, MMFLOAT *fa, long long int *ia, unsigned char **sa, int *ta, int noerror);
     unsigned char *doexpr(unsigned char *p, MMFLOAT *fa, long long int *ia, unsigned char **sa, int *oo, int *t);

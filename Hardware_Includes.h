@@ -260,19 +260,19 @@ typedef struct TU_ATTR_PACKED_16
  * the report descriptor at enumeration; process_touch_report() then uses
  * these offsets to decode each input report.
  */
-#define MAX_TOUCH_CONTACTS 10  /* HID spec allows more but 10 is the
-                                  practical cap for consumer screens */
+#define MAX_TOUCH_CONTACTS 10 /* HID spec allows more but 10 is the \
+								 practical cap for consumer screens */
 
 typedef struct
 {
-	bool valid;                          /* descriptor looked like a touch screen */
+	bool valid; /* descriptor looked like a touch screen */
 	bool uses_report_id;
-	uint8_t report_id;                   /* touch reports often share endpoint with config */
-	uint16_t report_length_bytes;        /* total report length (incl. report-id byte) */
-	uint8_t max_contacts;                /* number of Finger collections found */
+	uint8_t report_id;			  /* touch reports often share endpoint with config */
+	uint16_t report_length_bytes; /* total report length (incl. report-id byte) */
+	uint8_t max_contacts;		  /* number of Finger collections found */
 
 	/* Contact Count (Digitizer usage 0x54) — appears once per report. */
-	uint16_t contact_count_bit_offset;   /* relative to start of report payload */
+	uint16_t contact_count_bit_offset; /* relative to start of report payload */
 	uint8_t contact_count_bits;
 
 	/* The descriptor declares N identical "Finger" collections back-to-
@@ -291,22 +291,39 @@ typedef struct
 	uint8_t y_bit_offset;
 	uint8_t y_bits;
 
-	int32_t x_logical_max;               /* for scaling raw → display coords */
+	int32_t x_logical_max; /* for scaling raw → display coords */
 	int32_t y_logical_max;
+
+	/* Single-contact pointer fallback. Dual-mode digitizers emit the
+	   multitouch Finger report (report_id above) only for 2+ contacts and
+	   fall back to a Generic Desktop Mouse collection — its own report ID,
+	   one button (= tip) + absolute X/Y — for a single finger. Captured so
+	   single touches still register when the multitouch report never comes.
+	   Devices with no such collection leave has_pointer_fallback=false. */
+	bool has_pointer_fallback;
+	uint8_t pointer_report_id;
+	uint16_t pointer_button_bit_offset; /* button 1 = tip, relative to payload */
+	uint16_t pointer_x_bit_offset;
+	uint8_t pointer_x_bits;
+	uint16_t pointer_y_bit_offset;
+	uint8_t pointer_y_bits;
+	int32_t pointer_x_logical_max;
+	int32_t pointer_y_logical_max;
+	uint16_t pointer_report_length_bytes;
 } touch_info_t;
 
 typedef struct
 {
-	int16_t x;           /* raw logical X (0..x_logical_max) */
-	int16_t y;           /* raw logical Y (0..y_logical_max) */
-	uint8_t id;          /* contact identifier, stable across reports for one finger */
-	bool tip;            /* finger touching surface */
-	bool in_range;       /* finger detected (may be hovering) */
+	int16_t x;	   /* raw logical X (0..x_logical_max) */
+	int16_t y;	   /* raw logical Y (0..y_logical_max) */
+	uint8_t id;	   /* contact identifier, stable across reports for one finger */
+	bool tip;	   /* finger touching surface */
+	bool in_range; /* finger detected (may be hovering) */
 } touch_contact_t;
 
 typedef struct
 {
-	uint8_t count;                                    /* live contacts in this report */
+	uint8_t count; /* live contacts in this report */
 	touch_contact_t contacts[MAX_TOUCH_CONTACTS];
 } touch_report_t;
 
@@ -333,7 +350,7 @@ typedef struct s_HID
 	mouse_report_type_t mouse_type;
 	mouse_info_t mouse_info;
 	touch_info_t touch_info;
-	touch_report_t touch_report;  /* most-recently decoded report */
+	touch_report_t touch_report; /* most-recently decoded report */
 } a_HID;
 
 /* ============================================================================
@@ -354,7 +371,7 @@ extern int ExitMMBasicFlag;
 extern unsigned char *InterruptReturn;
 extern unsigned int _excep_peek;
 extern uint32_t _excep_code;
-
+extern uint8_t OptionVResreserved; /* runtime % of VRes reserved for OSK */
 /* ============================================================================
  * External variables - Timing and counters
  * ============================================================================ */
@@ -499,6 +516,9 @@ extern volatile bool usb_touch_active;
 extern volatile int16_t usb_touch_x;
 extern volatile int16_t usb_touch_y;
 extern volatile uint64_t usb_touch_last_us;
+extern volatile bool usb_touch_active2;
+extern volatile int16_t usb_touch_x2;
+extern volatile int16_t usb_touch_y2;
 #endif
 
 #ifdef USBKEYBOARD
@@ -550,6 +570,12 @@ extern uint32_t map16quads[16];
 extern uint32_t map16pairs[16];
 extern const uint32_t MAP256DEF[256];
 extern volatile int32_t v_scanline;
+#ifdef PICOMITEHDMIBTH
+/* Live HDMIBTH scanout resolution (definition in PicoMite.c). Shared with
+   FileIO.c so LoadOptions() can re-assert it into Option.Resolution after
+   reloading the Option struct from flash. */
+extern volatile int HDMIres;
+#endif
 extern uint16_t *tilefcols;
 extern uint16_t *tilebcols;
 extern uint8_t *tilefcols_w;
@@ -721,7 +747,8 @@ void InitReservedIO(void);
 /* ============================================================================
  * Function declarations - Data buffers
  * ============================================================================ */
-long long int *GetReceiveDataBuffer(unsigned char *p, unsigned int *nbr);
+struct s_CommsRxDest;
+unsigned int *GetReceiveDataBuffer(unsigned char *p, unsigned int *nbr, struct s_CommsRxDest *dest);
 
 /* ============================================================================
  * Function declarations - Font management

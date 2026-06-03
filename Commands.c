@@ -2180,6 +2180,13 @@ void MIPS16 do_run(unsigned char *cmdline, bool CMM2mode)
 {
 	extern void ResetPerfCounters(void);
 	ResetPerfCounters();
+#if defined(USBKEYBOARD) && defined(GUICONTROLS) && defined(PICOMITEVGA)
+	/* Erase the OSK and surrender the reserved strip up front. Calling
+	   this AFTER the conditional ClearScreen / library run below would let
+	   those paths trigger an OSK redraw via the ClearScreen hook, leaving
+	   the keyboard visible after the program starts. */
+	OSK_OnRunStart();
+#endif
 	// RUN [ filename$ ] [, cmd_args$ ]
 	unsigned char *filename = (unsigned char *)"", *cmd_args = (unsigned char *)"";
 	unsigned char *cmdbuf = GetTempStrMemory();
@@ -4261,6 +4268,11 @@ void RestoreContext(bool keep)
 extern void chdir(char *p);
 void MIPS16 do_chain(unsigned char *cmdline)
 {
+#if defined(USBKEYBOARD) && defined(GUICONTROLS) && defined(PICOMITEVGA)
+	/* Erase OSK and surrender the strip before anything else runs. Mirrors
+	   do_run — see comment there for the rationale. */
+	OSK_OnRunStart();
+#endif
 	unsigned char *filename = (unsigned char *)"", *cmd_args = (unsigned char *)"";
 	unsigned char *cmdbuf = GetMemory(256);
 	memcpy(cmdbuf, cmdline, STRINGSIZE);
@@ -4871,14 +4883,12 @@ void __not_in_flash_func(cmd_for)(void)
 				// "ncol"), pairing the outer FOR with an inner NEXT.
 				while (*xp)
 				{
-					if (mystrncasecmp(xp, vname, vlen) == 0
-						&& (xp == xstart || !isnamechar(xp[-1]))
-						&& !isnamechar(xp[vlen]))
+					if (mystrncasecmp(xp, vname, vlen) == 0 && (xp == xstart || !isnamechar(xp[-1])) && !isnamechar(xp[vlen]))
 						break;
 					xp++;
 				}
 				if (*xp)
-					t = 0;	 // found the matching NEXT
+					t = 0; // found the matching NEXT
 				else
 					t--; // no luck, just decrement our stack counter
 			}

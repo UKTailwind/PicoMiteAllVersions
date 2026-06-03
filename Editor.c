@@ -38,7 +38,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #if !defined(USBKEYBOARD) && !defined(PICOMITEBT)
 #include "class/cdc/cdc_device.h"
 #endif
-
+#define VResEdit (VRes - (VRes * OptionVResreserved / 100))
 #define DISPLAY_CLS 1
 #define REVERSE_VIDEO 3
 #define CLEAR_TO_EOL 4
@@ -104,10 +104,10 @@ void DisplayPutClever(char c)
             return;
         case '\n':
             CurrentY += gui_font_height;
-            if (CurrentY + gui_font_height >= VRes)
+            if (CurrentY + gui_font_height >= VResEdit)
             {
-                ScrollLCD(CurrentY + gui_font_height - VRes);
-                CurrentY -= (CurrentY + gui_font_height - VRes);
+                ScrollLCD(CurrentY + gui_font_height - VResEdit);
+                CurrentY -= (CurrentY + gui_font_height - VResEdit);
             }
             return;
         case '\t':
@@ -264,7 +264,7 @@ void MX470Display(int fn)
 #ifdef PICOMITEVGA
     case CLEAR_TO_EOS:
         MX470Display(CLEAR_TO_EOL);
-        DrawRectangle(0, CurrentY + gui_font_height, HRes - 1, VRes - 1, DISPLAY_TYPE == SCREENMODE1 ? 0 : gui_bcolour);
+        DrawRectangle(0, CurrentY + gui_font_height, HRes - 1, VResEdit - 1, DISPLAY_TYPE == SCREENMODE1 ? 0 : gui_bcolour);
 #ifdef HDMI
         if (FullColour)
         {
@@ -400,14 +400,14 @@ void MX470Display(int fn)
         break;
     case CLEAR_TO_EOS:
         DrawBox(CurrentX, CurrentY, HRes - 1, CurrentY + gui_font_height - 1, 0, 0, gui_bcolour);
-        DrawRectangle(0, CurrentY + gui_font_height, HRes - 1, VRes - 1, gui_bcolour);
+        DrawRectangle(0, CurrentY + gui_font_height, HRes - 1, VResEdit - 1, gui_bcolour);
         break;
 #endif
     case SCROLL_DOWN:
         break;
     case DRAW_LINE:
-        DrawBox(0, gui_font_height * (Option.Height - 2), HRes - 1, VRes - 1, 0, 0, (DISPLAY_TYPE == SCREENMODE1 ? 0 : gui_bcolour));
-        DrawLine(0, (VRes / gui_font_height) * gui_font_height - gui_font_height - 6, HRes - 1, (VRes / gui_font_height) * gui_font_height - gui_font_height - 6, 1, Option.ColourCode ? GUI_C_LINE : gui_fcolour);
+        DrawBox(0, gui_font_height * (Option.Height - 2), HRes - 1, VResEdit - 1, 0, 0, (DISPLAY_TYPE == SCREENMODE1 ? 0 : gui_bcolour));
+        DrawLine(0, (VResEdit / gui_font_height) * gui_font_height - gui_font_height - 6, HRes - 1, (VResEdit / gui_font_height) * gui_font_height - gui_font_height - 6, 1, Option.ColourCode ? GUI_C_LINE : gui_fcolour);
 #ifdef PICOMITEVGA
 #ifdef HDMI
         if (FullColour)
@@ -429,7 +429,7 @@ void MX470Display(int fn)
 #endif
 #endif
         CurrentX = 0;
-        CurrentY = (VRes / gui_font_height) * gui_font_height - gui_font_height;
+        CurrentY = (VResEdit / gui_font_height) * gui_font_height - gui_font_height;
         break;
     }
 }
@@ -616,6 +616,7 @@ void edit(unsigned char *cmdline, bool cmdfile)
         gui_fcolour = WHITE;
         gui_bcolour = BLACK;
         ClearScreen(gui_bcolour);
+        /* OSK redraw is handled centrally inside ClearScreen() now. */
     }
     if (Option.DISPLAY_CONSOLE == true && HRes / gui_font_width < 32)
         error("Font is too large");
@@ -834,6 +835,20 @@ void cmd_editfile(void)
 #define FM_SORT_TIME 1
 #define FM_SORT_TYPE 2
 #define FM_MIN_CACHE_NAME_CHARS 32
+// Buffers that hold a constructed full or child path (drive + directory + '/' +
+// filename) must be sized for a whole path, not a single name. FF_MAX_LFN is the
+// limit for one filename component only (63 on RP2040), so building a path into an
+// FF_MAX_LFN buffer overflows and falsely reports "Path too long". Use FM_PATH_MAX
+// for any buffer that receives the result of fm_make_child_path/fm_make_full_filename
+// or otherwise stores a complete path.
+//
+// Size = worst-case single-level full filename produced by fm_make_full_filename:
+//   "X:" + panel->path(<= FF_MAX_LFN-1) + "/" + name(<= FF_MAX_LFN) + NUL
+// = FF_MAX_LFN*2 + 5, rounded up with margin. Deliberately NOT STRINGSIZE(256):
+// fm_copy_dir_recursive recurses with four of these buffers per frame, so worst-case
+// stack is ~quadratic in this value; FF_MAX_LFN*2 keeps it bounded while still holding
+// any legal path (deeper recursive paths fail gracefully via fm_make_child_path).
+#define FM_PATH_MAX (FF_MAX_LFN * 2 + 8)
 
 typedef struct
 {
@@ -1872,7 +1887,7 @@ static int fm_build_panel_cache(fm_panel_t *panel, char *errmsg, int errmsglen)
             else if (panel->sortorder == FM_SORT_TIME)
             {
                 int dt = 0;
-                char fullfilename[FF_MAX_LFN];
+                char fullfilename[FM_PATH_MAX];
                 if (fm_make_child_path(panel->path, info.name, fullfilename, sizeof(fullfilename)) &&
                     lfs_getattr(&lfs, fullfilename, 'A', &dt, 4) == 4)
                 {
@@ -2569,8 +2584,8 @@ static int fm_rename_selected(fm_panel_t *panel, char *status, int statuslen)
 {
     fm_entry_t entry;
     char errmsg[STRINGSIZE];
-    char oldpath[FF_MAX_LFN];
-    char newpath[FF_MAX_LFN];
+    char oldpath[FM_PATH_MAX];
+    char newpath[FM_PATH_MAX];
     char newname[FF_MAX_LFN + 1];
     char prompt[STRINGSIZE * 2];
 
@@ -2625,7 +2640,7 @@ static int fm_delete_selected(fm_panel_t *panel, char *status, int statuslen)
 {
     fm_entry_t entry;
     char errmsg[STRINGSIZE];
-    char fullpath[FF_MAX_LFN];
+    char fullpath[FM_PATH_MAX];
     char prompt[STRINGSIZE * 2];
 
     if (panel->count <= 0 || panel->selected < 0 || panel->selected >= panel->count)
@@ -2691,7 +2706,7 @@ static int fm_delete_recursive_path(int filesystem, const char *path, char *stat
 
         while ((rc = lfs_dir_read(&lfs, &dir, &info)) > 0)
         {
-            char child[FF_MAX_LFN];
+            char child[FM_PATH_MAX];
             if (strcmp(info.name, ".") == 0 || strcmp(info.name, "..") == 0)
                 continue;
             if (!fm_make_child_path(path, info.name, child, sizeof(child)))
@@ -2764,7 +2779,7 @@ static int fm_delete_recursive_path(int filesystem, const char *path, char *stat
 
         while (fr == FR_OK && info.fname[0])
         {
-            char child[FF_MAX_LFN];
+            char child[FM_PATH_MAX];
             if (strcmp(info.fname, ".") == 0 || strcmp(info.fname, "..") == 0)
             {
                 fr = f_findnext(&dir, &info);
@@ -2841,7 +2856,7 @@ static int fm_delete_selected_recursive(fm_panel_t *panel, char *status, int sta
 {
     fm_entry_t entry;
     char errmsg[STRINGSIZE];
-    char fullpath[FF_MAX_LFN];
+    char fullpath[FM_PATH_MAX];
     int files = 0;
     int dirs = 0;
 
@@ -2951,7 +2966,7 @@ static int fm_delete_marked(fm_panel_t *panel, int recursive, char *status, int 
 
     for (i = 0; i < n; i++)
     {
-        char fullpath[FF_MAX_LFN];
+        char fullpath[FM_PATH_MAX];
 
         if (!fm_make_child_path(panel->path, items[i].name, fullpath, sizeof(fullpath)))
         {
@@ -3003,7 +3018,7 @@ static int fm_delete_marked(fm_panel_t *panel, int recursive, char *status, int 
 static int fm_make_directory(fm_panel_t *panel, char *status, int statuslen)
 {
     char name[FF_MAX_LFN + 1];
-    char path[FF_MAX_LFN];
+    char path[FM_PATH_MAX];
     char prompt[STRINGSIZE * 2];
 
     snprintf(prompt, sizeof(prompt), "New directory name: ");
@@ -3096,7 +3111,7 @@ static int fm_normalize_path(const char *in, char *out, int outlen)
 
 static int fm_resolve_path(const char *base, const char *input, char *out, int outlen)
 {
-    char combined[FF_MAX_LFN];
+    char combined[FM_PATH_MAX];
 
     if (!base || !input || !out)
         return 0;
@@ -3148,7 +3163,7 @@ static int fm_go_to_path(fm_panel_t *panel, char *status, int statuslen)
 
 static int fm_create_empty_file(int filesystem, const char *dir, const char *name, char *status, int statuslen)
 {
-    char path[FF_MAX_LFN];
+    char path[FM_PATH_MAX];
 
     if (!fm_make_child_path(dir, name, path, sizeof(path)))
     {
@@ -3224,8 +3239,8 @@ static int fm_duplicate_selected(fm_panel_t *panel, char *status, int statuslen)
 {
     fm_entry_t entry;
     char errmsg[STRINGSIZE];
-    char srcpath[FF_MAX_LFN], dstpath[FF_MAX_LFN];
-    char srcfile[FF_MAX_LFN], dstfile[FF_MAX_LFN];
+    char srcpath[FM_PATH_MAX], dstpath[FM_PATH_MAX];
+    char srcfile[FM_PATH_MAX], dstfile[FM_PATH_MAX];
     char newname[FF_MAX_LFN + 1];
     int files = 0, dirs = 0;
 
@@ -3301,8 +3316,8 @@ static int fm_move_selected(fm_panel_t *src, fm_panel_t *dst, char *status, int 
 {
     fm_entry_t entry;
     char errmsg[STRINGSIZE];
-    char srcpath[FF_MAX_LFN], dstpath[FF_MAX_LFN];
-    char srcfile[FF_MAX_LFN], dstfile[FF_MAX_LFN];
+    char srcpath[FM_PATH_MAX], dstpath[FM_PATH_MAX];
+    char srcfile[FM_PATH_MAX], dstfile[FM_PATH_MAX];
     int files = 0, dirs = 0;
 
     if (src->count <= 0 || src->selected < 0 || src->selected >= src->count)
@@ -3559,7 +3574,7 @@ static int fm_mkdir_one(int filesystem, const char *path)
 
 static int fm_ensure_dir(int filesystem, const char *path)
 {
-    char partial[FF_MAX_LFN];
+    char partial[FM_PATH_MAX];
     int i;
 
     if (path == NULL || path[0] == 0 || (path[0] == '/' && path[1] == 0))
@@ -3667,7 +3682,7 @@ static int fm_copy_dir_recursive(int srcfs, const char *srcdir, int dstfs, const
         }
         while ((rc = lfs_dir_read(&lfs, &dir, &info)) > 0)
         {
-            char csrc[FF_MAX_LFN], cdst[FF_MAX_LFN], srcfile[FF_MAX_LFN], dstfile[FF_MAX_LFN];
+            char csrc[FM_PATH_MAX], cdst[FM_PATH_MAX], srcfile[FM_PATH_MAX], dstfile[FM_PATH_MAX];
             if (strcmp(info.name, ".") == 0 || strcmp(info.name, "..") == 0)
                 continue;
             if (!fm_make_child_path(srcdir, info.name, csrc, sizeof(csrc)) ||
@@ -3729,7 +3744,7 @@ static int fm_copy_dir_recursive(int srcfs, const char *srcdir, int dstfs, const
         fr = f_findfirst(&dir, &info, srcdir, "*");
         while (fr == FR_OK && info.fname[0])
         {
-            char csrc[FF_MAX_LFN], cdst[FF_MAX_LFN], srcfile[FF_MAX_LFN], dstfile[FF_MAX_LFN];
+            char csrc[FM_PATH_MAX], cdst[FM_PATH_MAX], srcfile[FM_PATH_MAX], dstfile[FM_PATH_MAX];
             if (strcmp(info.fname, ".") == 0 || strcmp(info.fname, "..") == 0)
             {
                 fr = f_findnext(&dir, &info);
@@ -3797,10 +3812,10 @@ static int fm_copy_selected(fm_panel_t *src, fm_panel_t *dst, char *status, int 
 {
     fm_entry_t entry;
     char errmsg[STRINGSIZE];
-    char srcdir[FF_MAX_LFN];
-    char dstdir[FF_MAX_LFN];
-    char srcfile[FF_MAX_LFN];
-    char dstfile[FF_MAX_LFN];
+    char srcdir[FM_PATH_MAX];
+    char dstdir[FM_PATH_MAX];
+    char srcfile[FM_PATH_MAX];
+    char dstfile[FM_PATH_MAX];
     int file_count = 0;
     int dir_count = 0;
     if (src->count <= 0 || src->selected < 0 || src->selected >= src->count)
@@ -3994,7 +4009,7 @@ static void fm_adjust_volume(int delta, char *status, int status_len)
 
 static int fm_play_audio_file(const fm_panel_t *panel, const fm_entry_t *entry, char *status, int status_len)
 {
-    char full[FF_MAX_LFN];
+    char full[FM_PATH_MAX];
     int audio_type = fm_name_audio_type(entry->name);
 
     if (audio_type == FM_AUDIO_NONE)
@@ -4084,8 +4099,8 @@ static int fm_play_audio_file(const fm_panel_t *panel, const fm_entry_t *entry, 
 static int fm_show_image_file(const fm_panel_t *panel, const fm_entry_t *entry, char *status, int status_len,
                               int oldmode_local, int oldfont_local)
 {
-    char full[FF_MAX_LFN];
-    char loadline[FF_MAX_LFN + 16];
+    char full[FM_PATH_MAX];
+    char loadline[FM_PATH_MAX + 16];
     int image_type = fm_name_image_type(entry->name);
     unsigned char *saved_cmdline;
     int fm_font_local = PromptFont;
@@ -4223,7 +4238,7 @@ static int fm_show_image_file(const fm_panel_t *panel, const fm_entry_t *entry, 
 
 static int fm_list_file(const fm_panel_t *panel, const fm_entry_t *entry, char *status, int status_len)
 {
-    char full[FF_MAX_LFN];
+    char full[FM_PATH_MAX];
     jmp_buf saved_mark;
     unsigned char *saved_cmdline;
     unsigned char old_break_key = BreakKey;
@@ -4291,20 +4306,60 @@ static int fm_saved_fc = 0;
 static int fm_saved_bc = 0;
 static int fm_saved_font = 0;
 static int fm_saved_valid = 0;
-
+// Display mode + font snapshot taken just before FM hands control to a
+// launched BASIC program. -1 means "no pending restore". On the FM relaunch
+// after the program ends we force DISPLAY_TYPE / PromptFont back to these
+// so the program can't permanently change what FM looks like.
+#if defined(PICOMITEVGA)
+static int fm_program_run_mode = -1;
+static int fm_program_run_font = -1;
+#endif
 void cmd_fm(void)
 {
     fm_panel_t panels[2];
     char status[STRINGSIZE * 2];
     char errmsg[STRINGSIZE];
-    char run_bas_file[FF_MAX_LFN];
-    char run_bas_full[FF_MAX_LFN];
-    char run_edit_file[FF_MAX_LFN + 3];
+    char run_bas_file[FF_MAX_LFN + 1];
+    char run_bas_full[FM_PATH_MAX];
+    char run_edit_file[FM_PATH_MAX + 3];
     int active = 0;
     int context_state = 0;
     int done = 0;
     int run_from_fm = 0;
     int edit_from_fm = 0;
+#if defined(PICOMITEVGA)
+    /* Re-entry after a BASIC program launched from FM: the program may
+       have switched display mode or font. Restore FM's pre-launch state
+       before anything else runs (oldmode_local below otherwise snapshots
+       the program's mode and we'd never get back to FM's). Use setmode()
+       — it does the full mode switch (close-framebuffer / framebuffer
+       memset / mode-1 tile init / scanline sync / ResetDisplay) that a bare
+       DISPLAY_TYPE = X + ResetDisplay() leaves out, and those omissions
+       are what make a mode-3-to-mode-1 transition render at the wrong size. */
+    if (fm_program_run_mode >= 0)
+    {
+        if (DISPLAY_TYPE != fm_program_run_mode)
+        {
+            int target = fm_program_run_mode - SCREENMODE1 + 1; /* 1..5 */
+            setmode(target, true);
+        }
+        if (fm_program_run_font >= 0 && PromptFont != fm_program_run_font)
+        {
+            SetFont(fm_program_run_font);
+            PromptFont = fm_program_run_font;
+        }
+        fm_program_run_mode = -1;
+        fm_program_run_font = -1;
+#if defined(USBKEYBOARD) && defined(GUICONTROLS) && defined(PICOMITEVGA)
+        /* FM relaunches via the goto-autorun token path, bypassing the
+           prompt loop's OSK_OnPromptIdle. Call it explicitly so the OSK
+           gets restored to its pre-program state (system mode with the
+           strip reserved) before FM redraws. Honours the user_disabled
+           latch — a prompt-side KEYBOARD OFF still suppresses the OSK. */
+        OSK_OnPromptIdle();
+#endif
+    }
+#endif
     int oldmode_local = DISPLAY_TYPE;
     // On the first entry save the true pre-FM state; on relaunch after a
     // BASIC program use the values saved by the first entry so that colors
@@ -4592,6 +4647,62 @@ fm_relaunch:
                 }
             }
             c = MMInkey();
+#if defined(GUICONTROLS) && defined(USBKEYBOARD)
+            ProcessTouch();
+            if (touch_swipe_dir == 1 && c == -1)
+            {
+                c = LEFT;
+                touch_swipe_dir = 0;
+            }
+            if (touch_swipe_dir == 2 && c == -1)
+            {
+                c = RIGHT;
+                touch_swipe_dir = 0;
+            }
+            if (touch_swipe_dir == 4 && c == -1)
+            {
+                c = PDOWN;
+                touch_swipe_dir = 0;
+            }
+            if (touch_swipe_dir == 3 && c == -1)
+            {
+                c = PUP;
+                touch_swipe_dir = 0;
+            }
+            /* Tap-to-select: clicking a row in either panel makes that row
+               the current selection (and switches the active panel if the
+               tap landed on the other side). Taps inside the reserved OSK
+               strip never reach here — ProcessTouch consumes them. Redraw
+               the UI inline: setting need_full_redraw alone won't fire
+               from inside this inner poll loop. */
+            if (touch_tap)
+            {
+                touch_tap = 0;
+                if (c == -1 && gui_font_width > 0 && gui_font_height > 0)
+                {
+                    int tap_col = TouchX / gui_font_width;
+                    int tap_row = TouchY / gui_font_height;
+                    int target_panel = -1;
+                    if (tap_col >= 0 && tap_col < left_width)
+                        target_panel = 0;
+                    else if (tap_col >= right_x && tap_col < right_x + right_width)
+                        target_panel = 1;
+                    if (target_panel >= 0 &&
+                        tap_row >= list_top && tap_row < list_top + list_rows)
+                    {
+                        int idx = panels[target_panel].top + (tap_row - list_top);
+                        if (idx >= 0 && idx < panels[target_panel].count)
+                        {
+                            active = target_panel;
+                            p = &panels[active];
+                            p->selected = idx;
+                            fm_set_status_to_selected(p, status, sizeof(status));
+                            fm_draw_ui(panels, active, status);
+                        }
+                    }
+                }
+            }
+#endif
         }
 
         if (type_select_active)
@@ -5259,12 +5370,24 @@ fm_check_run:
         fm_sanitize_next_console_input = 1;
         strncpy(fm_last_launched_bas, run_bas_full, sizeof(fm_last_launched_bas) - 1);
         fm_last_launched_bas[sizeof(fm_last_launched_bas) - 1] = 0;
+#if defined(PICOMITEVGA)
+        /* Capture FM's current display mode + font so the relaunch path
+           can put them back if the program changes them. */
+        fm_program_run_mode = DISPLAY_TYPE;
+        fm_program_run_font = PromptFont;
+#endif
         fm_program_launched_from_fm = 1;
         if (!fm_run_bas_program(run_bas_file, run_bas_full))
         {
             fm_program_launched_from_fm = 0;
             fm_last_launched_bas[0] = 0;
             fm_sanitize_next_console_input = 0;
+#if defined(PICOMITEVGA)
+            /* Program never ran — no relaunch will happen, so clear the
+               snapshot to avoid restoring on some unrelated future entry. */
+            fm_program_run_mode = -1;
+            fm_program_run_font = -1;
+#endif
         }
     }
     if (edit_from_fm)
@@ -5971,8 +6094,8 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
     ytileheightsave = ytileheight;
     OptionY_TILESave = Y_TILE;
     ytileheight = gui_font_height;
-    Y_TILE = VRes / ytileheight;
-    if (VRes % ytileheight)
+    Y_TILE = VResEdit / ytileheight;
+    if (VResEdit % ytileheight)
         Y_TILE++;
 #else
     char RefreshSave = Option.Refresh;
@@ -6140,6 +6263,62 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
 #endif
 
                 c = MMInkey();
+#if defined(GUICONTROLS) && defined(USBKEYBOARD)
+            ProcessTouch();
+            if (touch_swipe_dir == 1 && c == -1)
+            {
+                c = HOME;
+                touch_swipe_dir = 0;
+            }
+            if (touch_swipe_dir == 2 && c == -1)
+            {
+                c = END;
+                touch_swipe_dir = 0;
+            }
+            if (touch_swipe_dir == 4 && c == -1)
+            {
+                c = PDOWN;
+                touch_swipe_dir = 0;
+            }
+            if (touch_swipe_dir == 3 && c == -1)
+            {
+                c = PUP;
+                touch_swipe_dir = 0;
+            }
+            /* Tap-to-position. Move the edit caret to the character cell the
+               user tapped. Ignore taps that landed inside the reserved OSK
+               strip (those are owned by the on-screen keyboard). Consume
+               touch_tap unconditionally so a tap concurrent with a key
+               press doesn't reposition the cursor on a later iteration. */
+            if (touch_tap)
+            {
+                touch_tap = 0;
+                int reservedTop = VRes - (VRes * OptionVResreserved / 100);
+                if (c == -1 && TouchY < reservedTop && gui_font_width > 0 && gui_font_height > 0)
+                {
+                    int tap_col = TouchX / gui_font_width;
+                    int tap_row = TouchY / gui_font_height;
+                    if (tap_col >= 0 && tap_col < VWidth &&
+                        tap_row >= 0 && tap_row < VHeight)
+                    {
+                        ShowCursor(false);
+                        while (*txtp != 0 && tap_row > cury)
+                            if (*txtp++ == '\n')
+                                cury++;
+                        while (txtp != EdBuff && tap_row < cury)
+                            if (*--txtp == '\n')
+                                cury--;
+                        while (txtp != EdBuff && *(txtp - 1) != '\n')
+                            txtp--;
+                        for (curx = 0; curx < tap_col && *txtp && *txtp != '\n'; curx++)
+                            txtp++;
+                        PositionCursor(txtp);
+                        PrintStatus();
+                        ShowCursor(true);
+                    }
+                }
+            }
+#endif
 
             if (statuscount++ == 5000)
                 PrintStatus();
@@ -6730,7 +6909,7 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
                     int fnbr1;
                     if (ExistsFile(fname))
                     {
-                        char backup[FF_MAX_LFN];
+                        char backup[STRINGSIZE + 8];
                         strcpy(backup, fname);
                         strcat(backup, ".bak");
                         fnbr1 = FindFreeFileNbr();
@@ -6863,8 +7042,32 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
             case CTRLKEY('T'):
             case F4:
                 MarkMode(clipboard, &buf[1]);
-                printScreen();
-                PrintFunctKeys(EDIT);
+                {
+                    // While selecting along a long line, mark-mode navigation drags
+                    // edx (the horizontal scroll) to the right but only redraws the
+                    // current line.  If we now redraw the whole screen with that
+                    // stale edx every background line is left scrolled and short
+                    // lines become unreachable.  Mirror the line-join fix: redraw
+                    // left-justified, then scroll only the cursor's own line if its
+                    // column is off-screen to the right.
+                    int abs_col = 0;
+                    unsigned char *q = txtp;
+                    while (q > EdBuff && *(q - 1) != '\n')
+                    {
+                        abs_col++;
+                        q--;
+                    }
+                    edx = 0;
+                    printScreen();
+                    PrintFunctKeys(EDIT);
+                    if (abs_col > VWidth - 1)
+                    {
+                        edx = abs_col - (VWidth - 1 - SCROLLCHARS);
+                        SCursor(0, cury);
+                        printLine(edy + cury);
+                    }
+                    curx = abs_col - edx;
+                }
                 PositionCursor(txtp);
                 break;
             case SHIFT_F4:
@@ -6917,7 +7120,7 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
                     break;
 
                 // Copy filename to local buffer
-                static char importfile[FF_MAX_LFN];
+                static char importfile[STRINGSIZE + 8];
                 strcpy(importfile, (char *)inpbuf);
 
                 // Add .bas extension if no extension and file not found
@@ -7015,7 +7218,7 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
                     break;
 
                 // Copy filename to local buffer
-                static char exportfile[FF_MAX_LFN];
+                static char exportfile[STRINGSIZE + 8];
                 strcpy(exportfile, (char *)inpbuf);
 
                 // Add .bas extension if no extension specified
@@ -7611,7 +7814,7 @@ void MarkMode(unsigned char *cb, unsigned char *buf)
                     if (*inpbuf != 0 && *inpbuf != ESC)
                     {
                         // Copy filename to local buffer
-                        static char exportfile[FF_MAX_LFN];
+                        static char exportfile[STRINGSIZE + 8];
                         strcpy(exportfile, (char *)inpbuf);
 
                         // Add .bas extension if no extension specified
@@ -8535,55 +8738,6 @@ int editInsertChar(unsigned char c, char *multi, int edit_buff_size)
     return true;
 }
 
-// print the function keys at the bottom of the screen
-void PrintFunctKeys(int typ)
-{
-    int i, x, y;
-    char *p;
-
-    if (typ == EDIT)
-    {
-        if (VWidth > 80)
-            p = "ESC:Exit F1:Save F2:Run F3/6:Find/r F4:Mrk F5:Paste F7/8:Rpl/r F9:In F10:Out F12/^A:Beautify";
-        else if (VWidth >= 70)
-            p = "F1:Save F2:Run F3:Find F4:Mark F5:Paste F7:Repl F7/8:Rpl/r F12/^A:Btfy";
-        else if (VWidth >= 55)
-            p = "F1:Save F2:Run F3:Find F4:Mrk F5:Paste F9:In F10:Out ^A:Btfy";
-        else
-            p = "EDIT MODE";
-    }
-    else
-    {
-        if (VWidth >= 70)
-            p = "MARK MODE  ESC=Exit DEL:Delete F4:Cut F5:Copy F10:Export";
-        else if (VWidth >= 49)
-            p = "MARK MODE  ESC:Exit DEL:Del F4:Cut F5:Cpy F10:Out";
-        else
-            p = "MARK MODE";
-    }
-
-    MX470Display(DRAW_LINE);                 // on the MX470 display draw the line
-    MX470PutS(p, GUI_C_STATUS, gui_bcolour); // display the string on the display attached to the MX470
-    MX470Display(CLEAR_TO_EOL);              // clear to the end of line on the MX470 display only
-
-    x = curx;
-    y = cury;
-    SCursor(0, VHeight);
-    if (Option.ColourCode)
-        PrintString(VT100_C_LINE);
-    PrintString("\033[4m"); // underline on
-    for (i = 0; i < VWidth; i++)
-        SSputchar(' ', 0);
-    PrintString("\033[0m\r\n"); // underline off
-    if (Option.ColourCode)
-        PrintString(VT100_C_STATUS);
-    PrintString(p);
-    if (Option.ColourCode)
-        PrintString(VT100_C_NORMAL);
-    PrintString("\033[K"); // clear to the end of the line on a vt100 emulator
-    SCursor(x, y);
-}
-
 // return the character length of the line that txtp sits on
 static int current_line_length(void)
 {
@@ -8599,28 +8753,116 @@ static int current_line_length(void)
     return len;
 }
 
+// Build the right-aligned status text for the current cursor position into buf.
+// Returns its length. Mirrors what PrintStatus draws so PrintFunctKeys can
+// reserve exactly the space the status will occupy (rather than always 20).
+static int editor_status_string(char *buf)
+{
+    int tx = edx + curx + 1;
+    if (edit_is_bas && current_line_length() > MAXSTRLEN)
+        sprintf(buf, "L:%d C:%d %s LONG", edy + cury + 1, tx, insert ? "INS" : "OVR");
+    else
+        sprintf(buf, "L:%d C:%d %s", edy + cury + 1, tx, insert ? "INS" : "OVR");
+    return (int)strlen(buf);
+}
+
+// Pick the longest function-key legend that fits in `avail` columns. The
+// shortest entry ("EDIT MODE"/"MARK MODE") is always the safe fallback.
+static const char *pickFunctKeyString(int typ, int avail)
+{
+    static const char *edit_keys[] = {
+        "ESC:Exit F1:Save F2:Run F3/6:Find/r F4:Mrk F5:Paste F7/8:Rpl/r F9:In F10:Out F12/^A:Beautify",
+        "F1:Save F2:Run F3:Find F4:Mark F5:Paste F7:Repl F7/8:Rpl/r F12/^A:Btfy",
+        "F1:Save F2:Run F3:Find F4:Mrk F5:Pst F9:In F10:Out ^A:Btfy",
+        "F1:Save F2:Run F3:Find F4:Mrk F5:Pst ^A:Btfy",
+        "EDIT MODE",
+    };
+    static const char *mark_keys[] = {
+        "MARK MODE  ESC=Exit DEL:Delete F4:Cut F5:Copy F10:Export",
+        "MARK MODE  ESC:Exit DEL:Del F4:Cut F5:Cpy F10:Out",
+        "MARK MODE",
+    };
+    const char **list = (typ == EDIT) ? edit_keys : mark_keys;
+    int n = (typ == EDIT) ? (int)(sizeof(edit_keys) / sizeof(edit_keys[0]))
+                          : (int)(sizeof(mark_keys) / sizeof(mark_keys[0]));
+    for (int i = 0; i < n; i++)
+    {
+        if ((int)strlen(list[i]) <= avail)
+            return list[i];
+    }
+    return list[n - 1];
+}
+
+// State shared between PrintFunctKeys and PrintStatus so the status width can
+// drive function-key re-layout dynamically as the cursor moves.
+static int g_funct_typ = EDIT;
+static const char *g_funct_string = NULL;
+static int g_status_width = 0;
+
+// print the function keys at the bottom of the screen
+void PrintFunctKeys(int typ)
+{
+    int i, x, y;
+    char temp[40];
+    int sw = editor_status_string(temp);
+    int avail = VWidth - sw - 1; // leave one space before status
+    const char *p = pickFunctKeyString(typ, avail);
+
+    g_funct_typ = typ;
+    g_funct_string = p;
+    g_status_width = sw;
+
+    MX470Display(DRAW_LINE);                         // on the MX470 display draw the line
+    MX470PutS((char *)p, GUI_C_STATUS, gui_bcolour); // display the string on the display attached to the MX470
+    MX470Display(CLEAR_TO_EOL);                      // clear to the end of line on the MX470 display only
+
+    x = curx;
+    y = cury;
+    SCursor(0, VHeight);
+    if (Option.ColourCode)
+        PrintString(VT100_C_LINE);
+    PrintString("\033[4m"); // underline on
+    for (i = 0; i < VWidth; i++)
+        SSputchar(' ', 0);
+    PrintString("\033[0m\r\n"); // underline off
+    if (Option.ColourCode)
+        PrintString(VT100_C_STATUS);
+    PrintString((char *)p);
+    if (Option.ColourCode)
+        PrintString(VT100_C_NORMAL);
+    PrintString("\033[K"); // clear to the end of the line on a vt100 emulator
+    SCursor(x, y);
+}
+
 // print the current status
 void PrintStatus(void)
 {
-    int tx, col;
-    char s[MAXSTRLEN], temp[40];
+    int col;
+    char temp[40];
 
-    tx = edx + curx + 1;
-    if (edit_is_bas && current_line_length() > MAXSTRLEN)
-        sprintf(temp, "L:%d C:%d %s LONG", edy + cury + 1, tx, insert ? "INS" : "OVR");
-    else
-        sprintf(temp, "L:%d C:%d %s", edy + cury + 1, tx, insert ? "INS" : "OVR");
-    sprintf(s, "%20s", temp);
-    col = VWidth - (int)strlen(s);
+    int cur_width = editor_status_string(temp);
+    int avail = VWidth - cur_width - 1;
+    const char *want_funct = pickFunctKeyString(g_funct_typ, avail);
+
+    // Redraw the function-key line whenever the legend would change (tier
+    // boundary crossed) or the status has shrunk (stale chars from the prior
+    // wider status would otherwise linger on the right of the legend).
+    if (want_funct != g_funct_string || cur_width < g_status_width)
+    {
+        PrintFunctKeys(g_funct_typ); // updates g_funct_string / g_status_width
+    }
+    g_status_width = cur_width;
+
+    col = VWidth - cur_width;
     if (col < 0)
         col = 0;
-    MX470Cursor(col * gui_font_width, (VRes / gui_font_height) * gui_font_height - gui_font_height);
-    MX470PutS(s, GUI_C_STATUS, gui_bcolour); // display the string on the display attached to the MX470
+    MX470Cursor(col * gui_font_width, (VResEdit / gui_font_height) * gui_font_height - gui_font_height);
+    MX470PutS(temp, GUI_C_STATUS, gui_bcolour); // display the string on the display attached to the MX470
 
     SCursor(col, VHeight + 1);
     if (Option.ColourCode)
         PrintString(VT100_C_STATUS);
-    PrintString(s);
+    PrintString(temp);
     if (Option.ColourCode)
         PrintString(VT100_C_NORMAL);
 
@@ -8634,7 +8876,7 @@ void editDisplayMsg(unsigned char *msg)
     if (Option.ColourCode)
         PrintString(VT100_C_ERROR);
     PrintString("\033[7m");
-    MX470Cursor(0, (VRes / gui_font_height) * gui_font_height - gui_font_height);
+    MX470Cursor(0, (VResEdit / gui_font_height) * gui_font_height - gui_font_height);
     PrintString((char *)msg);
     MX470PutS((char *)msg, BLACK, RED);
     if (Option.ColourCode)
@@ -8668,7 +8910,7 @@ void GetInputString(unsigned char *prompt)
     int i;
     SCursor(0, VHeight + 1);
     PrintString((char *)prompt);
-    MX470Cursor(0, (VRes / gui_font_height) * gui_font_height - gui_font_height);
+    MX470Cursor(0, (VResEdit / gui_font_height) * gui_font_height - gui_font_height);
     MX470PutS((char *)prompt, gui_fcolour, gui_bcolour);
     for (i = 0; i < VWidth - strlen((char *)prompt); i++)
     {
@@ -8676,7 +8918,7 @@ void GetInputString(unsigned char *prompt)
         MX470PutC(' ');
     }
     SCursor(strlen((char *)prompt), VHeight + 1);
-    MX470Cursor(strlen((char *)prompt) * gui_font_width, (VRes / gui_font_height) * gui_font_height - gui_font_height);
+    MX470Cursor(strlen((char *)prompt) * gui_font_width, (VResEdit / gui_font_height) * gui_font_height - gui_font_height);
     int len = 0;
     int maxlen = STRINGSIZE - 1;
     while (1)

@@ -272,7 +272,7 @@ void owReset(unsigned char *p)
 	ow_reset(pin);
 	ExtCurrentConfig[pin] = EXT_NOT_CONFIG;
 }
-void owWriteCore(int pin, int *buf, int len, int flag)
+void owWriteCore(int pin, unsigned int *buf, int len, int flag)
 {
 	disable_interrupts_pico();
 	for (int i = 0; i < len; i++)
@@ -307,8 +307,8 @@ void owWriteCore(int pin, int *buf, int len, int flag)
 // send one wire data
 void owWrite(unsigned char *p)
 {
-	int pin, flag, len, i, buf[255];
-	unsigned char *cp;
+	int pin, flag, len;
+	unsigned int buf[255];
 
 	getcsargs(&p, MAX_ARG_COUNT * 2);
 	if (!(argc & 0x01) || (argc < 7))
@@ -319,16 +319,7 @@ void owWrite(unsigned char *p)
 	flag = getint(argv[2], 0, 15);
 	len = getint(argv[4], 1, 255);
 
-	// check the first char for a legal variable name
-	cp = argv[6];
-	skipspace(cp);
-	// if (argc > 7 || (len == 1 && type == 0)) {                    // numeric expressions for data
-	if (len != ((argc - 5) >> 1))
-		StandardError(2);
-	for (i = 0; i < len; i++)
-	{
-		buf[i] = getinteger(argv[i + i + 6]);
-	}
+	GetCommsTxData(argv, argc, 6, len, buf);
 
 	// set up initial pin status (open drain, output, high)
 	ExtCfg(pin, EXT_NOT_CONFIG, 0); // set pin to unconfigured
@@ -352,7 +343,7 @@ void owWrite(unsigned char *p)
 	return;
 }
 
-void owReadCore(int pin, int *buf, int len, int flag)
+void owReadCore(int pin, unsigned int *buf, int len, int flag)
 {
 	disable_interrupts_pico();
 	PinSetBit(pin, TRISCLR); // set as output *** added this line
@@ -373,8 +364,9 @@ void owReadCore(int pin, int *buf, int len, int flag)
 // read one wire data
 void owRead(unsigned char *p)
 {
-	int pin, flag, len, i, buf[255];
-	void *ptr = NULL;
+	int pin, flag, len;
+	unsigned int buf[255];
+	CommsRxDest dest;
 
 	getcsargs(&p, MAX_ARG_COUNT * 2);
 	if (!(argc & 0x01) || (argc < 7))
@@ -385,17 +377,7 @@ void owRead(unsigned char *p)
 	flag = getint(argv[2], 0, 15);
 	len = getint(argv[4], 1, 255);
 
-	// check the validity of the argument list
-	if (len != ((argc - 5) >> 1))
-		StandardError(2);
-	for (i = 0; i < len; i++)
-	{
-		ptr = findvar(argv[i + i + 6], V_FIND);
-		if (g_vartbl[g_VarIndex].type & T_CONST)
-			StandardError(22);
-		if (!(g_vartbl[g_VarIndex].type & (T_NBR | T_INT)) || g_vartbl[g_VarIndex].dims[0] != 0)
-			StandardError(6);
-	}
+	GetCommsRxDest(argv, argc, 6, len, &dest);
 
 	// set up initial pin status (open drain, output, high)
 	ExtCfg(pin, EXT_NOT_CONFIG, 0); // set pin to unconfigured
@@ -415,14 +397,7 @@ void owRead(unsigned char *p)
 		PinSetBit(pin, TRISCLR);
 	}
 
-	for (i = 0; i < len; i++)
-	{
-		ptr = findvar(argv[i + i + 6], V_FIND);
-		if (g_vartbl[g_VarIndex].type & T_NBR)
-			*((MMFLOAT *)ptr) = buf[i];
-		else
-			*((long long int *)ptr) = buf[i];
-	}
+	PutCommsRxData(&dest, buf);
 	ExtCurrentConfig[pin] = EXT_NOT_CONFIG;
 	return;
 }

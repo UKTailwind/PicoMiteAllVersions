@@ -6586,6 +6586,25 @@ void LoadOptions(void)
     RGB121map[13] = LILAC;
     RGB121map[14] = YELLOW;
     RGB121map[15] = WHITE;
+    OptionVResreserved = Option.VRes_reserved;
+#if defined(USBKEYBOARD) && defined(GUICONTROLS) && defined(PICOMITEVGA)
+    /* If the user issued KEYBOARD OFF at the prompt, the OSK is latched
+       disabled and OptionVResreserved must stay zeroed even across the
+       LoadOptions calls that fire from the error handler / soft reset
+       paths — otherwise the strip silently re-appears mid-session. */
+    if (OSK_IsUserDisabled())
+        OptionVResreserved = 0;
+#endif
+#ifdef PICOMITEHDMIBTH
+    /* The byte-copy above just reverted Option.Resolution to the flash
+       value (always 1024x600 — OPTION RESOLUTION is gated off for this
+       build). But the RESOLUTION command can have switched the live
+       scanout to 640 without saving to flash. Re-assert the actual live
+       resolution so the error-handler / soft-reset reload never desyncs
+       Option.Resolution from what core1 is scanning (which corrupted the
+       display and made RESOLUTION 1024 a no-op). See HDMIres in PicoMite.c. */
+    Option.Resolution = HDMIres;
+#endif
 }
 
 void ResetOptions(bool startup)

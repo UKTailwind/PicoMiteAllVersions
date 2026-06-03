@@ -190,6 +190,13 @@ volatile bool usb_touch_active = false;
 volatile int16_t usb_touch_x = 0;
 volatile int16_t usb_touch_y = 0;
 volatile uint64_t usb_touch_last_us = 0;
+
+/* Contact 1 — exposed via TOUCH(X2) / TOUCH(Y2), mirroring the
+   Option.TOUCH_CAP capacitive multi-touch API. usb_touch_active2 is
+   true only when contact 1 is present AND has tip=1. */
+volatile bool usb_touch_active2 = false;
+volatile int16_t usb_touch_x2 = 0;
+volatile int16_t usb_touch_y2 = 0;
 typedef struct TU_ATTR_PACKED
 {
 	uint8_t x, y, z, rz; // joystick
@@ -637,6 +644,18 @@ bool analyze_touch_descriptor(const uint8_t *desc_report, uint16_t desc_len, tou
 	uint8_t finger_count = 0;
 	bool saw_touchscreen_root = false;
 
+	/* Pointer (Generic Desktop Mouse/Pointer) fallback-collection tracking.
+	   ptr_uq is a small usage queue so an X/Y pair declared as one Input
+	   with a usage array (09 30 09 31 ... Report Count 2) is distributed
+	   across the two 16-bit fields — the common mouse idiom. Reset on every
+	   Main item; only populated while inside the pointer collection. */
+	bool in_pointer = false;
+	int pointer_start_depth = -1;
+	int pointer_report_id = -1;
+	bool got_pointer_button = false;
+	uint16_t ptr_uq[8];
+	uint8_t ptr_uq_n = 0;
+
 	for (uint16_t i = 0; i < desc_len;)
 	{
 		uint8_t prefix = desc_report[i++];
@@ -678,7 +697,11 @@ bool analyze_touch_descriptor(const uint8_t *desc_report, uint16_t desc_len, tou
 		else if (bType == 2) /* Local */
 		{
 			if (bTag == 0)
+			{
 				last_usage = data & 0xFFFF; /* Usage */
+				if (in_pointer && ptr_uq_n < (uint8_t)(sizeof(ptr_uq) / sizeof(ptr_uq[0])))
+					ptr_uq[ptr_uq_n++] = last_usage;
+			}
 		}
 		else if (bType == 0) /* Main */
 		{
@@ -689,6 +712,17 @@ bool analyze_touch_descriptor(const uint8_t *desc_report, uint16_t desc_len, tou
 				   screen. Required for valid=true at the end. */
 				if (collection_depth == 1 && usage_page == 0x0D && last_usage == 0x04)
 					saw_touchscreen_root = true;
+				/* Generic Desktop Mouse(0x02)/Pointer(0x01) application
+				   collection — the single-finger pointer fallback some
+				   digitizers stream instead of the multitouch report.
+				   Capture its layout in parallel; the report ID is declared
+				   just inside it. */
+				if (collection_depth == 1 && usage_page == 0x01 &&
+					(last_usage == 0x01 || last_usage == 0x02) && !in_pointer)
+				{
+					in_pointer = true;
+					pointer_start_depth = collection_depth;
+				}
 				/* Finger collection — capture start bit, then descend
 				   so per-contact fields populate relative offsets.
 				   Lock finger_report_id to the Report ID that hosts
@@ -722,6 +756,8 @@ bool analyze_touch_descriptor(const uint8_t *desc_report, uint16_t desc_len, tou
 					finger_count++;
 					in_finger = false;
 				}
+				if (in_pointer && collection_depth == pointer_start_depth)
+					in_pointer = false;
 				collection_depth--;
 			}
 			else if (bTag == 8) /* Input */
@@ -780,6 +816,46 @@ bool analyze_touch_descriptor(const uint8_t *desc_report, uint16_t desc_len, tou
 					}
 				}
 
+				/* Pointer fallback capture (runs independently of the
+				   finger 'capture' flag — the Mouse collection has its own
+				   report ID, so bit_position has already been reset for it).
+				   Button 1 is the LSB of the first Button field; X/Y are the
+				   ABSOLUTE Generic Desktop axes (skip relative deltas — a
+				   relative mouse has no screen mapping). X and Y may share
+				   one Input via a usage array, so walk the per-field usages
+				   from the queue and place each by its own bit offset. */
+				if (in_pointer)
+				{
+					if (pointer_report_id == -1)
+						pointer_report_id = current_report_id;
+					if (usage_page == 0x09 && !got_pointer_button)
+					{
+						info->pointer_button_bit_offset = bit_position;
+						got_pointer_button = true;
+					}
+					else if (usage_page == 0x01 && !(data & 0x04)) /* Absolute */
+					{
+						for (uint8_t f = 0; f < report_count; f++)
+						{
+							uint16_t u = (f < ptr_uq_n) ? ptr_uq[f]
+														: (ptr_uq_n ? ptr_uq[ptr_uq_n - 1] : last_usage);
+							uint16_t off = bit_position + (uint16_t)f * report_size;
+							if (u == 0x30)
+							{
+								info->pointer_x_bit_offset = off;
+								info->pointer_x_bits = report_size;
+								info->pointer_x_logical_max = logical_max;
+							}
+							else if (u == 0x31)
+							{
+								info->pointer_y_bit_offset = off;
+								info->pointer_y_bits = report_size;
+								info->pointer_y_logical_max = logical_max;
+							}
+						}
+					}
+				}
+
 				bit_position += field_bits;
 				/* Local usage items are 'consumed' by the next Main item. */
 				last_usage = 0;
@@ -795,6 +871,8 @@ bool analyze_touch_descriptor(const uint8_t *desc_report, uint16_t desc_len, tou
 			{
 				last_usage = 0;
 			}
+			/* Every Main item consumes the pending Local usages. */
+			ptr_uq_n = 0;
 		}
 	}
 
@@ -816,8 +894,144 @@ bool analyze_touch_descriptor(const uint8_t *desc_report, uint16_t desc_len, tou
 	}
 	info->max_contacts = finger_count;
 
+	/* Finalise the pointer fallback. Require its own report ID (distinct
+	   from the multitouch one) plus absolute X/Y — a relative mouse has no
+	   logical max and can't be scaled to the screen, so skip those. */
+	if (pointer_report_id >= 0 && pointer_report_id != finger_report_id &&
+		got_pointer_button && info->pointer_x_bits > 0 && info->pointer_y_bits > 0 &&
+		info->pointer_x_logical_max > 0 && info->pointer_y_logical_max > 0)
+	{
+		info->has_pointer_fallback = true;
+		info->pointer_report_id = (uint8_t)pointer_report_id;
+		uint16_t bx = info->pointer_button_bit_offset + 1;
+		uint16_t ex = info->pointer_x_bit_offset + info->pointer_x_bits;
+		uint16_t ey = info->pointer_y_bit_offset + info->pointer_y_bits;
+		uint16_t end_bits = bx;
+		if (ex > end_bits)
+			end_bits = ex;
+		if (ey > end_bits)
+			end_bits = ey;
+		info->pointer_report_length_bytes = (end_bits + 7) / 8;
+		if (info->uses_report_id)
+			info->pointer_report_length_bytes += 1;
+	}
+
 	info->valid = (saw_touchscreen_root && finger_count > 0 && info->x_bits > 0 && info->y_bits > 0);
 	return info->valid;
+}
+
+/* Scale a raw device-logical axis value to current display coords, with
+   the same clip-to-range / fall-back-when-uninitialised rules used for the
+   multitouch contacts. res is HRes or VRes. */
+static int16_t touch_scale_axis(uint32_t raw, int32_t logical_max, int res)
+{
+	if (logical_max > 0 && res > 0)
+	{
+		if (raw > (uint32_t)logical_max)
+			raw = (uint32_t)logical_max;
+		int32_t v = (int32_t)((raw * (uint32_t)res) / (uint32_t)logical_max);
+		if (v >= res)
+			v = res - 1;
+		return (int16_t)v;
+	}
+	return (int16_t)raw;
+}
+
+/* Publish a decoded report to the generic touch-panel state watched by the
+   PicoMite.c edge detector (TouchDown/TouchUp) and GetTouch() in GUI.c, and
+   run the pinch / long-press gesture machine. Shared by the multitouch and
+   pointer-fallback decode paths. Uses out->count + out->contacts[]. */
+static void touch_publish(touch_report_t *out)
+{
+	/* A contact reported with tip=0 (hover) does NOT count as "pressed".
+	   Stamp the timestamp on EVERY report (including count=0 releases) so
+	   the watchdog only fires when reports actually stop arriving. */
+	usb_touch_last_us = time_us_64();
+	if (out->count > 0 && out->contacts[0].tip)
+	{
+		usb_touch_x = out->contacts[0].x;
+		usb_touch_y = out->contacts[0].y;
+		usb_touch_active = true;
+	}
+	else
+	{
+		usb_touch_active = false;
+	}
+	/* Contact 1 mirrors the Option.TOUCH_CAP X2/Y2 API. */
+	if (out->count >= 2 && out->contacts[1].tip)
+	{
+		usb_touch_x2 = out->contacts[1].x;
+		usb_touch_y2 = out->contacts[1].y;
+		usb_touch_active2 = true;
+	}
+	else
+	{
+		usb_touch_active2 = false;
+	}
+
+#ifdef GUICONTROLS
+	/* Two-finger pinch + long-press gesture analysis. The gesture state
+	   machine lives in Draw.c under #ifdef GUICONTROLS, so builds without
+	   GUI controls (e.g. VGAUSB) don't link these symbols — skip the
+	   calls. Raw usb_touch_x/y is still available to BASIC. Pinch is "live"
+	   while BOTH contacts have tip=1; usb_touch_x/y still hold the last
+	   position even after active goes false, so the end-position read is
+	   valid right at the transition. */
+	{
+		static bool pinch_was_both = false;
+		bool now_both = usb_touch_active && usb_touch_active2;
+		if (now_both && !pinch_was_both)
+		{
+			touch_gesture_pinch_start(usb_touch_x, usb_touch_y,
+									  usb_touch_x2, usb_touch_y2);
+		}
+		else if (!now_both && pinch_was_both)
+		{
+			touch_gesture_pinch_end(usb_touch_x, usb_touch_y,
+									usb_touch_x2, usb_touch_y2);
+		}
+		pinch_was_both = now_both;
+	}
+	/* Long-press detection during the hold. Runs on every report so a
+	   long-press fires the moment the held threshold is crossed, without
+	   waiting for the lift. Skipped when contact 1 is also active. */
+	touch_gesture_tick(usb_touch_x, usb_touch_y,
+					   usb_touch_active && !usb_touch_active2);
+#endif /* GUICONTROLS */
+}
+
+/* Decode a single-contact pointer-fallback report (dual-mode digitizer in
+   mouse mode). `bytes` is the payload with the report-ID byte already
+   stripped. Button 1 = tip; absolute X/Y scale like a contact. */
+static bool process_pointer_report(const uint8_t *bytes, uint16_t payload_len,
+								   const touch_info_t *info, touch_report_t *out)
+{
+	uint32_t need = (uint32_t)info->pointer_button_bit_offset + 1;
+	uint32_t nx = (uint32_t)info->pointer_x_bit_offset + info->pointer_x_bits;
+	uint32_t ny = (uint32_t)info->pointer_y_bit_offset + info->pointer_y_bits;
+	if (nx > need)
+		need = nx;
+	if (ny > need)
+		need = ny;
+	if ((uint32_t)payload_len * 8u < need)
+	{
+		out->count = 0;
+		return false;
+	}
+
+	bool tip = touch_read_bits(bytes, info->pointer_button_bit_offset, 1) != 0;
+	touch_contact_t *tc = &out->contacts[0];
+	tc->tip = tip;
+	tc->in_range = tip;
+	tc->id = 0;
+	uint32_t raw_x = touch_read_bits(bytes, info->pointer_x_bit_offset, info->pointer_x_bits);
+	uint32_t raw_y = touch_read_bits(bytes, info->pointer_y_bit_offset, info->pointer_y_bits);
+	tc->x = touch_scale_axis(raw_x, info->pointer_x_logical_max, HRes);
+	tc->y = touch_scale_axis(raw_y, info->pointer_y_logical_max, VRes);
+	out->count = tip ? 1 : 0;
+
+	touch_publish(out);
+	return true;
 }
 
 /**
@@ -836,17 +1050,37 @@ bool process_touch_report(const uint8_t *report, uint16_t len,
 	uint16_t payload_len = len;
 
 	/* If the device uses report IDs, the first byte is the report ID.
-	   Reports for other report IDs (config / feature mirrors) should
-	   be ignored — the analyser is keyed to one report-ID layout. */
+	   A dual-mode digitizer streams its Mouse-collection report ID for a
+	   single finger — route that to the pointer-fallback decoder. Reports
+	   for any other report ID (config / feature mirrors) are ignored. */
 	if (info->uses_report_id)
 	{
-		if (payload_len < 1 || bytes[0] != info->report_id)
+		if (payload_len < 1)
+		{
+			out->count = 0;
+			return false;
+		}
+		if (info->has_pointer_fallback && bytes[0] == info->pointer_report_id)
+			return process_pointer_report(bytes + 1, payload_len - 1, info, out);
+		if (bytes[0] != info->report_id)
 		{
 			out->count = 0;
 			return false;
 		}
 		bytes++;
 		payload_len--;
+	}
+
+	/* Reject a report too short to contain the contact-count field. A
+	   device whose report exceeds CFG_TUH_HID_EPIN_BUFSIZE arrives
+	   fragmented across callbacks; a leading fragment that omits the
+	   contact-count byte would otherwise decode as count=0 and silently
+	   swallow the touch. Better to drop the fragment than misread it. */
+	if ((uint32_t)payload_len * 8u <
+		(uint32_t)info->contact_count_bit_offset + info->contact_count_bits)
+	{
+		out->count = 0;
+		return false;
 	}
 
 	uint8_t raw_count = touch_read_bits(bytes,
@@ -906,46 +1140,7 @@ bool process_touch_report(const uint8_t *report, uint16_t len,
 		}
 	}
 
-	/* Drive the generic touch-panel state from contact 0. The timer-
-	   callback edge detector in PicoMite.c watches usb_touch_active to
-	   raise TouchDown/TouchUp; GetTouch() in GUI.c reads x/y from here.
-	   A contact reported with tip=0 (hover) does NOT count as "pressed".
-	   Stamp the timestamp on EVERY report (including count=0 releases)
-	   so the watchdog only fires when reports actually stop arriving. */
-	usb_touch_last_us = time_us_64();
-	//	bool was_active = usb_touch_active;
-	if (raw_count > 0 && out->contacts[0].tip)
-	{
-		usb_touch_x = out->contacts[0].x;
-		usb_touch_y = out->contacts[0].y;
-		usb_touch_active = true;
-	}
-	else
-	{
-		usb_touch_active = false;
-	}
-	/* TEMPORARY diagnostic — print on every tip transition (not on
-	   every report) so we can see exactly when down/up edges land.
-	   NOT gated by !CurrentLinePtr so this works even while a BASIC
-	   interrupt sub is running. */
-	/*	if (usb_touch_active != was_active)
-		{
-			SSPrintString(usb_touch_active ? "T:DOWN " : "T:UP   ");
-			SSPrintString("count=");
-			SInt(out->count);
-			if (out->count > 0)
-			{
-				SSPrintString(" id=");
-				SInt(out->contacts[0].id);
-				SSPrintString(" tip=");
-				SInt(out->contacts[0].tip ? 1 : 0);
-				SSPrintString(" x=");
-				SInt(out->contacts[0].x);
-				SSPrintString(" y=");
-				SInt(out->contacts[0].y);
-			}
-			SRet();
-		}*/
+	touch_publish(out);
 	return true;
 }
 
@@ -982,6 +1177,254 @@ void print_touch_info(const touch_info_t *info)
 	PRet();
 }
 
+/* ========================================================================
+   TOUCH FIELD-DIAGNOSIS TRACING — currently FORCE-ENABLED for the touch
+   debugging round. Comment out the #define below (or delete these 3 lines)
+   to return to release behaviour where the dumps compile to nothing.
+   Equivalent to building with -DTOUCH_DEBUG.
+   ======================================================================== */
+#ifndef TOUCH_DEBUG
+// #define TOUCH_DEBUG
+#endif
+
+/* Touch enumeration/report diagnostics. Build with -DTOUCH_DEBUG to
+   enable; otherwise the dump calls compile to nothing. Kept in place so
+   the next problem panel can be traced without re-deriving the hooks. */
+#ifdef TOUCH_DEBUG
+
+/**
+ * Diagnostic dump for a problem touch panel. Prints the raw HID report
+ * descriptor (hex, 16 bytes/line with byte offsets) followed by every
+ * field analyze_touch_descriptor() extracted from it. Paste the hex into
+ * any HID descriptor decoder (e.g. eleccelerator.com/usbdescreqparser) to
+ * hand-verify the real Finger layout against what the parser concluded —
+ * a mismatch in the bit offsets or report_id explains "detected but no
+ * touch". Self-guards on CurrentLinePtr to match the enumeration prints.
+ */
+void dump_touch_descriptor(const uint8_t *desc, uint16_t len, const touch_info_t *info)
+{
+	char s[16];
+	if (CurrentLinePtr)
+		return;
+	MMPrintString("---- Touch HID report descriptor (");
+	PInt(len);
+	MMPrintString(" bytes) ----\r\n");
+	for (uint16_t i = 0; i < len; i++)
+	{
+		if ((i & 0x0F) == 0)
+		{
+			sprintf(s, "%03X: ", i);
+			MMPrintString(s);
+		}
+		sprintf(s, "%02X ", desc[i]);
+		MMPrintString(s);
+		if ((i & 0x0F) == 0x0F)
+			PRet();
+	}
+	if (len & 0x0F)
+		PRet();
+	MMPrintString("---- Parsed touch_info ----\r\n");
+	MMPrintString("  uses_report_id=");
+	PInt(info->uses_report_id);
+	MMPrintString(" report_id=");
+	PInt(info->report_id);
+	MMPrintString(" report_length_bytes=");
+	PInt(info->report_length_bytes);
+	PRet();
+	MMPrintString("  max_contacts=");
+	PInt(info->max_contacts);
+	MMPrintString(" first_contact_bit_offset=");
+	PInt(info->first_contact_bit_offset);
+	MMPrintString(" contact_stride_bits=");
+	PInt(info->contact_stride_bits);
+	PRet();
+	MMPrintString("  contact_count bit_offset=");
+	PInt(info->contact_count_bit_offset);
+	MMPrintString(" bits=");
+	PInt(info->contact_count_bits);
+	PRet();
+	MMPrintString("  tip_switch_bit_offset=");
+	PInt(info->tip_switch_bit_offset);
+	MMPrintString(" in_range_bit_offset=");
+	PInt(info->in_range_bit_offset);
+	PRet();
+	MMPrintString("  contact_id bit_offset=");
+	PInt(info->contact_id_bit_offset);
+	MMPrintString(" bits=");
+	PInt(info->contact_id_bits);
+	PRet();
+	MMPrintString("  X bit_offset=");
+	PInt(info->x_bit_offset);
+	MMPrintString(" bits=");
+	PInt(info->x_bits);
+	MMPrintString(" logical_max=");
+	PInt(info->x_logical_max);
+	PRet();
+	MMPrintString("  Y bit_offset=");
+	PInt(info->y_bit_offset);
+	MMPrintString(" bits=");
+	PInt(info->y_bits);
+	MMPrintString(" logical_max=");
+	PInt(info->y_logical_max);
+	PRet();
+	MMPrintString("  pointer_fallback=");
+	PInt(info->has_pointer_fallback);
+	if (info->has_pointer_fallback)
+	{
+		MMPrintString(" report_id=");
+		PInt(info->pointer_report_id);
+		MMPrintString(" button@");
+		PInt(info->pointer_button_bit_offset);
+		MMPrintString(" X@");
+		PInt(info->pointer_x_bit_offset);
+		MMPrintString("/");
+		PInt(info->pointer_x_bits);
+		MMPrintString("b max=");
+		PInt(info->pointer_x_logical_max);
+		MMPrintString(" Y@");
+		PInt(info->pointer_y_bit_offset);
+		MMPrintString("/");
+		PInt(info->pointer_y_bits);
+		MMPrintString("b max=");
+		PInt(info->pointer_y_logical_max);
+	}
+	PRet();
+	MMPrintString("---------------------------\r\n");
+}
+
+/**
+ * Diagnostic dump of the first few Input reports a touch device sends —
+ * called AFTER process_touch_report so it can show the raw bytes AND what
+ * the decoder made of them on one line-pair. The crucial readouts:
+ *   [len]  vs  "expect NB"  → if len < expected, the report is arriving
+ *          FRAGMENTED across callbacks (e.g. [64] then a short tail). The
+ *          EPIN buffer size doesn't fix that if the host controller hands
+ *          up one packet per transfer — software reassembly is then needed.
+ *   count / tip / x / y / active → whether the decode actually produced a
+ *          live contact (count>0, tip=1, active=1) or silently dropped it.
+ * Limited to TOUCH_RAW_DUMP_LIMIT reports; resets each connection.
+ */
+#define TOUCH_RAW_DUMP_LIMIT 16
+static int touch_raw_dump_count = 0;
+void reset_touch_raw_dump(void) { touch_raw_dump_count = 0; }
+void dump_touch_report(const touch_info_t *info, const uint8_t *report,
+					   uint16_t len, const touch_report_t *out)
+{
+	char s[16];
+	if (CurrentLinePtr || touch_raw_dump_count >= TOUCH_RAW_DUMP_LIMIT)
+		return;
+	touch_raw_dump_count++;
+	MMPrintString("Touch report [");
+	PInt(len);
+	MMPrintString("] ");
+	for (uint16_t i = 0; i < len && i < 96; i++)
+	{
+		sprintf(s, "%02X ", report[i]);
+		MMPrintString(s);
+	}
+	PRet();
+	MMPrintString("  -> expect ");
+	PInt(info->report_length_bytes);
+	MMPrintString("B id=");
+	PInt(info->report_id);
+	if (info->has_pointer_fallback)
+	{
+		MMPrintString(" ptr_id=");
+		PInt(info->pointer_report_id);
+	}
+	MMPrintString(" count=");
+	PInt(out->count);
+	if (out->count > 0)
+	{
+		MMPrintString(" tip=");
+		PInt(out->contacts[0].tip);
+		MMPrintString(" x=");
+		PInt(out->contacts[0].x);
+		MMPrintString(" y=");
+		PInt(out->contacts[0].y);
+	}
+	MMPrintString(" active=");
+	PInt(usb_touch_active);
+	PRet();
+}
+
+#else /* !TOUCH_DEBUG — compile the dump calls out entirely */
+#define dump_touch_descriptor(desc, len, info) ((void)0)
+#define reset_touch_raw_dump() ((void)0)
+#define dump_touch_report(info, report, len, out) ((void)0)
+#endif /* TOUCH_DEBUG */
+
+/**
+ * Expected total length (bytes, including the report-ID byte) of the Input
+ * report identified by the leading byte `rid`. Used by the fragment
+ * reassembler to know when a multi-packet report is complete. Returns 0
+ * for an unrecognised report ID — the caller then treats the chunk as a
+ * self-contained report (process it as-is).
+ */
+static uint16_t touch_expected_len(const touch_info_t *info, uint8_t rid)
+{
+	if (!info->uses_report_id)
+		return info->report_length_bytes;
+	if (rid == info->report_id)
+		return info->report_length_bytes;
+	if (info->has_pointer_fallback && rid == info->pointer_report_id)
+		return info->pointer_report_length_bytes;
+	return 0;
+}
+
+/**
+ * Reassemble a touch Input report that the host controller delivers split
+ * across several interrupt-IN callbacks. The RP2350 USB host hands up one
+ * USB packet (≤ wMaxPacketSize, 64 bytes here) per transfer completion
+ * regardless of CFG_TUH_HID_EPIN_BUFSIZE, so a report longer than the
+ * packet size (e.g. a 10-contact Windows touch report at 84 bytes) arrives
+ * as 64 + tail. Without this, process_touch_report() saw only the first
+ * fragment — which lacks the contact-count byte — and decoded 0 contacts.
+ *
+ * The first fragment carries the report-ID byte, which tells us the full
+ * length; we buffer fragments until we have that many bytes, then decode
+ * the assembled report. Reports that fit one packet pass straight through
+ * on the first call. A single static buffer serves the (normally single)
+ * active touch panel; if a fragment from a different device interleaves
+ * mid-assembly the buffer restarts on it. Always-on (not a debug aid).
+ */
+static void touch_reassemble(uint8_t dev_addr, uint8_t instance,
+							 const uint8_t *report, uint16_t len,
+							 const touch_info_t *info, touch_report_t *out)
+{
+	static uint8_t asm_buf[256];
+	static uint16_t asm_fill = 0;
+	static uint16_t asm_exp = 0;
+	static uint8_t asm_addr = 0xFF, asm_inst = 0xFF;
+
+	/* Start a fresh report when the buffer is empty or a different device
+	   barges in. The leading byte of the first fragment is the report ID,
+	   from which we derive the expected total length. */
+	if (asm_fill == 0 || asm_addr != dev_addr || asm_inst != instance)
+	{
+		asm_fill = 0;
+		asm_addr = dev_addr;
+		asm_inst = instance;
+		uint8_t rid = (len > 0) ? report[0] : 0;
+		asm_exp = touch_expected_len(info, rid);
+		if (asm_exp == 0 || asm_exp > sizeof(asm_buf))
+			asm_exp = len; /* unknown / oversize → treat as a single chunk */
+	}
+
+	uint16_t copy = len;
+	if ((uint32_t)asm_fill + copy > sizeof(asm_buf))
+		copy = (uint16_t)(sizeof(asm_buf) - asm_fill);
+	memcpy(asm_buf + asm_fill, report, copy);
+	asm_fill += copy;
+
+	if (asm_fill >= asm_exp)
+	{
+		process_touch_report(asm_buf, asm_fill, info, out);
+		dump_touch_report(info, asm_buf, asm_fill, out);
+		asm_fill = 0;
+	}
+}
+
 /* TOUCH Device_type — same numbering scheme as PS4/PS3/SNES/XBOX/UNKNOWN. */
 #ifndef TOUCH
 #define TOUCH 133
@@ -989,16 +1432,40 @@ void print_touch_info(const touch_info_t *info)
 
 /* process_kbd_report is declared in KeyboardMap.h. */
 
+/*
+ * Force a real SE0 bus reset on the root USB port.
+ *
+ * hcd_port_reset() in the pico-sdk TinyUSB driver is a no-op stub, so driving
+ * the PHY output directly is the only way to assert a USB reset on RP2040 /
+ * RP2350. This matters for externally-powered hubs: they never lose VBUS when
+ * MMBasic reboots, so the hub keeps the USB address and configured state it
+ * held in the previous session and ignores the re-enumeration from address 0
+ * (the whole device tree "vanishes"). An SE0 reset forces a directly-attached
+ * hub back to Default state; TinyUSB then cascades the reset to the devices
+ * behind it as it re-enumerates each downstream port.
+ *
+ * The controller must already be initialised (tuh_init / rp2040_usb_init) so
+ * the PHY is powered and muxed before this is called.
+ */
+#define USB_BUS_RESET_PHY_OVERRIDE_EN (USB_USBPHY_DIRECT_OVERRIDE_TX_DM_OE_OVERRIDE_EN_BITS | USB_USBPHY_DIRECT_OVERRIDE_TX_DM_OVERRIDE_EN_BITS | \
+									   USB_USBPHY_DIRECT_OVERRIDE_TX_DP_OE_OVERRIDE_EN_BITS | USB_USBPHY_DIRECT_OVERRIDE_TX_DP_OVERRIDE_EN_BITS)
 void USB_bus_reset(void)
 {
-	hw_set_bits(&usb_hw->phy_direct_override, USB_USBPHY_DIRECT_OVERRIDE_TX_DM_OE_OVERRIDE_EN_BITS | USB_USBPHY_DIRECT_OVERRIDE_TX_DM_OVERRIDE_EN_BITS |
-												  USB_USBPHY_DIRECT_OVERRIDE_TX_DP_OE_OVERRIDE_EN_BITS | USB_USBPHY_DIRECT_OVERRIDE_TX_DP_OVERRIDE_EN_BITS);
+	// Take manual control of the DP/DM output drivers.
+	hw_set_bits(&usb_hw->phy_direct_override, USB_BUS_RESET_PHY_OVERRIDE_EN);
+	// Enable the output drivers, then pull both lines low = SE0 = bus reset.
 	hw_set_bits(&usb_hw->phy_direct, USB_USBPHY_DIRECT_TX_DM_OE_BITS | USB_USBPHY_DIRECT_TX_DP_OE_BITS);
-	uint32_t save = usb_hw->phy_direct;
 	hw_clear_bits(&usb_hw->phy_direct, USB_USBPHY_DIRECT_TX_DM_BITS | USB_USBPHY_DIRECT_TX_DP_BITS);
-	uSec(10000);
-	usb_hw->phy_direct = save;
-	hw_clear_bits(&usb_hw->phy_direct_override, USB_USBPHY_DIRECT_OVERRIDE_TX_DM_OE_OVERRIDE_EN_BITS | USB_USBPHY_DIRECT_OVERRIDE_TX_DM_OVERRIDE_EN_BITS);
+
+	// Hold the reset. USB spec minimum is 10 ms; drive ~20 ms so that slow /
+	// cheap hubs sample it reliably.
+	uSec(20000);
+
+	// Release: hand DP/DM back to the SIE. Clear ALL four override-enable bits
+	// (the previous version cleared only the two DM bits, leaving DP under
+	// manual control after return - a likely cause of the old unreliability).
+	hw_clear_bits(&usb_hw->phy_direct, USB_USBPHY_DIRECT_TX_DM_OE_BITS | USB_USBPHY_DIRECT_TX_DP_OE_BITS);
+	hw_clear_bits(&usb_hw->phy_direct_override, USB_BUS_RESET_PHY_OVERRIDE_EN);
 }
 void clearrepeat(void)
 {
@@ -1588,6 +2055,10 @@ void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const *desc_re
 					   sizeof(touch_info_t));
 				memset((void *)&HID[touch_slot].touch_report, 0,
 					   sizeof(touch_report_t));
+				/* Diagnostic: dump the descriptor + parsed layout, and arm
+				   the raw-report dump for this connection. */
+				dump_touch_descriptor(desc_report, desc_len, &tinfo);
+				reset_touch_raw_dump();
 				HID[touch_slot].report_rate = 5; /* fast polling — fingers move */
 				HID[touch_slot].report_timer = -(10 + (touch_slot + 2) * 500);
 				HID[touch_slot].active = true;
@@ -1595,6 +2066,7 @@ void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const *desc_re
 				/* Drive generic touch-panel state from this device. */
 				usb_touch_present = true;
 				usb_touch_active = false;
+				usb_touch_active2 = false;
 				/* Switch out of boot protocol so we get the multi-touch
 				   report layout instead of the BIOS-mode boot-mouse
 				   compatibility report (some touch screens default to
@@ -1602,7 +2074,7 @@ void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const *desc_re
 				tuh_hid_set_protocol(dev_addr, instance, HID_PROTOCOL_REPORT);
 				if (!CurrentLinePtr)
 				{
-					MMPrintString("Multi-touch Screen Connected on channel ");
+					MMPrintString("Multi-touch Connected on channel ");
 					PInt(touch_slot + 1);
 					MMPrintString(" (");
 					PInt(tinfo.max_contacts);
@@ -1696,34 +2168,34 @@ void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const *desc_re
 		}
 		else
 		{
-			MMPrintString("Unknown Device Connected on channel ");
-			PInt(slot + 1);
-			MMPrintString(" (pid=&H");
-			PIntH(pid);
-			MMPrintString(", vid=&H");
-			PIntH(vid);
-			MMPrintString(")");
-			MMPrintString("\r\n> ");
-			HID[slot].Device_address = dev_addr;
-			HID[slot].Device_instance = instance;
-			HID[slot].report_timer = -(10 + (slot + 2) * 500);
-			HID[slot].active = false;
-			HID[slot].report_rate = 20; // mSec between reports
-			HID[slot].Device_type = UNKNOWN;
-			HID[slot].active = true;
-			HID[slot].report_requested = false;
-			for (int i = 0; i < desc_len; i += 2)
-			{
-				putConsole('0', 0);
-				putConsole('x', 0);
-				PIntH(desc_report[i]);
-				putConsole(' ', 0);
-				putConsole('0', 0);
-				putConsole('x', 0);
-				PIntH(desc_report[i + 1]);
-				PRet();
-			}
-			return;
+			/*			MMPrintString("Unknown Device Connected on channel ");
+						PInt(slot + 1);
+						MMPrintString(" (pid=&H");
+						PIntH(pid);
+						MMPrintString(", vid=&H");
+						PIntH(vid);
+						MMPrintString(")");
+						MMPrintString("\r\n> ");
+						HID[slot].Device_address = dev_addr;
+						HID[slot].Device_instance = instance;
+						HID[slot].report_timer = -(10 + (slot + 2) * 500);
+						HID[slot].active = false;
+						HID[slot].report_rate = 20; // mSec between reports
+						HID[slot].Device_type = UNKNOWN;
+						HID[slot].active = true;
+						HID[slot].report_requested = false;
+						for (int i = 0; i < desc_len; i += 2)
+						{
+							putConsole('0', 0);
+							putConsole('x', 0);
+							PIntH(desc_report[i]);
+							putConsole(' ', 0);
+							putConsole('0', 0);
+							putConsole('x', 0);
+							PIntH(desc_report[i + 1]);
+							PRet();
+						}
+						return;*/
 		}
 	}
 	PlayMemWav(ezyZip_wav, EZYZIP_WAV_SIZE);
@@ -1778,8 +2250,9 @@ void tuh_hid_umount_cb(uint8_t dev_addr, uint8_t instance)
 		{
 			usb_touch_present = false;
 			usb_touch_active = false;
+			usb_touch_active2 = false;
 			if (!CurrentLinePtr)
-				MMPrintString("Multi-touch Screen Disconnected\r\n> ");
+				MMPrintString("Multi-touch Disconnected\r\n> ");
 			break;
 		}
 		else if (instance == HID[i].Device_instance && dev_addr == HID[i].Device_address && HID[i].Device_type == UNKNOWN)
@@ -1829,9 +2302,12 @@ void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance, uint8_t cons
 		//		MMPrintString("HID receive boot gamepad report\r\n");
 		if (HID[n].Device_type == TOUCH)
 		{
-			process_touch_report(report, len,
-								 (const touch_info_t *)&HID[n].touch_info,
-								 (touch_report_t *)&HID[n].touch_report);
+			/* Reassembles fragmented reports, then decodes + dumps the
+			   complete report (the host hands up one 64-byte packet per
+			   callback, so 84-byte reports arrive as 64 + tail). */
+			touch_reassemble(dev_addr, instance, report, len,
+							 (const touch_info_t *)&HID[n].touch_info,
+							 (touch_report_t *)&HID[n].touch_report);
 		}
 		else if (is_sony_ds4(dev_addr))
 		{

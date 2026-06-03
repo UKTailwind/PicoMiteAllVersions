@@ -505,10 +505,12 @@ uint8_t PSRAMpin;
         {43, 25, "GP25", UNUSED, 99, 99}, // pseudo pin 43 reserved for WEB/BT/BTH/HDMIBTH interface
         {44, 29, "GP29", UNUSED, 99, 99}, // pseudo pin 44 reserved for WEB/BT/BTH/HDMIBTH interface
 #else
+#ifndef PICOMITEWEB
     {41, 23, "GP23", DIGITAL_IN | DIGITAL_OUT | SPI0TX | I2C1SCL | PWM3B, 99, 131},             // pseudo pin 41
     {42, 24, "GP24", DIGITAL_IN | DIGITAL_OUT | SPI1RX | UART1TX | I2C0SDA | PWM4A, 99, 4},     // pseudo pin 42
     {43, 25, "GP25", DIGITAL_IN | DIGITAL_OUT | UART1RX | I2C0SCL | PWM4B, 99, 132},            // pseudo pin 43
     {44, 29, "GP29", DIGITAL_IN | DIGITAL_OUT | ANALOG_IN | UART0RX | I2C0SCL | PWM6B, 3, 134}, // pseudo pin 44
+#endif
 #endif
 #ifdef rp2350
         {45, 30, "GP30", DIGITAL_IN | DIGITAL_OUT | SPI1SCK | I2C1SDA | PWM7A, 99, 7},                       // pseudo pin 45
@@ -692,7 +694,7 @@ uint8_t PSRAMpin;
            packet handler (process_kbd_report path), so no extra
            drain logic is needed here. Also drives the CYW43 LED
            heartbeat — see bt_keyboard_poll() in BTKeyboard.c. */
-        bt_keyboard_poll();
+//        bt_keyboard_poll();
 #endif
 #ifdef PICOMITEBT
         /* Pump btstack/cyw43 and drain inbound RFCOMM bytes into the
@@ -895,7 +897,7 @@ uint8_t PSRAMpin;
            wrapper like PICOMITEBT — HID reports route directly into
            the console RX ring via process_kbd_report() from inside
            the packet handler. */
-        bt_keyboard_poll();
+//        bt_keyboard_poll();
 #endif
 #ifdef PICOMITEBT
         /* Service cyw43/btstack work from the main thread at full
@@ -1066,6 +1068,18 @@ int __not_in_flash_func(MMInkey)(void)
 #if !defined(USBKEYBOARD) && !defined(PICOMITEBTH)
         if (c == -1)
             CheckKeyboard();
+#endif
+#if defined(USBKEYBOARD) && defined(GUICONTROLS) && defined(PICOMITEVGA)
+        /* OSK taps should always reach the console RX queue while the
+           keyboard is visible — including during PRESS-ANY-KEY prompts and
+           any other input poll that calls MMInkey directly (cmd_list,
+           INPUT, etc). Only run when nothing arrived this poll so we don't
+           add work to the hot path. */
+        if (c == (unsigned int)-1 && OSK_IsActive())
+        {
+            ProcessTouch();
+            c = getConsole();
+        }
 #endif
 
         // Fast path: return normal characters immediately
@@ -2146,8 +2160,7 @@ int __not_in_flash_func(MMInkey)(void)
                100 ms. Typical reporting rates are 100-200 Hz while a
                finger is on the surface, so 100 ms is ~10-20 missed
                reports — well past any normal jitter. */
-            if (usb_armed && usb_touch_active
-                && (time_us_64() - usb_touch_last_us) > 100000ULL)
+            if (usb_armed && usb_touch_active && (time_us_64() - usb_touch_last_us) > 100000ULL)
             {
                 usb_touch_active = false;
             }
@@ -2160,7 +2173,7 @@ int __not_in_flash_func(MMInkey)(void)
 #ifdef USBKEYBOARD
                                 || usb_touch_active
 #endif
-                                ;
+                    ;
                 if (pen_down && !TouchState)
                 {
                     TouchState = TouchDown = true;
@@ -3411,6 +3424,29 @@ int __not_in_flash_func(MMInkey)(void)
     // This is the third scanline overall (-> =2 because zero-based).
     volatile int32_t v_scanline = 2;
 
+#ifdef PICOMITEHDMIBTH
+    /* Set by restartHDMIBTH() (core0) to ask the running scanout loop on
+       core1 to return so HDMICore can rebuild itself for a new
+       resolution. core1 clears it once the new mode is live. Avoids
+       resetting core1 or touching the chained DMA from core0. */
+    volatile bool hdmi_switch_pending = false;
+    /* Canonical source of truth for the resolution core1 is ACTUALLY
+       scanning out. Option.Resolution cannot serve this role: it is a
+       flash-backed option, and LoadOptions() (called from the error
+       handler and soft-reset paths) byte-copies the whole Option struct
+       back from flash — which would silently revert Option.Resolution to
+       the stored 1024x600 while the hardware is still running 640, causing
+       screen corruption AND making RESOLUTION 1024 a no-op (the guard
+       sees they already match). HDMIres survives LoadOptions; LoadOptions
+       re-asserts it into Option.Resolution so all the existing
+       Option.Resolution-based geometry/macros stay consistent. */
+    volatile int HDMIres = R1024x600;
+/* How long HDMICore holds the HSTX output dark mid-switch (microseconds).
+   Keep SHORT: a long no-signal gap can drive the monitor into standby so
+   it fails to re-acquire. 30 ms is plenty for a clean transition. */
+#define HDMIBTH_BLANK_US 30000
+#endif
+
     // During the vertical active period, we take two IRQs per scanline: one to
     // post the command list, and another to post the pixels.
     static bool vactive_cmdlist_posted = false;
@@ -3462,6 +3498,12 @@ int __not_in_flash_func(MMInkey)(void)
         {
             if (v_scanline != last_line)
             {
+#ifdef PICOMITEHDMIBTH
+                /* Return so HDMICore can rebuild for a new resolution
+                   (live RESOLUTION switch). No-op in other HDMI builds. */
+                if (hdmi_switch_pending)
+                    return;
+#endif
                 last_line = v_scanline;
                 load_line = v_scanline - (MODE_V_X_TOTAL_LINES - MODE_V_X_ACTIVE_LINES);
                 Line_dup = load_line >> 1;
@@ -3675,6 +3717,173 @@ int __not_in_flash_func(MMInkey)(void)
             }
         }
     }
+#ifdef PICOMITEHDMIBTH
+    /* HDMIBTH-only RGB332 640x480 scanout loop. This is the "special"
+       640x480 added so that 320x240x4bit ports (mode 2) get a native
+       integer-scaled mode. It is deliberately RGB332 (8-bit), mirroring
+       HDMIloopX's pipeline, so it reuses the 8-bit tile mechanism and
+       costs nothing extra in the framebuffer pool. Only modes 1 and 2
+       are supported (the resolutions the games target); other modes are
+       rejected by setmode/cmd_resolution. Kept separate from HDMIloopX
+       because the per-line work is too tight to generalise (see the
+       per-resolution loop family). Selected by HDMICore when
+       Option.Resolution == R640x480x8. */
+    void MIPS32 __not_in_flash_func(HDMIloopBTH640)(void)
+    {
+        int last_line = 2, load_line, line_to_load, Line_dup;
+        while (1)
+        {
+            if (v_scanline != last_line)
+            {
+                /* Return so HDMICore can rebuild for a new resolution. */
+                if (hdmi_switch_pending)
+                    return;
+                last_line = v_scanline;
+                load_line = v_scanline - (MODE_V_TOTAL_LINES - MODE_V_ACTIVE_LINES);
+                Line_dup = load_line >> 1;
+                line_to_load = last_line & 1;
+                if (load_line >= 0 && load_line < MODE_V_ACTIVE_LINES)
+                {
+                    __dmb();
+                    switch (DISPLAY_TYPE)
+                    {
+                    case SCREENMODE1: // 640x480x2 colour with 8-bit RGB332 tiles
+                    {
+                        uint8_t *p = (uint8_t *)HDMIlines[line_to_load];
+                        uint8_t *fcol_w = tilefcols_w + load_line / ytileheight * X_TILE, *bcol_w = tilebcols_w + load_line / ytileheight * X_TILE; // get the relevant tile
+                        uint32_t *pp = (uint32_t *)&DisplayBuf[load_line * MODE_H_S_ACTIVE_PIXELS / 8];
+                        uint32_t *qq = (uint32_t *)&LayerBuf[load_line * MODE_H_S_ACTIVE_PIXELS / 8];
+                        uint32_t d = *pp | *qq;
+                        for (int i = 0; i < MODE_H_S_ACTIVE_PIXELS / 32; i++)
+                        {
+                            *p++ = (d & 0x1) ? *fcol_w : *bcol_w;
+                            d >>= 1;
+                            *p++ = (d & 0x1) ? *fcol_w : *bcol_w;
+                            d >>= 1;
+                            *p++ = (d & 0x1) ? *fcol_w : *bcol_w;
+                            d >>= 1;
+                            *p++ = (d & 0x1) ? *fcol_w : *bcol_w;
+                            d >>= 1;
+                            *p++ = (d & 0x1) ? *fcol_w : *bcol_w;
+                            d >>= 1;
+                            *p++ = (d & 0x1) ? *fcol_w : *bcol_w;
+                            d >>= 1;
+                            *p++ = (d & 0x1) ? *fcol_w : *bcol_w;
+                            d >>= 1;
+                            *p++ = (d & 0x1) ? *fcol_w : *bcol_w;
+                            d >>= 1;
+                            fcol_w++;
+                            bcol_w++;
+                            *p++ = (d & 0x1) ? *fcol_w : *bcol_w;
+                            d >>= 1;
+                            *p++ = (d & 0x1) ? *fcol_w : *bcol_w;
+                            d >>= 1;
+                            *p++ = (d & 0x1) ? *fcol_w : *bcol_w;
+                            d >>= 1;
+                            *p++ = (d & 0x1) ? *fcol_w : *bcol_w;
+                            d >>= 1;
+                            *p++ = (d & 0x1) ? *fcol_w : *bcol_w;
+                            d >>= 1;
+                            *p++ = (d & 0x1) ? *fcol_w : *bcol_w;
+                            d >>= 1;
+                            *p++ = (d & 0x1) ? *fcol_w : *bcol_w;
+                            d >>= 1;
+                            *p++ = (d & 0x1) ? *fcol_w : *bcol_w;
+                            d >>= 1;
+                            fcol_w++;
+                            bcol_w++;
+                            *p++ = (d & 0x1) ? *fcol_w : *bcol_w;
+                            d >>= 1;
+                            *p++ = (d & 0x1) ? *fcol_w : *bcol_w;
+                            d >>= 1;
+                            *p++ = (d & 0x1) ? *fcol_w : *bcol_w;
+                            d >>= 1;
+                            *p++ = (d & 0x1) ? *fcol_w : *bcol_w;
+                            d >>= 1;
+                            *p++ = (d & 0x1) ? *fcol_w : *bcol_w;
+                            d >>= 1;
+                            *p++ = (d & 0x1) ? *fcol_w : *bcol_w;
+                            d >>= 1;
+                            *p++ = (d & 0x1) ? *fcol_w : *bcol_w;
+                            d >>= 1;
+                            *p++ = (d & 0x1) ? *fcol_w : *bcol_w;
+                            d >>= 1;
+                            fcol_w++;
+                            bcol_w++;
+                            *p++ = (d & 0x1) ? *fcol_w : *bcol_w;
+                            d >>= 1;
+                            *p++ = (d & 0x1) ? *fcol_w : *bcol_w;
+                            d >>= 1;
+                            *p++ = (d & 0x1) ? *fcol_w : *bcol_w;
+                            d >>= 1;
+                            *p++ = (d & 0x1) ? *fcol_w : *bcol_w;
+                            d >>= 1;
+                            *p++ = (d & 0x1) ? *fcol_w : *bcol_w;
+                            d >>= 1;
+                            *p++ = (d & 0x1) ? *fcol_w : *bcol_w;
+                            d >>= 1;
+                            *p++ = (d & 0x1) ? *fcol_w : *bcol_w;
+                            d >>= 1;
+                            *p++ = (d & 0x1) ? *fcol_w : *bcol_w;
+                            fcol_w++;
+                            bcol_w++;
+                            d = *(++pp) | *(++qq);
+                        }
+                    }
+                    break;
+                    case SCREENMODE2: // 320 x 240 x 4bit-colour mapped to RGB332, 2x scaled to 640x480
+                    {
+                        uint16_t *p = (uint16_t *)HDMIlines[line_to_load];
+                        uint8_t l, d, s;
+                        int pp = (Line_dup)*MODE_H_S_ACTIVE_PIXELS / 4;
+                        for (int i = 0; i < MODE_H_S_ACTIVE_PIXELS / 4; i++)
+                        {
+                            l = LayerBuf[pp + i];
+                            d = DisplayBuf[pp + i];
+                            s = SecondLayer[pp + i];
+                            if ((s & 0xf) != transparents)
+                            {
+                                *p++ = (uint16_t)map16quads[s & 0xf];
+                            }
+                            else
+                            {
+                                if ((l & 0xf) != transparent)
+                                {
+                                    *p++ = (uint16_t)map16quads[l & 0xf];
+                                }
+                                else
+                                {
+                                    *p++ = (uint16_t)map16quads[d & 0xf];
+                                }
+                            }
+                            d >>= 4;
+                            l >>= 4;
+                            s >>= 4;
+                            if ((s & 0xf) != transparents)
+                            {
+                                *p++ = (uint16_t)map16quads[s & 0xf];
+                            }
+                            else
+                            {
+                                if ((l & 0xf) != transparent)
+                                {
+                                    *p++ = (uint16_t)map16quads[l & 0xf];
+                                }
+                                else
+                                {
+                                    *p++ = (uint16_t)map16quads[d & 0xf];
+                                }
+                            }
+                        }
+                    }
+                    break;
+                    default:
+                    }
+                }
+            }
+        }
+    }
+#endif /* PICOMITEHDMIBTH — end of RGB332 640x480 scanout loop */
 #ifndef PICOMITEHDMIBTH
     /* HDMIBTH locks the display to 1024x600 (FreqX). The four scanout
        loops below cover the other timings (640x480 / 720x400 / 720p /
@@ -4481,29 +4690,72 @@ int __not_in_flash_func(MMInkey)(void)
     {
         mapreset();
 #ifdef PICOMITEHDMIBTH
-        /* HDMIBTH is locked to 1024x600 (FreqX). Skip the if/else chain
-           and the unused MODE_*_L/W/V/8/4/Y/S timing constants — they'd
-           still compile to flash because they're used elsewhere, but
-           the dead branches go away. */
-        MODE_H_SYNC_POLARITY = MODE_H_X_SYNC_POLARITY;
-        MODE_ACTIVE_LINES = MODE_V_X_ACTIVE_LINES;
-        MODE_ACTIVE_PIXELS = MODE_H_X_ACTIVE_PIXELS;
-        MODE_V_TOTAL_LINES = MODE_V_X_TOTAL_LINES;
-        MODE_H_ACTIVE_PIXELS = MODE_H_X_ACTIVE_PIXELS;
-        MODE_H_FRONT_PORCH = MODE_H_X_FRONT_PORCH;
-        MODE_H_SYNC_WIDTH = MODE_H_X_SYNC_WIDTH;
-        MODE_H_BACK_PORCH = MODE_H_X_BACK_PORCH;
-        MODE_V_SYNC_POLARITY = MODE_V_X_SYNC_POLARITY;
-        MODE_V_ACTIVE_LINES = MODE_V_X_ACTIVE_LINES;
-        MODE_V_FRONT_PORCH = MODE_V_X_FRONT_PORCH;
-        MODE_V_SYNC_WIDTH = MODE_V_X_SYNC_WIDTH;
-        MODE_V_BACK_PORCH = MODE_V_X_BACK_PORCH;
-        MODE1SIZE = MODE1SIZE_X;
-        MODE2SIZE = MODE2SIZE_X;
-        MODE3SIZE = MODE3SIZE_X;
-        MODE4SIZE = 0L;
-        MODE5SIZE = MODE5SIZE_X;
-        PIXELS_PER_WORD = 4;
+    hdmibth_setup:
+        /* HDMIBTH supports two RGB332 resolutions selected at runtime by
+           the RESOLUTION command (no reboot): 1024x600 (_X, default) and
+           the "special" 640x480x8 (_S). Both are 8-bit/RGB332 (FullColour
+           is false for both), so only the timing geometry and the HSTX
+           source clock differ. The other build's _L/_W/_V/_8/_4/_Y
+           branches are still gated out. A live RESOLUTION switch returns
+           from the scanout loop (see the tail) and re-enters here. */
+        if (Option.Resolution == R640x480x8)
+        {
+            MODE_H_SYNC_POLARITY = MODE_H_S_SYNC_POLARITY;
+            MODE_ACTIVE_LINES = MODE_V_S_ACTIVE_LINES;
+            MODE_ACTIVE_PIXELS = MODE_H_S_ACTIVE_PIXELS;
+            MODE_V_TOTAL_LINES = MODE_V_S_TOTAL_LINES;
+            MODE_H_ACTIVE_PIXELS = MODE_H_S_ACTIVE_PIXELS;
+            MODE_H_FRONT_PORCH = MODE_H_S_FRONT_PORCH;
+            MODE_H_SYNC_WIDTH = MODE_H_S_SYNC_WIDTH;
+            MODE_H_BACK_PORCH = MODE_H_S_BACK_PORCH;
+            MODE_V_SYNC_POLARITY = MODE_V_S_SYNC_POLARITY;
+            MODE_V_ACTIVE_LINES = MODE_V_S_ACTIVE_LINES;
+            MODE_V_FRONT_PORCH = MODE_V_S_FRONT_PORCH;
+            MODE_V_SYNC_WIDTH = MODE_V_S_SYNC_WIDTH;
+            MODE_V_BACK_PORCH = MODE_V_S_BACK_PORCH;
+            MODE1SIZE = MODE1SIZE_S;
+            MODE2SIZE = MODE2SIZE_S;
+            MODE3SIZE = MODE3SIZE_S;
+            MODE4SIZE = 0L;
+            MODE5SIZE = MODE5SIZE_S;
+            PIXELS_PER_WORD = 4;
+        }
+        else
+        {
+            MODE_H_SYNC_POLARITY = MODE_H_X_SYNC_POLARITY;
+            MODE_ACTIVE_LINES = MODE_V_X_ACTIVE_LINES;
+            MODE_ACTIVE_PIXELS = MODE_H_X_ACTIVE_PIXELS;
+            MODE_V_TOTAL_LINES = MODE_V_X_TOTAL_LINES;
+            MODE_H_ACTIVE_PIXELS = MODE_H_X_ACTIVE_PIXELS;
+            MODE_H_FRONT_PORCH = MODE_H_X_FRONT_PORCH;
+            MODE_H_SYNC_WIDTH = MODE_H_X_SYNC_WIDTH;
+            MODE_H_BACK_PORCH = MODE_H_X_BACK_PORCH;
+            MODE_V_SYNC_POLARITY = MODE_V_X_SYNC_POLARITY;
+            MODE_V_ACTIVE_LINES = MODE_V_X_ACTIVE_LINES;
+            MODE_V_FRONT_PORCH = MODE_V_X_FRONT_PORCH;
+            MODE_V_SYNC_WIDTH = MODE_V_X_SYNC_WIDTH;
+            MODE_V_BACK_PORCH = MODE_V_X_BACK_PORCH;
+            MODE1SIZE = MODE1SIZE_X;
+            MODE2SIZE = MODE2SIZE_X;
+            MODE3SIZE = MODE3SIZE_X;
+            MODE4SIZE = 0L;
+            MODE5SIZE = MODE5SIZE_X;
+            PIXELS_PER_WORD = 4;
+        }
+        /* HSTX source clock: pixel clock = clk_hstx / 5 (CSR CLKDIV=5
+           below). 1024x600 needs 50.4 MHz pixel → clk_hstx 252 MHz;
+           640x480@60 needs 25.2 MHz pixel → clk_hstx 126 MHz. The stock
+           build relies on the cold-boot default (clk_hstx == clk_sys) for
+           1024x600 and never configures it; here we must set it
+           EXPLICITLY every time so a live switch back from 640x480 (where
+           it was halved) restores 252 MHz. Target absolute frequencies so
+           this is robust to clk_sys. */
+        clock_configure(
+            clk_hstx,
+            0,                                                // No glitchless mux
+            CLOCKS_CLK_PERI_CTRL_AUXSRC_VALUE_CLKSRC_PLL_SYS, // System PLL on AUX mux
+            clock_get_hz(clk_sys),                            // Input frequency
+            (Option.Resolution == R640x480x8) ? 126000000 : 252000000);
 #else
         if (Option.Resolution == R1024x768)
         {
@@ -4840,16 +5092,111 @@ int __not_in_flash_func(MMInkey)(void)
 
         dma_hw->ints0 = (1u << DMACH_PING) | (1u << DMACH_PONG);
         dma_hw->inte0 = (1u << DMACH_PING) | (1u << DMACH_PONG);
+#ifdef PICOMITEHDMIBTH
+        /* On a live RESOLUTION switch HDMICore's setup re-runs (via the
+           hdmibth_setup goto). Register the exclusive handler only the
+           first time — re-registering it can hard_assert on some SDK
+           paths. The handler/vector is untouched by the rebuild. */
+        static bool hdmibth_irq_registered = false;
+        if (!hdmibth_irq_registered)
+        {
+            irq_set_exclusive_handler(DMA_IRQ_0, dma_irq_handler0);
+            hdmibth_irq_registered = true;
+        }
+#else
         irq_set_exclusive_handler(DMA_IRQ_0, dma_irq_handler0);
+#endif
         irq_set_enabled(DMA_IRQ_0, true);
 
         //    bus_ctrl_hw->priority = 1;
         dma_channel_start(DMACH_PING);
 #ifdef PICOMITEHDMIBTH
-        /* HDMIBTH only supports FreqX (1024x600), so call the scanout
-           loop directly. The other four loops are not compiled in this
-           build (see #ifndef PICOMITEHDMIBTH wrapper above). */
-        HDMIloopX();
+        /* HDMIBTH runs one of two RGB332 loops depending on the runtime
+           resolution: HDMIloopBTH640 for the special 640x480x8, otherwise
+           HDMIloopX for 1024x600. The other four loops are not compiled
+           in this build (see #ifndef PICOMITEHDMIBTH wrapper above).
+           These loops return (rather than spin forever) when a live
+           RESOLUTION switch is requested; we then tear the scanout down
+           on this core — IRQ off, both chained DMA channels aborted
+           together so neither re-triggers the other — and jump back to
+           hdmibth_setup to rebuild for the new resolution (clk_hstx,
+           timing, HSTX and DMA all re-initialised there). Doing this on
+           core1 avoids cross-core DMA/clock races and a core1 reset. */
+        /* Setup above is complete and the new mode is fully live, so
+           acknowledge any pending switch (harmless on the cold-boot
+           first pass) before entering the scanout loop. restartHDMIBTH()
+           waits on this clear, so it only returns once MODE*SIZE / timing
+           / clk_hstx are all in place for the new resolution. */
+        hdmi_switch_pending = false;
+        __dmb();
+        if (Option.Resolution == R640x480x8)
+            HDMIloopBTH640();
+        else
+            HDMIloopX();
+        /* A loop returns only when a live RESOLUTION switch is pending.
+           Tear the scanout down on this core and rebuild via the label:
+           IRQ off, HSTX stopped, and both chained DMA channels aborted
+           together (writing both abort bits at once) so neither
+           re-triggers the other. */
+        irq_set_enabled(DMA_IRQ_0, false);
+        /* Tear down the chained DMA correctly. PING and PONG CHAIN_TO each
+           other, so aborting one can RE-TRIGGER the other and the abort
+           never settles — core1 then reconfigures a still-live channel,
+           gets no completion IRQ, and wedges (symptom: switch to 1024
+           intermittently gives both "no signal" AND a dead prompt, because
+           core0 spins forever in setmode's `while(v_scanline!=0)`).
+           So FIRST break both chains (point CHAIN_TO at self, via the
+           non-triggering al1_ctrl alias), THEN abort both together. Bounded
+           waits so a stuck channel can never lock core1. */
+        hw_write_masked(&dma_hw->ch[DMACH_PING].al1_ctrl,
+                        DMACH_PING << DMA_CH0_CTRL_TRIG_CHAIN_TO_LSB,
+                        DMA_CH0_CTRL_TRIG_CHAIN_TO_BITS);
+        hw_write_masked(&dma_hw->ch[DMACH_PONG].al1_ctrl,
+                        DMACH_PONG << DMA_CH0_CTRL_TRIG_CHAIN_TO_LSB,
+                        DMA_CH0_CTRL_TRIG_CHAIN_TO_BITS);
+        __dmb();
+        dma_hw->abort = (1u << DMACH_PING) | (1u << DMACH_PONG);
+        {
+            uint64_t dl = time_us_64() + 2000;
+            while ((dma_hw->abort & ((1u << DMACH_PING) | (1u << DMACH_PONG))) && time_us_64() < dl)
+                tight_loop_contents();
+            while ((dma_hw->ch[DMACH_PING].ctrl_trig & DMA_CH0_CTRL_TRIG_BUSY_BITS) && time_us_64() < dl)
+                tight_loop_contents();
+            while ((dma_hw->ch[DMACH_PONG].ctrl_trig & DMA_CH0_CTRL_TRIG_BUSY_BITS) && time_us_64() < dl)
+                tight_loop_contents();
+        }
+        dma_hw->ints0 = (1u << DMACH_PING) | (1u << DMACH_PONG);
+        hstx_ctrl_hw->csr = 0; // stop HSTX output
+        /* Fully reset the HSTX peripheral so the rebuild starts from the
+           same clean state as a cold boot (which is 100% reliable). A live
+           switch otherwise reconfigures HSTX while it still holds residual
+           FIFO/serialiser state from the previous resolution, which made
+           640->1024 intermittently fail to produce a valid signal. The
+           rebuild re-does all HSTX config (expand, csr, pin mux) and the
+           GPIO pin functions, so a reset here is safe. */
+        reset_unreset_block_num_wait_blocking(RESETS_RESET_HSTX_LSB);
+        /* Brief blank so the monitor sees a clean signal drop. Keep it
+           SHORT — a long no-signal gap can send the monitor into standby
+           and it may then fail to re-acquire. */
+        {
+            uint64_t blank = time_us_64() + HDMIBTH_BLANK_US;
+            while (time_us_64() < blank)
+                tight_loop_contents();
+        }
+        /* Force the safe mode-1 scanout path for the rebuild window. The
+           layer-compositing modes (mode 2) read LayerBuf/SecondLayer at
+           offsets derived from the resolution geometry; running them after
+           the geometry has changed but before core0's setmode() has
+           re-laid-out the buffers reads out of range and faults core1
+           (→ HSTX stops → "no signal"). Mode 1 only reads the plain
+           bitmap, so it is always safe. setmode() sets the real mode once
+           the new resolution is live. */
+        DISPLAY_TYPE = SCREENMODE1;
+        v_scanline = 2;
+        dma_pong = false;
+        vactive_cmdlist_posted = false;
+        __dmb();
+        goto hdmibth_setup;
 #else
         if (Option.Resolution == R640x480f315 || Option.Resolution == R640x480f378 || Option.Resolution == R640x480f252 || Option.Resolution == R720x400)
             HDMIloop0();
@@ -5479,6 +5826,31 @@ uint32_t testPSRAM(void)
     }
 #endif
 
+#ifdef PICOMITEHDMIBTH
+    /* Runtime resolution switch for HDMIBTH (no reboot). Both 1024x600 and
+       640x480x8 keep the 252 MHz system clock, so only the HSTX source
+       clock, timing and scanout loop change — all redone by HDMICore.
+       Rather than reset core1 and fight the chained DMA from core0, we ask
+       the scanout loop (running on core1) to return via hdmi_switch_pending;
+       core1 then tears down its own DMA/HSTX and rebuilds for the new
+       resolution. Call from core0; the caller does the subsequent
+       setmode()/redraw. */
+    void restartHDMIBTH(int newres)
+    {
+        HDMIres = newres;           // canonical live value, survives LoadOptions
+        Option.Resolution = newres; // read by HDMICore once it re-enters setup
+        __dmb();
+        hdmi_switch_pending = true;
+        __dmb();
+        /* Wait (bounded) for core1 to acknowledge — it clears the flag once
+           the new mode is fully live. The timeout must exceed core1's mid-
+           switch blank hold (HDMIBTH_BLANK_US) plus rebuild time. */
+        uint64_t deadline = time_us_64() + HDMIBTH_BLANK_US + 300000;
+        while (hdmi_switch_pending && time_us_64() < deadline)
+            tight_loop_contents();
+        uSec(3000); // small settle before setmode() repaints
+    }
+#endif
     int MIPS16 main()
     {
         static int ErrorInPrompt;
@@ -5853,7 +6225,7 @@ uint32_t testPSRAM(void)
             bt_console_init();
         }
 #endif
-#if defined(PICOMITEBTH) || defined(PICOMITEHDMIBTH)
+#if defined(PICOMITEBTH) || defined(PICOMITEHDMIBTHx)
 #ifdef PICOMITEHDMIBTH
         /* HDMICore hardcodes DMACH_PING=0 / DMACH_PONG=1 (see the HDMI
            scanout block above). CYW43's bus_pio_spi grabs two unused
@@ -6080,11 +6452,15 @@ uint32_t testPSRAM(void)
             memset((void *)&HID[i], 0, sizeof(struct s_HID));
             HID[i].report_requested = true;
         }
-        //    USB_bus_reset();
-        hcd_port_reset(BOARD_TUH_RHPORT);
-        uSec(10000); // wait for any hub to power up
-        hcd_port_reset_end(BOARD_TUH_RHPORT);
+        // Bring the host controller up first so the PHY is powered, then drive
+        // a real SE0 bus reset. hcd_port_reset() is a no-op on this silicon, so
+        // without this an externally-powered hub (which keeps VBUS across an
+        // MMBasic reboot) holds its old USB address and ignores re-enumeration.
+        // Enumeration is deferred to tuh_task() in the main loop, which runs
+        // after the reset, so re-enumeration starts from a clean bus.
         tuh_init(BOARD_TUH_RHPORT);
+        USB_bus_reset();  // force any attached hub back to Default state
+        uSec(50000);      // recovery: let the hub re-detect its downstream ports
         USBenabled = true;
 #else
     initMouse0(0);
@@ -6098,6 +6474,10 @@ uint32_t testPSRAM(void)
         }
 #if defined(PICOMITEVGA) && !defined(HDMI)
         start_i2s(QVGA_PIO_NUM, 1);
+#elif defined(PICOMITEWEB)
+        // WEBRP2350: keep PIO2 free for the cyw43 SPI driver (the SDK
+        // picks the highest-numbered PIO with a free SM). I2S on PIO1.
+        start_i2s(1, 1);
 #else
         start_i2s(2, 1);
 #endif
@@ -6140,21 +6520,18 @@ uint32_t testPSRAM(void)
                 ClearProgram(true);
             }
 #ifdef PICOMITEWEB
-            // Scale the cyw43 PIO clock divider with clk_sys so the SPI link to
-            // the wireless chip stays within its 50 MHz rating when the user
-            // overclocks via OPTION CPU_Speed. SPI rate = clk_sys / (2*div);
-            // ceil(cpu_khz/80000) targets <=40 MHz SPI with headroom. Floor at
-            // 2 to match the SDK default at stock clocks (125/150 MHz).
-            {
-                uint32_t cyw43_div = (Option.CPU_Speed + 79999) / 80000;
-                if (cyw43_div < 2)
-                    cyw43_div = 2;
-                if (cyw43_div & 1)
-                    cyw43_div++; // must be even
-                cyw43_set_pio_clkdiv_int_frac8(cyw43_div, 0);
-            }
             if (cyw43_arch_init_with_country(wifi_country_to_cyw43(Option.wifi_country_code)) == 0)
             {
+                uint32_t cyw43_div = (Option.CPU_Speed + 99999) / 100000;
+                if (cyw43_div < 2)
+                    cyw43_div = 2;
+                cyw43_set_pio_clkdiv_int_frac8(cyw43_div, 0);
+                /*                char dbg[80];
+                                sprintf(dbg, "[cyw43] CPU_Speed=%u kHz, clk_sys=%u Hz, div=%u, SPI=%u kHz\r\n",
+                                        (unsigned)Option.CPU_Speed, (unsigned)clock_get_hz(clk_sys),
+                                        (unsigned)cyw43_div,
+                                        (unsigned)(clock_get_hz(clk_sys) / (2 * cyw43_div) / 1000));
+                                MMPrintString(dbg);*/
                 startupcomplete = 1;
                 WebConnect();
             }
@@ -6235,6 +6612,9 @@ uint32_t testPSRAM(void)
                 if (CurrentX != 0)
                     MMPrintString("\r\n"); // prompt should be on a new line
             }
+#if defined(USBKEYBOARD) && defined(GUICONTROLS) && defined(PICOMITEVGA)
+            OSK_OnPromptIdle();
+#endif
             MMAbort = false;
             BreakKey = BREAK_KEY;
             EchoOption = true;

@@ -26,7 +26,7 @@ set(VALID_COMPILE_VARIANTS
 # Guard restored: without it, this set() shadows the -DCOMPILE=X passed
 # by buildpicomite.bat and every variant silently builds as the default.
 if(NOT DEFINED COMPILE)
-	set(COMPILE HDMIUSB)
+	set(COMPILE  PICORP2350)
 endif()
 
 list(FIND VALID_COMPILE_VARIANTS "${COMPILE}" COMPILE_INDEX)

@@ -2492,6 +2492,7 @@ void dobacklight(void)
 }
 void InitReservedIO(void)
 {
+
 #ifdef rp2350
 	if (Option.PSRAM_CS_PIN)
 	{

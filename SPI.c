@@ -37,7 +37,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "hardware/spi.h"
 
 unsigned int *GetSendDataList(unsigned char *p, unsigned int *nbr);
-long long int *GetReceiveDataBuffer(unsigned char *p, unsigned int *nbr);
+unsigned int *GetReceiveDataBuffer(unsigned char *p, unsigned int *nbr, CommsRxDest *dest);
 
 uint8_t spibits = 8;
 uint8_t spi2bits = 8;
@@ -47,7 +47,6 @@ void cmd_spi(void)
     int speed;
     unsigned char *p;
     unsigned int nbr, *d;
-    long long int *dd;
     if (SPI0TXpin == 99 || SPI0RXpin == 99 || SPI0SCKpin == 99)
         error("Not all pins set for SPI");
 
@@ -90,18 +89,21 @@ void cmd_spi(void)
             uint16_t bRXBuffer[2];
             uint8_t cRxBuffer[4];
         } mybuff;
+        CommsRxDest dest;
+        unsigned int *rbuf, i;
         if (ExtCurrentConfig[SPI0RXpin] < EXT_COM_RESERVED)
             error("Not open");
-        dd = GetReceiveDataBuffer(p, &nbr);
-        while (nbr--)
+        rbuf = GetReceiveDataBuffer(p, &nbr, &dest);
+        for (i = 0; i < nbr; i++)
         {
             mybuff.aRxBuffer = 0;
             if (spibits > 8)
                 spi_read16_blocking(spi0, 0, &mybuff.bRXBuffer[0], 1);
             else
                 spi_read_blocking(spi0, 0, &mybuff.cRxBuffer[0], 1);
-            *dd++ = mybuff.aRxBuffer;
+            rbuf[i] = mybuff.aRxBuffer;
         }
+        PutCommsRxData(&dest, rbuf);
         return;
     }
 
@@ -175,7 +177,6 @@ void cmd_spi2(void)
     int speed;
     unsigned char *p;
     unsigned int nbr, *d;
-    long long int *dd;
     if (SPI1TXpin == 99 || SPI1RXpin == 99 || SPI1SCKpin == 99)
         error("Not all pins set for SPI2");
 
@@ -219,18 +220,21 @@ void cmd_spi2(void)
             uint16_t bRXBuffer[2];
             uint8_t cRxBuffer[4];
         } mybuff;
+        CommsRxDest dest;
+        unsigned int *rbuf, i;
         if (ExtCurrentConfig[SPI1TXpin] < EXT_COM_RESERVED)
             error("Not open");
-        dd = GetReceiveDataBuffer(p, &nbr);
-        while (nbr--)
+        rbuf = GetReceiveDataBuffer(p, &nbr, &dest);
+        for (i = 0; i < nbr; i++)
         {
             mybuff.aRxBuffer = 0;
             if (spi2bits > 8)
                 spi_read16_blocking(spi1, 0, &mybuff.bRXBuffer[0], 1);
             else
                 spi_read_blocking(spi1, 0, &mybuff.cRxBuffer[0], 1);
-            *dd++ = mybuff.aRxBuffer;
+            rbuf[i] = mybuff.aRxBuffer;
         }
+        PutCommsRxData(&dest, rbuf);
         return;
     }
 
@@ -300,8 +304,6 @@ void SPI2Close(void)
 unsigned int *GetSendDataList(unsigned char *p, unsigned int *nbr)
 {
     unsigned int *buf;
-    int i;
-    void *ptr;
 
     getcsargs(&p, MAX_ARG_COUNT);
     if (!(argc & 1))
@@ -310,95 +312,19 @@ unsigned int *GetSendDataList(unsigned char *p, unsigned int *nbr)
     if (!*nbr)
         return NULL;
     buf = GetTempMainMemory(*nbr * sizeof(unsigned int));
-
-    // first check if this is the situation with just two arguments where the second argument could be a string or a simple variable or an array
-    // check the correct arg count AND that the second argument looks like a variable AND it is not a function
-    if (argc == 3 && isnamestart(*argv[2]) && *skipvar(argv[2], false) == 0 && !(FindSubFun(argv[2], 1) >= 0 && strchr((char *)argv[2], '(') != NULL))
-    {
-        ptr = findvar(argv[2], V_NOFIND_NULL | V_EMPTY_OK);
-        if (ptr == NULL)
-            StandardError(6);
-        CHECK_STRUCT_MEMBER_ARRAY();  // Struct member arrays not supported here
-
-        // now check if it is a non array string
-        if (g_vartbl[g_VarIndex].type & T_STR)
-        {
-            if (g_vartbl[g_VarIndex].dims[0] != 0)
-                StandardError(6);
-            if (*((char *)ptr) < *nbr)
-                StandardError(28);
-            ptr += sizeof(char); // skip the length byte in a MMBasic string
-            for (i = 0; i < *nbr; i++)
-            {
-                buf[i] = *(char *)ptr;
-                ptr += sizeof(char);
-            }
-            return buf;
-        }
-
-        // if it is a MMFLOAT or integer do some sanity checks
-        if (g_vartbl[g_VarIndex].dims[1] != 0)
-            StandardError(6);
-        if (*nbr > 1)
-        {
-            if (g_vartbl[g_VarIndex].dims[0] == 0)
-                StandardError(6);
-            if (*nbr > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase))
-                StandardError(28);
-        }
-
-        // now check if it is a MMFLOAT
-        if (g_vartbl[g_VarIndex].type & T_NBR)
-        {
-            for (i = 0; i < *nbr; i++)
-            {
-                buf[i] = FloatToInt32(*(MMFLOAT *)ptr);
-                ptr += sizeof(MMFLOAT);
-            }
-            return buf;
-        }
-
-        // try for an integer
-        if (g_vartbl[g_VarIndex].type & T_INT)
-        {
-            for (i = 0; i < *nbr; i++)
-            {
-                buf[i] = *(unsigned int *)ptr;
-                ptr += sizeof(long long int);
-            }
-            return buf;
-        }
-    }
-
-    // if we got to here we must have a simple list of expressions to send (phew!)
-    if (*nbr != ((argc - 1) >> 1))
-        StandardError(2);
-    for (i = 0; i < *nbr; i++)
-    {
-        buf[i] = getinteger(argv[i + i + 2]);
-    }
+    GetCommsTxData(argv, argc, 2, *nbr, buf);
     return buf;
 }
 
-long long int *GetReceiveDataBuffer(unsigned char *p, unsigned int *nbr)
+unsigned int *GetReceiveDataBuffer(unsigned char *p, unsigned int *nbr, CommsRxDest *dest)
 {
-    void *ptr;
-
-    getcsargs(&p, 3);
-    if (argc != 3)
+    getcsargs(&p, MAX_ARG_COUNT);
+    if (!(argc & 1))
         SyntaxError();
     *nbr = getinteger(argv[0]);
-    ptr = findvar(argv[2], V_NOFIND_NULL | V_EMPTY_OK);
-    if (ptr == NULL)
-        StandardError(6);
-    CHECK_STRUCT_MEMBER_ARRAY();  // Struct member arrays not supported here
-    if ((g_vartbl[g_VarIndex].type & T_INT) && g_vartbl[g_VarIndex].dims[0] > 0 && g_vartbl[g_VarIndex].dims[1] == 0)
-    { // integer array
-        if ((((long long int *)ptr - g_vartbl[g_VarIndex].val.ia) + *nbr) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase))
-            error("Insufficient array size");
-    }
-    else
-        StandardError(6);
-    return ptr;
+    if ((int)*nbr < 1)
+        StandardError(21);
+    GetCommsRxDest(argv, argc, 2, *nbr, dest);
+    return GetTempMainMemory(*nbr * sizeof(unsigned int));
 }
 /*  @endcond */

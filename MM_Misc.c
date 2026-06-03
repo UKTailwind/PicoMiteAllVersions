@@ -2747,6 +2747,21 @@ void MIPS16 printoptions(void)
         PO2Int("DEFAULT MODE", Option.DISPLAY_TYPE - SCREENMODE1 + 1);
     if (Option.Height != 40 || Option.Width != 80)
         PO3Int("DISPLAY", Option.Height, Option.Width);
+#if defined(USBKEYBOARD) && defined(GUICONTROLS) && defined(PICOMITEVGA)
+    /* Option.VRes_reserved is the stored / flash-backed value; the runtime
+       working copy lives in OptionVResreserved. Report the stored one so
+       OPTION LIST reflects what the user actually configured. Append the
+       ", M" multi-touch flag when set so the printed line round-trips
+       back to a valid OPTION SCREEN KEYBOARD command. */
+    if (Option.VRes_reserved)
+    {
+        PO("Screen Keyboard");
+        PInt(Option.VRes_reserved);
+        if (Option.Multi)
+            MMPrintString(", M");
+        MMPrintString("\r\n");
+    }
+#endif
 #ifdef HDMI
     if (Option.HDMIclock != 2 || Option.HDMId0 != 0 || Option.HDMId1 != 6 || Option.HDMId2 != 4)
     {
@@ -3595,11 +3610,6 @@ void MIPS16 clear320(void)
     FreeMemorySafe((void **)&buff320);
     return;
 }
-// void MIPS16 clearSPI320(void){
-//     HRes=480;
-//     VRes=320;
-//     return;
-// }
 
 #endif
 bool MIPS16 testMODBUFF(bool proposed, int proposedsize, bool noask)
@@ -5156,7 +5166,24 @@ void MIPS16 cmd_option(void)
             MMPrintString("Restart to activate"); // set the console baud rate
         return;
     }
-
+#if defined(USBKEYBOARD) && defined(GUICONTROLS) && defined(PICOMITEVGA)
+    tp = checkstring(cmdline, (unsigned char *)"SCREEN KEYBOARD");
+    if (tp)
+    {
+        /* Option.VRes_reserved is the stored value; OptionVResreserved is
+           the runtime working copy used by the editor / prompt. Keep both
+           in sync so the new value takes effect immediately and survives
+           a reboot. */
+        getcsargs(&tp, 3);
+        Option.VRes_reserved = getint(argv[0], 0, 50);
+        OptionVResreserved = Option.VRes_reserved;
+        Option.Multi = 0;
+        if (argc == 3 && mytoupper(*argv[2]) == 'M')
+            Option.Multi = true;
+        SaveOptions();
+        return;
+    }
+#endif
     tp = checkstring(cmdline, (unsigned char *)"SERIAL CONSOLE");
     if (tp)
     {
@@ -7137,6 +7164,34 @@ void MIPS16 fun_device(void)
     targ = T_STR;
 }
 
+#if defined(USBKEYBOARD) && defined(GUICONTROLS) && defined(PICOMITEVGA)
+/* KEYBOARD ON  — draws the on-screen keyboard in the bottom reserved strip
+                  and routes taps to the console RX path.
+   KEYBOARD OFF — erases the OSK and stops routing.
+   Requires OptionVResreserved > 0 (set via OPTION SCREEN OFFSET).
+   Outside a running program the OSK is managed automatically by the prompt,
+   so this command is intended for use inside RUNning code. */
+void MIPS16 cmd_keyboard(void)
+{
+    unsigned char *tp;
+    tp = checkstring(cmdline, (unsigned char *)"ON");
+    if (tp)
+    {
+        checkend(tp);
+        OSK_SetProgramActive(true);
+        return;
+    }
+    tp = checkstring(cmdline, (unsigned char *)"OFF");
+    if (tp)
+    {
+        checkend(tp);
+        OSK_SetProgramActive(false);
+        return;
+    }
+    error("Syntax");
+}
+#endif
+
 void MIPS16 fun_info(void)
 {
     unsigned char *tp;
@@ -7188,6 +7243,15 @@ void MIPS16 fun_info(void)
     {
         iret = ytileheight;
         targ = T_INT;
+        return;
+#endif
+#if defined(USBKEYBOARD) && defined(GUICONTROLS) && defined(PICOMITEVGA)
+    }
+    else if (checkstring(ep, (unsigned char *)"KEYBOARD"))
+    {
+        strcpy((char *)sret, OSK_IsProgramActive() ? "On" : "Off");
+        CtoM(sret);
+        targ = T_STR;
         return;
 #endif
     }
@@ -9285,6 +9349,15 @@ int __not_in_flash_func(check_interrupt)(void)
         if (CheckGuiFlag)
             CheckGui(); // This implements a LED flash
     }
+#if defined(USBKEYBOARD) && defined(PICOMITEVGA)
+    else if (OSK_IsActive() && !calibrate)
+    {
+        /* OSK is drawn but the user has not allocated GUI controls, so the
+           normal ProcessTouch gate (Ctrl != NULL) is closed. Run it anyway
+           so OSK taps reach the dispatcher. */
+        ProcessTouch();
+    }
+#endif
 #endif
     /* Cursor refresh lives in routinechecks() — it fires from the
        prompt's getchar loop too, so the cursor tracks the mouse even

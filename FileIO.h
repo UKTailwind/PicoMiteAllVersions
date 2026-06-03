@@ -203,7 +203,7 @@ extern "C"
                      compatibility, and stash MaxCtrls in the first byte
                      of extensions[] further down. */
 #if defined(GUICONTROLS) && !defined(PICOMITEVGA)
-//                uint8_t MaxCtrls;
+                //                uint8_t MaxCtrls;
                 unsigned char spare3[4];
 #else
         uint8_t HDMIclock;
@@ -353,7 +353,9 @@ extern "C"
                    layout (and the 7-XMODEM-block size) is unchanged. */
                 uint8_t MaxCtrls;
                 uint8_t Resolution;
-                unsigned char extensions[77]; // 896 bytes == 7 XMODEM blocks
+                uint8_t VRes_reserved;
+                bool Multi;
+                unsigned char extensions[75]; // 896 bytes == 7 XMODEM blocks
                                               // #else
                                               //                 unsigned char extensions[79];    // 896 bytes == 7 XMODEM blocks
                                               // #endif

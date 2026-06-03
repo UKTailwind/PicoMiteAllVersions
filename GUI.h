@@ -139,6 +139,21 @@ void CheckGuiTimeouts(void);
  * ============================================================================ */
 void ProcessTouch(void);
 
+#if defined(USBKEYBOARD) && defined(GUICONTROLS) && defined(PICOMITEVGA)
+/* ============================================================================
+ * On-Screen Keyboard (OSK) — see GUI.c for the implementation.
+ * ============================================================================ */
+void OSK_DrawAll(void);
+void OSK_Erase(void);
+void OSK_Invalidate(void);                   /* call after operations that wipe the strip */
+void OSK_DropState(void);                    /* clear state without redrawing (caller already cleared pixels) */
+void OSK_OnPromptIdle(void);                 /* prompt loop / editor entry */
+void OSK_OnRunStart(void);                   /* invoked from do_run() */
+void OSK_SetProgramActive(bool on);          /* KEYBOARD ON / KEYBOARD OFF */
+bool OSK_IsProgramActive(void);
+bool OSK_IsActive(void);
+bool OSK_IsUserDisabled(void);               /* KEYBOARD OFF at prompt latch */
+#endif
 
 #endif /* GUI_H_INCL */
 #endif /* !defined(INCLUDE_COMMAND_TABLE) && !defined(INCLUDE_TOKEN_TABLE) */

@@ -316,6 +316,14 @@ char CMM1 = 0;
 // note that HRes == 0 is an indication that a display is not configured
 short HRes = 0, VRes = 0;
 short lastx, lasty;
+/* Runtime working copy of Option.VRes_reserved (the on-screen-keyboard
+   strip height) expressed as a percentage of VRes, 0..50. Defined here
+   (not in GUI.c) because GUI.c isn't compiled on every target — e.g.
+   RP2040 VGA builds skip it — yet Draw.c / RGB121.c / Editor.c / FileIO.c
+   reference this symbol unconditionally for their VResEdit math. On
+   builds without the OSK the value stays 0 and (VRes - VRes*0/100) == VRes,
+   so the math degenerates harmlessly. */
+uint8_t OptionVResreserved;
 const int CMM1map[16] = {BLACK, BLUE, GREEN, CYAN, RED, MAGENTA, YELLOW, WHITE, MYRTLE, COBALT, MIDGREEN, CERULEAN, RUST, FUCHSIA, BROWN, LILAC};
 int RGB121map[16];
 // pointers to the drawing primitives
@@ -985,6 +993,267 @@ void fun_click(void)
 }
 
 /* ====================================================================
+ *  Touch gesture state machine.
+ *  Modelled on the mouse double-click state machine in KeyboardMap.c:
+ *  ProcessTouch (GUI.c) calls touch_gesture_on_down / _on_up at the
+ *  edges, the helpers track the swipe in module-static state, and
+ *  fun_touch reads it back via TOUCH(SWL/SWR/SWU/SWD) or TOUCH(SWIPE).
+ *
+ *  Direction codes:
+ *    0 = none, 1 = left, 2 = right, 3 = up, 4 = down
+ *
+ *  Latching: a detected swipe stays latched until the next touch-down
+ *  edge clears it. That lets the BASIC program poll TOUCH(SWL) etc.
+ *  any time between gestures without race-of-read risk, the way
+ *  nunstruct[n].Z works for the mouse double-click.
+ * ==================================================================== */
+static int16_t touch_swipe_start_x = 0;
+static int16_t touch_swipe_start_y = 0;
+static uint64_t touch_swipe_start_us = 0;
+int touch_swipe_dir = 0;                   /* extern-visible via Draw.h */
+int touch_tap = 0;                         /* 0 / 1, cleared on read */
+int touch_longpress = 0;                   /* 0 / 1, cleared on read */
+int touch_doubletap = 0;                   /* 0 / 1, cleared on read */
+static bool touch_longpress_fired = false; /* set during hold; suppresses tap/swipe at lift */
+static uint64_t touch_last_tap_us = 0;
+static int16_t touch_last_tap_x = 0;
+static int16_t touch_last_tap_y = 0;
+
+/* Tunables — kept together so they're easy to tweak.
+   TAP_MAX_DT       quick-press cap before a tap turns into a "held but
+                    too short to be a long press"
+   HOLD_MIN_DT      threshold below which a held finger isn't a long press
+   STILL_MAX        pixel-radius the finger may wander and still count
+                    as a tap / long press / double-tap second-touch
+   DBL_TAP_WINDOW   max gap between two taps that get fused into a
+                    double-tap
+   DBL_TAP_RADIUS   max distance between the two taps' positions
+   SWIPE_MAX_DT     above this dt the gesture is a slow drag, not a swipe
+*/
+#define TAP_MAX_DT 250000ULL
+#define HOLD_MIN_DT 500000ULL
+#define STILL_MAX 15
+#define DBL_TAP_WINDOW 500000ULL
+#define DBL_TAP_RADIUS 30
+#define SWIPE_MAX_DT 600000ULL
+
+void touch_gesture_on_down(int16_t x, int16_t y)
+{
+    touch_swipe_start_x = x;
+    touch_swipe_start_y = y;
+    touch_swipe_start_us = time_us_64();
+    touch_swipe_dir = 0;
+    touch_longpress_fired = false;
+}
+
+/* Called frequently while a touch is in progress (from the
+   process_touch_report path for USB; could be wired into ProcessTouch
+   for resistive panels too). Detects a long-press WHILE the finger is
+   still down so UI code can show the menu / highlight without waiting
+   for the lift. */
+void touch_gesture_tick(int16_t cur_x, int16_t cur_y, bool is_down)
+{
+    if (!is_down)
+        return;
+    if (touch_swipe_start_us == 0)
+        return;
+    if (touch_longpress_fired)
+        return;
+    uint64_t dt = time_us_64() - touch_swipe_start_us;
+    if (dt < HOLD_MIN_DT)
+        return;
+    int dx = (int)cur_x - (int)touch_swipe_start_x;
+    int dy = (int)cur_y - (int)touch_swipe_start_y;
+    int adx = (dx < 0) ? -dx : dx;
+    int ady = (dy < 0) ? -dy : dy;
+    if (adx > STILL_MAX || ady > STILL_MAX)
+        return; /* moved too much — not a hold */
+    touch_longpress = 1;
+    touch_longpress_fired = true;
+}
+
+void touch_gesture_on_up(int16_t end_x, int16_t end_y)
+{
+    if (touch_swipe_start_us == 0)
+        return;
+    /* If long-press already fired during the hold, the touch is
+       consumed — don't also report a tap or swipe for the same gesture. */
+    if (touch_longpress_fired)
+        return;
+    uint64_t dt = time_us_64() - touch_swipe_start_us;
+    int dx = end_x - touch_swipe_start_x;
+    int dy = end_y - touch_swipe_start_y;
+    int adx = (dx < 0) ? -dx : dx;
+    int ady = (dy < 0) ? -dy : dy;
+    /* Swipe threshold ~15% of the shorter screen dimension, with a
+       30-pixel floor; falls back to 30 px when HRes/VRes aren't
+       initialised. */
+    int min_dim = (HRes > 0 && VRes > 0)
+                      ? (HRes < VRes ? HRes : VRes)
+                      : 240;
+    int sw_thresh = min_dim / 6;
+    if (sw_thresh < 30)
+        sw_thresh = 30;
+
+    /* Try swipe first: large enough motion in the right time window. */
+    if ((adx >= sw_thresh || ady >= sw_thresh) && dt <= SWIPE_MAX_DT)
+    {
+        if (adx > ady)
+            touch_swipe_dir = (dx > 0) ? 2 : 1;
+        else
+            touch_swipe_dir = (dy > 0) ? 4 : 3;
+        return;
+    }
+
+    /* Not a swipe. For tap / hold / double-tap classification the
+       finger must have stayed roughly still. */
+    if (adx > STILL_MAX || ady > STILL_MAX)
+        return;
+
+    if (dt >= HOLD_MIN_DT)
+    {
+        /* At-lift long-press fallback (covers callers that don't run
+           the tick — resistive panels currently). */
+        touch_longpress = 1;
+        return;
+    }
+    if (dt <= TAP_MAX_DT)
+    {
+        /* Tap. Check whether it fuses with a previous tap to make a
+           double-tap. */
+        uint64_t now = time_us_64();
+        if (touch_last_tap_us != 0 && (now - touch_last_tap_us) <= DBL_TAP_WINDOW)
+        {
+            int ddx = (int)touch_swipe_start_x - (int)touch_last_tap_x;
+            int ddy = (int)touch_swipe_start_y - (int)touch_last_tap_y;
+            int addx = (ddx < 0) ? -ddx : ddx;
+            int addy = (ddy < 0) ? -ddy : ddy;
+            if (addx <= DBL_TAP_RADIUS && addy <= DBL_TAP_RADIUS)
+            {
+                touch_doubletap = 1;
+                touch_last_tap_us = 0; /* don't chain into triple-tap */
+                return;
+            }
+        }
+        touch_tap = 1;
+        touch_last_tap_us = now;
+        touch_last_tap_x = touch_swipe_start_x;
+        touch_last_tap_y = touch_swipe_start_y;
+    }
+    /* else: between TAP_MAX_DT and HOLD_MIN_DT — not classified */
+}
+
+/* Two-finger gestures. Driven from process_touch_report when both
+   contacts are simultaneously active. We capture the contact vector
+   (x2-x1, y2-y1) at the moment both come down and again at the moment
+   either lifts; that one vector pair is enough for all three
+   classifications:
+     pinch  — change in vector LENGTH (squared, to avoid sqrt)
+     rotate — change in vector ANGLE (atan2 cross/dot)
+     2-tap  — both contacts barely moved and the gesture was short
+*/
+static int16_t pinch_start_x1 = 0, pinch_start_y1 = 0;
+static int16_t pinch_start_x2 = 0, pinch_start_y2 = 0;
+static uint64_t pinch_start_us = 0;
+static uint32_t touch_pinch_initial_dsq = 0;
+int touch_pinch_dir = 0;  /* 0=none, 1=expand, 2=contract */
+int touch_rotate_dir = 0; /* 0=none, 1=CW, 2=CCW */
+int touch_twotap = 0;     /* 0 or 1 */
+
+/* ~15° angular threshold for rotate. atan2 returns -π..π; 15° = ~0.26 rad. */
+#define ROTATE_RAD_THRESHOLD 0.26f
+/* Per-contact stillness for two-finger tap. */
+#define TWOTAP_STILL_MAX 15
+#define TWOTAP_MAX_DT 300000ULL
+
+void touch_gesture_pinch_start(int16_t x1, int16_t y1, int16_t x2, int16_t y2)
+{
+    pinch_start_x1 = x1;
+    pinch_start_y1 = y1;
+    pinch_start_x2 = x2;
+    pinch_start_y2 = y2;
+    pinch_start_us = time_us_64();
+    int dx = (int)x2 - (int)x1;
+    int dy = (int)y2 - (int)y1;
+    touch_pinch_initial_dsq = (uint32_t)(dx * dx + dy * dy);
+    touch_pinch_dir = 0;
+    touch_rotate_dir = 0;
+    touch_twotap = 0;
+}
+
+void touch_gesture_pinch_end(int16_t x1, int16_t y1, int16_t x2, int16_t y2)
+{
+    if (touch_pinch_initial_dsq == 0)
+        return;
+    uint64_t dt = time_us_64() - pinch_start_us;
+    int dx_init = (int)pinch_start_x2 - (int)pinch_start_x1;
+    int dy_init = (int)pinch_start_y2 - (int)pinch_start_y1;
+    int dx_end = (int)x2 - (int)x1;
+    int dy_end = (int)y2 - (int)y1;
+    uint32_t init_dsq = touch_pinch_initial_dsq;
+    uint32_t final_dsq = (uint32_t)(dx_end * dx_end + dy_end * dy_end);
+    touch_pinch_initial_dsq = 0;
+    uint32_t change_dsq = (final_dsq > init_dsq)
+                              ? (final_dsq - init_dsq)
+                              : (init_dsq - final_dsq);
+
+    /* 1. Pinch (distance ratio change ≥ 30%). */
+    if (change_dsq >= 900)
+    {
+        if (final_dsq * 100u > init_dsq * 169u)
+        {
+            touch_pinch_dir = 1; /* expand */
+            return;
+        }
+        if (final_dsq * 169u < init_dsq * 100u)
+        {
+            touch_pinch_dir = 2; /* contract */
+            return;
+        }
+        /* Distance changed but ratio inconclusive — keep going. */
+    }
+
+    /* 2. Rotate (angle between contact vectors ≥ ~15°).
+       cross = dx_init * dy_end - dy_init * dx_end
+       dot   = dx_init * dx_end + dy_init * dy_end
+       angle = atan2(cross, dot)  — radians, sign-preserving
+       Screen Y is down, so positive cross = clockwise on screen. */
+    float cross = (float)dx_init * (float)dy_end - (float)dy_init * (float)dx_end;
+    float dot = (float)dx_init * (float)dx_end + (float)dy_init * (float)dy_end;
+    if (cross != 0.0f || dot != 0.0f)
+    {
+        float angle = atan2f(cross, dot);
+        if (angle > ROTATE_RAD_THRESHOLD)
+        {
+            touch_rotate_dir = 1; /* CW */
+            return;
+        }
+        if (angle < -ROTATE_RAD_THRESHOLD)
+        {
+            touch_rotate_dir = 2; /* CCW */
+            return;
+        }
+    }
+
+    /* 3. Two-finger tap (both contacts still + short duration). */
+    if (dt <= TWOTAP_MAX_DT)
+    {
+        int dx1 = (int)x1 - (int)pinch_start_x1;
+        int dy1 = (int)y1 - (int)pinch_start_y1;
+        int dx2 = (int)x2 - (int)pinch_start_x2;
+        int dy2 = (int)y2 - (int)pinch_start_y2;
+        int adx1 = (dx1 < 0) ? -dx1 : dx1;
+        int ady1 = (dy1 < 0) ? -dy1 : dy1;
+        int adx2 = (dx2 < 0) ? -dx2 : dx2;
+        int ady2 = (dy2 < 0) ? -dy2 : dy2;
+        if (adx1 <= TWOTAP_STILL_MAX && ady1 <= TWOTAP_STILL_MAX && adx2 <= TWOTAP_STILL_MAX && ady2 <= TWOTAP_STILL_MAX)
+        {
+            touch_twotap = 1;
+        }
+    }
+}
+
+/* ====================================================================
  *  TOUCH() function — historically touch-panel-only, now extended to
  *  the same input-source coverage as CLICK() so a single BASIC program
  *  can run on VGA/HDMI (mouse), touch-LCD (touch + optional mouse),
@@ -998,7 +1267,8 @@ void fun_click(void)
  *
  *  TOUCH() and CLICK() return the same values for the overlapping
  *  subcommands. TOUCH() additionally exposes X2/Y2 multi-touch on
- *  capacitive panels, which has no mouse equivalent.
+ *  capacitive panels, which has no mouse equivalent, and a small
+ *  gesture analyser (SWL/SWR/SWU/SWD/SWIPE).
  * ==================================================================== */
 void fun_touch(void)
 {
@@ -1048,15 +1318,170 @@ void fun_touch(void)
         iret = LastX;
     else if (checkstring(ep, (unsigned char *)"LASTY"))
         iret = LastY;
+    /* Second contact point — TOUCH(X2) / TOUCH(Y2). Two possible
+       sources:
+         - capacitive resistive panel with Option.TOUCH_CAP set
+           (non-PICOMITEVGA builds only — VGA/HDMI Option layout
+           doesn't carry TOUCH_CAP)
+         - USB multi-touch contact 1 (any USBKEYBOARD build)
+       The first source that has live data wins. Returns TOUCH_ERROR
+       when neither has a second contact, matching the X/Y behaviour
+       when no touch is happening. */
+    else if (checkstring(ep, (unsigned char *)"X2"))
+    {
+        int x2 = TOUCH_ERROR;
 #ifndef PICOMITEVGA
-    /* Capacitive multi-touch: second contact point. Only meaningful on
-       hardware that supports it; on builds with no touch panel
-       (PICOMITEVGA) the Option struct doesn't carry TOUCH_CAP at all. */
-    else if (Option.TOUCH_CAP && checkstring(ep, (unsigned char *)"X2"))
-        iret = GetTouch(GET_X_AXIS2);
-    else if (Option.TOUCH_CAP && checkstring(ep, (unsigned char *)"Y2"))
-        iret = GetTouch(GET_Y_AXIS2);
+        if (Option.TOUCH_CAP)
+            x2 = GetTouch(GET_X_AXIS2);
 #endif
+#ifdef USBKEYBOARD
+        if (x2 == TOUCH_ERROR && usb_touch_active2)
+            x2 = usb_touch_x2;
+#endif
+        iret = x2;
+    }
+    else if (checkstring(ep, (unsigned char *)"Y2"))
+    {
+        int y2 = TOUCH_ERROR;
+#ifndef PICOMITEVGA
+        if (Option.TOUCH_CAP)
+            y2 = GetTouch(GET_Y_AXIS2);
+#endif
+#ifdef USBKEYBOARD
+        if (y2 == TOUCH_ERROR && usb_touch_active2)
+            y2 = usb_touch_y2;
+#endif
+        iret = y2;
+    }
+    /* Single-finger swipe gestures. Latched at the touch-up edge by
+       touch_gesture_on_up() (see gesture section above). Each one-shot
+       accessor consumes its matching direction on read (mirroring the
+       mouse double-click flag): reading TOUCH(SWL) on a left swipe
+       returns 1 and clears; reading TOUCH(SWR) on the same left swipe
+       returns 0 without clearing, so a polling loop that tests SWL
+       first then SWR doesn't accidentally lose the event.
+       TOUCH(SWIPE) returns the code (0/1/2/3/4) AND clears, so it's
+       the natural form for a SELECT CASE dispatch. */
+    else if (checkstring(ep, (unsigned char *)"SWL"))
+    {
+        if (touch_swipe_dir == 1)
+        {
+            iret = 1;
+            touch_swipe_dir = 0;
+        }
+        else
+            iret = 0;
+    }
+    else if (checkstring(ep, (unsigned char *)"SWR"))
+    {
+        if (touch_swipe_dir == 2)
+        {
+            iret = 1;
+            touch_swipe_dir = 0;
+        }
+        else
+            iret = 0;
+    }
+    else if (checkstring(ep, (unsigned char *)"SWU"))
+    {
+        if (touch_swipe_dir == 3)
+        {
+            iret = 1;
+            touch_swipe_dir = 0;
+        }
+        else
+            iret = 0;
+    }
+    else if (checkstring(ep, (unsigned char *)"SWD"))
+    {
+        if (touch_swipe_dir == 4)
+        {
+            iret = 1;
+            touch_swipe_dir = 0;
+        }
+        else
+            iret = 0;
+    }
+    else if (checkstring(ep, (unsigned char *)"SWIPE"))
+    {
+        iret = touch_swipe_dir;
+        touch_swipe_dir = 0;
+    }
+    /* Two-finger pinch gestures. Latched when the second contact
+       lifts (or the first does, whichever ends the dual-touch).
+       Same clear-on-matching-read semantics as the swipes. */
+    else if (checkstring(ep, (unsigned char *)"EXPAND"))
+    {
+        if (touch_pinch_dir == 1)
+        {
+            iret = 1;
+            touch_pinch_dir = 0;
+        }
+        else
+            iret = 0;
+    }
+    else if (checkstring(ep, (unsigned char *)"CONTRACT"))
+    {
+        if (touch_pinch_dir == 2)
+        {
+            iret = 1;
+            touch_pinch_dir = 0;
+        }
+        else
+            iret = 0;
+    }
+    else if (checkstring(ep, (unsigned char *)"PINCH"))
+    {
+        iret = touch_pinch_dir; /* 0=none, 1=expand, 2=contract */
+        touch_pinch_dir = 0;
+    }
+    /* Single-finger tap / long-press / double-tap. All clear-on-read. */
+    else if (checkstring(ep, (unsigned char *)"TAP"))
+    {
+        iret = touch_tap;
+        touch_tap = 0;
+    }
+    else if (checkstring(ep, (unsigned char *)"HOLD"))
+    {
+        iret = touch_longpress;
+        touch_longpress = 0;
+    }
+    else if (checkstring(ep, (unsigned char *)"DTAP"))
+    {
+        iret = touch_doubletap;
+        touch_doubletap = 0;
+    }
+    /* Two-finger rotate / two-finger tap. Same clear-on-read pattern. */
+    else if (checkstring(ep, (unsigned char *)"CW"))
+    {
+        if (touch_rotate_dir == 1)
+        {
+            iret = 1;
+            touch_rotate_dir = 0;
+        }
+        else
+            iret = 0;
+    }
+    else if (checkstring(ep, (unsigned char *)"CCW"))
+    {
+        if (touch_rotate_dir == 2)
+        {
+            iret = 1;
+            touch_rotate_dir = 0;
+        }
+        else
+            iret = 0;
+    }
+    else if (checkstring(ep, (unsigned char *)"ROTATE"))
+    {
+        iret = touch_rotate_dir; /* 0=none, 1=CW, 2=CCW */
+        touch_rotate_dir = 0;
+    }
+    else if (checkstring(ep, (unsigned char *)"TTAP"))
+    {
+        iret = touch_twotap;
+        touch_twotap = 0;
+    }
     else
         SyntaxError();
     targ = T_INT;
@@ -1463,6 +1888,80 @@ bool click_handle_gui_subcommand(unsigned char *cmdline_in)
     return true;
 }
 #endif /* GUICONTROLS */
+
+#if defined(PICOMITEVGA) && defined(USBKEYBOARD) && !defined(GUICONTROLS)
+/* ====================================================================
+ *  Minimal TOUCH() / CLICK() for VGAUSB-style builds — PICOMITEVGA +
+ *  USBKEYBOARD without GUICONTROLS (e.g. VGAUSB on RP2040, where the
+ *  Ctrl[] heap reservation doesn't fit so GUICONTROLS is deliberately
+ *  omitted, see CMakeLists.txt comment "RP2040 VGA is too tight on
+ *  memory for the Ctrl[] heap reservation"). The USB host driver
+ *  already decodes mouse and multi-touch reports and populates
+ *  nunstruct[2] (mouse) and usb_touch_x/y/active (touch) — this gives
+ *  BASIC programs a way to read that state without dragging in the
+ *  full GUI-controls stack (Ctrl[], gesture state machine, soft
+ *  cursor, swipe detector, etc.).
+ *
+ *  Supported subcommands:
+ *    TOUCH(X) / TOUCH(Y)       primary contact position, -1 if no touch
+ *    TOUCH(DOWN) / TOUCH(UP)   button state
+ *    TOUCH(X2) / TOUCH(Y2)     second contact, -1 if only one finger
+ *    CLICK(X) / CLICK(Y)       active pointing-device position, -1 if up
+ *    CLICK(DOWN) / CLICK(UP)   same button OR'd from USB touch + mouse
+ *
+ *  Unsupported here (full GUICONTROLS builds expose these):
+ *    SWL/SWR/SWU/SWD/SWIPE     no gesture state machine on this build
+ *    EXPAND/CONTRACT/CW/CCW    no two-finger gesture analyser
+ *    TAP/DTAP/LONGPRESS/2TAP   same
+ *    REF/LASTREF/LASTX/LASTY   no Ctrl[] array to reference
+ *  Asking for any of these raises a syntax error so the program fails
+ *  loudly rather than silently returning 0.
+ * ==================================================================== */
+#define VGAUSB_TOUCH_ERROR (-1)
+
+void fun_touch(void)
+{
+    /* Primary "is something touching" — USB touch contact 0 OR the
+       (USB) mouse left button. */
+    int btn = (usb_touch_active || nunstruct[2].L) ? 1 : 0;
+    if (checkstring(ep, (unsigned char *)"X"))
+        iret = btn ? (usb_touch_active ? usb_touch_x : nunstruct[2].ax)
+                   : VGAUSB_TOUCH_ERROR;
+    else if (checkstring(ep, (unsigned char *)"Y"))
+        iret = btn ? (usb_touch_active ? usb_touch_y : nunstruct[2].ay)
+                   : VGAUSB_TOUCH_ERROR;
+    else if (checkstring(ep, (unsigned char *)"DOWN"))
+        iret = btn;
+    else if (checkstring(ep, (unsigned char *)"UP"))
+        iret = !btn;
+    else if (checkstring(ep, (unsigned char *)"X2"))
+        iret = usb_touch_active2 ? usb_touch_x2 : VGAUSB_TOUCH_ERROR;
+    else if (checkstring(ep, (unsigned char *)"Y2"))
+        iret = usb_touch_active2 ? usb_touch_y2 : VGAUSB_TOUCH_ERROR;
+    else
+        SyntaxError();
+    targ = T_INT;
+}
+
+void fun_click(void)
+{
+    int btn = (usb_touch_active || nunstruct[2].L) ? 1 : 0;
+    if (checkstring(ep, (unsigned char *)"DOWN"))
+        iret = btn;
+    else if (checkstring(ep, (unsigned char *)"UP"))
+        iret = !btn;
+    else if (checkstring(ep, (unsigned char *)"X"))
+        iret = btn ? (usb_touch_active ? usb_touch_x : nunstruct[2].ax)
+                   : VGAUSB_TOUCH_ERROR;
+    else if (checkstring(ep, (unsigned char *)"Y"))
+        iret = btn ? (usb_touch_active ? usb_touch_y : nunstruct[2].ay)
+                   : VGAUSB_TOUCH_ERROR;
+    else
+        SyntaxError();
+    targ = T_INT;
+}
+#endif /* PICOMITEVGA && USBKEYBOARD && !GUICONTROLS */
+
 #endif /* PICOMITEVGA || GUICONTROLS — end of cursor block */
 
 #ifndef PICOMITEVGA
@@ -1772,10 +2271,15 @@ void MIPS16 cmd_guiMX170(void)
             MMPrintString(" Circles per Second");
             return;
         }
-#ifndef PICOMITEVGA
+/* GUI TEST TOUCH needs GetTouch / GET_X_AXIS / TOUCH_ERROR from Touch.h.
+   Touch.h is included by Hardware_Includes.h only for PICOMITE,
+   PICOMITEWEB, or (PICOMITEVGA && GUICONTROLS). VGAUSB defines USBKEYBOARD
+   but not GUICONTROLS — so the gate has to match the Touch.h include
+   condition exactly, not just USBKEYBOARD. */
+#if defined(PICOMITE) || defined(PICOMITEWEB) || (defined(PICOMITEVGA) && defined(GUICONTROLS))
         if ((checkstring(p, (unsigned char *)"TOUCH")))
         {
-            int x, y;
+            int x, y, x2, y2;
             ClearScreen(gui_bcolour);
             while (getConsole() < '\r')
             {
@@ -1783,6 +2287,28 @@ void MIPS16 cmd_guiMX170(void)
                 y = GetTouch(GET_Y_AXIS);
                 if (x != TOUCH_ERROR && y != TOUCH_ERROR)
                     DrawBox(x - 1, y - 1, x + 1, y + 1, 0, WHITE, WHITE);
+                /* Second contact, so two-finger panels can be exercised.
+                   Sources mirror TOUCH(X2)/TOUCH(Y2): a TOUCH_CAP resistive
+                   panel (non-VGA) or USB multi-touch contact 1. Drawn in a
+                   distinct colour so the two fingers are distinguishable. */
+                x2 = TOUCH_ERROR;
+                y2 = TOUCH_ERROR;
+#ifndef PICOMITEVGA
+                if (Option.TOUCH_CAP)
+                {
+                    x2 = GetTouch(GET_X_AXIS2);
+                    y2 = GetTouch(GET_Y_AXIS2);
+                }
+#endif
+#ifdef USBKEYBOARD
+                if (x2 == TOUCH_ERROR && usb_touch_active2)
+                {
+                    x2 = usb_touch_x2;
+                    y2 = usb_touch_y2;
+                }
+#endif
+                if (x2 != TOUCH_ERROR && y2 != TOUCH_ERROR)
+                    DrawBox(x2 - 1, y2 - 1, x2 + 1, y2 + 1, 0, CYAN, CYAN);
             }
             ClearScreen(gui_bcolour);
             return;
@@ -2027,6 +2553,16 @@ void ClearScreen(int c)
         DrawRectangle(0, 0, HRes - 1, VRes - 1, c);
 #else
     DrawRectangle(0, 0, HRes - 1, VRes - 1, c);
+#endif
+#if defined(USBKEYBOARD) && defined(GUICONTROLS) && defined(PICOMITEVGA)
+    /* The reserved strip just got wiped. In system mode we own the strip
+       and must restore the OSK so the prompt and editor remain usable.
+       Program mode is the BASIC program's responsibility — drop our state
+       so taps don't keep firing on now-invisible buttons. */
+    if (OSK_IsProgramActive())
+        OSK_DropState();
+    else if (OSK_IsActive())
+        OSK_DrawAll();
 #endif
 }
 void DrawBuffered(int xti, int yti, int c, int complete)
@@ -2357,7 +2893,42 @@ Draw a box with rounded corners
 ***********************************************************************************************/
 void MIPS16 DrawRBox(int x1, int y1, int x2, int y2, int radius, int c, int fill)
 {
-    int f, ddF_x, ddF_y, xx, yy;
+    int f, ddF_x, ddF_y, xx, yy, maxr, t;
+
+    // normalise the corners so x1,y1 is top-left and x2,y2 is bottom-right
+    if (x2 < x1)
+    {
+        t = x1;
+        x1 = x2;
+        x2 = t;
+    }
+    if (y2 < y1)
+    {
+        t = y1;
+        y1 = y2;
+        y2 = t;
+    }
+    // the radius cannot exceed half of the shorter side, otherwise the arcs
+    // do not meet the straight sides and the outline/fill is left with gaps
+    if (radius < 0)
+        radius = 0;
+    maxr = (x2 - x1) / 2;
+    if ((y2 - y1) / 2 < maxr)
+        maxr = (y2 - y1) / 2;
+    if (radius > maxr)
+        radius = maxr;
+    if (radius < 1)
+    { // degenerate to an ordinary rectangle (no rounding possible)
+        if (fill >= 0)
+            DrawRectangle(x1 + 1, y1 + 1, x2 - 1, y2 - 1, fill);
+        DrawRectangle(x1, y1, x2, y1, c); // top side
+        DrawRectangle(x1, y2, x2, y2, c); // bottom side
+        DrawRectangle(x1, y1, x1, y2, c); // left side
+        DrawRectangle(x2, y1, x2, y2, c); // right side
+        if (Option.Refresh)
+            Display_Refresh();
+        return;
+    }
 
     f = 1 - radius;
     ddF_x = 1;
@@ -2376,15 +2947,6 @@ void MIPS16 DrawRBox(int x1, int y1, int x2, int y2, int radius, int c, int fill
         xx += 1;
         ddF_x += 2;
         f += ddF_x;
-        DrawPixel(x2 + xx - radius, y2 + yy - radius, c); // Bottom Right Corner
-        DrawPixel(x2 + yy - radius, y2 + xx - radius, c); // ^^^
-        DrawPixel(x1 - xx + radius, y2 + yy - radius, c); // Bottom Left Corner
-        DrawPixel(x1 - yy + radius, y2 + xx - radius, c); // ^^^
-
-        DrawPixel(x2 + xx - radius, y1 - yy + radius, c); // Top Right Corner
-        DrawPixel(x2 + yy - radius, y1 - xx + radius, c); // ^^^
-        DrawPixel(x1 - xx + radius, y1 - yy + radius, c); // Top Left Corner
-        DrawPixel(x1 - yy + radius, y1 - xx + radius, c); // ^^^
         if (fill >= 0)
         {
             DrawRectangle(x2 + xx - radius - 1, y2 + yy - radius, x1 - xx + radius + 1, y2 + yy - radius, fill);
@@ -2392,13 +2954,33 @@ void MIPS16 DrawRBox(int x1, int y1, int x2, int y2, int radius, int c, int fill
             DrawRectangle(x2 + xx - radius - 1, y1 - yy + radius, x1 - xx + radius + 1, y1 - yy + radius, fill);
             DrawRectangle(x2 + yy - radius - 1, y1 - xx + radius, x1 - yy + radius + 1, y1 - xx + radius, fill);
         }
+        else
+        {
+            DrawPixel(x2 + xx - radius, y2 + yy - radius, c); // Bottom Right Corner
+            DrawPixel(x2 + yy - radius, y2 + xx - radius, c); // ^^^
+            DrawPixel(x1 - xx + radius, y2 + yy - radius, c); // Bottom Left Corner
+            DrawPixel(x1 - yy + radius, y2 + xx - radius, c); // ^^^
+
+            DrawPixel(x2 + xx - radius, y1 - yy + radius, c); // Top Right Corner
+            DrawPixel(x2 + yy - radius, y1 - xx + radius, c); // ^^^
+            DrawPixel(x1 - xx + radius, y1 - yy + radius, c); // Top Left Corner
+            DrawPixel(x1 - yy + radius, y1 - xx + radius, c); // ^^^
+        }
     }
     if (fill >= 0)
+    {
         DrawRectangle(x1 + 1, y1 + radius, x2 - 1, y2 - radius, fill);
-    DrawRectangle(x1 + radius - 1, y1, x2 - radius + 1, y1, c); // top side
-    DrawRectangle(x1 + radius - 1, y2, x2 - radius + 1, y2, c); // botom side
-    DrawRectangle(x1, y1 + radius, x1, y2 - radius, c);         // left side
-    DrawRectangle(x2, y1 + radius, x2, y2 - radius, c);         // right side
+        DrawRBox(x1, y1, x2, y2, radius, c, -1);
+    }
+    else
+    {
+        DrawRectangle(x1 + radius - 1, y1, x2 - radius + 1, y1, c); // top side
+        DrawRectangle(x1 + radius - 1, y2, x2 - radius + 1, y2, c); // botom side
+        DrawRectangle(x1, y1 + radius, x1, y2 - radius, c);         // left side
+        DrawRectangle(x2, y1 + radius, x2, y2 - radius, c);         // right side
+    }
+    //    if (fill != c && fill != -1)
+    //        DrawRBox(x1, y1, x2, y2, radius, c, -1);
     if (Option.Refresh)
         Display_Refresh();
 }
@@ -6412,6 +6994,7 @@ void cmd_cls(void)
     CurrentX = CurrentY = 0;
     if (Option.Refresh)
         Display_Refresh();
+    /* OSK redraw/drop is handled centrally inside ClearScreen() now. */
 }
 
 void fun_rgb(void)
@@ -11326,10 +11909,10 @@ void MIPS16 cmd_font(void)
         }
 #endif
         PromptFont = gui_font;
-        if (CurrentY + gui_font_height >= VRes)
+        if (CurrentY + gui_font_height >= (VRes - (VRes * OptionVResreserved / 100)))
         {
-            ScrollLCD(CurrentY + gui_font_height - VRes); // scroll up if the font change split the line over the bottom
-            CurrentY -= (CurrentY + gui_font_height - VRes);
+            ScrollLCD(CurrentY + gui_font_height - (VRes - (VRes * OptionVResreserved / 100))); // scroll up if the font change split the line over the bottom
+            CurrentY -= (CurrentY + gui_font_height - (VRes - (VRes * OptionVResreserved / 100)));
         }
     }
 }
@@ -11819,18 +12402,18 @@ void ScrollLCD555(int lines)
         return;
     if (lines >= 0)
     {
-        for (int i = 0; i < VRes - lines; i++)
+        for (int i = 0; i < (VRes - (VRes * OptionVResreserved / 100)) - lines; i++)
         {
             int d = i * (HRes << 1), s = (i + lines) * (HRes << 1);
             for (int c = 0; c < (HRes << 1); c++)
                 WriteBuf[d + c] = WriteBuf[s + c];
         }
-        DrawRectangle(0, VRes - lines, HRes - 1, VRes - 1, PromptBC); // erase the lines to be scrolled off
+        DrawRectangle(0, (VRes - (VRes * OptionVResreserved / 100)) - lines, HRes - 1, (VRes - (VRes * OptionVResreserved / 100)) - 1, PromptBC); // erase the lines to be scrolled off
     }
     else
     {
         lines = -lines;
-        for (int i = VRes - 1; i >= lines; i--)
+        for (int i = (VRes - (VRes * OptionVResreserved / 100)) - 1; i >= lines; i--)
         {
             int d = i * (HRes << 1), s = (i - lines) * (HRes << 1);
             for (int c = 0; c < (HRes << 1); c++)
@@ -12112,18 +12695,18 @@ void ScrollLCD256(int lines)
         return;
     if (lines >= 0)
     {
-        for (int i = 0; i < VRes - lines; i++)
+        for (int i = 0; i < (VRes - (VRes * OptionVResreserved / 100)) - lines; i++)
         {
             int d = i * HRes, s = (i + lines) * HRes;
             for (int c = 0; c < (HRes); c++)
                 WriteBuf[d + c] = WriteBuf[s + c];
         }
-        DrawRectangle(0, VRes - lines, HRes - 1, VRes - 1, PromptBC); // erase the lines to be scrolled off
+        DrawRectangle(0, (VRes - (VRes * OptionVResreserved / 100)) - lines, HRes - 1, (VRes - (VRes * OptionVResreserved / 100)) - 1, PromptBC); // erase the lines to be scrolled off
     }
     else
     {
         lines = -lines;
-        for (int i = VRes - 1; i >= lines; i--)
+        for (int i = (VRes - (VRes * OptionVResreserved / 100)) - 1; i >= lines; i--)
         {
             int d = i * HRes, s = (i - lines) * HRes;
             for (int c = 0; c < (HRes << 1); c++)
@@ -12315,13 +12898,33 @@ void cmd_map(void)
 #endif
 void setmode(int mode, bool clear)
 {
+#ifdef PICOMITEHDMIBTH
+    /* The special RGB332 640x480 only implements modes 1 and 2
+       (HDMIloopBTH640). Reject the higher modes rather than scan out
+       an unhandled DISPLAY_TYPE. */
+    if (Option.Resolution == R640x480x8 && mode > 2)
+        error("Mode not available in this resolution");
+#endif
     closeframebuffer('A');
     if (clear)
         memset((void *)FRAMEBUFFER, 0, framebuffersize);
 #ifdef HDMI
+#ifdef PICOMITEHDMIBTH
+    /* Bounded wait: a live RESOLUTION switch can leave the scanout briefly
+       stopped (or, if core1 ever wedges during a rebuild, stopped for
+       good). Never spin here forever — that would hang the BASIC prompt on
+       core0 with no way out. The frame-boundary sync is best-effort. */
+    {
+        uint64_t dl = time_us_64() + 50000;
+        while (v_scanline != 0 && time_us_64() < dl)
+        {
+        }
+    }
+#else
     while (v_scanline != 0)
     {
     }
+#endif
 #else
     while (QVgaScanLine != 0)
     {
@@ -12446,7 +13049,56 @@ void cmd_mode(void)
 {
     int mode = getint(cmdline, 1, MAXMODES);
     setmode(mode, true);
+#if defined(USBKEYBOARD) && defined(GUICONTROLS) && defined(PICOMITEVGA)
+    OSK_Invalidate();
+#endif
 }
+#ifdef PICOMITEHDMIBTH
+/* RESOLUTION <res>
+   Live, no-reboot switch of the HDMIBTH display resolution:
+     RESOLUTION 1024  -> 1024x600 RGB332, mode 1
+     RESOLUTION 640   -> 640x480  RGB332, mode 1
+     RESOLUTION 320   -> 640x480  RGB332, mode 2 (320x240)
+   320 and 640 are the same physical resolution (R640x480x8); 320 simply
+   lands in mode 2, the native 2x-scaled 320x240 the games target. Use
+   MODE to change mode within a resolution. All run at the same 252 MHz
+   system clock, so only the HSTX clock/timing and scanout loop change —
+   no SoftReset. */
+void cmd_resolution(void)
+{
+    getargs(&cmdline, 1, (unsigned char *)",");
+    if (argc != 1)
+        SyntaxError();
+    int newres = 0, mode = 1;
+    if (checkstring(argv[0], (unsigned char *)"1024"))
+    {
+        newres = R1024x600;
+        mode = 1;
+    }
+    else if (checkstring(argv[0], (unsigned char *)"640"))
+    {
+        newres = R640x480x8;
+        mode = 1;
+    }
+    else if (checkstring(argv[0], (unsigned char *)"320"))
+    {
+        newres = R640x480x8;
+        mode = 2;
+    }
+    else
+        error("Invalid resolution");
+    /* Only rebuild the scanout when the physical resolution actually
+       changes; a same-resolution RESOLUTION just changes mode. The
+       rebuild always drops to mode 1 internally (see HDMICore teardown),
+       so the target mode is applied afterwards via setmode(). */
+    if (newres != Option.Resolution)
+        restartHDMIBTH(newres);
+    setmode(mode, true);
+#if defined(USBKEYBOARD) && defined(GUICONTROLS) && defined(PICOMITEVGA)
+    OSK_Invalidate();
+#endif
+}
+#endif
 #endif
 /*
  * @cond
@@ -12891,13 +13543,13 @@ void ScrollLCD2(int lines)
             }
         }
 #endif
-        for (int i = 0; i < VRes - lines; i++)
+        for (int i = 0; i < (VRes - (VRes * OptionVResreserved / 100)) - lines; i++)
         {
             int d = i * (HRes >> 3), s = (i + lines) * (HRes >> 3);
             for (int c = 0; c < (HRes >> 3); c++)
                 WriteBuf[d + c] = WriteBuf[s + c];
         }
-        DrawRectangle(0, VRes - lines, HRes - 1, VRes - 1, 0); // erase the lines to be scrolled off
+        DrawRectangle(0, (VRes - (VRes * OptionVResreserved / 100)) - lines, HRes - 1, (VRes - (VRes * OptionVResreserved / 100)) - 1, 0); // erase the lines to be scrolled off
     }
     else
     {
@@ -12940,7 +13592,7 @@ void ScrollLCD2(int lines)
             }
         }
 #endif
-        for (int i = VRes - 1; i >= lines; i--)
+        for (int i = (VRes - (VRes * OptionVResreserved / 100)) - 1; i >= lines; i--)
         {
             int d = i * (HRes >> 3), s = (i - lines) * (HRes >> 3);
             for (int c = 0; c < (HRes >> 3); c++)
@@ -13499,7 +14151,7 @@ void SetFont(int fnt)
     gui_font_height = FontTable[fnt >> 4][1] * (fnt & 0b1111);
     if (Option.DISPLAY_CONSOLE)
     {
-        Option.Height = VRes / gui_font_height;
+        Option.Height = (VRes - (VRes * OptionVResreserved / 100)) / gui_font_height;
         Option.Width = HRes / gui_font_width;
     }
     gui_font = fnt;
@@ -13926,7 +14578,7 @@ void DisplayPutC(char c)
         CurrentX = 0;
         return;
     case '\n':
-        if (CurrentY + 2 * gui_font_height > VRes)
+        if (CurrentY + 2 * gui_font_height > (VRes - (VRes * OptionVResreserved / 100)))
         {
             if (Option.NoScroll && Option.DISPLAY_CONSOLE)
             {

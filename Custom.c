@@ -140,10 +140,17 @@ bool PIO2 = false;
 #endif
 #ifdef PICOMITEWEB
 #ifdef rp2350
+// WEBRP2350: I2S audio is loaded onto PIO1 by start_i2s(1, 1); the cyw43
+// SPI driver claims the highest-numbered PIO with a free SM (SDK scans
+// PIO2 -> PIO1 -> PIO0) so it lands on PIO2. Both must be hidden from
+// MMBasic - a user PIO PROGRAM / PIO STOP would clear the instruction
+// memory and disable all SMs on the target PIO, breaking the WiFi link
+// or the audio output mid-run.
 bool PIO0 = true;
 bool PIO1 = false;
-bool PIO2 = true;
+bool PIO2 = false;
 #else
+// RP2040 has only 2 PIOs; cyw43 lands on PIO1 (highest).
 bool PIO0 = true;
 bool PIO1 = false;
 bool PIO2 = false;

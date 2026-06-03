@@ -620,18 +620,18 @@ void ScrollLCD16(int lines)
         return;
     if (lines >= 0)
     {
-        for (int i = 0; i < VRes - lines; i++)
+        for (int i = 0; i < (VRes - (VRes * OptionVResreserved / 100)) - lines; i++)
         {
             int d = i * (HRes >> 1), s = (i + lines) * (HRes >> 1);
             for (int c = 0; c < (HRes >> 1); c++)
                 WriteBuf[d + c] = WriteBuf[s + c];
         }
-        DrawRectangle(0, VRes - lines, HRes - 1, VRes - 1, PromptBC); // erase the lines to be scrolled off
+        DrawRectangle(0, (VRes - (VRes * OptionVResreserved / 100)) - lines, HRes - 1, (VRes - (VRes * OptionVResreserved / 100)) - 1, PromptBC); // erase the lines to be scrolled off
     }
     else
     {
         lines = -lines;
-        for (int i = VRes - 1; i >= lines; i--)
+        for (int i = (VRes - (VRes * OptionVResreserved / 100)) - 1; i >= lines; i--)
         {
             int d = i * (HRes >> 1), s = (i - lines) * (HRes >> 1);
             for (int c = 0; c < (HRes >> 1); c++)

@@ -265,8 +265,15 @@ void cmd_RunCMM2(void);
 #if PICOMITERP2350
 void cmd_mode(void);
 #endif
+#ifdef PICOMITEHDMIBTH
+void cmd_resolution(void);
+#endif
 
 void cmd_update(void);
+
+#if defined(USBKEYBOARD) && defined(GUICONTROLS) && defined(PICOMITEVGA)
+void cmd_keyboard(void);
+#endif
 
 /* Operator functions */
 void op_invalid(void);
@@ -404,7 +411,11 @@ void fun_trim(void);
 void fun_dev(void);
 void fun_map(void);
 void fun_touch(void);
-#ifdef GUICONTROLS
+#if defined(GUICONTROLS) || (defined(PICOMITEVGA) && defined(USBKEYBOARD))
+/* fun_click() lives in Draw.c. Full version compiles under GUICONTROLS;
+   a minimal VGAUSB-style version (USB touch + USB mouse, no Ctrl[] or
+   gesture state machine) compiles under PICOMITEVGA && USBKEYBOARD
+   without GUICONTROLS — declare it for both. */
 void fun_click(void);
 #endif
 void fun_linputstr(void);
@@ -590,6 +601,9 @@ void fun_frame(void);
 #ifdef PICOMITEVGA
 	{(unsigned char *)"TILE", T_CMD, 0, cmd_tile},
 	{(unsigned char *)"MODE", T_CMD, 0, cmd_mode},
+#ifdef PICOMITEHDMIBTH
+	{(unsigned char *)"RESOLUTION", T_CMD, 0, cmd_resolution},
+#endif
 	{(unsigned char *)"Map(", T_CMD | T_FUN, 0, cmd_map},
 	{(unsigned char *)"Map", T_CMD, 0, cmd_map},
 #else
@@ -683,6 +697,9 @@ void fun_frame(void);
 #ifdef rp2350
 	{(unsigned char *)"Slew", T_CMD, 0, cmd_slew},
 	{(unsigned char *)"TMC22xx", T_CMD, 0, cmd_TMC22xx},
+#endif
+#if defined(USBKEYBOARD) && defined(GUICONTROLS) && defined(PICOMITEVGA)
+	{(unsigned char *)"Keyboard", T_CMD, 0, cmd_keyboard},
 #endif
 
 {
@@ -827,13 +844,15 @@ void fun_frame(void);
 	{(unsigned char *)"GetScanLine", T_FNA | T_INT, 0, fun_getscanline},
 	{(unsigned char *)"Map(", T_FUN | T_INT, 0, fun_map},
 #endif
-	/* TOUCH() is now source-aware: on builds without a physical
-	   touch panel (PICOMITEVGA + GUICONTROLS) it reads cursor/mouse
-	   state, so a single BASIC GUI program can poll TOUCH(X)/(Y)/
-	   (REF)/(LASTREF) and run unchanged across touch-LCD and
-	   VGA/HDMI targets. Implementation lives in Draw.c next to
-	   fun_click and is gated by the same condition. */
-#if !defined(PICOMITEVGA) || defined(GUICONTROLS)
+	/* TOUCH() is source-aware:
+	   - touch-LCD targets read the resistive panel directly,
+	   - PICOMITEVGA + GUICONTROLS reads cursor/mouse + USB touch,
+	   - PICOMITEVGA + USBKEYBOARD without GUICONTROLS (VGAUSB RP2040)
+	     reads the USB-decoded mouse + multi-touch state directly via
+	     the minimal Draw.c implementation, so a BASIC program can still
+	     poll TOUCH(X)/(Y)/(DOWN)/(X2)/(Y2) even when the full GUI-
+	     controls stack isn't compiled. */
+#if !defined(PICOMITEVGA) || defined(GUICONTROLS) || defined(USBKEYBOARD)
 	{(unsigned char *)"Touch(", T_FUN | T_INT, 0, fun_touch},
 #endif
 #ifdef PICOMITEWEB
@@ -842,9 +861,11 @@ void fun_frame(void);
 #ifdef GUICONTROLS
 	{(unsigned char *)"MsgBox(", T_FUN | T_INT, 0, fun_msgbox},
 	{(unsigned char *)"CtrlVal(", T_FUN | T_NBR | T_STR, 0, fun_ctrlval},
-	/* CLICK() — mouse/synthetic-click equivalent of TOUCH() for GUI
-	   controls. Available on every GUICONTROLS build (mouse-driven on
-	   VGA/HDMI, mouse-or-touch on PICORP2350 etc.). */
+#endif
+	/* CLICK() — mouse/touch-equivalent of TOUCH() for GUI controls
+	   (full version, GUICONTROLS) or a USB-mouse+touch reader (minimal
+	   version on PICOMITEVGA + USBKEYBOARD without GUICONTROLS). */
+#if defined(GUICONTROLS) || (defined(PICOMITEVGA) && defined(USBKEYBOARD))
 	{(unsigned char *)"Click(", T_FUN | T_INT, 0, fun_click},
 #endif
 #if PICOMITERP2350
