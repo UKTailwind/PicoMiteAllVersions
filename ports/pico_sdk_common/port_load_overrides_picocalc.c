@@ -39,15 +39,20 @@ void port_apply_load_overrides(void)
 
     Option.DefaultFC = GREEN;
 
-    Option.AUDIO_L = 31;
-    Option.AUDIO_R = 32;
-    Option.AUDIO_SLICE = 5;
+    if (!Option.AUDIO_L && !Option.AUDIO_CLK_PIN && !Option.audio_i2s_bclk) {
+        Option.AUDIO_L = 31;
+        Option.AUDIO_R = 32;
+        Option.AUDIO_SLICE = 5;
+    }
 
-    Option.AUDIO_CLK_PIN = 0;
-    Option.AUDIO_MOSI_PIN = 0;
-    Option.AUDIO_DCS_PIN = 0;
-    Option.AUDIO_DREQ_PIN = 0;
-    Option.AUDIO_RESET_PIN = 0;
+    if (!Option.AUDIO_CLK_PIN) {
+        Option.AUDIO_MOSI_PIN = 0;
+        Option.AUDIO_MISO_PIN = 0;
+        Option.AUDIO_CS_PIN = 0;
+        Option.AUDIO_DCS_PIN = 0;
+        Option.AUDIO_DREQ_PIN = 0;
+        Option.AUDIO_RESET_PIN = 0;
+    }
 
     Option.KeyboardConfig = CONFIG_I2C;
     Option.SYSTEM_I2C_SDA = 9;

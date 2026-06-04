@@ -149,11 +149,14 @@ set(PICOMITE_LEGACY_CORE_SOURCES
 	core/mmbasic/CFunction.c
 )
 
-# Audio: device body lives in drivers/pwm_synth/pwm_synth.c (PWM/PIO
-# tones, WAV/FLAC/MP3/MOD decoders, VS1053 glue). shared/audio/Audio.c itself holds
-# only the host cmd_play and compiles on host builds via the host port Makefiles.
+# Audio: Pico command/hardware glue lives in drivers/pwm_synth/pwm_synth.c.
+# Software file decoding and tone/sound tables are shared with the other ports.
+# shared/audio/Audio.c itself holds the host/shared cmd_play surface and compiles
+# on host/ESP32-style builds via their port build files.
 set(PICOMITE_AUDIO_DEVICE_SOURCES
 	drivers/pwm_synth/pwm_synth.c
+	shared/audio/audio_stream.c
+	shared/audio/synth_pcm.c
 )
 
 set(PICOMITE_VM_SHARED_GFX_SOURCES

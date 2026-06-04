@@ -185,7 +185,7 @@ CORE_SRCS += core/mmbasic/MMBasic_Print.c core/mmbasic/MMBasic_REPL.c core/mmbas
 CORE_SRCS += shared/gfx/gfx_box_shared.c shared/gfx/gfx_circle_shared.c shared/gfx/gfx_line_shared.c shared/gfx/gfx_pixel_shared.c
 CORE_SRCS += shared/gfx/gfx_cls_shared.c shared/gfx/gfx_text_shared.c shared/gfx/gfx_console_shared.c
 CORE_SRCS += shared/mmbasic/mm_misc_shared.c shared/mmbasic/options_ini.c core/mmbasic/OptionCommands.c
-CORE_SRCS += core/mmbasic/Draw.c shared/gfx/RGB121.c shared/gfx/Tilemap.c core/mmbasic/FileIO.c shared/audio/Audio.c drivers/bmp_decoder/BmpDecoder.c third_party/regex/re.c third_party/picojpeg/picojpeg.c
+CORE_SRCS += core/mmbasic/Draw.c shared/gfx/RGB121.c shared/gfx/Tilemap.c core/mmbasic/FileIO.c shared/audio/Audio.c shared/audio/audio_stream.c drivers/bmp_decoder/BmpDecoder.c third_party/regex/re.c third_party/picojpeg/picojpeg.c
 CORE_SRCS += core/mmbasic/XModem.c
 
 CORE_STATE_SRCS = display_state.c pin_state.c option_state.c audio_state.c
@@ -219,7 +219,7 @@ else
 PC386_GFX_3D_SRC := gfx_3d/gfx_3d.c
 endif
 
-CORE_DRV_SRCS = audio_mp3/audio_mp3_stub.c \
+CORE_DRV_SRCS = audio_mp3/audio_mp3_real.c third_party/hxcmod/hxcmod.c \
                 spi_lcd/spi_lcd_mem332_stub.c \
                 display_merge/display_merge_stub.c \
                 vga_pio/vga_ops_stub.c \

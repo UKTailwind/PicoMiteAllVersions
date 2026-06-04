@@ -140,9 +140,11 @@ static int esp32_escdecode_read_byte_ms(int timeout_ms) {
 int MMInkey(void) {
     static int in_web_poll;
     extern void ProcessWeb(int mode);
+    extern void checkWAVinput(void);   /* keep file playback fed while the REPL idles */
     if (!in_web_poll) {
         in_web_poll = 1;
         ProcessWeb(0);
+        checkWAVinput();
         in_web_poll = 0;
     }
     /* Drain any chars left over from an earlier unrecognised escape
@@ -176,9 +178,11 @@ int MMgetchar(void) {
     int from_web;
     do {
         extern void ProcessWeb(int mode);
+        extern void checkWAVinput(void);
         ShowCursor(1);
         from_web = 0;
         ProcessWeb(0);
+        checkWAVinput();
         c = esp32_console_ring_pop();
         if (c < 0) {
             c = esp32_web_console_pop_key();

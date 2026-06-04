@@ -71,8 +71,11 @@ static void esp32_runtime_network_service(void) {
     ProcessWeb(0);
 }
 
+extern void checkWAVinput(void);   /* shared audio stream decode pump */
+
 static void esp32_runtime_service(void) {
     esp32_runtime_pump_input();
+    checkWAVinput();
     mmbasic_runtime_poll_service_once(&s_network_service_active,
                                       esp32_runtime_network_service);
 }

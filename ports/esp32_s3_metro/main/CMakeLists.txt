@@ -32,6 +32,7 @@ set(CORE_SRCS
     ${REPO_ROOT}/core/mmbasic/OptionCommands.c
     ${REPO_ROOT}/shared/cmd_ws2812_shared.c
     ${REPO_ROOT}/shared/cmd_psram.c
+    ${REPO_ROOT}/shared/audio/synth_pcm.c
 )
 
 set(STATE_SRCS
@@ -79,13 +80,15 @@ set(DEVICE_FACING_SRCS
     ${REPO_ROOT}/shared/gfx/Tilemap.c
     ${REPO_ROOT}/core/mmbasic/FileIO.c
     ${REPO_ROOT}/shared/audio/Audio.c
+    ${REPO_ROOT}/shared/audio/audio_stream.c
     ${REPO_ROOT}/drivers/bmp_decoder/BmpDecoder.c
     ${REPO_ROOT}/third_party/regex/re.c
     ${REPO_ROOT}/third_party/picojpeg/picojpeg.c
 )
 
 set(DRIVER_STUBS
-    ${REPO_ROOT}/drivers/audio_mp3/audio_mp3_stub.c
+    ${REPO_ROOT}/drivers/audio_mp3/audio_mp3_real.c
+    ${REPO_ROOT}/third_party/hxcmod/hxcmod.c
     ${REPO_ROOT}/drivers/spi_lcd/spi_lcd_mem332_stub.c
     ${REPO_ROOT}/drivers/display_merge/display_merge_stub.c
     ${REPO_ROOT}/drivers/vga_pio/vga_ops_stub.c
@@ -142,7 +145,8 @@ set(PORT_LOCAL_SRCS
     hal_pin_esp32.c                         # real GPIO/ADC over driver/gpio.h + esp_adc
     esp32_pin_tables.c                      # Metro GPIO map + GPn codemap
     hal_ws2812_esp32.c                      # WS2812/SK6812 over ESP32 RMT
-    hal_audio_esp32_stub.c
+    esp32_audio_options.c                   # OPTION AUDIO / MM.INFO$(AUDIO) surface
+    hal_audio_esp32.c                       # I2S/PDM backend (shared synth_pcm)
     hal_vm_framebuffer_esp32_stub.c
     hal_time_esp32.c
     hal_random_esp32.c
@@ -231,6 +235,7 @@ idf_component_register(
     REQUIRES
         driver
         esp_adc
+        esp_driver_i2s
         esp_driver_rmt
         esp_driver_sdspi
         esp_timer

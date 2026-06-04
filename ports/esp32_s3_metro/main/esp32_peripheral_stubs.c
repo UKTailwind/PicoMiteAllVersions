@@ -29,6 +29,7 @@
 #include "runtime/runtime.h"
 #include "vm_sys_pin.h"
 #include "hal/hal_time.h"
+#include "esp32_audio_options.h"
 
 /* esp32_parse_pin_arg — converts a "GPn" textual pin argument (or raw pin
  * number) to the VM's internal pin index. Used by cmd_setpin / fun_pin. */
@@ -62,6 +63,7 @@ int MemLoadProgram(unsigned char *fname, unsigned char *ram) {
 void printoptions(void) {
     extern void esp32_wifi_print_options(void);
     esp32_wifi_print_options();
+    esp32_audio_print_options();
     /* PSRAM presence: the slab is set up by hal_psram_init() at boot
      * from heap_caps_aligned_alloc(MALLOC_CAP_SPIRAM). PSRAM_CS_PIN
      * is the rp2350 channel and stays at 0 on ESP32, so emit a
@@ -218,6 +220,7 @@ void cmd_option(void)
         printoptions();
         return;
     }
+    if (esp32_audio_option_setter(cmdline)) return;
     if (option_command_handle_common(cmdline, false)) return;
     if (esp32_wifi_option_setter(cmdline)) return;
     error("Option not supported on this port");
@@ -414,8 +417,6 @@ void cmd_wraptarget(void) {}
 
 void cmd_xmodem(void) {}
 
-void disable_audio(void) {}
-
 void disable_sd(void) {}
 
 void disable_systemi2c(void) {}
@@ -484,6 +485,7 @@ void fun_info(void) {
     if (checkstring(ep, (unsigned char *)"PSRAM SIZE")) {
         iret = PSRAMsize; targ = T_INT; return;
     }
+    if (esp32_audio_mminfo(ep, sret, &targ)) return;
     if (checkstring(ep, (unsigned char *)"STACK")) {
         iret = (int64_t)uxTaskGetStackHighWaterMark(NULL) * sizeof(StackType_t);
         targ = T_INT;

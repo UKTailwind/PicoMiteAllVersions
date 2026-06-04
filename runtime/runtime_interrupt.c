@@ -19,6 +19,9 @@
 #define MMB_HOT_FUNC(name) name
 #endif
 
+extern char *WAVInterrupt;
+extern bool WAVcomplete;
+
 void MMB_HOT_FUNC(mmbasic_runtime_interrupt_save_error_state)(
     int *saved_option_error_skip,
     char *saved_error_message,
@@ -110,6 +113,9 @@ int MMB_HOT_FUNC(mmbasic_runtime_check_interrupt)(
         (adapter->udp_pending && adapter->udp_pending()))) {
         intaddr = (unsigned char *)UDPinterrupt;
         UDPreceive = false;
+    } else if (WAVInterrupt != NULL && WAVcomplete) {
+        intaddr = (unsigned char *)WAVInterrupt;
+        WAVcomplete = false;
     } else {
         return 0;
     }
