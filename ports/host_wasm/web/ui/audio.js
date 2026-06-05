@@ -39,6 +39,11 @@ let toneStopTimer = null;
 // PLAY SOUND state — 4 slots × {L, R} oscillators/buffers.
 const soundSlots = [null, null, null, null];
 
+// Streamed file playback state — scheduled AudioBufferSource chunks.
+let streamRate = 0;
+let streamNextTime = 0;
+const streamSources = new Set();
+
 // Shared white-noise buffer (used for type "N").
 let whiteNoiseBuf = null;
 
@@ -196,6 +201,75 @@ function stopAllSounds() {
     }
 }
 
+function stopStream() {
+    for (const entry of streamSources) {
+        try { entry.source.stop(); } catch (_) {}
+        try { entry.source.disconnect(); } catch (_) {}
+        try { entry.splitter.disconnect(); } catch (_) {}
+    }
+    streamSources.clear();
+    streamRate = 0;
+    streamNextTime = 0;
+}
+
+function finishStream() {
+    streamRate = 0;
+    streamNextTime = 0;
+}
+
+function beginStream(sampleRate) {
+    if (!ensureCtx()) return;
+    stopStream();
+    streamRate = Math.max(1, sampleRate | 0);
+    streamNextTime = ctx.currentTime + 0.05;
+}
+
+function bytesToInt16(data) {
+    if (data instanceof Int16Array) return data;
+    if (data instanceof Uint8Array) {
+        return new Int16Array(data.buffer, data.byteOffset, Math.floor(data.byteLength / 2));
+    }
+    if (data instanceof ArrayBuffer || data instanceof SharedArrayBuffer) {
+        return new Int16Array(data);
+    }
+    return new Int16Array(0);
+}
+
+function playStreamSamples(sampleRate, data) {
+    if (!ensureCtx()) return;
+    const rate = Math.max(1, sampleRate | 0);
+    if (streamRate !== rate) beginStream(rate);
+
+    const pcm = bytesToInt16(data);
+    const frames = Math.floor(pcm.length / 2);
+    if (frames <= 0) return;
+
+    const buffer = ctx.createBuffer(2, frames, rate);
+    const left = buffer.getChannelData(0);
+    const right = buffer.getChannelData(1);
+    for (let i = 0, j = 0; i < frames; i++, j += 2) {
+        left[i] = Math.max(-1, pcm[j] / 32768);
+        right[i] = Math.max(-1, pcm[j + 1] / 32768);
+    }
+
+    const source = ctx.createBufferSource();
+    const splitter = ctx.createChannelSplitter(2);
+    source.buffer = buffer;
+    source.connect(splitter);
+    splitter.connect(masterL, 0);
+    splitter.connect(masterR, 1);
+
+    const when = Math.max(streamNextTime || 0, ctx.currentTime + 0.01);
+    streamNextTime = when + frames / rate;
+    const entry = { source, splitter };
+    streamSources.add(entry);
+    source.onended = () => {
+        streamSources.delete(entry);
+        try { splitter.disconnect(); } catch (_) {}
+    };
+    source.start(when);
+}
+
 function setSoundSide(slotIdx, side, type, freq, vol) {
     if (!soundSlots[slotIdx]) {
         soundSlots[slotIdx] = {
@@ -255,6 +329,7 @@ function playSound(slot1, ch, type, freq, vol) {
 function playStop() {
     stopTone();
     stopAllSounds();
+    stopStream();
 }
 
 function volToGain(v) {
@@ -287,6 +362,10 @@ window.picomiteAudio = {
     volume: setVolume,
     pause:  pauseAudio,
     resume: resumeAudio,
+    streamBegin: beginStream,
+    streamSamples: playStreamSamples,
+    streamEof() {},
+    streamEnd: finishStream,
 };
 
 armAudioOnGesture();

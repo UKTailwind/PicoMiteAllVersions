@@ -80,7 +80,7 @@ LDFLAGS = -pthread -sPTHREAD_POOL_SIZE=1 \
           -Wl,--allow-multiple-definition
 
 AUDIO_SHARED_CORE_SRCS = shared/audio/Audio.c shared/audio/audio_runtime.c shared/audio/audio_stream.c
-AUDIO_BACKEND_SRCS = hal_audio_host.c
+AUDIO_BACKEND_SRCS = hal_audio_wasm.c
 
 # Core MMBasic sources — mirror ports/host_native/Makefile CORE_SRCS.
 CORE_SRCS = core/mmbasic/MMBasic.c core/mmbasic/Commands.c core/mmbasic/Functions.c core/mmbasic/Operators.c core/mmbasic/MATHS.c \

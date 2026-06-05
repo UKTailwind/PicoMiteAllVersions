@@ -1,5 +1,5 @@
 // Headless smoke test: boot the WASM page, wait for the REPL to accept
-// input, issue `PLAY TONE 440,500`, and verify the audio bridge fires.
+// input, issue PLAY audio commands, and verify the audio bridge fires.
 //
 // Uses the Playwright install under the pico-gamer sidecar — we don't
 // want to pull a full node_modules into this repo for a one-off check.
@@ -8,6 +8,7 @@
 
 import { chromium } from '/Users/joshv/.local/state/yolobox/instances/pico-gamer-main/checkout/web/node_modules/playwright/index.mjs';
 import { spawn } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { setTimeout as sleep } from 'node:timers/promises';
 
 const PORT = 8124;
@@ -23,6 +24,40 @@ function startServer() {
     return child;
 }
 
+function makeWav() {
+    const sampleRate = 44100;
+    const frames = sampleRate * 2;
+    const bytes = new Uint8Array(44 + frames * 4);
+    const view = new DataView(bytes.buffer);
+    const text = (off, s) => {
+        for (let i = 0; i < s.length; i++) bytes[off + i] = s.charCodeAt(i);
+    };
+    text(0, 'RIFF');
+    view.setUint32(4, 36 + frames * 4, true);
+    text(8, 'WAVE');
+    text(12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, 2, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * 4, true);
+    view.setUint16(32, 4, true);
+    view.setUint16(34, 16, true);
+    text(36, 'data');
+    view.setUint32(40, frames * 4, true);
+    for (let i = 0; i < frames; i++) {
+        const s = Math.round(Math.sin((i / sampleRate) * Math.PI * 2 * 440) * 12000);
+        view.setInt16(44 + i * 4, s, true);
+        view.setInt16(44 + i * 4 + 2, s, true);
+    }
+    return bytes;
+}
+
+const repoRoot = new URL('../../..', import.meta.url).pathname;
+function fixtureBytes(path) {
+    return Array.from(readFileSync(`${repoRoot}/${path}`));
+}
+
 async function waitForPort() {
     for (let i = 0; i < 30; i++) {
         try {
@@ -32,6 +67,41 @@ async function waitForPort() {
         await sleep(200);
     }
     throw new Error('server did not come up');
+}
+
+async function uploadFile(page, path, bytes) {
+    await page.evaluate(({ path, bytes }) => {
+        window.picomite.fsWrite(path, new Uint8Array(bytes));
+    }, { path, bytes });
+}
+
+async function playAndExpectSustainedStream(page, command, label, expectedRate = 0) {
+    await page.evaluate(() => { window.__audioCalls = []; });
+    await page.keyboard.type(command, { delay: 20 });
+    await page.keyboard.press('Enter');
+    await sleep(300);
+    const initial = await page.evaluate(() =>
+        window.__audioCalls.filter((c) => c.op === 'streamSamples').length);
+    await sleep(1700);
+    const calls = await page.evaluate(() => window.__audioCalls);
+    const beginCalls = calls.filter((c) => c.op === 'streamBegin');
+    const sampleCalls = calls.filter((c) => c.op === 'streamSamples');
+    if (!beginCalls.length || !sampleCalls.length) {
+        console.error(`FAIL — no streamed audio calls after ${label}. Calls:`, calls);
+        process.exit(1);
+    }
+    if (expectedRate) {
+        const streamRate = beginCalls[beginCalls.length - 1].args[0];
+        if (streamRate !== expectedRate) {
+            console.error(`FAIL — unexpected ${label} stream sample rate: ${streamRate}`);
+            process.exit(1);
+        }
+    }
+    if (sampleCalls.length <= initial) {
+        console.error(`FAIL — ${label} did not continue feeding PCM after the initial queue. initial=${initial} later=${sampleCalls.length}`);
+        process.exit(1);
+    }
+    console.log(`OK — ${label} continued streaming PCM (${initial} -> ${sampleCalls.length} chunks).`);
 }
 
 const server = startServer();
@@ -70,6 +140,10 @@ try {
                 }
             });
         });
+
+        await uploadFile(page, '/sd/smoke.wav', Array.from(makeWav()));
+        await uploadFile(page, '/sd/short.mp3', fixtureBytes('demos/sound/short.mp3'));
+        await uploadFile(page, '/sd/short.mod', fixtureBytes('demos/sound/short.mod'));
 
         // Focus the canvas (clicks count as user gesture, unblocking audio).
         await page.click('#screen');
@@ -117,6 +191,18 @@ try {
             process.exit(1);
         }
         console.log(`OK — audio bridge received sound(${slot}, "${ch}", "${type}", ${f}, ${vol}).`);
+
+        await page.keyboard.type('B:', { delay: 20 });
+        await page.keyboard.press('Enter');
+        await playAndExpectSustainedStream(page, 'PLAY WAV "smoke.wav"', 'PLAY WAV', 44100);
+        await page.keyboard.type('PLAY STOP', { delay: 20 });
+        await page.keyboard.press('Enter');
+        await sleep(200);
+        await playAndExpectSustainedStream(page, 'PLAY MP3 "short.mp3"', 'PLAY MP3', 22050);
+        await page.keyboard.type('PLAY STOP', { delay: 20 });
+        await page.keyboard.press('Enter');
+        await sleep(200);
+        await playAndExpectSustainedStream(page, 'PLAY MODFILE "short.mod"', 'PLAY MODFILE', 44100);
 
         // PLAY STOP routes through.
         await page.keyboard.type('PLAY STOP', { delay: 20 });

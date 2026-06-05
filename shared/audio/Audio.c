@@ -459,6 +459,7 @@ int MIPS16 audio_cmd_play_common(void) {
         WAVInterrupt = NULL;
         WAVcomplete = 0;
         if (audio_stream_play_wav(fname) != 0) error("Cannot play file");
+        audio_stream_service();
         if (argc == 3) {
             if (!CurrentLinePtr) error("No program running");
             WAVInterrupt = (char *)GetIntAddress(argv[2]);
@@ -484,6 +485,7 @@ int MIPS16 audio_cmd_play_common(void) {
         WAVInterrupt = NULL;
         WAVcomplete = 0;
         if (audio_stream_play_mp3(fname) != 0) error("Cannot play file");
+        audio_stream_service();
         if (argc == 3) {
             if (!CurrentLinePtr) error("No program running");
             WAVInterrupt = (char *)GetIntAddress(argv[2]);
@@ -509,6 +511,7 @@ int MIPS16 audio_cmd_play_common(void) {
         WAVInterrupt = NULL;
         WAVcomplete = 0;
         if (audio_stream_play_flac(fname) != 0) error("Cannot play file");
+        audio_stream_service();
         if (argc == 3) {
             if (!CurrentLinePtr) error("No program running");
             WAVInterrupt = (char *)GetIntAddress(argv[2]);
@@ -534,6 +537,7 @@ int MIPS16 audio_cmd_play_common(void) {
         WAVInterrupt = NULL;
         WAVcomplete = 0;
         if (audio_stream_play_mod_noloop(fname, argc == 3) != 0) error("Cannot play file");
+        audio_stream_service();
         if (argc == 3) {
             if (!CurrentLinePtr) error("No program running");
             WAVInterrupt = (char *)GetIntAddress(argv[2]);
