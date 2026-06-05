@@ -6,6 +6,16 @@ if ! command -v clang-format >/dev/null 2>&1; then
     exit 127
 fi
 
+clang_format_version=$(clang-format --version)
+case "$clang_format_version" in
+    "clang-format version 21.1.8"*)
+        ;;
+    *)
+        echo "clang-format 21.1.8 is required, found: $clang_format_version" >&2
+        exit 1
+        ;;
+esac
+
 crlf_files=$(git grep -Il $'\r' -- . \
     ':(exclude)third_party/**' \
     ':(exclude)ports/host_native/vendor/**' || true)
