@@ -392,6 +392,10 @@ $(BUILD_DIR)/coredrv/%.o: $(REPO_ROOT)/drivers/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
+$(BUILD_DIR)/coredrv/third_party/%.o: $(REPO_ROOT)/third_party/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
 $(BUILD_DIR)/bc/%.o: $(REPO_ROOT)/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c -o $@ $<
