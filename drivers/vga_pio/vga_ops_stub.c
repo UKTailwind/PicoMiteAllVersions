@@ -12,52 +12,90 @@
 #include <stdint.h>
 #include "hal/hal_vga_ops.h"
 
-int  hal_vga_ops_handle_cls(int c)         { (void)c; return 0; }
-int  hal_vga_ops_handle_tile_cls(int c)    { (void)c; return 0; }
-int  hal_vga_ops_handle_layer_clear(void)  { return 0; }
-void hal_vga_ops_retile_for_font(void)     { }
-void hal_vga_ops_wait_scanline_zero(void)  { }
+int hal_vga_ops_handle_cls(int c) {
+    (void)c;
+    return 0;
+}
+int hal_vga_ops_handle_tile_cls(int c) {
+    (void)c;
+    return 0;
+}
+int hal_vga_ops_handle_layer_clear(void) {
+    return 0;
+}
+void hal_vga_ops_retile_for_font(void) {}
+void hal_vga_ops_wait_scanline_zero(void) {}
 uint8_t hal_vga_ops_layer_merge_byte(uint8_t primary, int x, int y) {
-    (void)x; (void)y; return primary;
+    (void)x;
+    (void)y;
+    return primary;
 }
 uint8_t hal_vga_ops_layer_merge_rgb8(uint8_t primary, int x, int y) {
-    (void)x; (void)y; return primary;
+    (void)x;
+    (void)y;
+    return primary;
 }
-volatile unsigned char *hal_vga_ops_fb_n_target(void) { return NULL; }
-volatile unsigned char *hal_vga_ops_fb_t_target(void) { return NULL; }
-int hal_vga_ops_fb_t_supported(void) { return 0; }
-int  hal_vga_ops_fb2_tilematch(int x1, int y1, int w_px, int h_px) {
-    (void)x1; (void)y1; (void)w_px; (void)h_px; return 0;
+volatile unsigned char * hal_vga_ops_fb_n_target(void) {
+    return NULL;
+}
+volatile unsigned char * hal_vga_ops_fb_t_target(void) {
+    return NULL;
+}
+int hal_vga_ops_fb_t_supported(void) {
+    return 0;
+}
+int hal_vga_ops_fb2_tilematch(int x1, int y1, int w_px, int h_px) {
+    (void)x1;
+    (void)y1;
+    (void)w_px;
+    (void)h_px;
+    return 0;
 }
 void hal_vga_ops_fb2_fill_tile_colours(int x1, int y1, int w_px, int h_px, int fc, int bc) {
-    (void)x1; (void)y1; (void)w_px; (void)h_px; (void)fc; (void)bc;
+    (void)x1;
+    (void)y1;
+    (void)w_px;
+    (void)h_px;
+    (void)fc;
+    (void)bc;
 }
-void hal_vga_ops_scroll_tile_colours(int lines) { (void)lines; }
-void hal_vga_ops_tile_colour(int x, int y, int *front, int *back) {
-    (void)x; (void)y; *front = 0xFFFFFF; *back = 0;
+void hal_vga_ops_scroll_tile_colours(int lines) {
+    (void)lines;
+}
+void hal_vga_ops_tile_colour(int x, int y, int * front, int * back) {
+    (void)x;
+    (void)y;
+    *front = 0xFFFFFF;
+    *back = 0;
 }
 int hal_vga_ops_handle_blit_move(int x1, int y1, int x2, int y2, int w, int h) {
-    (void)x1; (void)y1; (void)x2; (void)y2; (void)w; (void)h; return 0;
+    (void)x1;
+    (void)y1;
+    (void)x2;
+    (void)y2;
+    (void)w;
+    (void)h;
+    return 0;
 }
-void hal_vga_ops_reset_display_vga(void) { }
-void hal_vga_ops_reserved_io_recovery(void) { }
+void hal_vga_ops_reset_display_vga(void) {}
+void hal_vga_ops_reserved_io_recovery(void) {}
 
 /* VGA-memory stubs — the real impls live in drivers/vga_pio/vga_memory.c
  * for PICOMITEVGA builds. Non-VGA targets (PICOMITE SPI-LCD, WEB, host)
  * get the no-op/null versions below so Memory.c + display-merge HAL
  * stubs + vm_sys_graphics reference these symbols unconditionally. */
-unsigned char *WriteBuf    = NULL;
-unsigned char *LayerBuf    = NULL;
-unsigned char *FrameBuf    = NULL;
-unsigned char *ShadowBuf   = NULL;
-int            fb_dma_chan = -1;
+unsigned char * WriteBuf = NULL;
+unsigned char * LayerBuf = NULL;
+unsigned char * FrameBuf = NULL;
+unsigned char * ShadowBuf = NULL;
+int fb_dma_chan = -1;
 
 /* No VGA framebuffer on SPI-LCD / WEB / host — FRAMEBUFFER is NULL,
  * framebuffersize is 0. Memory.c's AllMemory is sized via
  * HAL_PORT_FRAMEBUFFER_TRAILER_BYTES which is 0 on non-VGA ports, so
  * there's no trailer region to point into. */
-unsigned char *FRAMEBUFFER    = NULL;
-uint32_t       framebuffersize = 0;
+unsigned char * FRAMEBUFFER = NULL;
+uint32_t framebuffersize = 0;
 
 /* ytileheight is read by MM_Misc.c's MM.INFO("TILE HEIGHT") on every
  * target. VGA builds set it to 16 or 480/12; non-VGA default is 0. */
@@ -65,11 +103,14 @@ volatile int ytileheight = 0;
 
 /* Called from Memory.c::InitHeap — no-op on non-VGA (no framebuffer
  * planes to rebind). */
-void vga_memory_init_planes(void) { }
+void vga_memory_init_planes(void) {}
 
 /* setmode is a VGA-only entry for switching SCREENMODE (1-5) live.
  * Draw.h extern-declares it unconditionally; Commands.c calls it from
  * cmd_new / cmd_end. Non-VGA ports don't have QVGA SCREENMODEs and
  * Option.DISPLAY_TYPE never takes a SCREENMODE value there, so the
  * stub is safely unreachable at runtime. */
-void setmode(int mode, bool clear) { (void)mode; (void)clear; }
+void setmode(int mode, bool clear) {
+    (void)mode;
+    (void)clear;
+}

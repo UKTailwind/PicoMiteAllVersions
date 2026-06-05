@@ -16,5 +16,9 @@
  * docs/port-duplication-audit.md Finding 10.
  */
 
-int getConsole(void) { return -1; }
-int kbhitConsole(void) { return 0; }
+int getConsole(void) {
+    return -1;
+}
+int kbhitConsole(void) {
+    return 0;
+}

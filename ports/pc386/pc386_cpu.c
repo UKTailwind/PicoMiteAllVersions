@@ -8,11 +8,11 @@
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 
-extern void     SoftReset(void);
-extern void     hal_time_sleep_us(uint32_t us);
+extern void SoftReset(void);
+extern void hal_time_sleep_us(uint32_t us);
 
 void cmd_cpu(void) {
-    unsigned char *p;
+    unsigned char * p;
     if ((p = checkstring(cmdline, (unsigned char *)"RESTART"))) {
         checkend(p);
         hal_time_sleep_us(10000);

@@ -19,13 +19,13 @@ void ansi_terminal_install_resize_handler(void) {
     /* No-op. See file header. */
 }
 
-int ansi_terminal_query_size(int *rows, int *cols) {
+int ansi_terminal_query_size(int * rows, int * cols) {
     HANDLE hout = GetStdHandle(STD_OUTPUT_HANDLE);
     if (hout == INVALID_HANDLE_VALUE) return -1;
     CONSOLE_SCREEN_BUFFER_INFO csbi;
     if (!GetConsoleScreenBufferInfo(hout, &csbi)) return -1;
     int r = (int)(csbi.srWindow.Bottom - csbi.srWindow.Top + 1);
-    int c = (int)(csbi.srWindow.Right  - csbi.srWindow.Left + 1);
+    int c = (int)(csbi.srWindow.Right - csbi.srWindow.Left + 1);
     if (r <= 0 || c <= 0) return -1;
     if (rows) *rows = r;
     if (cols) *cols = c;

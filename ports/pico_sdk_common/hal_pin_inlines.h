@@ -21,19 +21,16 @@
 
 #include "hardware/gpio.h"
 
-static inline void hal_pin_write_fast(uint32_t gpio, bool high)
-{
+static inline void hal_pin_write_fast(uint32_t gpio, bool high) {
     gpio_put(gpio, high);
 }
 
-static inline bool hal_pin_read_fast(uint32_t gpio)
-{
+static inline bool hal_pin_read_fast(uint32_t gpio) {
     return gpio_get(gpio);
 }
 
-static inline void hal_pin_toggle_fast(uint32_t gpio)
-{
+static inline void hal_pin_toggle_fast(uint32_t gpio) {
     gpio_xor_mask64(1ULL << gpio);
 }
 
-#endif  /* HAL_PIN_INLINES_H */
+#endif /* HAL_PIN_INLINES_H */

@@ -45,7 +45,7 @@ static unsigned g_pushback_tail;
 
 static void push_back(int c) {
     unsigned next = (g_pushback_head + 1) & (ESCDECODE_PUSHBACK_SIZE - 1);
-    if (next == g_pushback_tail) return;  /* ring full — drop */
+    if (next == g_pushback_tail) return; /* ring full — drop */
     g_pushback[g_pushback_head] = c;
     g_pushback_head = next;
 }
@@ -72,21 +72,32 @@ int mmbasic_escdecode_run(int (*read_byte_ms)(int timeout_ms)) {
      * also recognised the `ESC O 2 R` quirk that maps to SHIFT_F3. */
     if (c1 == 'O') {
         int c2 = read_byte_ms(50);
-        if (c2 < 0) { push_back('O'); return ESC; }
+        if (c2 < 0) {
+            push_back('O');
+            return ESC;
+        }
         switch (c2) {
-            case 'P': return F1;
-            case 'Q': return F2;
-            case 'R': return F3;
-            case 'S': return F4;
-            case 'T': return F5;
+        case 'P':
+            return F1;
+        case 'Q':
+            return F2;
+        case 'R':
+            return F3;
+        case 'S':
+            return F4;
+        case 'T':
+            return F5;
         }
         if (c2 == '2') {
             int c3 = read_byte_ms(70);
-            if (c3 == 'R') return F3 + 0x20;     /* SHIFT_F3 */
-            push_back('O'); push_back(c2); if (c3 >= 0) push_back(c3);
+            if (c3 == 'R') return F3 + 0x20; /* SHIFT_F3 */
+            push_back('O');
+            push_back(c2);
+            if (c3 >= 0) push_back(c3);
             return ESC;
         }
-        push_back('O'); push_back(c2);
+        push_back('O');
+        push_back(c2);
         return ESC;
     }
 
@@ -98,20 +109,31 @@ int mmbasic_escdecode_run(int (*read_byte_ms)(int timeout_ms)) {
 
     /* ESC [ <something>. Single-letter terminators come first. */
     int c2 = read_byte_ms(50);
-    if (c2 < 0) { push_back('['); return ESC; }
+    if (c2 < 0) {
+        push_back('[');
+        return ESC;
+    }
     switch (c2) {
-        case 'A': return UP;
-        case 'B': return DOWN;
-        case 'C': return RIGHT;
-        case 'D': return LEFT;
-        case 'H': return HOME;                   /* xterm */
-        case 'F': return END;                    /* xterm */
-        case 'Z': return SHIFT_TAB;              /* esp32 / xterm extension */
+    case 'A':
+        return UP;
+    case 'B':
+        return DOWN;
+    case 'C':
+        return RIGHT;
+    case 'D':
+        return LEFT;
+    case 'H':
+        return HOME; /* xterm */
+    case 'F':
+        return END; /* xterm */
+    case 'Z':
+        return SHIFT_TAB; /* esp32 / xterm extension */
     }
 
     /* Numeric parameter forms: ESC [ <n>[~|;<m>{~|letter}] */
     if (c2 < '0' || c2 > '9') {
-        push_back('['); push_back(c2);
+        push_back('[');
+        push_back(c2);
         return ESC;
     }
     int n = c2 - '0';
@@ -126,42 +148,74 @@ int mmbasic_escdecode_run(int (*read_byte_ms)(int timeout_ms)) {
     }
     /* Letter terminator with modifier — base key only. */
     switch (c3) {
-        case 'A': return UP;
-        case 'B': return DOWN;
-        case 'C': return RIGHT;
-        case 'D': return LEFT;
-        case 'H': return HOME;
-        case 'F': return END;
+    case 'A':
+        return UP;
+    case 'B':
+        return DOWN;
+    case 'C':
+        return RIGHT;
+    case 'D':
+        return LEFT;
+    case 'H':
+        return HOME;
+    case 'F':
+        return END;
     }
     /* Tilde terminator — legacy `n ~` form, possibly with modifier skipped. */
     if (c3 == '~') {
         switch (n) {
-            case 1:  return HOME;
-            case 2:  return INSERT;
-            case 3:  return DEL;
-            case 4:  return END;
-            case 5:  return PUP;
-            case 6:  return PDOWN;
-            case 11: return F1;
-            case 12: return F2;
-            case 13: return F3;
-            case 14: return F4;
-            case 15: return F5;
-            case 17: return F6;
-            case 18: return F7;
-            case 19: return F8;
-            case 20: return F9;
-            case 21: return F10;
-            case 23: return F11;
-            case 24: return F12;
-            case 25: return F3 + 0x20;       /* SHIFT_F3 */
-            case 26: return F4 + 0x20;       /* SHIFT_F4 */
-            case 28: return F5 + 0x20;       /* SHIFT_F5 */
-            case 29: return F6 + 0x20;       /* SHIFT_F6 */
-            case 31: return F7 + 0x20;       /* SHIFT_F7 */
-            case 32: return F8 + 0x20;       /* SHIFT_F8 */
-            case 33: return F9 + 0x20;       /* SHIFT_F9 */
-            case 34: return F10 + 0x20;      /* SHIFT_F10 */
+        case 1:
+            return HOME;
+        case 2:
+            return INSERT;
+        case 3:
+            return DEL;
+        case 4:
+            return END;
+        case 5:
+            return PUP;
+        case 6:
+            return PDOWN;
+        case 11:
+            return F1;
+        case 12:
+            return F2;
+        case 13:
+            return F3;
+        case 14:
+            return F4;
+        case 15:
+            return F5;
+        case 17:
+            return F6;
+        case 18:
+            return F7;
+        case 19:
+            return F8;
+        case 20:
+            return F9;
+        case 21:
+            return F10;
+        case 23:
+            return F11;
+        case 24:
+            return F12;
+        case 25:
+            return F3 + 0x20; /* SHIFT_F3 */
+        case 26:
+            return F4 + 0x20; /* SHIFT_F4 */
+        case 28:
+            return F5 + 0x20; /* SHIFT_F5 */
+        case 29:
+            return F6 + 0x20; /* SHIFT_F6 */
+        case 31:
+            return F7 + 0x20; /* SHIFT_F7 */
+        case 32:
+            return F8 + 0x20; /* SHIFT_F8 */
+        case 33:
+            return F9 + 0x20; /* SHIFT_F9 */
+        case 34:
+            return F10 + 0x20; /* SHIFT_F10 */
         }
     }
     return ESC;

@@ -7,9 +7,9 @@
 #include "shared/net/mm_net_ntp.h"
 #include "shared/net/mm_net_ntp_hal.h"
 
-int mm_net_ntp_query_unix_seconds(const char *host, uint16_t port,
+int mm_net_ntp_query_unix_seconds(const char * host, uint16_t port,
                                   uint32_t timeout_ms,
-                                  uint32_t *unix_seconds) {
+                                  uint32_t * unix_seconds) {
     if (!host || !unix_seconds) return HAL_NET_ERR;
     *unix_seconds = 0;
 

@@ -32,36 +32,36 @@ static inline uint8_t inb(uint16_t port) {
     return val;
 }
 
-#define COM1_BASE       0x3F8
-#define COM1_RBR        (COM1_BASE + 0)
-#define COM1_THR        (COM1_BASE + 0)
-#define COM1_DLL        (COM1_BASE + 0)  /* when DLAB=1 */
-#define COM1_IER        (COM1_BASE + 1)
-#define COM1_DLM        (COM1_BASE + 1)  /* when DLAB=1 */
-#define COM1_FCR        (COM1_BASE + 2)
-#define COM1_LCR        (COM1_BASE + 3)
-#define COM1_MCR        (COM1_BASE + 4)
-#define COM1_LSR        (COM1_BASE + 5)
-#define COM1_SCRATCH    (COM1_BASE + 7)
+#define COM1_BASE 0x3F8
+#define COM1_RBR (COM1_BASE + 0)
+#define COM1_THR (COM1_BASE + 0)
+#define COM1_DLL (COM1_BASE + 0) /* when DLAB=1 */
+#define COM1_IER (COM1_BASE + 1)
+#define COM1_DLM (COM1_BASE + 1) /* when DLAB=1 */
+#define COM1_FCR (COM1_BASE + 2)
+#define COM1_LCR (COM1_BASE + 3)
+#define COM1_MCR (COM1_BASE + 4)
+#define COM1_LSR (COM1_BASE + 5)
+#define COM1_SCRATCH (COM1_BASE + 7)
 
-#define LCR_DLAB        0x80
-#define LCR_8N1         0x03
+#define LCR_DLAB 0x80
+#define LCR_8N1 0x03
 
-#define FCR_ENABLE      0x01
-#define FCR_CLEAR_RX    0x02
-#define FCR_CLEAR_TX    0x04
-#define FCR_TRIGGER_14  0xC0
+#define FCR_ENABLE 0x01
+#define FCR_CLEAR_RX 0x02
+#define FCR_CLEAR_TX 0x04
+#define FCR_TRIGGER_14 0xC0
 
-#define MCR_DTR         0x01
-#define MCR_RTS         0x02
-#define MCR_OUT2        0x08   /* must be set for IRQ delivery on PC */
-#define MCR_LOOPBACK    0x10
+#define MCR_DTR 0x01
+#define MCR_RTS 0x02
+#define MCR_OUT2 0x08 /* must be set for IRQ delivery on PC */
+#define MCR_LOOPBACK 0x10
 
-#define LSR_DATA_READY  0x01
-#define LSR_THR_EMPTY   0x20
+#define LSR_DATA_READY 0x01
+#define LSR_THR_EMPTY 0x20
 
 /* 115200 / 3 = 38400 baud. */
-#define BAUD_DIVISOR    3
+#define BAUD_DIVISOR 3
 
 bool serial_init(void) {
     /* Enable the FIFO FIRST. The 16550 starts in 16450 single-byte
@@ -77,8 +77,8 @@ bool serial_init(void) {
 
     /* Program baud rate (DLAB=1, write divisor, restore DLAB=0). */
     outb(COM1_LCR, LCR_DLAB);
-    outb(COM1_DLL, (uint8_t) (BAUD_DIVISOR & 0xFF));
-    outb(COM1_DLM, (uint8_t) ((BAUD_DIVISOR >> 8) & 0xFF));
+    outb(COM1_DLL, (uint8_t)(BAUD_DIVISOR & 0xFF));
+    outb(COM1_DLM, (uint8_t)((BAUD_DIVISOR >> 8) & 0xFF));
 
     /* 8 data bits, no parity, 1 stop bit. Note that touching LCR
      * while DLAB=1 to write 8N1 also clears DLAB. */
@@ -93,10 +93,10 @@ void serial_putc(char c) {
     while ((inb(COM1_LSR) & LSR_THR_EMPTY) == 0) {
         /* spin */
     }
-    outb(COM1_THR, (uint8_t) c);
+    outb(COM1_THR, (uint8_t)c);
 }
 
-void serial_puts(const char *s) {
+void serial_puts(const char * s) {
     while (*s) {
         if (*s == '\n') {
             serial_putc('\r');
@@ -109,13 +109,13 @@ void serial_puts(const char *s) {
  * drained by serial_getc_nonblock. Pre-IRQ-init the ring is empty
  * so the function falls through to the LSR poll. */
 #define RX_RING_SIZE 256
-static volatile uint8_t  rx_ring[RX_RING_SIZE];
+static volatile uint8_t rx_ring[RX_RING_SIZE];
 static volatile uint16_t rx_head;
 static volatile uint16_t rx_tail;
 
-#define IER_RX_AVAIL   0x01
+#define IER_RX_AVAIL 0x01
 
-static void serial_irq_handler(idt_regs_t *r) {
+static void serial_irq_handler(idt_regs_t * r) {
     (void)r;
     /* Drain everything available — IRQ may coalesce multiple bytes. */
     while (inb(COM1_LSR) & LSR_DATA_READY) {
@@ -155,7 +155,7 @@ int serial_getc_nonblock(void) {
     }
     /* No IRQs yet (or no buffered bytes) — fall back to LSR poll. */
     if ((inb(COM1_LSR) & LSR_DATA_READY) == 0) return -1;
-    return (int) inb(COM1_RBR);
+    return (int)inb(COM1_RBR);
 }
 
 int serial_getc_blocking(void) {

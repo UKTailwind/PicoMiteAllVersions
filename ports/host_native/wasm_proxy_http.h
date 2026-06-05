@@ -17,16 +17,16 @@ typedef enum wasm_proxy_http_status {
 } wasm_proxy_http_status_t;
 
 typedef struct wasm_proxy_http_response {
-    uint8_t *data;
+    uint8_t * data;
     size_t len;
     int truncated;
     char error[160];
 } wasm_proxy_http_response_t;
 
-int wasm_proxy_http_request(const char *host, int port,
-                            const uint8_t *request, size_t request_len,
+int wasm_proxy_http_request(const char * host, int port,
+                            const uint8_t * request, size_t request_len,
                             size_t max_response_bytes, int timeout_ms,
-                            wasm_proxy_http_response_t *out);
-void wasm_proxy_http_response_free(wasm_proxy_http_response_t *resp);
+                            wasm_proxy_http_response_t * out);
+void wasm_proxy_http_response_free(wasm_proxy_http_response_t * resp);
 
 #endif

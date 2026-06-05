@@ -6,11 +6,24 @@
 #include <string.h>
 
 static void test_large_text_repaint_coalesces_to_dirty_bounds(void) {
-    enum { W = 320, H = 240, GLYPH_W = 8, GLYPH_H = 12 };
+    enum { W = 320,
+           H = 240,
+           GLYPH_W = 8,
+           GLYPH_H = 12 };
     static uint32_t pixels[W * H];
     static const unsigned char glyph[] = {
-        0xff, 0x81, 0xbd, 0xa5, 0xa5, 0xbd,
-        0x81, 0xff, 0xff, 0x81, 0x81, 0xff,
+        0xff,
+        0x81,
+        0xbd,
+        0xa5,
+        0xa5,
+        0xbd,
+        0x81,
+        0xff,
+        0xff,
+        0x81,
+        0x81,
+        0xff,
     };
     web_console_display_t display;
 
@@ -44,7 +57,8 @@ static void test_large_text_repaint_coalesces_to_dirty_bounds(void) {
 }
 
 static void test_small_dirty_rect_packs_one_framebuffer_blit(void) {
-    enum { W = 64, H = 32 };
+    enum { W = 64,
+           H = 32 };
     static uint32_t pixels[W * H];
     static uint8_t payload[512];
     web_console_display_t display;

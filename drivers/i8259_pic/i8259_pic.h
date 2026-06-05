@@ -20,15 +20,15 @@
 #include <stdbool.h>
 
 /* Vector base after remap. */
-#define PIC_REMAP_OFFSET   0x20
-#define PIC_VECTOR(irq)    (PIC_REMAP_OFFSET + (irq))
+#define PIC_REMAP_OFFSET 0x20
+#define PIC_VECTOR(irq) (PIC_REMAP_OFFSET + (irq))
 
 /* Initialise both PICs at the standard offsets, mask every line.
  * Safe to call once at boot. */
 void pic_init(void);
 
 void pic_unmask(uint8_t irq);
-void pic_mask  (uint8_t irq);
+void pic_mask(uint8_t irq);
 
 /* End-Of-Interrupt — call at the end of every IRQ handler. Sends the
  * EOI to the slave (if irq >= 8) and the master. */

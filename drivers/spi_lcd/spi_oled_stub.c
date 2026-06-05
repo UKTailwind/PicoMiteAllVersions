@@ -6,4 +6,6 @@
 
 #include "hal/hal_display_oled_spi.h"
 
-void hal_oled_spi_set_contrast(int level_percent) { (void)level_percent; }
+void hal_oled_spi_set_contrast(int level_percent) {
+    (void)level_percent;
+}

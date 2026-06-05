@@ -24,7 +24,7 @@ count .req r2
 @ Save the callee-save portion of the register file.
 vpush {s16 - s31} @ 17
 @ 'Warm up' the transfer engine, which wants to operate in units of
-@ 128 bytes, by making smaller transfers until count a multiple of 
+@ 128 bytes, by making smaller transfers until count a multiple of
 @ Special-case the single word transfer; the macro below won't work.
 lsrs.n count, #1 @ 1
 itt cs @ 0 (aligned)

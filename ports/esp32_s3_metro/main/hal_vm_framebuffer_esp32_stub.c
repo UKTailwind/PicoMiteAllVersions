@@ -20,20 +20,20 @@
 #include "drivers/web_console/web_console_display.h"
 #include "hal/hal_vm_framebuffer.h"
 
-#define ESP32_WEB_DISPLAY_WIDTH  320
+#define ESP32_WEB_DISPLAY_WIDTH 320
 #define ESP32_WEB_DISPLAY_HEIGHT 240
 
 static web_console_display_t s_web_display;
-static uint32_t *s_web_pixels;
+static uint32_t * s_web_pixels;
 extern volatile int DISPLAY_TYPE;
 extern void ProcessWeb(int mode);
 
-web_console_display_t *esp32_web_console_display(void) {
+web_console_display_t * esp32_web_console_display(void) {
     return s_web_pixels ? &s_web_display : NULL;
 }
 
-static void *web_display_alloc(size_t bytes) {
-    void *p = heap_caps_malloc(bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+static void * web_display_alloc(size_t bytes) {
+    void * p = heap_caps_malloc(bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (!p) p = malloc(bytes);
     return p;
 }
@@ -48,7 +48,7 @@ static void esp32_web_draw_rectangle(int x1, int y1, int x2, int y2, int c) {
 
 static void esp32_web_draw_bitmap(int x, int y, int width, int height,
                                   int scale, int fc, int bc,
-                                  unsigned char *bitmap) {
+                                  unsigned char * bitmap) {
     web_console_display_bitmap(&s_web_display, x, y, width, height, scale,
                                fc, bc, bitmap);
 }
@@ -58,18 +58,18 @@ static void esp32_web_scroll_lcd(int lines) {
 }
 
 static void esp32_web_draw_buffer(int x1, int y1, int x2, int y2,
-                                  unsigned char *p) {
+                                  unsigned char * p) {
     web_console_display_draw_buffer(&s_web_display, x1, y1, x2, y2, p);
 }
 
 static void esp32_web_draw_buffer_fast(int x1, int y1, int x2, int y2,
-                                       int blank, unsigned char *p) {
+                                       int blank, unsigned char * p) {
     (void)blank;
     web_console_display_draw_buffer(&s_web_display, x1, y1, x2, y2, p);
 }
 
 static void esp32_web_read_buffer(int x1, int y1, int x2, int y2,
-                                  unsigned char *p) {
+                                  unsigned char * p) {
     web_console_display_read_buffer(&s_web_display, x1, y1, x2, y2, p);
 }
 
@@ -135,16 +135,33 @@ int esp32_web_console_display_init(void) {
 
 void hal_vm_framebuffer_shutdown_runtime(void) {}
 void hal_vm_framebuffer_service(void) {}
-void hal_vm_framebuffer_create(int fast) { (void)fast; }
-void hal_vm_framebuffer_layer(int hc, int c) { (void)hc; (void)c; }
-void hal_vm_framebuffer_write(char w) { (void)w; }
-void hal_vm_framebuffer_close(char w) { (void)w; }
+void hal_vm_framebuffer_create(int fast) {
+    (void)fast;
+}
+void hal_vm_framebuffer_layer(int hc, int c) {
+    (void)hc;
+    (void)c;
+}
+void hal_vm_framebuffer_write(char w) {
+    (void)w;
+}
+void hal_vm_framebuffer_close(char w) {
+    (void)w;
+}
 void hal_vm_framebuffer_merge(int hc, int c, int m, int hr, int rms) {
-    (void)hc; (void)c; (void)m; (void)hr; (void)rms;
+    (void)hc;
+    (void)c;
+    (void)m;
+    (void)hr;
+    (void)rms;
 }
 void hal_vm_framebuffer_sync(void) {}
 void hal_vm_framebuffer_wait(void) {}
-void hal_vm_framebuffer_copy(char from, char to, int bg) { (void)from; (void)to; (void)bg; }
+void hal_vm_framebuffer_copy(char from, char to, int bg) {
+    (void)from;
+    (void)to;
+    (void)bg;
+}
 
 /* No physical display flush is required, but graphics-heavy BASIC code can
  * spend a long time between normal runtime polls. Use refresh as a capped
@@ -165,7 +182,9 @@ void Display_Refresh(void) {
 
 /* Display-related globals + functions referenced by core code. */
 volatile int DISPLAY_TYPE = 0;
-void ScrollLCDSPISCR(int lines) { (void)lines; }
+void ScrollLCDSPISCR(int lines) {
+    (void)lines;
+}
 void setterminal(int height, int width) {
     if (height > 0) Option.Height = height;
     if (width > 0) Option.Width = width;
@@ -176,10 +195,21 @@ void setterminal(int height, int width) {
 bool screen320 = 0;
 void DisplayNotSet(void) {}
 void setframebuffer(void) {}
-void closeframebuffer(char layer) { (void)layer; }
-void blitmerge(int x0, int y0, int w, int h, uint8_t colour) {
-    (void)x0; (void)y0; (void)w; (void)h; (void)colour;
+void closeframebuffer(char layer) {
+    (void)layer;
 }
-void copyframetoscreen(uint8_t *s, int xstart, int xend, int ystart, int yend, int odd) {
-    (void)s; (void)xstart; (void)xend; (void)ystart; (void)yend; (void)odd;
+void blitmerge(int x0, int y0, int w, int h, uint8_t colour) {
+    (void)x0;
+    (void)y0;
+    (void)w;
+    (void)h;
+    (void)colour;
+}
+void copyframetoscreen(uint8_t * s, int xstart, int xend, int ystart, int yend, int odd) {
+    (void)s;
+    (void)xstart;
+    (void)xend;
+    (void)ystart;
+    (void)yend;
+    (void)odd;
 }

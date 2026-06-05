@@ -7,7 +7,7 @@
 int ansi_mode_set(int n, int w, int h);
 
 /* Read a configured mode slot. Returns 0 on success, -1 on bad args. */
-int ansi_mode_get(int n, int *w, int *h);
+int ansi_mode_get(int n, int * w, int * h);
 
 /* Highest valid slot number (currently 5). */
 int ansi_mode_max(void);

@@ -29,7 +29,7 @@ extern "C" {
 #endif
 
 void mm_net_telnet_rx_reset(void);
-void mm_net_telnet_rx_feed(const uint8_t *data, size_t len);
+void mm_net_telnet_rx_feed(const uint8_t * data, size_t len);
 
 #ifdef __cplusplus
 }

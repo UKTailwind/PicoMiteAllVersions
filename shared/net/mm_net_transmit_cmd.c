@@ -9,14 +9,14 @@
 #include "shared/net/mm_net_http.h"
 #include "shared/net/mm_net_transmit_cmd.h"
 
-static void clear_args(mm_net_transmit_args_t *out) {
+static void clear_args(mm_net_transmit_args_t * out) {
     memset(out, 0, sizeof(*out));
     out->extra = 4096;
 }
 
-int mm_net_transmit_parse(unsigned char *cmd, int max_pcb,
-                          mm_net_transmit_args_t *out) {
-    unsigned char *arg;
+int mm_net_transmit_parse(unsigned char * cmd, int max_pcb,
+                          mm_net_transmit_args_t * out) {
+    unsigned char * arg;
     clear_args(out);
 
     arg = checkstring(cmd, (unsigned char *)"CODE");

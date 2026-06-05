@@ -7,35 +7,30 @@
 #include "shared/net/mm_net_udp_cmd.h"
 #include "esp32_udp.h"
 
-extern char *UDPinterrupt;
+extern char * UDPinterrupt;
 extern volatile bool UDPreceive;
 
 static mm_net_udp_service_t s_udp;
 
-int esp32_udp_interrupt_pending(void)
-{
+int esp32_udp_interrupt_pending(void) {
     return UDPreceive ? 1 : 0;
 }
 
-void esp32_udp_poll(void)
-{
+void esp32_udp_poll(void) {
     mm_net_udp_service_poll(&s_udp);
 }
 
-void esp32_udp_server_stop(void)
-{
+void esp32_udp_server_stop(void) {
     mm_net_udp_service_stop(&s_udp);
 }
 
-int esp32_udp_server_open(uint16_t port)
-{
+int esp32_udp_server_open(uint16_t port) {
     if (!port) return 0;
     return mm_net_udp_service_open(&s_udp, port);
 }
 
-int esp32_udp_cmd(unsigned char *tp)
-{
-    unsigned char *arg;
+int esp32_udp_cmd(unsigned char * tp) {
+    unsigned char * arg;
 
     arg = checkstring(tp, (unsigned char *)"INTERRUPT");
     if (arg) {

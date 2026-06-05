@@ -9,6 +9,6 @@
 
 #include "hal/hal_main_init.h"
 
-void port_audio_i2s_pio_add_program(void *pio) {
+void port_audio_i2s_pio_add_program(void * pio) {
     (void)pio;
 }

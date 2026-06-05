@@ -1,22 +1,22 @@
 #include "vm_device_support.h"
 #include "gfx_pixel_shared.h"
 
-static int gfx_pixel_arg_value(const GfxPixelArg *arg, int index) {
+static int gfx_pixel_arg_value(const GfxPixelArg * arg, int index) {
     if (!arg->present || arg->count <= 0 || arg->get_int == NULL) return 0;
     return arg->get_int(arg->ctx, (arg->count > 1) ? index : 0);
 }
 
-static void gfx_pixel_fail_msg(const GfxPixelErrorSink *errors, const char *msg) {
+static void gfx_pixel_fail_msg(const GfxPixelErrorSink * errors, const char * msg) {
     if (errors && errors->fail_msg) errors->fail_msg(errors->ctx, msg);
 }
 
-static void gfx_pixel_fail_range(const GfxPixelErrorSink *errors, const char *label,
+static void gfx_pixel_fail_range(const GfxPixelErrorSink * errors, const char * label,
                                  int value, int min, int max) {
     if (errors && errors->fail_range) errors->fail_range(errors->ctx, label, value, min, max);
 }
 
-void gfx_pixel_execute(GfxPixelMode mode, const GfxPixelArg *args, int field_count,
-                       const GfxPixelErrorSink *errors) {
+void gfx_pixel_execute(GfxPixelMode mode, const GfxPixelArg * args, int field_count,
+                       const GfxPixelErrorSink * errors) {
     int x = 0, y = 0, c = gui_fcolour;
     const int max_colour = (int)WHITE;
 
@@ -45,7 +45,8 @@ void gfx_pixel_execute(GfxPixelMode mode, const GfxPixelArg *args, int field_cou
             }
         }
 
-        if (c != -1) DrawPixel(x, y, c);
+        if (c != -1)
+            DrawPixel(x, y, c);
         else {
             CurrentX = x;
             CurrentY = y;

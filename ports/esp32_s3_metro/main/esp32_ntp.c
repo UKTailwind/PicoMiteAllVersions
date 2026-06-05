@@ -17,8 +17,7 @@
 extern int64_t TimeOffsetToUptime;
 extern volatile int day_of_week;
 
-void esp32_ntp_cmd(unsigned char *arg)
-{
+void esp32_ntp_cmd(unsigned char * arg) {
     getargs(&arg, 5, (unsigned char *)",");
     if (!(argc == 0 || argc == 1 || argc == 3 || argc == 5)) error("Syntax");
 
@@ -27,11 +26,13 @@ void esp32_ntp_cmd(unsigned char *arg)
         adjust = getnumber(argv[0]);
         if (adjust < -12.0 || adjust > 14.0) error("Invalid Time Offset");
     }
-    char *host = GetTempMemory(STRINGSIZE);
-    if (argc >= 3 && *argv[2]) strcpy(host, (char *)getCstring(argv[2]));
-    else strcpy(host, "pool.ntp.org");
+    char * host = GetTempMemory(STRINGSIZE);
+    if (argc >= 3 && *argv[2])
+        strcpy(host, (char *)getCstring(argv[2]));
+    else
+        strcpy(host, "pool.ntp.org");
     uint16_t port = ESP32_NTP_PORT;
-    char *colon = strrchr(host, ':');
+    char * colon = strrchr(host, ':');
     if (colon && colon[1]) {
         int parsed_port = atoi(colon + 1);
         if (parsed_port > 0 && parsed_port <= 65535) {
@@ -59,7 +60,7 @@ void esp32_ntp_cmd(unsigned char *arg)
     time_t epoch = (time_t)(unix_seconds + timeadjust);
     struct tm utc_buf;
     hal_calendar_epoch_to_tm(epoch, &utc_buf);
-    struct tm *utc = &utc_buf;
+    struct tm * utc = &utc_buf;
 
     day_of_week = utc->tm_wday;
     if (day_of_week == 0) day_of_week = 7;

@@ -23,8 +23,10 @@
 
 static unsigned ata_drive_for_pdrv(BYTE pdrv) {
     switch (pdrv) {
-        case 2:  return ATA_PRIMARY_MASTER;
-        default: return ATA_DRIVE_COUNT;   /* invalid */
+    case 2:
+        return ATA_PRIMARY_MASTER;
+    default:
+        return ATA_DRIVE_COUNT; /* invalid */
     }
 }
 
@@ -36,19 +38,21 @@ DSTATUS disk_initialize(BYTE pdrv) {
 #endif
     unsigned drive = ata_drive_for_pdrv(pdrv);
     if (drive >= ATA_DRIVE_COUNT) return STA_NODISK;
-    const ata_drive_info_t *info = ata_drive(drive);
-    if (!info || !info->present)  return STA_NODISK;
-    return 0;  /* ready */
+    const ata_drive_info_t * info = ata_drive(drive);
+    if (!info || !info->present) return STA_NODISK;
+    return 0; /* ready */
 }
 
 DSTATUS disk_status(BYTE pdrv) {
     return disk_initialize(pdrv);
 }
 
-DRESULT disk_read(BYTE pdrv, BYTE *buff, LBA_t sector, UINT count) {
+DRESULT disk_read(BYTE pdrv, BYTE * buff, LBA_t sector, UINT count) {
     if (pdrv == 0 || pdrv == 1) {
 #ifdef FATFS_NO_FDC
-        (void)buff; (void)sector; (void)count;
+        (void)buff;
+        (void)sector;
+        (void)count;
         return RES_NOTRDY;
 #else
         while (count > 0) {
@@ -69,82 +73,85 @@ DRESULT disk_read(BYTE pdrv, BYTE *buff, LBA_t sector, UINT count) {
         /* LBA28 sector-count register is 8-bit (max 256 sectors per
          * command; 0 == 256). Cap at 255 to keep the cast obvious. */
         UINT chunk = (count > 255) ? 255 : count;
-        if (ata_read_sectors(drive, (uint32_t) sector,
-                             (uint8_t) chunk, buff) != 0) {
+        if (ata_read_sectors(drive, (uint32_t)sector,
+                             (uint8_t)chunk, buff) != 0) {
             return RES_ERROR;
         }
-        buff   += (size_t) chunk * 512;
+        buff += (size_t)chunk * 512;
         sector += chunk;
-        count  -= chunk;
+        count -= chunk;
     }
     return RES_OK;
 }
 
-DRESULT disk_write(BYTE pdrv, const BYTE *buff, LBA_t sector, UINT count) {
+DRESULT disk_write(BYTE pdrv, const BYTE * buff, LBA_t sector, UINT count) {
     if (pdrv == 0 || pdrv == 1) {
-        (void)buff; (void)sector; (void)count;
+        (void)buff;
+        (void)sector;
+        (void)count;
         return RES_WRPRT;
     }
     unsigned drive = ata_drive_for_pdrv(pdrv);
     if (drive >= ATA_DRIVE_COUNT) return RES_PARERR;
     while (count > 0) {
         UINT chunk = (count > 255) ? 255 : count;
-        if (ata_write_sectors(drive, (uint32_t) sector,
-                              (uint8_t) chunk, buff) != 0) {
+        if (ata_write_sectors(drive, (uint32_t)sector,
+                              (uint8_t)chunk, buff) != 0) {
             return RES_ERROR;
         }
-        buff   += (size_t) chunk * 512;
+        buff += (size_t)chunk * 512;
         sector += chunk;
-        count  -= chunk;
+        count -= chunk;
     }
     return RES_OK;
 }
 
-DRESULT disk_ioctl(BYTE pdrv, BYTE cmd, void *buff) {
+DRESULT disk_ioctl(BYTE pdrv, BYTE cmd, void * buff) {
     if (pdrv == 0 || pdrv == 1) {
 #ifdef FATFS_NO_FDC
-        (void)cmd; (void)buff;
+        (void)cmd;
+        (void)buff;
         return RES_NOTRDY;
 #else
         if (!fdc_present(pdrv)) return RES_NOTRDY;
         switch (cmd) {
-            case CTRL_SYNC:
-                return RES_OK;
-            case GET_SECTOR_COUNT:
-                *(LBA_t *) buff = FDC_1440_SECTORS;
-                return RES_OK;
-            case GET_SECTOR_SIZE:
-                *(WORD *) buff = 512;
-                return RES_OK;
-            case GET_BLOCK_SIZE:
-                *(DWORD *) buff = 1;
-                return RES_OK;
+        case CTRL_SYNC:
+            return RES_OK;
+        case GET_SECTOR_COUNT:
+            *(LBA_t *)buff = FDC_1440_SECTORS;
+            return RES_OK;
+        case GET_SECTOR_SIZE:
+            *(WORD *)buff = 512;
+            return RES_OK;
+        case GET_BLOCK_SIZE:
+            *(DWORD *)buff = 1;
+            return RES_OK;
         }
         return RES_PARERR;
 #endif
     }
     unsigned drive = ata_drive_for_pdrv(pdrv);
     if (drive >= ATA_DRIVE_COUNT) return RES_PARERR;
-    const ata_drive_info_t *info = ata_drive(drive);
-    if (!info || !info->present)  return RES_NOTRDY;
+    const ata_drive_info_t * info = ata_drive(drive);
+    if (!info || !info->present) return RES_NOTRDY;
 
     switch (cmd) {
-        case CTRL_SYNC:
-            /* Every disk_write already issues FLUSH CACHE per the
+    case CTRL_SYNC:
+        /* Every disk_write already issues FLUSH CACHE per the
              * ATA-PIO driver's per-sector loop; nothing else to do. */
-            return RES_OK;
-        case GET_SECTOR_COUNT:
-            *(LBA_t *) buff = info->sector_count;
-            return RES_OK;
-        case GET_SECTOR_SIZE:
-            *(WORD *) buff = 512;
-            return RES_OK;
-        case GET_BLOCK_SIZE:
-            /* No erase-block concept on a real spinning/SSD disk
+        return RES_OK;
+    case GET_SECTOR_COUNT:
+        *(LBA_t *)buff = info->sector_count;
+        return RES_OK;
+    case GET_SECTOR_SIZE:
+        *(WORD *)buff = 512;
+        return RES_OK;
+    case GET_BLOCK_SIZE:
+        /* No erase-block concept on a real spinning/SSD disk
              * surface; FatFs uses this only for FF_USE_MKFS=1, and
              * a value of 1 means "no preferred alignment". */
-            *(DWORD *) buff = 1;
-            return RES_OK;
+        *(DWORD *)buff = 1;
+        return RES_OK;
     }
     return RES_PARERR;
 }
@@ -158,10 +165,5 @@ DRESULT disk_ioctl(BYTE pdrv, BYTE cmd, void *buff) {
  *   bit 10:5  = minute (0..59)
  *   bit  4:0  = second / 2 (0..29) */
 DWORD get_fattime(void) {
-    return ((DWORD) (2026 - 1980) << 25)
-         | ((DWORD) 5              << 21)
-         | ((DWORD) 10             << 16)
-         | ((DWORD) 12             << 11)
-         | ((DWORD) 0              <<  5)
-         | ((DWORD) 0              <<  0);
+    return ((DWORD)(2026 - 1980) << 25) | ((DWORD)5 << 21) | ((DWORD)10 << 16) | ((DWORD)12 << 11) | ((DWORD)0 << 5) | ((DWORD)0 << 0);
 }

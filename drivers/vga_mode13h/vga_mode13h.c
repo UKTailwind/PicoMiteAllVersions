@@ -19,38 +19,38 @@
 #include "ports/pc386/multiboot1.h"
 
 extern const int CMM1map[16];
-extern const mb1_info_t *pc386_multiboot_info;
+extern const mb1_info_t * pc386_multiboot_info;
 extern uint16_t pc386_bios_video_int10(uint16_t ax, uint16_t bx, uint16_t cx,
                                        uint16_t dx, uint16_t es, uint16_t di);
 
-#define VGA_WIDTH       320
-#define VGA_HEIGHT      200
-#define VGA_MAX_WIDTH   1024
-#define VGA_MAX_HEIGHT  768
-#define VGA_MAX_PIXELS  (VGA_MAX_WIDTH * VGA_MAX_HEIGHT)
+#define VGA_WIDTH 320
+#define VGA_HEIGHT 200
+#define VGA_MAX_WIDTH 1024
+#define VGA_MAX_HEIGHT 768
+#define VGA_MAX_PIXELS (VGA_MAX_WIDTH * VGA_MAX_HEIGHT)
 #define VBE_MODE_INFO_ADDR 0x5400u
 
 #define VGA_DAC_WRITE_INDEX 0x3C8
-#define VGA_DAC_DATA        0x3C9
-#define BGA_INDEX_PORT      0x01CE
-#define BGA_DATA_PORT       0x01CF
-#define BGA_INDEX_ID        0
-#define BGA_INDEX_XRES      1
-#define BGA_INDEX_YRES      2
-#define BGA_INDEX_BPP       3
-#define BGA_INDEX_ENABLE    4
-#define BGA_INDEX_BANK      5
+#define VGA_DAC_DATA 0x3C9
+#define BGA_INDEX_PORT 0x01CE
+#define BGA_DATA_PORT 0x01CF
+#define BGA_INDEX_ID 0
+#define BGA_INDEX_XRES 1
+#define BGA_INDEX_YRES 2
+#define BGA_INDEX_BPP 3
+#define BGA_INDEX_ENABLE 4
+#define BGA_INDEX_BANK 5
 #define BGA_INDEX_VIRT_WIDTH 6
 #define BGA_INDEX_VIRT_HEIGHT 7
-#define BGA_INDEX_X_OFFSET  8
-#define BGA_INDEX_Y_OFFSET  9
-#define BGA_ID_MIN          0xB0C0
-#define BGA_ID_MAX          0xB0C5
-#define BGA_ENABLED         0x0001
-#define BGA_LFB_ENABLED     0x0040
+#define BGA_INDEX_X_OFFSET 8
+#define BGA_INDEX_Y_OFFSET 9
+#define BGA_ID_MIN 0xB0C0
+#define BGA_ID_MAX 0xB0C5
+#define BGA_ENABLED 0x0001
+#define BGA_LFB_ENABLED 0x0040
 
-static volatile uint8_t *const vga_fb = (volatile uint8_t *)0xA0000u;
-static volatile uint8_t *fb;
+static volatile uint8_t * const vga_fb = (volatile uint8_t *)0xA0000u;
+static volatile uint8_t * fb;
 static uint8_t shadow[VGA_MAX_PIXELS];
 static uint8_t fastgfx_back[VGA_MAX_PIXELS];
 static bool linear_fb_available;
@@ -72,7 +72,7 @@ static uint32_t bank_current = UINT32_MAX;
  * Logical fb offsets are translated to physical VRAM via this value so
  * scrolling becomes a CRTC register update instead of a full screen blit. */
 static uint32_t fb_start_byte = 0;
-static uint32_t fb_vram_size = 524288u;  /* GD5420 = 512KB */
+static uint32_t fb_vram_size = 524288u; /* GD5420 = 512KB */
 static bool fb_hw_scroll_capable = false;
 static int vga_x_offset;
 static int vga_y_offset;
@@ -125,26 +125,26 @@ typedef struct {
     Pc386VideoBackend backend;
     uint16_t bios_mode;
     uint16_t fallback_bios_mode;
-    const char *name;
+    const char * name;
 } Pc386VideoMode;
 
 static VesaModeInfo vesa_mode_cache[4];
 static Pc386SvgaBackend svga_backend = PC386_SVGA_VESA;
 
 static const Pc386VideoMode pc386_modes[] = {
-    {1,  320, 200,  320, 200,   0,  0, 1, PC386_VIDEO_VGA13H, 0x0013, 0x0000, "320x200"},
-    {2,  640, 480,  640, 480,   0,  0, 1, PC386_VIDEO_SVGA,   0x0101, 0x0000, "640x480"},
-    {3,  720, 400,  720, 400,   0,  0, 1, PC386_VIDEO_SVGA,   0x0103, 0x0000, "720x400"},
-    {4,  320, 320,  720, 400, 200, 40, 1, PC386_VIDEO_SVGA,   0x0103, 0x0000, "320x320"},
-    {5,  480, 480,  640, 480,  80,  0, 1, PC386_VIDEO_SVGA,   0x0101, 0x0000, "480x480"},
-    {6,  320, 320, 1024, 768, 192, 64, 2, PC386_VIDEO_SVGA,   0x0104, 0x0000, "320x320x2"},
+    {1, 320, 200, 320, 200, 0, 0, 1, PC386_VIDEO_VGA13H, 0x0013, 0x0000, "320x200"},
+    {2, 640, 480, 640, 480, 0, 0, 1, PC386_VIDEO_SVGA, 0x0101, 0x0000, "640x480"},
+    {3, 720, 400, 720, 400, 0, 0, 1, PC386_VIDEO_SVGA, 0x0103, 0x0000, "720x400"},
+    {4, 320, 320, 720, 400, 200, 40, 1, PC386_VIDEO_SVGA, 0x0103, 0x0000, "320x320"},
+    {5, 480, 480, 640, 480, 80, 0, 1, PC386_VIDEO_SVGA, 0x0101, 0x0000, "480x480"},
+    {6, 320, 320, 1024, 768, 192, 64, 2, PC386_VIDEO_SVGA, 0x0104, 0x0000, "320x320x2"},
 };
 
 static uint16_t vbe_last_mode;
 static uint16_t vbe_last_lfb_status;
 static uint16_t vbe_last_banked_status;
 static uint16_t vbe_last_bank_status;
-static const char *vbe_last_failure = "none";
+static const char * vbe_last_failure = "none";
 static uint16_t cirrus_last_native_set_ax;
 static uint16_t cirrus_last_native_get_ax;
 static bool cirrus_last_native_used;
@@ -179,7 +179,7 @@ static inline uint8_t inb(uint16_t port) {
     return val;
 }
 
-static void vga_write_regs(const uint8_t *regs) {
+static void vga_write_regs(const uint8_t * regs) {
     outb(0x3C2, *regs++);
 
     for (uint8_t i = 0; i < 5; i++) {
@@ -215,16 +215,66 @@ static void vga_write_regs(const uint8_t *regs) {
 static void vga_program_mode13h_registers(void) {
     static const uint8_t mode13h_regs[] = {
         0x63,
-        0x03, 0x01, 0x0F, 0x00, 0x0E,
-        0x5F, 0x4F, 0x50, 0x82, 0x54, 0x80, 0xBF, 0x1F,
-        0x00, 0x41, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x9C, 0x0E, 0x8F, 0x28, 0x40, 0x96, 0xB9, 0xA3,
+        0x03,
+        0x01,
+        0x0F,
+        0x00,
+        0x0E,
+        0x5F,
+        0x4F,
+        0x50,
+        0x82,
+        0x54,
+        0x80,
+        0xBF,
+        0x1F,
+        0x00,
+        0x41,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x9C,
+        0x0E,
+        0x8F,
+        0x28,
+        0x40,
+        0x96,
+        0xB9,
+        0xA3,
         0xFF,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x40, 0x05, 0x0F,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x40,
+        0x05,
+        0x0F,
         0xFF,
-        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
-        0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
-        0x41, 0x00, 0x0F, 0x00, 0x00,
+        0x00,
+        0x01,
+        0x02,
+        0x03,
+        0x04,
+        0x05,
+        0x06,
+        0x07,
+        0x08,
+        0x09,
+        0x0A,
+        0x0B,
+        0x0C,
+        0x0D,
+        0x0E,
+        0x0F,
+        0x41,
+        0x00,
+        0x0F,
+        0x00,
+        0x00,
     };
     vga_write_regs(mode13h_regs);
 }
@@ -264,17 +314,17 @@ static void vga_load_cmm1_palette(void) {
 }
 
 static uint16_t vbe_read16(int off) {
-    volatile uint8_t *p = (volatile uint8_t *)(uintptr_t)(VBE_MODE_INFO_ADDR + (uint32_t)off);
+    volatile uint8_t * p = (volatile uint8_t *)(uintptr_t)(VBE_MODE_INFO_ADDR + (uint32_t)off);
     return (uint16_t)p[0] | ((uint16_t)p[1] << 8);
 }
 
 static uint32_t vbe_read32(int off) {
-    volatile uint8_t *p = (volatile uint8_t *)(uintptr_t)(VBE_MODE_INFO_ADDR + (uint32_t)off);
+    volatile uint8_t * p = (volatile uint8_t *)(uintptr_t)(VBE_MODE_INFO_ADDR + (uint32_t)off);
     return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
 }
 
-static bool vesa_probe_mode_info(uint16_t bios_mode, VesaModeInfo *out) {
-    volatile uint8_t *info = (volatile uint8_t *)(uintptr_t)VBE_MODE_INFO_ADDR;
+static bool vesa_probe_mode_info(uint16_t bios_mode, VesaModeInfo * out) {
+    volatile uint8_t * info = (volatile uint8_t *)(uintptr_t)VBE_MODE_INFO_ADDR;
     for (int i = 0; i < 256; i++) info[i] = 0;
 
     uint16_t status = pc386_bios_video_int10(0x4F01, 0, bios_mode, 0, 0, VBE_MODE_INFO_ADDR);
@@ -312,8 +362,8 @@ static bool vesa_probe_mode_info(uint16_t bios_mode, VesaModeInfo *out) {
     return true;
 }
 
-static const VesaModeInfo *vesa_get_mode_info(uint16_t bios_mode) {
-    VesaModeInfo *free_slot = NULL;
+static const VesaModeInfo * vesa_get_mode_info(uint16_t bios_mode) {
+    VesaModeInfo * free_slot = NULL;
     for (size_t i = 0; i < sizeof(vesa_mode_cache) / sizeof(vesa_mode_cache[0]); i++) {
         if (vesa_mode_cache[i].valid && vesa_mode_cache[i].bios_mode == bios_mode) {
             return &vesa_mode_cache[i];
@@ -329,7 +379,7 @@ static bool vesa_mode_supported(uint16_t bios_mode) {
     return vesa_get_mode_info(bios_mode) != NULL;
 }
 
-static void vesa_apply_mode_info(const VesaModeInfo *info) {
+static void vesa_apply_mode_info(const VesaModeInfo * info) {
     fb = (volatile uint8_t *)(uintptr_t)info->framebuffer;
     fb_width = (int)info->width;
     fb_height = (int)info->height;
@@ -368,36 +418,36 @@ static uint32_t banked_window_offset(uint32_t offset) {
     return offset - banked_window_base(offset);
 }
 
-static void vram_write_bytes(volatile uint8_t *dst, const uint8_t *src, uint32_t len) {
+static void vram_write_bytes(volatile uint8_t * dst, const uint8_t * src, uint32_t len) {
     uint32_t dwords = len >> 2;
     uint32_t tail = len & 3u;
     if (dwords) {
-        __asm__ volatile ("rep movsl"
-            : "+D"(dst), "+S"(src), "+c"(dwords)
-            : : "memory");
+        __asm__ volatile("rep movsl"
+                         : "+D"(dst), "+S"(src), "+c"(dwords)
+                         : : "memory");
     }
     if (tail) {
-        __asm__ volatile ("rep movsb"
-            : "+D"(dst), "+S"(src), "+c"(tail)
-            : : "memory");
+        __asm__ volatile("rep movsb"
+                         : "+D"(dst), "+S"(src), "+c"(tail)
+                         : : "memory");
     }
 }
 
-static void vram_fill_bytes(volatile uint8_t *dst, uint8_t value, uint32_t len) {
+static void vram_fill_bytes(volatile uint8_t * dst, uint8_t value, uint32_t len) {
     uint32_t pattern = (uint32_t)value * 0x01010101u;
     uint32_t dwords = len >> 2;
     uint32_t tail = len & 3u;
     if (dwords) {
-        __asm__ volatile ("rep stosl"
-            : "+D"(dst), "+c"(dwords)
-            : "a"(pattern)
-            : "memory");
+        __asm__ volatile("rep stosl"
+                         : "+D"(dst), "+c"(dwords)
+                         : "a"(pattern)
+                         : "memory");
     }
     if (tail) {
-        __asm__ volatile ("rep stosb"
-            : "+D"(dst), "+c"(tail)
-            : "a"((uint32_t)value)
-            : "memory");
+        __asm__ volatile("rep stosb"
+                         : "+D"(dst), "+c"(tail)
+                         : "a"((uint32_t)value)
+                         : "memory");
     }
 }
 
@@ -414,11 +464,13 @@ static void cirrus_set_start_address_bytes(uint32_t byte_offset) {
      * enough for the no-wrap scroll range of modes 2 (max 217 KB) and 3
      * (max 236 KB). Cirrus CR1B[0,2,3] extensions are not needed here. */
     uint32_t addr_dwords = byte_offset >> 2;
-    outb(0x3D4, 0x0D); outb(0x3D5, (uint8_t)(addr_dwords & 0xFFu));
-    outb(0x3D4, 0x0C); outb(0x3D5, (uint8_t)((addr_dwords >> 8) & 0xFFu));
+    outb(0x3D4, 0x0D);
+    outb(0x3D5, (uint8_t)(addr_dwords & 0xFFu));
+    outb(0x3D4, 0x0C);
+    outb(0x3D5, (uint8_t)((addr_dwords >> 8) & 0xFFu));
 }
 
-static volatile uint8_t *banked_ptr(uint32_t offset) {
+static volatile uint8_t * banked_ptr(uint32_t offset) {
     offset = fb_offset_logical_to_phys(offset);
     uint32_t bank = banked_bank_for_offset(offset);
     uint32_t window_off = banked_window_offset(offset);
@@ -434,12 +486,12 @@ static volatile uint8_t *banked_ptr(uint32_t offset) {
     return fb + window_off;
 }
 
-static bool banked_write_bytes(uint32_t offset, const uint8_t *src, uint32_t len) {
+static bool banked_write_bytes(uint32_t offset, const uint8_t * src, uint32_t len) {
     while (len != 0) {
         uint32_t window_off = banked_window_offset(offset);
         uint32_t chunk = bank_window_bytes - window_off;
         if (chunk > len) chunk = len;
-        volatile uint8_t *dst = banked_ptr(offset);
+        volatile uint8_t * dst = banked_ptr(offset);
         if (dst == NULL) return false;
         vram_write_bytes(dst, src, chunk);
         offset += chunk;
@@ -454,7 +506,7 @@ static bool banked_fill_bytes(uint32_t offset, uint8_t value, uint32_t len) {
         uint32_t window_off = banked_window_offset(offset);
         uint32_t chunk = bank_window_bytes - window_off;
         if (chunk > len) chunk = len;
-        volatile uint8_t *dst = banked_ptr(offset);
+        volatile uint8_t * dst = banked_ptr(offset);
         if (dst == NULL) return false;
         vram_fill_bytes(dst, value, chunk);
         offset += chunk;
@@ -489,7 +541,7 @@ static void print_hex32(uint32_t value) {
 }
 
 static void vesa_print_mode_debug(uint16_t bios_mode) {
-    const VesaModeInfo *info = vesa_get_mode_info(bios_mode);
+    const VesaModeInfo * info = vesa_get_mode_info(bios_mode);
     MMPrintString("VBE ");
     print_hex16(bios_mode);
     if (info == NULL) {
@@ -575,7 +627,7 @@ static void cirrus_print_debug(void) {
     MMPrintString("\r\n");
 }
 
-static bool bga_set_mode(const VesaModeInfo *info) {
+static bool bga_set_mode(const VesaModeInfo * info) {
     if (!bga_available()) return false;
     if (info->width == 0 || info->height == 0 || info->bpp == 0) return false;
     bga_write(BGA_INDEX_ENABLE, 0);
@@ -599,7 +651,7 @@ static bool vesa_set_bios_mode(uint16_t bios_mode) {
     vbe_last_banked_status = 0;
     vbe_last_bank_status = 0;
     vbe_last_failure = "none";
-    const VesaModeInfo *info = vesa_get_mode_info(bios_mode);
+    const VesaModeInfo * info = vesa_get_mode_info(bios_mode);
     if (info == NULL) {
         vbe_last_failure = "4F01 probe";
         return false;
@@ -662,7 +714,7 @@ static bool cirrus_mode_supported(uint16_t bios_mode) {
 }
 
 static bool cirrus_set_mode(uint16_t bios_mode) {
-    const CirrusGd542xModeInfo *info = cirrus_gd542x_mode_info(bios_mode);
+    const CirrusGd542xModeInfo * info = cirrus_gd542x_mode_info(bios_mode);
     if (info == NULL) return false;
     cirrus_last_native_used = false;
     cirrus_last_native_set_ax = 0;
@@ -756,7 +808,7 @@ static uint32_t pack_linear_pixel(uint32_t rgb) {
 
 static void vga_write_planar_pixel(int x, int y, uint8_t colour) {
     uint32_t off = (uint32_t)((size_t)y * (size_t)fb_pitch + (size_t)(x >> 3));
-    volatile uint8_t *p = banked_fb_available ? banked_ptr(off) : fb + off;
+    volatile uint8_t * p = banked_fb_available ? banked_ptr(off) : fb + off;
     if (p == NULL) return;
     uint8_t bit = (uint8_t)(0x80u >> (x & 7));
     outb(0x3C4, 0x02);
@@ -790,7 +842,7 @@ static void hw_put_pixel_xy(int x, int y, uint32_t rgb) {
     }
 
     uint32_t off = (uint32_t)((size_t)y * (size_t)fb_pitch + (size_t)x * (size_t)((fb_bpp + 7) / 8));
-    volatile uint8_t *p = banked_fb_available ? banked_ptr(off) : fb + off;
+    volatile uint8_t * p = banked_fb_available ? banked_ptr(off) : fb + off;
     if (p == NULL) return;
     uint32_t px = pack_linear_pixel(rgb);
     if (fb_bpp == 8) {
@@ -816,7 +868,7 @@ static void hw_put_pixel_index_xy(int x, int y, uint8_t idx) {
     }
     if (fb_bpp == 8) {
         uint32_t off = (uint32_t)((size_t)y * (size_t)fb_pitch + (size_t)x);
-        volatile uint8_t *p = banked_fb_available ? banked_ptr(off) : fb + off;
+        volatile uint8_t * p = banked_fb_available ? banked_ptr(off) : fb + off;
         if (p != NULL) *p = idx;
         return;
     }
@@ -831,7 +883,7 @@ static inline size_t visible_pixels(void) {
     return (size_t)vga_width * (size_t)vga_height;
 }
 
-static inline uint8_t *draw_target(void) {
+static inline uint8_t * draw_target(void) {
     return fastgfx_active ? fastgfx_back : shadow;
 }
 
@@ -870,7 +922,7 @@ static void present_shadow(void) {
     if (banked_fb_available && !planar_fb_available && fb_bpp == 8 && vga_scale == 1) {
         for (int y = 0; y < vga_height; y++) {
             uint32_t dst = (uint32_t)((size_t)(vga_y_offset + y) * (size_t)fb_pitch + (size_t)vga_x_offset);
-            const uint8_t *src = shadow + (size_t)y * (size_t)vga_width;
+            const uint8_t * src = shadow + (size_t)y * (size_t)vga_width;
             if (!banked_write_bytes(dst, src, (uint32_t)vga_width)) break;
         }
         return;
@@ -918,7 +970,7 @@ static void clear_physical_framebuffer(uint32_t rgb) {
     }
 }
 
-static void normalize_rect(int *x1, int *y1, int *x2, int *y2) {
+static void normalize_rect(int * x1, int * y1, int * x2, int * y2) {
     if (*x2 < *x1) {
         int t = *x1;
         *x1 = *x2;
@@ -931,7 +983,7 @@ static void normalize_rect(int *x1, int *y1, int *x2, int *y2) {
     }
 }
 
-static bool clip_rect(int *x1, int *y1, int *x2, int *y2) {
+static bool clip_rect(int * x1, int * y1, int * x2, int * y2) {
     normalize_rect(x1, y1, x2, y2);
     if (*x2 < 0 || *y2 < 0 || *x1 >= vga_width || *y1 >= vga_height) return false;
     if (*x1 < 0) *x1 = 0;
@@ -955,7 +1007,7 @@ static void mode13h_draw_rectangle(int x1, int y1, int x2, int y2, int c) {
      * so modes 4/5 don't need the byte-at-a-time fallback. */
     if (vga_scale == 1) {
         uint8_t idx = rgb_to_332(rgb);
-        uint8_t *target = draw_target();
+        uint8_t * target = draw_target();
         for (int y = y1; y <= y2; y++) {
             size_t off = (size_t)y * (size_t)vga_width + (size_t)x1;
             size_t len = (size_t)(x2 - x1 + 1);
@@ -982,7 +1034,7 @@ static void mode13h_draw_rectangle(int x1, int y1, int x2, int y2, int c) {
 
 static void mode13h_draw_bitmap(int x1, int y1, int width, int height,
                                 int scale, int fc, int bc,
-                                unsigned char *bitmap) {
+                                unsigned char * bitmap) {
     if (x1 >= vga_width || y1 >= vga_height ||
         x1 + width * scale < 0 || y1 + height * scale < 0) {
         return;
@@ -1000,11 +1052,12 @@ static void mode13h_draw_bitmap(int x1, int y1, int width, int height,
                 int clip_x0 = x1 < 0 ? -x1 : 0;
                 int clip_x1 = x1 + row_width > vga_width ? vga_width - x1 : row_width;
                 if (clip_x0 >= clip_x1) continue;
-                uint8_t *shadow_row = shadow + (size_t)dst_y * (size_t)vga_width;
+                uint8_t * shadow_row = shadow + (size_t)dst_y * (size_t)vga_width;
                 for (int sx = clip_x0; sx < clip_x1; sx++) {
                     int k = sx / scale;
                     int bit = (bitmap[((i * width) + k) / 8] >>
-                               (((height * width) - ((i * width) + k) - 1) % 8)) & 1;
+                               (((height * width) - ((i * width) + k) - 1) % 8)) &
+                              1;
                     int colour = bit ? fc : bc;
                     if (colour < 0) {
                         row[sx - clip_x0] = shadow_row[(size_t)(x1 + sx)];
@@ -1026,7 +1079,8 @@ static void mode13h_draw_bitmap(int x1, int y1, int width, int height,
         for (int j = 0; j < scale; j++) {
             for (int k = 0; k < width; k++) {
                 int bit = (bitmap[((i * width) + k) / 8] >>
-                           (((height * width) - ((i * width) + k) - 1) % 8)) & 1;
+                           (((height * width) - ((i * width) + k) - 1) % 8)) &
+                          1;
                 int colour = bit ? fc : bc;
                 if (colour < 0) continue;
                 for (int m = 0; m < scale; m++) {
@@ -1047,7 +1101,7 @@ static void mode13h_scroll_lcd(int lines) {
     uint8_t blank = rgb_to_332((uint32_t)PromptBC & 0x00FFFFFFu);
     if (lines > 0) {
         size_t keep = (size_t)(vga_height - lines) * (size_t)vga_width;
-        uint8_t *target = draw_target();
+        uint8_t * target = draw_target();
         memmove(target, target + (size_t)lines * (size_t)vga_width, keep);
         memset(target + keep, blank, (size_t)lines * (size_t)vga_width);
         if (pure_vga13h_frontbuffer()) {
@@ -1067,7 +1121,7 @@ static void mode13h_scroll_lcd(int lines) {
                 fb_start_byte = 0;
                 for (int y = 0; y < fb_height; y++) {
                     uint32_t dst = (uint32_t)y * (uint32_t)fb_pitch;
-                    const uint8_t *src = shadow + (size_t)y * (size_t)vga_width;
+                    const uint8_t * src = shadow + (size_t)y * (size_t)vga_width;
                     (void)banked_write_bytes(dst, src, (uint32_t)vga_width);
                 }
                 cirrus_set_start_address_bytes(0);
@@ -1085,7 +1139,7 @@ static void mode13h_scroll_lcd(int lines) {
     } else {
         lines = -lines;
         size_t keep = (size_t)(vga_height - lines) * (size_t)vga_width;
-        uint8_t *target = draw_target();
+        uint8_t * target = draw_target();
         memmove(target + (size_t)lines * (size_t)vga_width, target, keep);
         memset(target, blank, (size_t)lines * (size_t)vga_width);
         if (pure_vga13h_frontbuffer()) {
@@ -1099,7 +1153,7 @@ static void mode13h_scroll_lcd(int lines) {
     }
 }
 
-static void mode13h_draw_buffer(int x1, int y1, int x2, int y2, unsigned char *p) {
+static void mode13h_draw_buffer(int x1, int y1, int x2, int y2, unsigned char * p) {
     normalize_rect(&x1, &y1, &x2, &y2);
     if (banked_fb_available && !planar_fb_available && fb_bpp == 8 && !fastgfx_active &&
         vga_scale == 1) {
@@ -1141,7 +1195,7 @@ static void mode13h_draw_buffer(int x1, int y1, int x2, int y2, unsigned char *p
     }
 }
 
-static void mode13h_read_buffer(int x1, int y1, int x2, int y2, unsigned char *p) {
+static void mode13h_read_buffer(int x1, int y1, int x2, int y2, unsigned char * p) {
     normalize_rect(&x1, &y1, &x2, &y2);
     for (int y = y1; y <= y2; y++) {
         for (int x = x1; x <= x2; x++) {
@@ -1154,7 +1208,7 @@ static void mode13h_read_buffer(int x1, int y1, int x2, int y2, unsigned char *p
 }
 
 static void mode13h_draw_buffer_fast(int x1, int y1, int x2, int y2,
-                                     int blank, unsigned char *p) {
+                                     int blank, unsigned char * p) {
     normalize_rect(&x1, &y1, &x2, &y2);
     int toggle = 0;
     if (banked_fb_available && !planar_fb_available && fb_bpp == 8 && !fastgfx_active &&
@@ -1166,7 +1220,7 @@ static void mode13h_draw_buffer_fast(int x1, int y1, int x2, int y2,
             int clip_x1 = rect_width;
             if (x1 + clip_x1 > vga_width) clip_x1 = vga_width - x1;
             bool row_visible = (y >= 0 && y < vga_height && clip_x0 < clip_x1);
-            uint8_t *shadow_row = row_visible ? shadow + (size_t)y * (size_t)vga_width : NULL;
+            uint8_t * shadow_row = row_visible ? shadow + (size_t)y * (size_t)vga_width : NULL;
             for (int dx = 0; dx < rect_width; dx++) {
                 uint8_t packed = *p;
                 uint8_t nibble = toggle ? (uint8_t)(packed >> 4) : (uint8_t)(packed & 0x0F);
@@ -1206,7 +1260,7 @@ static void mode13h_draw_buffer_fast(int x1, int y1, int x2, int y2,
     }
 }
 
-static void mode13h_read_buffer_fast(int x1, int y1, int x2, int y2, unsigned char *p) {
+static void mode13h_read_buffer_fast(int x1, int y1, int x2, int y2, unsigned char * p) {
     normalize_rect(&x1, &y1, &x2, &y2);
     int toggle = 0;
     for (int y = y1; y <= y2; y++) {
@@ -1224,18 +1278,18 @@ static void mode13h_read_buffer_fast(int x1, int y1, int x2, int y2, unsigned ch
 
 uint32_t vga_mode13h_get_pixel(int x, int y) {
     if (x < 0 || y < 0 || x >= vga_width || y >= vga_height) return 0;
-    uint8_t *target = draw_target();
+    uint8_t * target = draw_target();
     return rgb_from_332(target[(size_t)y * (size_t)vga_width + (size_t)x]);
 }
 
-static const Pc386VideoMode *find_mode(int mode) {
+static const Pc386VideoMode * find_mode(int mode) {
     for (size_t i = 0; i < sizeof(pc386_modes) / sizeof(pc386_modes[0]); i++) {
         if (pc386_modes[i].mode == mode) return &pc386_modes[i];
     }
     return NULL;
 }
 
-static bool mode_fits(const Pc386VideoMode *m) {
+static bool mode_fits(const Pc386VideoMode * m) {
     if (m->backend == PC386_VIDEO_VGA13H) return true;
 #ifdef PC386_NO_BIOS_VIDEO
     return false;
@@ -1249,7 +1303,7 @@ static bool mode_fits(const Pc386VideoMode *m) {
 #endif
 }
 
-static uint16_t select_mode_bios_mode(const Pc386VideoMode *m) {
+static uint16_t select_mode_bios_mode(const Pc386VideoMode * m) {
     if (m->backend == PC386_VIDEO_VGA13H) return m->bios_mode;
     if (svga_backend == PC386_SVGA_CIRRUS) {
         if (cirrus_mode_supported(m->bios_mode)) return m->bios_mode;
@@ -1266,7 +1320,7 @@ static uint16_t select_mode_bios_mode(const Pc386VideoMode *m) {
 }
 
 void vga_mode13h_set_mode(int mode, int clear) {
-    const Pc386VideoMode *m = find_mode(mode);
+    const Pc386VideoMode * m = find_mode(mode);
     if (m == NULL) error("Invalid mode");
     if (!mode_fits(m)) error("Mode not available");
 
@@ -1335,8 +1389,8 @@ void vga_mode13h_set_mode(int mode, int clear) {
      * qualify; mode 4/5 letterbox and mode 1 VGA13h do not. */
     fb_start_byte = 0;
     fb_hw_scroll_capable = banked_fb_available && !planar_fb_available && fb_bpp == 8 &&
-                          vga_scale == 1 && vga_x_offset == 0 && vga_y_offset == 0 &&
-                          vga_width == fb_width && vga_height == fb_height;
+                           vga_scale == 1 && vga_x_offset == 0 && vga_y_offset == 0 &&
+                           vga_width == fb_width && vga_height == fb_height;
     if (fb_hw_scroll_capable) cirrus_set_start_address_bytes(0);
     if (clear) {
         memset(shadow, 0, visible_pixels());

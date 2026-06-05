@@ -19,8 +19,8 @@
 #undef PinRead
 #endif
 
-int pc386_parse_lpt_pin(unsigned char *arg) {
-    unsigned char *p = arg;
+int pc386_parse_lpt_pin(unsigned char * arg) {
+    unsigned char * p = arg;
     skipspace(p);
     if ((p[0] == 'G' || p[0] == 'g') && (p[1] == 'P' || p[1] == 'p'))
         p += 2;
@@ -73,7 +73,7 @@ int codemap(int pin) {
     return pin;
 }
 
-int codecheck(unsigned char *line) {
+int codecheck(unsigned char * line) {
     if ((line[0] == 'G' || line[0] == 'g') && (line[1] == 'P' || line[1] == 'p'))
         return 0;
     return 4;
@@ -87,10 +87,17 @@ void ExtCfg(int pin, int cfg, int option) {
     if (IsInvalidPin(pin)) error("Invalid pin");
     if (option) error("Unsupported SETPIN option");
     switch (cfg) {
-        case EXT_NOT_CONFIG: vm_sys_pin_setpin(pin, VM_PIN_MODE_OFF,  VM_PIN_OPT_NONE); break;
-        case EXT_DIG_IN:     vm_sys_pin_setpin(pin, VM_PIN_MODE_DIN,  VM_PIN_OPT_NONE); break;
-        case EXT_DIG_OUT:    vm_sys_pin_setpin(pin, VM_PIN_MODE_DOUT, VM_PIN_OPT_NONE); break;
-        default: error("Unsupported SETPIN mode");
+    case EXT_NOT_CONFIG:
+        vm_sys_pin_setpin(pin, VM_PIN_MODE_OFF, VM_PIN_OPT_NONE);
+        break;
+    case EXT_DIG_IN:
+        vm_sys_pin_setpin(pin, VM_PIN_MODE_DIN, VM_PIN_OPT_NONE);
+        break;
+    case EXT_DIG_OUT:
+        vm_sys_pin_setpin(pin, VM_PIN_MODE_DOUT, VM_PIN_OPT_NONE);
+        break;
+    default:
+        error("Unsupported SETPIN mode");
     }
     ExtCurrentConfig[pin] = cfg;
 }
@@ -101,10 +108,16 @@ void ExtSet(int pin, int val) {
         ExtCurrentConfig[pin] = EXT_DIG_OUT;
 }
 
-int64_t ExtInp(int pin) { return vm_sys_pin_read(pin); }
+int64_t ExtInp(int pin) {
+    return vm_sys_pin_read(pin);
+}
 
-int PinRead(int pin) { return (int)ExtInp(pin); }
-int GetPinBit(int pin) { return (int)ExtInp(pin); }
+int PinRead(int pin) {
+    return (int)ExtInp(pin);
+}
+int GetPinBit(int pin) {
+    return (int)ExtInp(pin);
+}
 
 volatile unsigned int GetPinStatus(int pin) {
     if (IsInvalidPin(pin)) return 0;
@@ -114,12 +127,27 @@ volatile unsigned int GetPinStatus(int pin) {
 void PinSetBit(int pin, unsigned int offset) {
     if (IsInvalidPin(pin)) error("Invalid pin");
     switch ((int)offset) {
-        case LATSET:  ExtSet(pin, 1); break;
-        case LATCLR:  ExtSet(pin, 0); break;
-        case LATINV:  hal_pin_toggle((uint32_t)pin); break;
-        case TRISSET: ExtCfg(pin, EXT_DIG_IN, 0); break;
-        case TRISCLR: ExtCfg(pin, EXT_DIG_OUT, 0); break;
-        case CNPUSET: case CNPUCLR: case CNPDSET: case CNPDCLR: break;
-        default: error("Unsupported pin operation");
+    case LATSET:
+        ExtSet(pin, 1);
+        break;
+    case LATCLR:
+        ExtSet(pin, 0);
+        break;
+    case LATINV:
+        hal_pin_toggle((uint32_t)pin);
+        break;
+    case TRISSET:
+        ExtCfg(pin, EXT_DIG_IN, 0);
+        break;
+    case TRISCLR:
+        ExtCfg(pin, EXT_DIG_OUT, 0);
+        break;
+    case CNPUSET:
+    case CNPUCLR:
+    case CNPDSET:
+    case CNPDCLR:
+        break;
+    default:
+        error("Unsupported pin operation");
     }
 }

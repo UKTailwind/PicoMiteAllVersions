@@ -9,7 +9,7 @@
 
 #include "MMBasic_Includes.h"
 
-void hal_port_sprite_loadpng(unsigned char *p) {
+void hal_port_sprite_loadpng(unsigned char * p) {
     (void)p;
     error("LOADPNG not supported on this device");
 }

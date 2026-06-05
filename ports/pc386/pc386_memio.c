@@ -13,7 +13,7 @@
 #include "Hardware_Includes.h"
 
 void cmd_poke(void) {
-    unsigned char *p;
+    unsigned char * p;
     getargs(&cmdline, 5, (unsigned char *)",");
     if ((p = checkstring(argv[0], (unsigned char *)"BYTE"))) {
         if (argc != 3) error("Argument count");
@@ -53,9 +53,9 @@ void cmd_poke(void) {
         uint16_t port = (uint16_t)getinteger(p);
         uint32_t v = (uint32_t)getinteger(argv[2]);
         if (v > 0xFF) {
-            __asm__ volatile("outw %0, %1" :: "a"((uint16_t)v), "Nd"(port));
+            __asm__ volatile("outw %0, %1" ::"a"((uint16_t)v), "Nd"(port));
         } else {
-            __asm__ volatile("outb %0, %1" :: "a"((uint8_t)v), "Nd"(port));
+            __asm__ volatile("outb %0, %1" ::"a"((uint8_t)v), "Nd"(port));
         }
         return;
     }
@@ -63,44 +63,52 @@ void cmd_poke(void) {
 }
 
 void fun_peek(void) {
-    unsigned char *p;
+    unsigned char * p;
     getargs(&ep, 3, (unsigned char *)",");
     if ((p = checkstring(argv[0], (unsigned char *)"INT8")) ||
         (p = checkstring(argv[0], (unsigned char *)"BYTE"))) {
         if (argc != 1) error("Syntax");
         iret = *(uint8_t *)(uintptr_t)getinteger(p);
-        targ = T_INT; return;
+        targ = T_INT;
+        return;
     }
     if ((p = checkstring(argv[0], (unsigned char *)"SHORT"))) {
         if (argc != 1) error("Syntax");
         iret = *(uint16_t *)((uintptr_t)getinteger(p) & ~(uintptr_t)1);
-        targ = T_INT; return;
+        targ = T_INT;
+        return;
     }
     if ((p = checkstring(argv[0], (unsigned char *)"WORD"))) {
         if (argc != 1) error("Syntax");
         iret = *(uint32_t *)((uintptr_t)getinteger(p) & ~(uintptr_t)3);
-        targ = T_INT; return;
+        targ = T_INT;
+        return;
     }
     if ((p = checkstring(argv[0], (unsigned char *)"INTEGER"))) {
         if (argc != 1) error("Syntax");
         iret = *(uint64_t *)((uintptr_t)getinteger(p) & ~(uintptr_t)7);
-        targ = T_INT; return;
+        targ = T_INT;
+        return;
     }
     if ((p = checkstring(argv[0], (unsigned char *)"FLOAT"))) {
         if (argc != 1) error("Syntax");
         fret = *(MMFLOAT *)((uintptr_t)getinteger(p) & ~(uintptr_t)7);
-        targ = T_NBR; return;
+        targ = T_NBR;
+        return;
     }
     if ((p = checkstring(argv[0], (unsigned char *)"PORT"))) {
         if (argc != 1) error("Syntax");
         uint16_t port = (uint16_t)getinteger(p);
         uint8_t v;
         __asm__ volatile("inb %1, %0" : "=a"(v) : "Nd"(port));
-        iret = v; targ = T_INT; return;
+        iret = v;
+        targ = T_INT;
+        return;
     }
     if (argc == 1) {
         iret = *(uint8_t *)(uintptr_t)getinteger(argv[0]);
-        targ = T_INT; return;
+        targ = T_INT;
+        return;
     }
     error("Syntax");
 }

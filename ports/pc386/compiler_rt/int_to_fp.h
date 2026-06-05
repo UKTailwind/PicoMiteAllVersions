@@ -19,22 +19,30 @@
 #if defined SRC_I64
 typedef int64_t src_t;
 typedef uint64_t usrc_t;
-static __inline int clzSrcT(usrc_t x) { return __builtin_clzll(x); }
+static __inline int clzSrcT(usrc_t x) {
+    return __builtin_clzll(x);
+}
 
 #elif defined SRC_U64
 typedef uint64_t src_t;
 typedef uint64_t usrc_t;
-static __inline int clzSrcT(usrc_t x) { return __builtin_clzll(x); }
+static __inline int clzSrcT(usrc_t x) {
+    return __builtin_clzll(x);
+}
 
 #elif defined SRC_I128
 typedef __int128_t src_t;
 typedef __uint128_t usrc_t;
-static __inline int clzSrcT(usrc_t x) { return __clzti2(x); }
+static __inline int clzSrcT(usrc_t x) {
+    return __clzti2(x);
+}
 
 #elif defined SRC_U128
 typedef __uint128_t src_t;
 typedef __uint128_t usrc_t;
-static __inline int clzSrcT(usrc_t x) { return __clzti2(x); }
+static __inline int clzSrcT(usrc_t x) {
+    return __clzti2(x);
+}
 
 #else
 #error Source should be a handled integer type.
@@ -46,7 +54,7 @@ typedef uint32_t dst_rep_t;
 #define DST_REP_C UINT32_C
 
 enum {
-  dstSigBits = 23,
+    dstSigBits = 23,
 };
 
 #elif defined DST_DOUBLE
@@ -55,7 +63,7 @@ typedef uint64_t dst_rep_t;
 #define DST_REP_C UINT64_C
 
 enum {
-  dstSigBits = 52,
+    dstSigBits = 52,
 };
 
 #elif defined DST_QUAD
@@ -64,7 +72,7 @@ typedef __uint128_t dst_rep_t;
 #define DST_REP_C (__uint128_t)
 
 enum {
-  dstSigBits = 112,
+    dstSigBits = 112,
 };
 
 #else
@@ -72,11 +80,11 @@ enum {
 #endif
 
 static __inline dst_t dstFromRep(dst_rep_t x) {
-  const union {
-    dst_t f;
-    dst_rep_t i;
-  } rep = {.i = x};
-  return rep.f;
+    const union {
+        dst_t f;
+        dst_rep_t i;
+    } rep = {.i = x};
+    return rep.f;
 }
 
 #endif // INT_TO_FP_H

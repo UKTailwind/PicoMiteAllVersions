@@ -21,20 +21,20 @@
 #include "hardware/dma.h"
 
 /* --- VM-side merge / copy state ----------------------------------------- */
-static int       vm_fb_merge_running     = 0;
-static uint8_t   vm_fb_merge_colour      = 0;
-static uint32_t  vm_fb_merge_interval_us = 0;
-static uint8_t  *vm_fb_copy_src          = NULL;
-static int       vm_fb_copy_pending      = 0;
+static int vm_fb_merge_running = 0;
+static uint8_t vm_fb_merge_colour = 0;
+static uint32_t vm_fb_merge_interval_us = 0;
+static uint8_t * vm_fb_copy_src = NULL;
+static int vm_fb_copy_pending = 0;
 
 /* Shared scanline scratch for the merge + copy fallback paths. */
-static uint8_t  *vm_fb_linebuf           = NULL;
-static size_t   vm_fb_linebuf_bytes      = 0;
+static uint8_t * vm_fb_linebuf = NULL;
+static size_t vm_fb_linebuf_bytes = 0;
 
-static uint8_t *vm_fb_reserve_line(size_t bytes) {
+static uint8_t * vm_fb_reserve_line(size_t bytes) {
     if (bytes == 0) return NULL;
     if (vm_fb_linebuf != NULL && vm_fb_linebuf_bytes >= bytes) return vm_fb_linebuf;
-    uint8_t *p = (uint8_t *)BC_ALLOC(bytes);
+    uint8_t * p = (uint8_t *)BC_ALLOC(bytes);
     if (!p) error("NEM[gfx:scratch] want=%", (int)bytes);
     if (vm_fb_linebuf) BC_FREE(vm_fb_linebuf);
     vm_fb_linebuf = p;
@@ -43,7 +43,9 @@ static uint8_t *vm_fb_reserve_line(size_t bytes) {
 }
 
 /* --- Helpers ------------------------------------------------------------- */
-static size_t vm_fb_bytes(void) { return (size_t)HRes * (size_t)VRes / 2u; }
+static size_t vm_fb_bytes(void) {
+    return (size_t)HRes * (size_t)VRes / 2u;
+}
 
 static uint8_t vm_fb_rgb121(uint32_t c) {
     return (uint8_t)(((c & 0x800000u) >> 20) |
@@ -59,7 +61,7 @@ static void vm_fb_stop_merge(void) {
     vm_fb_merge_interval_us = 0;
 }
 
-static void vm_fb_copy_to_screen(uint8_t *src) {
+static void vm_fb_copy_to_screen(uint8_t * src) {
     if (src == NULL) return;
     copyframetoscreen(src, 0, HRes - 1, 0, VRes - 1, 0);
 }
@@ -73,9 +75,9 @@ static void vm_fb_complete_pending_copy(void) {
 
 static void vm_fb_merge_now(uint8_t transparent) {
     int stride;
-    uint8_t *linebuf;
-    uint8_t *src_layer;
-    uint8_t *src_frame;
+    uint8_t * linebuf;
+    uint8_t * src_layer;
+    uint8_t * src_frame;
     int y;
 
     if (LayerBuf == NULL || FrameBuf == NULL) return;
@@ -92,8 +94,8 @@ static void vm_fb_merge_now(uint8_t transparent) {
     src_frame = FrameBuf;
 
     for (y = 0; y < VRes; ++y) {
-        uint8_t *layer_row = src_layer + (size_t)y * (size_t)stride;
-        uint8_t *frame_row = src_frame + (size_t)y * (size_t)stride;
+        uint8_t * layer_row = src_layer + (size_t)y * (size_t)stride;
+        uint8_t * frame_row = src_frame + (size_t)y * (size_t)stride;
         memcpy(linebuf, frame_row, (size_t)stride);
         for (int x = 0; x < stride; ++x) {
             uint8_t layer = layer_row[x];
@@ -121,16 +123,25 @@ void hal_vm_framebuffer_shutdown_runtime(void) {
     if (WriteBuf == FrameBuf || WriteBuf == LayerBuf) restorepanel();
     if (ShadowBuf) BC_FREE(ShadowBuf);
     ShadowBuf = NULL;
-    if (fb_dma_chan >= 0) { dma_channel_unclaim(fb_dma_chan); fb_dma_chan = -1; }
+    if (fb_dma_chan >= 0) {
+        dma_channel_unclaim(fb_dma_chan);
+        fb_dma_chan = -1;
+    }
     if (FrameBuf) BC_FREE(FrameBuf);
     if (LayerBuf) BC_FREE(LayerBuf);
     FrameBuf = NULL;
     LayerBuf = NULL;
     WriteBuf = NULL;
-    if (vm_fb_linebuf) { BC_FREE(vm_fb_linebuf); vm_fb_linebuf = NULL; vm_fb_linebuf_bytes = 0; }
+    if (vm_fb_linebuf) {
+        BC_FREE(vm_fb_linebuf);
+        vm_fb_linebuf = NULL;
+        vm_fb_linebuf_bytes = 0;
+    }
 }
 
-void hal_vm_framebuffer_service(void) { vm_fb_complete_pending_copy(); }
+void hal_vm_framebuffer_service(void) {
+    vm_fb_complete_pending_copy();
+}
 
 void hal_vm_framebuffer_create(int fast) {
     size_t bytes;
@@ -162,22 +173,22 @@ void hal_vm_framebuffer_layer(int has_colour, int colour) {
 
 void hal_vm_framebuffer_write(char which) {
     switch (which) {
-        case BC_FB_TARGET_N:
-            if (mergerunning) error("Display in use for merged operation");
-            restorepanel();
-            return;
-        case BC_FB_TARGET_F:
-            if (FrameBuf == NULL) error("Frame buffer not created");
-            WriteBuf = FrameBuf;
-            setframebuffer();
-            return;
-        case BC_FB_TARGET_L:
-            if (LayerBuf == NULL) error("Layer buffer not created");
-            WriteBuf = LayerBuf;
-            setframebuffer();
-            return;
-        default:
-            error("Syntax");
+    case BC_FB_TARGET_N:
+        if (mergerunning) error("Display in use for merged operation");
+        restorepanel();
+        return;
+    case BC_FB_TARGET_F:
+        if (FrameBuf == NULL) error("Frame buffer not created");
+        WriteBuf = FrameBuf;
+        setframebuffer();
+        return;
+    case BC_FB_TARGET_L:
+        if (LayerBuf == NULL) error("Layer buffer not created");
+        WriteBuf = LayerBuf;
+        setframebuffer();
+        return;
+    default:
+        error("Syntax");
     }
 }
 
@@ -188,8 +199,14 @@ void hal_vm_framebuffer_close(char which) {
         if (WriteBuf == FrameBuf) restorepanel();
         BC_FREE(FrameBuf);
         FrameBuf = NULL;
-        if (ShadowBuf) { BC_FREE(ShadowBuf); ShadowBuf = NULL; }
-        if (fb_dma_chan >= 0) { dma_channel_unclaim(fb_dma_chan); fb_dma_chan = -1; }
+        if (ShadowBuf) {
+            BC_FREE(ShadowBuf);
+            ShadowBuf = NULL;
+        }
+        if (fb_dma_chan >= 0) {
+            dma_channel_unclaim(fb_dma_chan);
+            fb_dma_chan = -1;
+        }
     }
     if ((which == 'A' || which == BC_FB_TARGET_L) && LayerBuf != NULL) {
         if (WriteBuf == LayerBuf) restorepanel();
@@ -207,44 +224,44 @@ void hal_vm_framebuffer_merge(int has_colour, int colour, int mode, int has_rate
     if (has_rate && rate_ms < 0) error("Number out of bounds");
 
     switch (mode) {
-        case BC_FB_MERGE_MODE_NOW:
-            vm_fb_stop_merge();
-            vm_fb_merge_now(transparent);
-            return;
-        case BC_FB_MERGE_MODE_B:
-            vm_fb_stop_merge();
-            if (!(((Option.DISPLAY_TYPE > I2C_PANEL && Option.DISPLAY_TYPE < BufferedPanel) ||
-                   (Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL)
+    case BC_FB_MERGE_MODE_NOW:
+        vm_fb_stop_merge();
+        vm_fb_merge_now(transparent);
+        return;
+    case BC_FB_MERGE_MODE_B:
+        vm_fb_stop_merge();
+        if (!(((Option.DISPLAY_TYPE > I2C_PANEL && Option.DISPLAY_TYPE < BufferedPanel) ||
+               (Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL)
 #if defined(rp2350)
-                   || Option.DISPLAY_TYPE >= NEXTGEN
+               || Option.DISPLAY_TYPE >= NEXTGEN
 #endif
-                   ))) {
-                error("Not available on this display");
-            }
-            if (diskchecktimer < 200 && SPIatRisk) diskchecktimer = 200;
-            hal_display_merge_post_fill(transparent);
-            return;
-        case BC_FB_MERGE_MODE_R:
-            if (!(((Option.DISPLAY_TYPE > I2C_PANEL && Option.DISPLAY_TYPE < BufferedPanel) ||
-                   (Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL)))) {
-                error("Not available on this display");
-            }
-            if (WriteBuf == NULL) {
-                WriteBuf = FrameBuf;
-                setframebuffer();
-            }
-            vm_fb_stop_merge();
-            vm_fb_merge_running = 1;
-            vm_fb_merge_colour = transparent;
-            mergetimer = (uint32_t)(has_rate ? rate_ms : 0);
-            vm_fb_merge_interval_us = (uint32_t)(has_rate ? rate_ms * 1000 : 0);
-            hal_display_merge_post_bg(transparent, vm_fb_merge_interval_us);
-            return;
-        case BC_FB_MERGE_MODE_A:
-            vm_fb_stop_merge();
-            return;
-        default:
-            error("Syntax");
+               ))) {
+            error("Not available on this display");
+        }
+        if (diskchecktimer < 200 && SPIatRisk) diskchecktimer = 200;
+        hal_display_merge_post_fill(transparent);
+        return;
+    case BC_FB_MERGE_MODE_R:
+        if (!(((Option.DISPLAY_TYPE > I2C_PANEL && Option.DISPLAY_TYPE < BufferedPanel) ||
+               (Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL)))) {
+            error("Not available on this display");
+        }
+        if (WriteBuf == NULL) {
+            WriteBuf = FrameBuf;
+            setframebuffer();
+        }
+        vm_fb_stop_merge();
+        vm_fb_merge_running = 1;
+        vm_fb_merge_colour = transparent;
+        mergetimer = (uint32_t)(has_rate ? rate_ms : 0);
+        vm_fb_merge_interval_us = (uint32_t)(has_rate ? rate_ms * 1000 : 0);
+        hal_display_merge_post_bg(transparent, vm_fb_merge_interval_us);
+        return;
+    case BC_FB_MERGE_MODE_A:
+        vm_fb_stop_merge();
+        return;
+    default:
+        error("Syntax");
     }
 }
 
@@ -260,15 +277,16 @@ void hal_vm_framebuffer_wait(void) {
     if (Option.DISPLAY_TYPE == ILI9341 || Option.DISPLAY_TYPE == ST7796SP ||
         Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE == ST7789B ||
         Option.DISPLAY_TYPE == ILI9488 || Option.DISPLAY_TYPE == ILI9488P) {
-        while (GetLineILI9341() != 0) {}
+        while (GetLineILI9341() != 0) {
+        }
     }
 }
 
 void hal_vm_framebuffer_copy(char from, char to, int background) {
     int complex = 0;
-    unsigned char *saved = WriteBuf;
-    uint8_t *s = NULL;
-    uint8_t *d = NULL;
+    unsigned char * saved = WriteBuf;
+    uint8_t * s = NULL;
+    uint8_t * d = NULL;
 
     from = (char)toupper((unsigned char)from);
     to = (char)toupper((unsigned char)to);
@@ -283,7 +301,8 @@ void hal_vm_framebuffer_copy(char from, char to, int background) {
     } else if (from == BC_FB_TARGET_F) {
         if (FrameBuf == NULL) error("Frame buffer not created");
         s = FrameBuf;
-    } else error("Syntax");
+    } else
+        error("Syntax");
 
     if (to == BC_FB_TARGET_N) {
         complex = 2;
@@ -293,12 +312,13 @@ void hal_vm_framebuffer_copy(char from, char to, int background) {
     } else if (to == BC_FB_TARGET_F) {
         if (FrameBuf == NULL) error("Frame buffer not created");
         d = FrameBuf;
-    } else error("Syntax");
+    } else
+        error("Syntax");
 
     if (!complex) {
         if (d != s) memcpy(d, s, vm_fb_bytes());
     } else if (complex == 1) {
-        unsigned char *linebuf = vm_fb_reserve_line((size_t)HRes * 3u);
+        unsigned char * linebuf = vm_fb_reserve_line((size_t)HRes * 3u);
         int y;
         WriteBuf = d;
         setframebuffer();
@@ -319,7 +339,8 @@ void hal_vm_framebuffer_copy(char from, char to, int background) {
     }
 
     WriteBuf = saved;
-    if (WriteBuf == FrameBuf || WriteBuf == LayerBuf) setframebuffer();
-    else restorepanel();
+    if (WriteBuf == FrameBuf || WriteBuf == LayerBuf)
+        setframebuffer();
+    else
+        restorepanel();
 }
-

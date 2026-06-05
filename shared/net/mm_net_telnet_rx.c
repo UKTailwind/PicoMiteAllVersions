@@ -36,12 +36,12 @@
 #include "Hardware_Includes.h"
 
 /* RFC 854 commands referenced here. */
-#define IAC_BYTE   0xFFu
-#define TELNET_SE   240
-#define TELNET_SB   250
+#define IAC_BYTE 0xFFu
+#define TELNET_SE 240
+#define TELNET_SB 250
 #define TELNET_WILL 251
 #define TELNET_WONT 252
-#define TELNET_DO   253
+#define TELNET_DO 253
 #define TELNET_DONT 254
 
 enum {
@@ -87,7 +87,7 @@ static void rx_push(uint8_t c) {
     }
 }
 
-void mm_net_telnet_rx_feed(const uint8_t *data, size_t len) {
+void mm_net_telnet_rx_feed(const uint8_t * data, size_t len) {
     if (!data || len == 0) return;
     for (size_t i = 0; i < len; ++i) {
         uint8_t b = data[i];
@@ -107,7 +107,7 @@ void mm_net_telnet_rx_feed(const uint8_t *data, size_t len) {
             } else if (b == TELNET_SB) {
                 g_rx_state = RX_SB;
             } else if (b == TELNET_WILL || b == TELNET_WONT ||
-                       b == TELNET_DO   || b == TELNET_DONT) {
+                       b == TELNET_DO || b == TELNET_DONT) {
                 g_rx_state = RX_OPT;
             } else {
                 /* NOP / GA / standalone command — no option byte. */

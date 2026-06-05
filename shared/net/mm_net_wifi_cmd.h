@@ -12,8 +12,8 @@ extern "C" {
 #endif
 
 typedef struct {
-    int64_t *dest;
-    char *buffer;
+    int64_t * dest;
+    char * buffer;
     int capacity;
 } mm_net_scan_args_t;
 
@@ -27,11 +27,11 @@ typedef struct {
     int has_static_ip;
 } mm_net_wifi_credentials_t;
 
-void mm_net_wifi_parse_scan(unsigned char *arg, mm_net_scan_args_t *out);
-void mm_net_wifi_scan_command(unsigned char *arg);
-void mm_net_wifi_parse_credentials(unsigned char *arg,
-                                   const char *default_hostname,
-                                   mm_net_wifi_credentials_t *out);
+void mm_net_wifi_parse_scan(unsigned char * arg, mm_net_scan_args_t * out);
+void mm_net_wifi_scan_command(unsigned char * arg);
+void mm_net_wifi_parse_credentials(unsigned char * arg,
+                                   const char * default_hostname,
+                                   mm_net_wifi_credentials_t * out);
 
 #ifdef __cplusplus
 }

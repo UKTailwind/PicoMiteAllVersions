@@ -22,7 +22,7 @@
 #endif
 
 /* From host_fb.c. */
-extern uint32_t *host_framebuffer;
+extern uint32_t * host_framebuffer;
 extern int host_fb_width;
 extern int host_fb_height;
 extern volatile uint32_t host_fb_generation;

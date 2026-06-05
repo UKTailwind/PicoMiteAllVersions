@@ -22,60 +22,60 @@ static int caps_have(uint32_t required) {
 
 int mm_net_lifecycle_service_supported(mm_net_lifecycle_service_t service) {
     switch (service) {
-        case MM_NET_LIFECYCLE_WIFI_CONNECT:
-            return caps_have(HAL_NET_CAP_WIFI_CONNECT);
-        case MM_NET_LIFECYCLE_WIFI_SCAN:
-            return caps_have(HAL_NET_CAP_WIFI_SCAN);
-        case MM_NET_LIFECYCLE_TCP_CLIENT:
-            return caps_have(HAL_NET_CAP_TCP_CLIENT) ||
-                   caps_have(HAL_NET_CAP_HTTP_FETCH);
-        case MM_NET_LIFECYCLE_TCP_SERVER:
-            return caps_have(HAL_NET_CAP_TCP_SERVER);
-        case MM_NET_LIFECYCLE_TCP_STREAM:
-            return caps_have(HAL_NET_CAP_TCP_STREAM);
-        case MM_NET_LIFECYCLE_UDP:
-            return caps_have(HAL_NET_CAP_UDP_SERVER | HAL_NET_CAP_UDP_SEND);
-        case MM_NET_LIFECYCLE_NTP:
-            return caps_have(HAL_NET_CAP_UDP_SEND);
-        case MM_NET_LIFECYCLE_TFTP:
-            return caps_have(HAL_NET_CAP_UDP_SERVER | HAL_NET_CAP_UDP_SEND);
-        case MM_NET_LIFECYCLE_TELNET:
-            return caps_have(HAL_NET_CAP_TCP_SERVER);
-        case MM_NET_LIFECYCLE_WEB_CONSOLE:
-            return caps_have(HAL_NET_CAP_TCP_SERVER);
-        case MM_NET_LIFECYCLE_MQTT:
-            return caps_have(HAL_NET_CAP_MQTT_PLAIN) ||
-                   caps_have(HAL_NET_CAP_MQTT_WEBSOCKET);
-        default:
-            return 0;
+    case MM_NET_LIFECYCLE_WIFI_CONNECT:
+        return caps_have(HAL_NET_CAP_WIFI_CONNECT);
+    case MM_NET_LIFECYCLE_WIFI_SCAN:
+        return caps_have(HAL_NET_CAP_WIFI_SCAN);
+    case MM_NET_LIFECYCLE_TCP_CLIENT:
+        return caps_have(HAL_NET_CAP_TCP_CLIENT) ||
+               caps_have(HAL_NET_CAP_HTTP_FETCH);
+    case MM_NET_LIFECYCLE_TCP_SERVER:
+        return caps_have(HAL_NET_CAP_TCP_SERVER);
+    case MM_NET_LIFECYCLE_TCP_STREAM:
+        return caps_have(HAL_NET_CAP_TCP_STREAM);
+    case MM_NET_LIFECYCLE_UDP:
+        return caps_have(HAL_NET_CAP_UDP_SERVER | HAL_NET_CAP_UDP_SEND);
+    case MM_NET_LIFECYCLE_NTP:
+        return caps_have(HAL_NET_CAP_UDP_SEND);
+    case MM_NET_LIFECYCLE_TFTP:
+        return caps_have(HAL_NET_CAP_UDP_SERVER | HAL_NET_CAP_UDP_SEND);
+    case MM_NET_LIFECYCLE_TELNET:
+        return caps_have(HAL_NET_CAP_TCP_SERVER);
+    case MM_NET_LIFECYCLE_WEB_CONSOLE:
+        return caps_have(HAL_NET_CAP_TCP_SERVER);
+    case MM_NET_LIFECYCLE_MQTT:
+        return caps_have(HAL_NET_CAP_MQTT_PLAIN) ||
+               caps_have(HAL_NET_CAP_MQTT_WEBSOCKET);
+    default:
+        return 0;
     }
 }
 
-const char *mm_net_lifecycle_unsupported_message(
+const char * mm_net_lifecycle_unsupported_message(
     mm_net_lifecycle_service_t service) {
     switch (service) {
-        case MM_NET_LIFECYCLE_WIFI_CONNECT:
-        case MM_NET_LIFECYCLE_WIFI_SCAN:
-            return "WiFi not supported";
-        case MM_NET_LIFECYCLE_TCP_SERVER:
-            return "TCP server not supported";
-        case MM_NET_LIFECYCLE_TCP_STREAM:
-            return "TCP stream not supported";
-        case MM_NET_LIFECYCLE_UDP:
-            return "UDP not supported";
-        case MM_NET_LIFECYCLE_NTP:
-            return "NTP not supported";
-        case MM_NET_LIFECYCLE_TFTP:
-            return "TFTP not supported";
-        case MM_NET_LIFECYCLE_TELNET:
-            return "Telnet not supported";
-        case MM_NET_LIFECYCLE_WEB_CONSOLE:
-            return "Web console not supported";
-        case MM_NET_LIFECYCLE_MQTT:
-            return "MQTT not supported";
-        case MM_NET_LIFECYCLE_TCP_CLIENT:
-        default:
-            return "Network feature not supported";
+    case MM_NET_LIFECYCLE_WIFI_CONNECT:
+    case MM_NET_LIFECYCLE_WIFI_SCAN:
+        return "WiFi not supported";
+    case MM_NET_LIFECYCLE_TCP_SERVER:
+        return "TCP server not supported";
+    case MM_NET_LIFECYCLE_TCP_STREAM:
+        return "TCP stream not supported";
+    case MM_NET_LIFECYCLE_UDP:
+        return "UDP not supported";
+    case MM_NET_LIFECYCLE_NTP:
+        return "NTP not supported";
+    case MM_NET_LIFECYCLE_TFTP:
+        return "TFTP not supported";
+    case MM_NET_LIFECYCLE_TELNET:
+        return "Telnet not supported";
+    case MM_NET_LIFECYCLE_WEB_CONSOLE:
+        return "Web console not supported";
+    case MM_NET_LIFECYCLE_MQTT:
+        return "MQTT not supported";
+    case MM_NET_LIFECYCLE_TCP_CLIENT:
+    default:
+        return "Network feature not supported";
     }
 }
 
@@ -85,7 +85,7 @@ static mm_net_lifecycle_result_t maybe_reboot(unsigned mask, unsigned bit) {
 }
 
 mm_net_lifecycle_result_t mm_net_lifecycle_on_network_ready(
-    const mm_net_lifecycle_hooks_t *hooks) {
+    const mm_net_lifecycle_hooks_t * hooks) {
     if (!hooks) return MM_NET_LIFECYCLE_OK;
     if (Option.TCP_PORT && hooks->open_tcp_server &&
         mm_net_lifecycle_service_supported(MM_NET_LIFECYCLE_TCP_SERVER) &&
@@ -111,7 +111,7 @@ mm_net_lifecycle_result_t mm_net_lifecycle_on_network_ready(
 }
 
 void mm_net_lifecycle_on_network_down(
-    const mm_net_lifecycle_hooks_t *hooks) {
+    const mm_net_lifecycle_hooks_t * hooks) {
     if (!hooks) return;
     if (hooks->close_web_console) hooks->close_web_console();
     if (hooks->close_telnet) hooks->close_telnet();
@@ -121,7 +121,7 @@ void mm_net_lifecycle_on_network_down(
 }
 
 void mm_net_lifecycle_store_wifi_credentials(
-    unsigned char *arg, const char *default_hostname,
+    unsigned char * arg, const char * default_hostname,
     mm_net_lifecycle_wifi_validate_t validate) {
     mm_net_wifi_credentials_t parsed;
     mm_net_wifi_parse_credentials(arg, default_hostname, &parsed);
@@ -144,8 +144,8 @@ void mm_net_lifecycle_store_wifi_credentials(
 }
 
 mm_net_lifecycle_result_t mm_net_lifecycle_wifi_connect(
-    const mm_net_lifecycle_wifi_connect_t *connect) {
-    const char *password = *Option.PASSWORD ? (char *)Option.PASSWORD : "";
+    const mm_net_lifecycle_wifi_connect_t * connect) {
+    const char * password = *Option.PASSWORD ? (char *)Option.PASSWORD : "";
 
     hal_net_wifi_set_credentials((char *)Option.SSID, password,
                                  Option.hostname, Option.ipaddress,
@@ -162,8 +162,7 @@ mm_net_lifecycle_result_t mm_net_lifecycle_wifi_connect(
         return MM_NET_LIFECYCLE_OK;
     }
 
-    const char *name = *Option.hostname ? Option.hostname :
-                       (connect ? connect->default_hostname : NULL);
+    const char * name = *Option.hostname ? Option.hostname : (connect ? connect->default_hostname : NULL);
     if (name && *name) MMPrintString((char *)name);
     MMPrintString(" connecting to WiFi...\r\n");
 
@@ -185,7 +184,7 @@ mm_net_lifecycle_result_t mm_net_lifecycle_wifi_connect(
     MMPrintString(buff);
     WIFIconnected = 1;
 
-    const mm_net_lifecycle_hooks_t *hooks = connect ? connect->hooks : NULL;
+    const mm_net_lifecycle_hooks_t * hooks = connect ? connect->hooks : NULL;
     if (mm_net_lifecycle_on_network_ready(hooks) != MM_NET_LIFECYCLE_OK) {
         MMPrintString("Failed to create network service\r\n");
         return MM_NET_LIFECYCLE_ERROR;
@@ -194,8 +193,8 @@ mm_net_lifecycle_result_t mm_net_lifecycle_wifi_connect(
 }
 
 mm_net_lifecycle_result_t mm_net_lifecycle_option_setter(
-    unsigned char *cmdline, const mm_net_lifecycle_hooks_t *hooks) {
-    unsigned char *tp;
+    unsigned char * cmdline, const mm_net_lifecycle_hooks_t * hooks) {
+    unsigned char * tp;
 
     tp = checkstring(cmdline, (unsigned char *)"WEB MESSAGES");
     if (tp) {
@@ -336,35 +335,32 @@ mm_net_lifecycle_result_t mm_net_lifecycle_option_setter(
 
 int mm_net_lifecycle_handle_option_result(
     mm_net_lifecycle_result_t result,
-    const mm_net_lifecycle_result_handler_t *handler) {
+    const mm_net_lifecycle_result_handler_t * handler) {
     switch (result) {
-        case MM_NET_LIFECYCLE_NOT_HANDLED:
-            return 0;
-        case MM_NET_LIFECYCLE_OK:
+    case MM_NET_LIFECYCLE_NOT_HANDLED:
+        return 0;
+    case MM_NET_LIFECYCLE_OK:
+        return 1;
+    case MM_NET_LIFECYCLE_REBOOT_REQUIRED:
+        if (handler && handler->reboot_required) {
+            handler->reboot_required();
             return 1;
-        case MM_NET_LIFECYCLE_REBOOT_REQUIRED:
-            if (handler && handler->reboot_required) {
-                handler->reboot_required();
-                return 1;
-            }
-            error(handler && handler->apply_error ? handler->apply_error :
-                                                   "Failed to apply network option");
-            return 1;
-        case MM_NET_LIFECYCLE_UNSUPPORTED:
-            error(handler && handler->unsupported_error ?
-                  handler->unsupported_error : "Network feature not supported");
-            return 1;
-        case MM_NET_LIFECYCLE_ERROR:
-        default:
-            error(handler && handler->apply_error ? handler->apply_error :
-                                                   "Failed to apply network option");
-            return 1;
+        }
+        error(handler && handler->apply_error ? handler->apply_error : "Failed to apply network option");
+        return 1;
+    case MM_NET_LIFECYCLE_UNSUPPORTED:
+        error(handler && handler->unsupported_error ? handler->unsupported_error : "Network feature not supported");
+        return 1;
+    case MM_NET_LIFECYCLE_ERROR:
+    default:
+        error(handler && handler->apply_error ? handler->apply_error : "Failed to apply network option");
+        return 1;
     }
     return 1;
 }
 
 void mm_net_lifecycle_runtime_reset(
-    const mm_net_lifecycle_runtime_hooks_t *hooks) {
+    const mm_net_lifecycle_runtime_hooks_t * hooks) {
     if (hooks) {
         if (hooks->clear_tcp_requests) hooks->clear_tcp_requests();
         if (hooks->close_tcp_client) hooks->close_tcp_client();
@@ -384,7 +380,7 @@ void mm_net_lifecycle_runtime_reset(
 }
 
 void mm_net_lifecycle_poll(
-    const mm_net_lifecycle_poll_hooks_t *hooks, int mode,
+    const mm_net_lifecycle_poll_hooks_t * hooks, int mode,
     int require_network_ready) {
     if (!hooks) return;
     if (require_network_ready && !WIFIconnected) return;

@@ -31,7 +31,7 @@ bool lpt_centronics_pin_write(uint32_t pin, bool high);
 bool lpt_centronics_pin_toggle(uint32_t pin);
 
 bool lpt_centronics_write_byte(uint8_t byte);
-size_t lpt_centronics_write(const void *buf, size_t len);
+size_t lpt_centronics_write(const void * buf, size_t len);
 void lpt_centronics_flush(void);
 
 #ifdef __cplusplus

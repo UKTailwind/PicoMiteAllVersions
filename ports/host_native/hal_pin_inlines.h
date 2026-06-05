@@ -16,19 +16,16 @@
 
 #include "hal/hal_pin.h"
 
-static inline void hal_pin_write_fast(uint32_t gpio, bool high)
-{
+static inline void hal_pin_write_fast(uint32_t gpio, bool high) {
     hal_pin_write(gpio, high);
 }
 
-static inline bool hal_pin_read_fast(uint32_t gpio)
-{
+static inline bool hal_pin_read_fast(uint32_t gpio) {
     return hal_pin_read(gpio);
 }
 
-static inline void hal_pin_toggle_fast(uint32_t gpio)
-{
+static inline void hal_pin_toggle_fast(uint32_t gpio) {
     hal_pin_toggle(gpio);
 }
 
-#endif  /* HAL_PIN_INLINES_H */
+#endif /* HAL_PIN_INLINES_H */

@@ -20,12 +20,17 @@
 extern int ticks_per_second;
 
 #define PICO_WS2812_SETUPTIME (12 - (Option.CPU_Speed - 250000) / 50000)
-#define PICO_WS2812_SHORTPAUSE(a) do {                                      \
-    systick_hw->cvr = 0;                                                     \
-    asm("NOP"); asm("NOP"); asm("NOP"); asm("NOP"); asm("NOP");            \
-    while (systick_hw->cvr > (uint32_t)(a)) {                                \
-    }                                                                        \
-} while (0)
+#define PICO_WS2812_SHORTPAUSE(a)                 \
+    do {                                          \
+        systick_hw->cvr = 0;                      \
+        asm("NOP");                               \
+        asm("NOP");                               \
+        asm("NOP");                               \
+        asm("NOP");                               \
+        asm("NOP");                               \
+        while (systick_hw->cvr > (uint32_t)(a)) { \
+        }                                         \
+    } while (0)
 
 typedef struct {
     int t0h;
@@ -35,42 +40,37 @@ typedef struct {
     int reset_us;
 } pico_ws2812_timing_t;
 
-static int pico_ws2812_pause_ticks(MMFLOAT units_20000)
-{
+static int pico_ws2812_pause_ticks(MMFLOAT units_20000) {
     int ticks_per_millisecond = ticks_per_second / 1000;
     return 16777215 + PICO_WS2812_SETUPTIME -
            (int)((units_20000 * ticks_per_millisecond) / 20000.0);
 }
 
-static pico_ws2812_timing_t pico_ws2812_timing_for(hal_ws2812_type_t type)
-{
+static pico_ws2812_timing_t pico_ws2812_timing_for(hal_ws2812_type_t type) {
     switch (type) {
-        case HAL_WS2812_ORIGINAL:
-            return (pico_ws2812_timing_t){
-                pico_ws2812_pause_ticks(7.0),
-                pico_ws2812_pause_ticks(13.0),
-                pico_ws2812_pause_ticks(14.0),
-                pico_ws2812_pause_ticks(9.5),
-                50
-            };
-        case HAL_WS2812_SK6812:
-        case HAL_WS2812_SK6812W:
-            return (pico_ws2812_timing_t){
-                pico_ws2812_pause_ticks(6.0),
-                pico_ws2812_pause_ticks(15.0),
-                pico_ws2812_pause_ticks(12.0),
-                pico_ws2812_pause_ticks(9.0),
-                80
-            };
-        case HAL_WS2812_B:
-        default:
-            return (pico_ws2812_timing_t){
-                pico_ws2812_pause_ticks(8.0),
-                pico_ws2812_pause_ticks(14.0),
-                pico_ws2812_pause_ticks(16.0),
-                pico_ws2812_pause_ticks(6.5),
-                280
-            };
+    case HAL_WS2812_ORIGINAL:
+        return (pico_ws2812_timing_t){
+            pico_ws2812_pause_ticks(7.0),
+            pico_ws2812_pause_ticks(13.0),
+            pico_ws2812_pause_ticks(14.0),
+            pico_ws2812_pause_ticks(9.5),
+            50};
+    case HAL_WS2812_SK6812:
+    case HAL_WS2812_SK6812W:
+        return (pico_ws2812_timing_t){
+            pico_ws2812_pause_ticks(6.0),
+            pico_ws2812_pause_ticks(15.0),
+            pico_ws2812_pause_ticks(12.0),
+            pico_ws2812_pause_ticks(9.0),
+            80};
+    case HAL_WS2812_B:
+    default:
+        return (pico_ws2812_timing_t){
+            pico_ws2812_pause_ticks(8.0),
+            pico_ws2812_pause_ticks(14.0),
+            pico_ws2812_pause_ticks(16.0),
+            pico_ws2812_pause_ticks(6.5),
+            280};
     }
 }
 
@@ -78,8 +78,7 @@ static void __not_in_flash_func(pico_ws2812_emit)(uint32_t gpio,
                                                   int t1h, int t1l,
                                                   int t0h, int t0l,
                                                   size_t len,
-                                                  const uint8_t *p)
-{
+                                                  const uint8_t * p) {
     for (size_t i = 0; i < len; i++) {
         for (int j = 0; j < 8; j++) {
             if (*p & (uint8_t)(0x80u >> j)) {
@@ -99,8 +98,7 @@ static void __not_in_flash_func(pico_ws2812_emit)(uint32_t gpio,
 }
 
 int hal_ws2812_write(uint32_t gpio, hal_ws2812_type_t type,
-                     const uint8_t *wire_bytes, size_t wire_len)
-{
+                     const uint8_t * wire_bytes, size_t wire_len) {
     pico_ws2812_timing_t timing = pico_ws2812_timing_for(type);
 
     if (!wire_bytes || wire_len == 0)

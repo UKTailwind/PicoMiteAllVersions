@@ -21,8 +21,8 @@ enum {
 };
 
 void mm_net_state_clear_messages(void);
-void mm_net_state_copy_mstring(int which, unsigned char *out);
-void mm_net_state_set_mstring(int which, const void *data, size_t len);
+void mm_net_state_copy_mstring(int which, unsigned char * out);
+void mm_net_state_set_mstring(int which, const void * data, size_t len);
 void mm_net_state_set_ipv4_address(const uint8_t bytes[4]);
 
 #ifdef __cplusplus

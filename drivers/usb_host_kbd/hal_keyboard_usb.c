@@ -41,7 +41,7 @@ void hal_keyboard_init(void) {
         HID[i].report_requested = true;
     }
     hcd_port_reset(BOARD_TUH_RHPORT);
-    uSec(10000);                 /* wait for any hub to power up */
+    uSec(10000); /* wait for any hub to power up */
     hcd_port_reset_end(BOARD_TUH_RHPORT);
     tuh_init(BOARD_TUH_RHPORT);
     USBenabled = true;
@@ -49,7 +49,8 @@ void hal_keyboard_init(void) {
 
 int hal_keyboard_keydown_count(void) {
     int count = 0;
-    for (int i = 0; i < 6; i++) if (KeyDown[i]) count++;
+    for (int i = 0; i < 6; i++)
+        if (KeyDown[i]) count++;
     return count;
 }
 
@@ -59,8 +60,8 @@ int hal_keyboard_keydown_slot(int slot) {
 }
 
 uint32_t hal_keyboard_lock_state(void) {
-    return (caps_lock   ? 1u : 0u) |
-           (num_lock    ? 2u : 0u) |
+    return (caps_lock ? 1u : 0u) |
+           (num_lock ? 2u : 0u) |
            (scroll_lock ? 4u : 0u);
 }
 
@@ -77,10 +78,10 @@ int hal_keyboard_set_layout(int layout) {
 
 void hal_keyboard_quiesce_for_reset(void) {
     USBenabled = false;
-    uSec(50000);   /* let outstanding USB transfers complete */
+    uSec(50000); /* let outstanding USB transfers complete */
 }
 
-int hal_keyboard_usb_raw_report(int slot, unsigned char *out, int max_len) {
+int hal_keyboard_usb_raw_report(int slot, unsigned char * out, int max_len) {
     if (slot < 1 || slot > 4 || !out || max_len < 2) return 0;
     /* HID[slot-1].report is a length-prefixed MMBasic string (report[0]
      * is the byte count). Copy the length byte plus payload, clamped to
@@ -115,7 +116,8 @@ void hal_keyboard_routinechecks_pump(void) {
 void hal_console_usb_cdc_putc(char c, int flush) {
     /* USB-host-keyboard port: USB-A is in host mode so there's no
      * USB-CDC device-side stdio to write to. */
-    (void)c; (void)flush;
+    (void)c;
+    (void)flush;
 }
 
 extern volatile int keytimer;

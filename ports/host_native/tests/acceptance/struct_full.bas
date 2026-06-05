@@ -398,12 +398,12 @@ Sub TestLocalStructArray
   localArr(0).x = 1 : localArr(0).y = 2
   localArr(1).x = 3 : localArr(1).y = 4
   localArr(2).x = 5 : localArr(2).y = 6
-  
+
   Local ok% = 1
   If localArr(0).x <> 1 Or localArr(0).y <> 2 Then ok% = 0
   If localArr(1).x <> 3 Or localArr(1).y <> 4 Then ok% = 0
   If localArr(2).x <> 5 Or localArr(2).y <> 6 Then ok% = 0
-  
+
   If ok% Then
     Print "  PASS: LOCAL struct array works"
   Else
@@ -955,7 +955,7 @@ Else
   Open "structtest.dat" For Input As #1
   Struct Load #1, saveArr()
   Close #1
-  
+
   ' Verify data - check each condition separately to avoid line continuation issues
   Dim loadOk% = 1
   If saveArr(0).name <> "Alice" Or saveArr(0).age <> 25 Then loadOk% = 0
@@ -964,7 +964,7 @@ Else
   If Abs(saveArr(1).height - 1.75) >= 0.01 Then loadOk% = 0
   If saveArr(2).name <> "Charlie" Or saveArr(2).age <> 35 Then loadOk% = 0
   If Abs(saveArr(2).height - 1.85) >= 0.01 Then loadOk% = 0
-  
+
   If loadOk% Then
     Print "  PASS: STRUCT SAVE/LOAD"
   Else

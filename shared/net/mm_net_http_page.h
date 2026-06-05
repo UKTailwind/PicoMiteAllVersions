@@ -11,8 +11,8 @@
 extern "C" {
 #endif
 
-int mm_net_http_render_page(const char *fname, int extra,
-                            char **out, size_t *out_len);
+int mm_net_http_render_page(const char * fname, int extra,
+                            char ** out, size_t * out_len);
 
 #ifdef __cplusplus
 }

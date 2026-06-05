@@ -30,16 +30,16 @@
 #include "pc386_panic.h"
 
 #ifdef PC386_BOOT_TRACE
-extern void kputs(const char *s);
+extern void kputs(const char * s);
 #define PC386_TRACE(s) kputs(s)
 #else
 #define PC386_TRACE(s) ((void)0)
 #endif
 
-extern jmp_buf mark;          /* defined by MMBasic.c */
+extern jmp_buf mark; /* defined by MMBasic.c */
 
 /* Forward decls for the output hook contract host_runtime.c established. */
-void (*host_output_hook)(const char *text, int len) = NULL;
+void (*host_output_hook)(const char * text, int len) = NULL;
 
 extern uint64_t hal_time_us_64(void);
 extern uint64_t timeroffset;
@@ -47,14 +47,13 @@ extern void flash_range_erase(uint32_t off, uint32_t count);
 extern void pc386_options_defaults_ready(void);
 
 #define PC386_DEFAULT_REPEAT_START_MS 350
-#define PC386_DEFAULT_REPEAT_RATE_MS   75
+#define PC386_DEFAULT_REPEAT_RATE_MS 75
 
 /* =========================================================================
  *  Runtime lifecycle
  * ========================================================================= */
 
-void pc386_apply_runtime_option_defaults(void)
-{
+void pc386_apply_runtime_option_defaults(void) {
     /* Sensible Option defaults for a freshly-booted pc386 kernel.
      * LoadOptions reads from a memset-zero options buffer on first
      * boot which leaves every field at 0. Override the few that have
@@ -65,10 +64,10 @@ void pc386_apply_runtime_option_defaults(void)
      *   Tab = 4 — Editor TAB stop
      *   DefaultFont/FC/BC — fresh zeroed options would otherwise draw
      *                       black text on a black graphics console. */
-    if (Option.Tab    == 0) Option.Tab    = 4;
+    if (Option.Tab == 0) Option.Tab = 4;
     if (Option.RepeatStart == 0) Option.RepeatStart = PC386_DEFAULT_REPEAT_START_MS;
-    if (Option.RepeatRate  == 0) Option.RepeatRate  = PC386_DEFAULT_REPEAT_RATE_MS;
-    if (Option.DefaultFont == 0) Option.DefaultFont = 1;  /* font 1, 8x12 */
+    if (Option.RepeatRate == 0) Option.RepeatRate = PC386_DEFAULT_REPEAT_RATE_MS;
+    if (Option.DefaultFont == 0) Option.DefaultFont = 1; /* font 1, 8x12 */
     if (Option.DefaultFC == 0 && Option.DefaultBC == 0) {
         Option.DefaultFC = WHITE;
         Option.DefaultBC = BLACK;
@@ -108,7 +107,7 @@ void mmbasic_runtime_port_begin(void) {
     gui_bcolour = PromptBC = Option.DefaultBC;
     PromptFont = Option.DefaultFont;
     Option.DISPLAY_CONSOLE = 1;
-    OptionConsole = 2;                         /* display only */
+    OptionConsole = 2; /* display only */
     Option.Width = HRes / gui_font_width;
     Option.Height = VRes / gui_font_height;
     CurrentX = CurrentY = 0;
@@ -134,8 +133,10 @@ void mmbasic_runtime_port_begin(void) {
     PC386_TRACE("RT:save-options, ");
 }
 
-void host_runtime_finish(void) { }
-int  host_runtime_timed_out(void) { return 0; }
+void host_runtime_finish(void) {}
+int host_runtime_timed_out(void) {
+    return 0;
+}
 
 /* =========================================================================
  *  CheckAbort + interrupt poll hooks.
@@ -150,27 +151,29 @@ int  host_runtime_timed_out(void) { return 0; }
  * ========================================================================= */
 
 /* Tick* globals + InterruptReturn/InterruptUsed live in pc386_state.c. */
-extern volatile int       TickTimer[];
-extern int                TickPeriod[];
-extern unsigned char     *TickInt[];
+extern volatile int TickTimer[];
+extern int TickPeriod[];
+extern unsigned char * TickInt[];
 extern volatile unsigned char TickActive[];
-extern unsigned char     *InterruptReturn;
-extern int                InterruptUsed;
+extern unsigned char * InterruptReturn;
+extern int InterruptUsed;
 #define PC386_NBRSETTICKS 4
 
 /* Watchdog state: deadline (in us) past which check_interrupt SoftResets. */
 static uint64_t pc386_wd_deadline_us = 0;
-static int      pc386_wd_armed = 0;
+static int pc386_wd_armed = 0;
 void pc386_watchdog_kick(uint32_t period_ms) {
     pc386_wd_deadline_us = hal_time_us_64() + (uint64_t)period_ms * 1000ull;
     pc386_wd_armed = (period_ms != 0);
 }
 
-extern unsigned char *nextstmt;
+extern unsigned char * nextstmt;
 extern int g_LocalIndex;
 extern void SoftReset(void);
 
-void CheckAbort(void)         { mmbasic_runtime_checkabort(NULL); }
+void CheckAbort(void) {
+    mmbasic_runtime_checkabort(NULL);
+}
 
 int check_interrupt(void) {
     /* 1. Watchdog: if armed and deadline passed, hard-reset the box. */
@@ -182,7 +185,10 @@ int check_interrupt(void) {
     /* 2. Advance TickTimer[] based on real elapsed ms since last call. */
     static uint64_t last_us = 0;
     uint64_t now = hal_time_us_64();
-    if (last_us == 0) { last_us = now; return 0; }
+    if (last_us == 0) {
+        last_us = now;
+        return 0;
+    }
     uint32_t elapsed_ms = (uint32_t)((now - last_us) / 1000ull);
     if (elapsed_ms) {
         last_us += (uint64_t)elapsed_ms * 1000ull;
@@ -206,12 +212,20 @@ int check_interrupt(void) {
     }
     return 0;
 }
-void ClearExternalIO(void)    { }
-void closeframebuffer(char l) { (void)l; }
-void clear320(void)           { }
-void initMouse0(int s)        { (void)s; }
-void restorepanel(void)       { WriteBuf = NULL; }
-void routinechecks(void)      { mmbasic_runtime_routinechecks(NULL); }
+void ClearExternalIO(void) {}
+void closeframebuffer(char l) {
+    (void)l;
+}
+void clear320(void) {}
+void initMouse0(int s) {
+    (void)s;
+}
+void restorepanel(void) {
+    WriteBuf = NULL;
+}
+void routinechecks(void) {
+    mmbasic_runtime_routinechecks(NULL);
+}
 /* CPU RESTART: pulse the CPU reset line via the 8042 keyboard controller
  * (the canonical pre-ACPI x86 software reset). If the KBC is wedged,
  * fall through to a triple fault by loading a null IDT and faulting. */
@@ -224,27 +238,38 @@ void SoftReset(void) {
         __asm__ volatile("inb $0x64, %0" : "=a"(status));
         if ((status & 0x02u) == 0) break;
     }
-    __asm__ volatile("outb %0, $0x64" :: "a"((uint8_t)0xFEu));
+    __asm__ volatile("outb %0, $0x64" ::"a"((uint8_t)0xFEu));
     /* Give the KBC ~10ms to act before we triple-fault. */
-    for (volatile int i = 0; i < 10000000; i++) { }
+    for (volatile int i = 0; i < 10000000; i++) {
+    }
     /* Triple-fault fallback: load a null IDT and fire an int. */
-    static const struct { uint16_t limit; uint32_t base; } __attribute__((packed))
-        null_idt = { 0, 0 };
-    __asm__ volatile("lidt %0" :: "m"(null_idt));
+    static const struct {
+        uint16_t limit;
+        uint32_t base;
+    } __attribute__((packed))
+    null_idt = {0, 0};
+    __asm__ volatile("lidt %0" ::"m"(null_idt));
     __asm__ volatile("int $0x03");
     for (;;) __asm__ volatile("hlt");
 }
-void uSec(int us)             { extern void hal_time_sleep_us(uint32_t); hal_time_sleep_us((uint32_t)us); }
+void uSec(int us) {
+    extern void hal_time_sleep_us(uint32_t);
+    hal_time_sleep_us((uint32_t)us);
+}
 
 /* MMBasic.c uses __get_MSP for stack-overflow protection. PC has no MSP
  * concept (and we have plenty of stack); return a value that always
  * passes the comparison. */
-uint32_t __get_MSP(void) { return 0xFFFFFFFFu; }
+uint32_t __get_MSP(void) {
+    return 0xFFFFFFFFu;
+}
 
 /* DisplayPutC lives in gfx_console_shared.c — don't redefine. */
-void Display_Refresh(void) { }
+void Display_Refresh(void) {}
 void DisplayNotSet(void) { /* no error — mmbasic_runtime_port_begin sets DISPLAY_TYPE */ }
-void ScrollLCDSPISCR(int s) { (void)s; }
+void ScrollLCDSPISCR(int s) {
+    (void)s;
+}
 
 /* =========================================================================
  *  Console I/O — fork every byte to BOTH the graphics console (primary,
@@ -358,15 +383,21 @@ int kbhitConsole(void) {
      * they don't otherwise use on pc386. */
     return 0;
 }
-void myprintf(char *s)     { MMPrintString(s); }
+void myprintf(char * s) {
+    MMPrintString(s);
+}
 
 /* MMfopen/MMfclose/MMgetline — file I/O routes through hal_filesystem;
  * this layer is the dispatch handle. Stage 3f wires real bodies. */
-void MMfopen(unsigned char *fname, unsigned char *mode, int fnbr) {
-    (void)fname; (void)mode; (void)fnbr;
+void MMfopen(unsigned char * fname, unsigned char * mode, int fnbr) {
+    (void)fname;
+    (void)mode;
+    (void)fnbr;
 }
 
-void MMfclose(int fnbr) { FileClose(fnbr); }
+void MMfclose(int fnbr) {
+    FileClose(fnbr);
+}
 
 // MMgetline lives in runtime/runtime_getline.c — shared across every port.
 
@@ -414,25 +445,22 @@ int port_drivecheck_remap(int t) {
 }
 
 static char pc386_fatfs_drive = 'C';
-static char pc386_fatfs_cwd[3][FF_MAX_LFN] = { "A:/", "B:/", "C:/" };
+static char pc386_fatfs_cwd[3][FF_MAX_LFN] = {"A:/", "B:/", "C:/"};
 extern char filepath[][FF_MAX_LFN];
 
-static int pc386_fatfs_drive_index(char drive)
-{
+static int pc386_fatfs_drive_index(char drive) {
     if (drive == 'A') return 0;
     if (drive == 'B') return 1;
     return 2;
 }
 
-static void pc386_store_fatfs_cwd(char drive)
-{
+static void pc386_store_fatfs_cwd(char drive) {
     int idx = pc386_fatfs_drive_index(drive);
     strncpy(pc386_fatfs_cwd[idx], filepath[1], sizeof(pc386_fatfs_cwd[idx]) - 1);
     pc386_fatfs_cwd[idx][sizeof(pc386_fatfs_cwd[idx]) - 1] = 0;
 }
 
-static void pc386_load_fatfs_cwd(char drive)
-{
+static void pc386_load_fatfs_cwd(char drive) {
     int idx = pc386_fatfs_drive_index(drive);
     if (pc386_fatfs_cwd[idx][0] == 0) {
         snprintf(pc386_fatfs_cwd[idx], sizeof(pc386_fatfs_cwd[idx]), "%c:/", drive);
@@ -440,7 +468,7 @@ static void pc386_load_fatfs_cwd(char drive)
     strcpy(filepath[1], pc386_fatfs_cwd[idx]);
 }
 
-const char *port_filesystem_prefix(int filesystem) {
+const char * port_filesystem_prefix(int filesystem) {
     static char prefix[3] = "C:";
     if (!filesystem) return "A:";
     prefix[0] = pc386_fatfs_drive;
@@ -451,10 +479,9 @@ const char *port_filesystem_prefix(int filesystem) {
  *  Cmd_files / cmd_load lifecycle hooks.
  * ========================================================================= */
 
-void cmd_files_save_program_context(void) { }
-void cmd_files_restore_program_context(void) { }
-void cmd_files_pump_console_key(int *c)
-{
+void cmd_files_save_program_context(void) {}
+void cmd_files_restore_program_context(void) {}
+void cmd_files_pump_console_key(int * c) {
     if (!c || *c != -1) return;
     int key = MMInkey();
     if (key >= 0) *c = key;
@@ -466,11 +493,16 @@ void cmd_files_pump_console_key(int *c)
  * exactly what we want here. */
 
 /* CallCFunction / CallExecuteProgram — pc386 has no CFunction support. */
-int64_t CallCFunction(unsigned char *cmd, unsigned char *args, unsigned char *def, unsigned char *caller) {
-    (void)cmd; (void)args; (void)def; (void)caller;
+int64_t CallCFunction(unsigned char * cmd, unsigned char * args, unsigned char * def, unsigned char * caller) {
+    (void)cmd;
+    (void)args;
+    (void)def;
+    (void)caller;
     return 0;
 }
-void CallExecuteProgram(char *p) { (void)p; }
+void CallExecuteProgram(char * p) {
+    (void)p;
+}
 
 /* =========================================================================
  *  port_* hooks — every "what does this board look like" question.
@@ -479,10 +511,16 @@ void CallExecuteProgram(char *p) { (void)p; }
 
 #include "bytecode.h"
 
-int  port_usb_count(void) { return 0; }
-int  port_usb_hid_field(int n, int field) { (void)n; (void)field; return 0; }
+int port_usb_count(void) {
+    return 0;
+}
+int port_usb_hid_field(int n, int field) {
+    (void)n;
+    (void)field;
+    return 0;
+}
 
-int  port_mount_sd_drive(void) {
+int port_mount_sd_drive(void) {
     /* A:/B:/C: are mounted from kmain via FatFs over FDC/ATA. Nothing
      * to do here — already mounted. SDCardStat-clear matches host. */
     extern volatile BYTE SDCardStat;
@@ -512,26 +550,50 @@ void port_drive_check(char drive) {
     pc386_load_fatfs_cwd(pc386_fatfs_drive);
 }
 
-void port_picocalc_set_keyboard_backlight(int level) { (void)level; }
-int  port_picocalc_battery_pct(void) { return 0; }
-int  port_picocalc_is_charging(void) { return 0; }
-void port_picocalc_factory_reset_options(void) { }
+void port_picocalc_set_keyboard_backlight(int level) {
+    (void)level;
+}
+int port_picocalc_battery_pct(void) {
+    return 0;
+}
+int port_picocalc_is_charging(void) {
+    return 0;
+}
+void port_picocalc_factory_reset_options(void) {}
 
-void port_print_supported_boards(void) { }
-int  port_factory_reset_board(unsigned char *p) { (void)p; return 0; }
+void port_print_supported_boards(void) {}
+int port_factory_reset_board(unsigned char * p) {
+    (void)p;
+    return 0;
+}
 
-int  port_display_option_setter(unsigned char *cmdline) { (void)cmdline; return 0; }
-void port_print_display_options(void) { }
-void port_print_lcd_spi(void) { }
-void port_print_keyboard_heartbeat(void) { }
-void port_print_usb_kb_repeat(void) { }
-void port_clear_lcd_spi_if_shares_system(void) { }
-int  port_pinno_alias_for_name(const char *n) { (void)n; return 0; }
-int  port_pin_is_reserved_alias(int p) { (void)p; return 0; }
-const char *port_pin_reserved_label(int p) { (void)p; return NULL; }
-int  port_lcd320_option_setter(unsigned char *c) { (void)c; return 0; }
-int  port_keyboard_option_setter(unsigned char *cmdline) {
-    unsigned char *tp = checkstring(cmdline, (unsigned char *)"KEYBOARD REPEAT");
+int port_display_option_setter(unsigned char * cmdline) {
+    (void)cmdline;
+    return 0;
+}
+void port_print_display_options(void) {}
+void port_print_lcd_spi(void) {}
+void port_print_keyboard_heartbeat(void) {}
+void port_print_usb_kb_repeat(void) {}
+void port_clear_lcd_spi_if_shares_system(void) {}
+int port_pinno_alias_for_name(const char * n) {
+    (void)n;
+    return 0;
+}
+int port_pin_is_reserved_alias(int p) {
+    (void)p;
+    return 0;
+}
+const char * port_pin_reserved_label(int p) {
+    (void)p;
+    return NULL;
+}
+int port_lcd320_option_setter(unsigned char * c) {
+    (void)c;
+    return 0;
+}
+int port_keyboard_option_setter(unsigned char * cmdline) {
+    unsigned char * tp = checkstring(cmdline, (unsigned char *)"KEYBOARD REPEAT");
     if (!tp) return 0;
     getargs(&tp, 3, (unsigned char *)",");
     Option.RepeatStart = getint(argv[0], 100, 2000);
@@ -539,57 +601,125 @@ int  port_keyboard_option_setter(unsigned char *cmdline) {
     SaveOptions();
     return 1;
 }
-int  port_misc_option_setter(unsigned char *c) { (void)c; return 0; }
-int  port_pico_pins_option_setter(unsigned char *c) { (void)c; return 0; }
-int  port_heartbeat_option_setter(unsigned char *c) { (void)c; return 0; }
-void port_apply_default_console_colors(int fc, int bc) { (void)fc; (void)bc; }
-int  port_system_lcd_spi_option_setter(unsigned char *c) { (void)c; return 0; }
-int  port_audio_i2s_pio_slice(int p1, int p2) { (void)p1; (void)p2; return 0; }
-
-int  port_mminfo_interrupts(int64_t *o) { (void)o; return 0; }
-int  port_mminfo_touch_status(unsigned char *o) { (void)o; return 0; }
-int  port_mminfo_scroll_start(int64_t *o) { (void)o; return 0; }
-int  port_mminfo_screenbuff(int64_t *o)   { (void)o; return 0; }
-
-#include "hardware/pio.h"
-PIO port_pio_for_index(int i) { (void)i; return NULL; }
-
-int  port_poke_display_panel(unsigned char *p) { (void)p; return 0; }
-
-void port_web_print_options(void) { }
-int  port_web_option_setter(unsigned char *c) { (void)c; return 0; }
-int  port_web_mminfo(unsigned char *ep, int64_t *iret,
-                     unsigned char *sret, int *targ)
-{ (void)ep; (void)iret; (void)sret; (void)targ; return 0; }
-int  port_web_get_ssid(unsigned char *o, int *t) { (void)o; (void)t; return 0; }
-
-/* bc_debug.c crash-dump hooks. */
-uint32_t port_bc_crash_get_sp(void) { return 0; }
-void port_bc_crash_save_fault_regs(BCCrashInfo *info) { (void)info; }
-
-void port_select_error_prompt_font(void) { }
-void port_clear_runtime_display_reset(void) { }
-void port_error_restore_console_surface(void) { }
-void port_error_show_lcd_banner(int line, const char *src, const char *err) {
-    (void)line; (void)src; (void)err;
+int port_misc_option_setter(unsigned char * c) {
+    (void)c;
+    return 0;
+}
+int port_pico_pins_option_setter(unsigned char * c) {
+    (void)c;
+    return 0;
+}
+int port_heartbeat_option_setter(unsigned char * c) {
+    (void)c;
+    return 0;
+}
+void port_apply_default_console_colors(int fc, int bc) {
+    (void)fc;
+    (void)bc;
+}
+int port_system_lcd_spi_option_setter(unsigned char * c) {
+    (void)c;
+    return 0;
+}
+int port_audio_i2s_pio_slice(int p1, int p2) {
+    (void)p1;
+    (void)p2;
+    return 0;
 }
 
-int  port_try_find_subfun_hash(unsigned char *p, int *out)
-{ (void)p; (void)out; return 0; }
-void port_prepare_program_finalize_subfun(int e) { (void)e; }
-int  port_try_find_label_hash(unsigned char *l, unsigned char **o)
-{ (void)l; (void)o; return 0; }
-int  port_try_check_var_subfun_collision(const unsigned char *n, int len)
-{ (void)n; (void)len; return 0; }
+int port_mminfo_interrupts(int64_t * o) {
+    (void)o;
+    return 0;
+}
+int port_mminfo_touch_status(unsigned char * o) {
+    (void)o;
+    return 0;
+}
+int port_mminfo_scroll_start(int64_t * o) {
+    (void)o;
+    return 0;
+}
+int port_mminfo_screenbuff(int64_t * o) {
+    (void)o;
+    return 0;
+}
 
-void port_bc_bridge_clear_subfun_hash(void) { }
-void port_bc_bridge_rehash_subfun(unsigned char **a) { (void)a; }
+#include "hardware/pio.h"
+PIO port_pio_for_index(int i) {
+    (void)i;
+    return NULL;
+}
+
+int port_poke_display_panel(unsigned char * p) {
+    (void)p;
+    return 0;
+}
+
+void port_web_print_options(void) {}
+int port_web_option_setter(unsigned char * c) {
+    (void)c;
+    return 0;
+}
+int port_web_mminfo(unsigned char * ep, int64_t * iret,
+                    unsigned char * sret, int * targ) {
+    (void)ep;
+    (void)iret;
+    (void)sret;
+    (void)targ;
+    return 0;
+}
+int port_web_get_ssid(unsigned char * o, int * t) {
+    (void)o;
+    (void)t;
+    return 0;
+}
+
+/* bc_debug.c crash-dump hooks. */
+uint32_t port_bc_crash_get_sp(void) {
+    return 0;
+}
+void port_bc_crash_save_fault_regs(BCCrashInfo * info) {
+    (void)info;
+}
+
+void port_select_error_prompt_font(void) {}
+void port_clear_runtime_display_reset(void) {}
+void port_error_restore_console_surface(void) {}
+void port_error_show_lcd_banner(int line, const char * src, const char * err) {
+    (void)line;
+    (void)src;
+    (void)err;
+}
+
+int port_try_find_subfun_hash(unsigned char * p, int * out) {
+    (void)p;
+    (void)out;
+    return 0;
+}
+void port_prepare_program_finalize_subfun(int e) {
+    (void)e;
+}
+int port_try_find_label_hash(unsigned char * l, unsigned char ** o) {
+    (void)l;
+    (void)o;
+    return 0;
+}
+int port_try_check_var_subfun_collision(const unsigned char * n, int len) {
+    (void)n;
+    (void)len;
+    return 0;
+}
+
+void port_bc_bridge_clear_subfun_hash(void) {}
+void port_bc_bridge_rehash_subfun(unsigned char ** a) {
+    (void)a;
+}
 
 /* vm_sys_time port hook — pc386 has no RTC yet (would come from CMOS
  * port 0x70/0x71 in a later stage). Return zero; vm_sys_time falls
  * back to the un-set value. */
 #include <time.h>
-int port_vm_time_get_tm(struct tm *out) {
+int port_vm_time_get_tm(struct tm * out) {
     (void)out;
     return 0;
 }
@@ -598,7 +728,9 @@ int port_vm_time_get_tm(struct tm *out) {
  *  bc_runtime free-source hook (matches host_native — pc386 owns the
  *  source buffer the same way; never BC_FREE it).
  * ========================================================================= */
-void port_bc_runtime_free_source(const char **source) { (void)source; }
+void port_bc_runtime_free_source(const char ** source) {
+    (void)source;
+}
 
 /* Draw.c terminal hooks live in runtime/runtime_terminal_hooks_noop.c —
  * shared across every port with a real framebuffer. */

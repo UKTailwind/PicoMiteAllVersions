@@ -33,17 +33,17 @@ uint32_t dma_rx_chan2 = 0;
 uint32_t dma_tx_chan = 0;
 uint32_t dma_tx_chan2 = 0;
 bool dmarunning = 0;
-int64_t *ds18b20Timers = NULL;
+int64_t * ds18b20Timers = NULL;
 /* ExtCurrentConfig is provided by core/state/pin_state.c. */
 /* FileTable lives in FileIO.c. */
-const uint8_t *flash_progmemory = NULL;
+const uint8_t * flash_progmemory = NULL;
 /* FSerror lives in FileIO.c. */
 int GPSchannel = 0;
 /* gui_bcolour / gui_fcolour / gui_font live in Draw.c. */
 uint8_t I2C0locked = 0;
 uint8_t I2C1locked = 0;
 unsigned char IgnorePIN = 0;
-unsigned char *InterruptReturn = NULL;
+unsigned char * InterruptReturn = NULL;
 int InterruptUsed = 0;
 int last_adc = 0;
 lfs_t lfs;
@@ -51,8 +51,8 @@ int MMCharPos = 0;
 int mmI2Cvalue = 0;
 int mmOWvalue = 0;
 bool mouse0 = 0;
-unsigned char *OnKeyGOSUB = NULL;
-unsigned char *OnPS2GOSUB = NULL;
+unsigned char * OnKeyGOSUB = NULL;
+unsigned char * OnPS2GOSUB = NULL;
 MMFLOAT optionangle = 0;
 bool optionfastaudio = 0;
 bool optionfulltime = 0;
@@ -60,30 +60,86 @@ bool optionlogging = 0;
 int PromptFont = 1;
 int PromptFC = 0xFFFFFF;
 int PromptBC = 0;
-volatile int  PS2code = 0;
-volatile bool PS2int  = false;
+volatile int PS2code = 0;
+volatile bool PS2int = false;
 volatile bool TCPreceived = false;
-char         *TCPreceiveInterrupt = NULL;
+char * TCPreceiveInterrupt = NULL;
 /* realflashpointer lives in FileIO.c. */
 
 /* Erased-flash buffers so Memory.c's scan loops terminate immediately. */
 static unsigned char pc386_saved_vars_buf[32] = {
-    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
 };
-unsigned char *SavedVarsFlash = pc386_saved_vars_buf;
+unsigned char * SavedVarsFlash = pc386_saved_vars_buf;
 
 unsigned char pc386_cfunction_buf[32] = {
-    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
 };
 
 volatile unsigned int ScrewUpTimer = 0;
-unsigned char *TickInt[NBRSETTICKS] = {NULL};
+unsigned char * TickInt[NBRSETTICKS] = {NULL};
 volatile int TickTimer[NBRSETTICKS] = {0};
 int TickPeriod[NBRSETTICKS] = {0};
 volatile unsigned char TickActive[NBRSETTICKS] = {0};
@@ -95,23 +151,23 @@ volatile int MMAbort = 0;
 volatile unsigned int WDTimer = 0;
 
 const struct s_PinDef PinDef[NBRPINS + 1] = {
-    [1]  = { .pin = 1,  .GPno = 1,  .pinname = "1",  .mode = DIGITAL_OUT },
-    [2]  = { .pin = 2,  .GPno = 2,  .pinname = "2",  .mode = DIGITAL_OUT },
-    [3]  = { .pin = 3,  .GPno = 3,  .pinname = "3",  .mode = DIGITAL_OUT },
-    [4]  = { .pin = 4,  .GPno = 4,  .pinname = "4",  .mode = DIGITAL_OUT },
-    [5]  = { .pin = 5,  .GPno = 5,  .pinname = "5",  .mode = DIGITAL_OUT },
-    [6]  = { .pin = 6,  .GPno = 6,  .pinname = "6",  .mode = DIGITAL_OUT },
-    [7]  = { .pin = 7,  .GPno = 7,  .pinname = "7",  .mode = DIGITAL_OUT },
-    [8]  = { .pin = 8,  .GPno = 8,  .pinname = "8",  .mode = DIGITAL_OUT },
-    [9]  = { .pin = 9,  .GPno = 9,  .pinname = "9",  .mode = DIGITAL_OUT },
-    [10] = { .pin = 10, .GPno = 10, .pinname = "10", .mode = DIGITAL_IN },
-    [11] = { .pin = 11, .GPno = 11, .pinname = "11", .mode = DIGITAL_IN },
-    [12] = { .pin = 12, .GPno = 12, .pinname = "12", .mode = DIGITAL_IN },
-    [13] = { .pin = 13, .GPno = 13, .pinname = "13", .mode = DIGITAL_IN },
-    [14] = { .pin = 14, .GPno = 14, .pinname = "14", .mode = DIGITAL_OUT },
-    [15] = { .pin = 15, .GPno = 15, .pinname = "15", .mode = DIGITAL_IN },
-    [16] = { .pin = 16, .GPno = 16, .pinname = "16", .mode = DIGITAL_OUT },
-    [17] = { .pin = 17, .GPno = 17, .pinname = "17", .mode = DIGITAL_OUT },
+    [1] = {.pin = 1, .GPno = 1, .pinname = "1", .mode = DIGITAL_OUT},
+    [2] = {.pin = 2, .GPno = 2, .pinname = "2", .mode = DIGITAL_OUT},
+    [3] = {.pin = 3, .GPno = 3, .pinname = "3", .mode = DIGITAL_OUT},
+    [4] = {.pin = 4, .GPno = 4, .pinname = "4", .mode = DIGITAL_OUT},
+    [5] = {.pin = 5, .GPno = 5, .pinname = "5", .mode = DIGITAL_OUT},
+    [6] = {.pin = 6, .GPno = 6, .pinname = "6", .mode = DIGITAL_OUT},
+    [7] = {.pin = 7, .GPno = 7, .pinname = "7", .mode = DIGITAL_OUT},
+    [8] = {.pin = 8, .GPno = 8, .pinname = "8", .mode = DIGITAL_OUT},
+    [9] = {.pin = 9, .GPno = 9, .pinname = "9", .mode = DIGITAL_OUT},
+    [10] = {.pin = 10, .GPno = 10, .pinname = "10", .mode = DIGITAL_IN},
+    [11] = {.pin = 11, .GPno = 11, .pinname = "11", .mode = DIGITAL_IN},
+    [12] = {.pin = 12, .GPno = 12, .pinname = "12", .mode = DIGITAL_IN},
+    [13] = {.pin = 13, .GPno = 13, .pinname = "13", .mode = DIGITAL_IN},
+    [14] = {.pin = 14, .GPno = 14, .pinname = "14", .mode = DIGITAL_OUT},
+    [15] = {.pin = 15, .GPno = 15, .pinname = "15", .mode = DIGITAL_IN},
+    [16] = {.pin = 16, .GPno = 16, .pinname = "16", .mode = DIGITAL_OUT},
+    [17] = {.pin = 17, .GPno = 17, .pinname = "17", .mode = DIGITAL_OUT},
 };
 
 /* Timer/system variables */
@@ -152,9 +208,9 @@ lfs_dir_t lfs_dir;
 struct lfs_info lfs_info;
 /* DisplayHRes / DisplayVRes live in Draw.c. */
 int ScreenSize = 0;
-unsigned char *DisplayBuf = NULL;
-unsigned char *SecondLayer = NULL;
-unsigned char *SecondFrame = NULL;
+unsigned char * DisplayBuf = NULL;
+unsigned char * SecondLayer = NULL;
+unsigned char * SecondFrame = NULL;
 char LCDAttrib = 0;
 /* camera[] is provided by core/state/display_state.c. */
 /* RGB121map[] lives in Draw.c. */
@@ -190,21 +246,21 @@ uint8_t slice4 = 0, slice5 = 0, slice6 = 0, slice7 = 0;
 uint8_t SPI0locked = 0, SPI1locked = 0;
 volatile int CallBackEnabled = 0;
 int ADCopen = 0;
-volatile MMFLOAT *volatile a1float = NULL, *volatile a2float = NULL;
-volatile MMFLOAT *volatile a3float = NULL, *volatile a4float = NULL;
+volatile MMFLOAT * volatile a1float = NULL, * volatile a2float = NULL;
+volatile MMFLOAT * volatile a3float = NULL, * volatile a4float = NULL;
 uint32_t ADCmax = 0;
-char *ADCInterrupt = NULL;
-short *ADCbuffer = NULL;
-volatile uint8_t *adcint = NULL;
+char * ADCInterrupt = NULL;
+short * ADCbuffer = NULL;
+volatile uint8_t * adcint = NULL;
 uint8_t *adcint1 = NULL, *adcint2 = NULL;
-unsigned char *KeypadInterrupt = NULL;
+unsigned char * KeypadInterrupt = NULL;
 MMFLOAT ADCscale[4] = {0}, ADCbottom[4] = {0};
 
 /* IR */
 void *IrDev = NULL, *IrCmd = NULL;
 volatile char IrVarType = 0, IrState = 0, IrGotMsg = 0;
 int IrBits = 0, IrCount = 0;
-unsigned char *IrInterrupt = NULL;
+unsigned char * IrInterrupt = NULL;
 unsigned int CFuncInt1 = 0, CFuncInt2 = 0, CFuncInt3 = 0, CFuncInt4 = 0;
 
 int p100interrupts[NBRPINS + 1] = {0};
@@ -216,25 +272,38 @@ int QVGA_CLKDIV = 0;
 volatile int X_TILE = 0, Y_TILE = 0;
 int CameraSlice = 0, CameraChannel = 0;
 char id_out[256] = {0};
-uint8_t *buff320 = NULL;
+uint8_t * buff320 = NULL;
 uint16_t SD_CLK_PIN = 0, SD_MOSI_PIN = 0, SD_MISO_PIN = 0, SD_CS_PIN = 0;
 bool screen320 = 0;
 
 /* PINMAP */
 const uint8_t PINMAP[30] = {
-    [1] = 1,   [2] = 2,   [3] = 3,   [4] = 4,   [5] = 5,
-    [6] = 6,   [7] = 7,   [8] = 8,   [9] = 9,   [10] = 10,
-    [11] = 11, [12] = 12, [13] = 13, [14] = 14, [15] = 15,
-    [16] = 16, [17] = 17,
+    [1] = 1,
+    [2] = 2,
+    [3] = 3,
+    [4] = 4,
+    [5] = 5,
+    [6] = 6,
+    [7] = 7,
+    [8] = 8,
+    [9] = 9,
+    [10] = 10,
+    [11] = 11,
+    [12] = 12,
+    [13] = 13,
+    [14] = 14,
+    [15] = 15,
+    [16] = 16,
+    [17] = 17,
 };
 
 /* PinFunction */
-const char *PinFunction[64] = {NULL};
+const char * PinFunction[64] = {NULL};
 
 /* Tile color arrays */
 uint8_t map16[16] = {0};
-uint16_t tilefcols[80*40] = {0};
-uint16_t tilebcols[80*40] = {0};
+uint16_t tilefcols[80 * 40] = {0};
+uint16_t tilebcols[80 * 40] = {0};
 
 /* PS/2 mouse pins */
 int MOUSE_CLOCK = 0, MOUSE_DATA = 0;
@@ -244,7 +313,7 @@ volatile uint64_t IRoffset = 0;
 /* dma_hw / watchdog_hw stubs — Commands.c references their fields. */
 #include "hardware/dma.h"
 #include "hardware/structs/watchdog.h"
-static dma_hw_t      pc386_dma_store  = {0};
+static dma_hw_t pc386_dma_store = {0};
 static watchdog_hw_t pc386_wdog_store = {0};
-dma_hw_t      *dma_hw      = &pc386_dma_store;
-watchdog_hw_t *watchdog_hw = &pc386_wdog_store;
+dma_hw_t * dma_hw = &pc386_dma_store;
+watchdog_hw_t * watchdog_hw = &pc386_wdog_store;

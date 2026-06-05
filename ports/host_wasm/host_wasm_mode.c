@@ -25,7 +25,7 @@
 
 #define HOST_WASM_MODE_MAX 5
 
-static int mode_w[HOST_WASM_MODE_MAX + 1] = {0};  /* 1-indexed; [0] unused */
+static int mode_w[HOST_WASM_MODE_MAX + 1] = {0}; /* 1-indexed; [0] unused */
 static int mode_h[HOST_WASM_MODE_MAX + 1] = {0};
 
 /*
@@ -47,7 +47,7 @@ void wasm_set_mode_resolution(int mode, int w, int h) {
 
 /* Lookup helper used by cmd_mode below and by the runtime initialiser
  * that pre-resolves MODE 1 as the boot screen mode. */
-int host_wasm_mode_lookup(int mode, int *w, int *h) {
+int host_wasm_mode_lookup(int mode, int * w, int * h) {
     if (mode < 1 || mode > HOST_WASM_MODE_MAX) return 0;
     if (mode_w[mode] <= 0 || mode_h[mode] <= 0) return 0;
     if (w) *w = mode_w[mode];

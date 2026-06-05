@@ -29,11 +29,11 @@
 #include "host_keyrepeat.h"
 #include "host_terminal.h"
 
-static int   host_raw_mode_active = 0;
-static DWORD host_orig_in_mode    = 0;
-static DWORD host_orig_out_mode   = 0;
-static UINT  host_orig_in_cp      = 0;
-static UINT  host_orig_out_cp     = 0;
+static int host_raw_mode_active = 0;
+static DWORD host_orig_in_mode = 0;
+static DWORD host_orig_out_mode = 0;
+static UINT host_orig_in_cp = 0;
+static UINT host_orig_out_cp = 0;
 
 #define HOST_PENDING_CAP 16384
 static unsigned char host_pending_bytes[HOST_PENDING_CAP];
@@ -82,11 +82,11 @@ static int host_read_os_byte_nonblock(void) {
 
 static void host_raw_mode_restore(void) {
     if (!host_raw_mode_active) return;
-    HANDLE hin  = GetStdHandle(STD_INPUT_HANDLE);
+    HANDLE hin = GetStdHandle(STD_INPUT_HANDLE);
     HANDLE hout = GetStdHandle(STD_OUTPUT_HANDLE);
-    if (hin  != INVALID_HANDLE_VALUE) SetConsoleMode(hin,  host_orig_in_mode);
+    if (hin != INVALID_HANDLE_VALUE) SetConsoleMode(hin, host_orig_in_mode);
     if (hout != INVALID_HANDLE_VALUE) SetConsoleMode(hout, host_orig_out_mode);
-    if (host_orig_in_cp)  SetConsoleCP(host_orig_in_cp);
+    if (host_orig_in_cp) SetConsoleCP(host_orig_in_cp);
     if (host_orig_out_cp) SetConsoleOutputCP(host_orig_out_cp);
     timeEndPeriod(1);
     host_raw_mode_active = 0;
@@ -108,14 +108,14 @@ static void host_raw_mode_signal(int sig) {
  * pages before exiting so the user's shell isn't left in raw mode. */
 static BOOL WINAPI host_win32_ctrl_handler(DWORD ctrl_type) {
     switch (ctrl_type) {
-        case CTRL_C_EVENT:
-        case CTRL_BREAK_EVENT:
-        case CTRL_CLOSE_EVENT:
-        case CTRL_LOGOFF_EVENT:
-        case CTRL_SHUTDOWN_EVENT:
-            host_raw_mode_restore();
-            ExitProcess(1);
-            return TRUE;
+    case CTRL_C_EVENT:
+    case CTRL_BREAK_EVENT:
+    case CTRL_CLOSE_EVENT:
+    case CTRL_LOGOFF_EVENT:
+    case CTRL_SHUTDOWN_EVENT:
+        host_raw_mode_restore();
+        ExitProcess(1);
+        return TRUE;
     }
     return FALSE;
 }
@@ -124,15 +124,15 @@ void host_raw_mode_enter(void) {
     if (host_raw_mode_active) return;
     if (!_isatty(_fileno(stdin))) return;
 
-    HANDLE hin  = GetStdHandle(STD_INPUT_HANDLE);
+    HANDLE hin = GetStdHandle(STD_INPUT_HANDLE);
     HANDLE hout = GetStdHandle(STD_OUTPUT_HANDLE);
     if (hin == INVALID_HANDLE_VALUE || hout == INVALID_HANDLE_VALUE) return;
-    if (!GetConsoleMode(hin,  &host_orig_in_mode))  return;
+    if (!GetConsoleMode(hin, &host_orig_in_mode)) return;
     if (!GetConsoleMode(hout, &host_orig_out_mode)) return;
 
     DWORD in_mode = host_orig_in_mode;
     in_mode &= ~(ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT | ENABLE_PROCESSED_INPUT);
-    in_mode |=  ENABLE_VIRTUAL_TERMINAL_INPUT;
+    in_mode |= ENABLE_VIRTUAL_TERMINAL_INPUT;
     SetConsoleMode(hin, in_mode);
 
     DWORD out_mode = host_orig_out_mode;
@@ -148,7 +148,7 @@ void host_raw_mode_enter(void) {
      * CP850 / OEM and paint mojibake. Save the original code pages
      * so the restore hook puts the user's shell back the way it
      * was found. */
-    host_orig_in_cp  = GetConsoleCP();
+    host_orig_in_cp = GetConsoleCP();
     host_orig_out_cp = GetConsoleOutputCP();
     SetConsoleCP(CP_UTF8);
     SetConsoleOutputCP(CP_UTF8);
@@ -162,7 +162,7 @@ void host_raw_mode_enter(void) {
     setvbuf(stdout, NULL, _IONBF, 0);
 
     atexit(host_raw_mode_restore);
-    signal(SIGINT,  host_raw_mode_signal);
+    signal(SIGINT, host_raw_mode_signal);
     signal(SIGTERM, host_raw_mode_signal);
     signal(SIGABRT, host_raw_mode_signal);
     SetConsoleCtrlHandler(host_win32_ctrl_handler, TRUE);
@@ -224,13 +224,13 @@ void host_push_back_byte(int c) {
     host_pending_push_front(c);
 }
 
-int host_terminal_get_size(int *rows, int *cols) {
+int host_terminal_get_size(int * rows, int * cols) {
     HANDLE hout = GetStdHandle(STD_OUTPUT_HANDLE);
     if (hout == INVALID_HANDLE_VALUE) return -1;
     CONSOLE_SCREEN_BUFFER_INFO csbi;
     if (!GetConsoleScreenBufferInfo(hout, &csbi)) return -1;
     int r = (int)(csbi.srWindow.Bottom - csbi.srWindow.Top + 1);
-    int c = (int)(csbi.srWindow.Right  - csbi.srWindow.Left + 1);
+    int c = (int)(csbi.srWindow.Right - csbi.srWindow.Left + 1);
     if (r <= 0 || c <= 0) return -1;
     if (rows) *rows = r;
     if (cols) *cols = c;

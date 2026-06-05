@@ -17,25 +17,25 @@
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 
-extern volatile int            TickTimer[];
-extern int                     TickPeriod[];
-extern unsigned char          *TickInt[];
-extern volatile unsigned char  TickActive[];
-extern unsigned char          *InterruptReturn;
-extern unsigned char          *nextstmt;
-extern int                     g_LocalIndex;
-extern void                    pc386_watchdog_kick(uint32_t period_ms);
+extern volatile int TickTimer[];
+extern int TickPeriod[];
+extern unsigned char * TickInt[];
+extern volatile unsigned char TickActive[];
+extern unsigned char * InterruptReturn;
+extern unsigned char * nextstmt;
+extern int g_LocalIndex;
+extern void pc386_watchdog_kick(uint32_t period_ms);
 
-extern int             FindSubFun(unsigned char *p, int type);
-extern unsigned char  *findlabel(unsigned char *p);
-extern unsigned char  *findline(int linenbr, int mustfind);
-extern unsigned char  *subfun[];
-extern short           gui_font_width, gui_font_height;
-extern int             gui_fcolour, gui_bcolour;
+extern int FindSubFun(unsigned char * p, int type);
+extern unsigned char * findlabel(unsigned char * p);
+extern unsigned char * findline(int linenbr, int mustfind);
+extern unsigned char * subfun[];
+extern short gui_font_width, gui_font_height;
+extern int gui_fcolour, gui_bcolour;
 
 /* ---------- GetIntAddress -------------------------------------------- */
 
-unsigned char *GetIntAddress(unsigned char *p) {
+unsigned char * GetIntAddress(unsigned char * p) {
     if (isnamestart((uint8_t)*p)) {
         int i = FindSubFun(p, 0);
         if (i == -1) return findlabel(p);
@@ -48,7 +48,7 @@ unsigned char *GetIntAddress(unsigned char *p) {
 
 void cmd_settick(void) {
     int period, irq = 0;
-    char *s = GetTempMemory(STRINGSIZE);
+    char * s = GetTempMemory(STRINGSIZE);
     getargs(&cmdline, 5, (unsigned char *)",");
     /* Canonical SETTICK accepts argc == 3 or 5. The forms are:
      *   SETTICK period, handler [, irq]
@@ -58,8 +58,14 @@ void cmd_settick(void) {
     if (!(argc == 3 || argc == 5)) error("Argument count");
     strcpy(s, (char *)argv[0]);
     if (argc == 5) irq = getint(argv[4], 1, 4) - 1;
-    if (strcasecmp((char *)argv[0], "PAUSE")  == 0) { TickActive[irq] = 0; return; }
-    if (strcasecmp((char *)argv[0], "RESUME") == 0) { TickActive[irq] = 1; return; }
+    if (strcasecmp((char *)argv[0], "PAUSE") == 0) {
+        TickActive[irq] = 0;
+        return;
+    }
+    if (strcasecmp((char *)argv[0], "RESUME") == 0) {
+        TickActive[irq] = 1;
+        return;
+    }
     period = getint(argv[0], -1, 0x7FFFFFFF);
     if (period == 0) {
         TickInt[irq] = NULL;
@@ -70,7 +76,7 @@ void cmd_settick(void) {
         TickPeriod[irq] = period;
         TickInt[irq] = GetIntAddress(argv[2]);
         TickTimer[irq] = 0;
-        InterruptUsed = 1;     /* match canonical MM_Misc.c */
+        InterruptUsed = 1; /* match canonical MM_Misc.c */
         TickActive[irq] = 1;
     }
 }
@@ -93,7 +99,7 @@ void cmd_ireturn(void) {
  * check_interrupt(). */
 
 void cmd_watchdog(void) {
-    unsigned char *p;
+    unsigned char * p;
     if ((p = checkstring(cmdline, (unsigned char *)"HW"))) {
         (void)p;
         error("WATCHDOG HW not available on pc386 (no hardware WDT)");
@@ -111,38 +117,59 @@ void cmd_watchdog(void) {
 void fun_info(void) {
     sret = GetTempMemory(STRINGSIZE);
     if (!ep || !*ep) {
-        sret[0] = 0; targ = T_STR; return;
+        sret[0] = 0;
+        targ = T_STR;
+        return;
     }
     if (checkstring(ep, (unsigned char *)"HRES")) {
-        iret = HRes; targ = T_INT; return;
+        iret = HRes;
+        targ = T_INT;
+        return;
     }
     if (checkstring(ep, (unsigned char *)"VRES")) {
-        iret = VRes; targ = T_INT; return;
+        iret = VRes;
+        targ = T_INT;
+        return;
     }
     if (checkstring(ep, (unsigned char *)"FONTWIDTH")) {
-        iret = gui_font_width; targ = T_INT; return;
+        iret = gui_font_width;
+        targ = T_INT;
+        return;
     }
     if (checkstring(ep, (unsigned char *)"FONTHEIGHT")) {
-        iret = gui_font_height; targ = T_INT; return;
+        iret = gui_font_height;
+        targ = T_INT;
+        return;
     }
     if (checkstring(ep, (unsigned char *)"FONT")) {
-        iret = (gui_font >> 4) + 1; targ = T_INT; return;
+        iret = (gui_font >> 4) + 1;
+        targ = T_INT;
+        return;
     }
     if (checkstring(ep, (unsigned char *)"FCOLOUR") ||
         checkstring(ep, (unsigned char *)"FCOLOR")) {
-        iret = gui_fcolour; targ = T_INT; return;
+        iret = gui_fcolour;
+        targ = T_INT;
+        return;
     }
     if (checkstring(ep, (unsigned char *)"BCOLOUR") ||
         checkstring(ep, (unsigned char *)"BCOLOR")) {
-        iret = gui_bcolour; targ = T_INT; return;
+        iret = gui_bcolour;
+        targ = T_INT;
+        return;
     }
     if (checkstring(ep, (unsigned char *)"VERSION")) {
         strcpy((char *)sret, MMBASIC_BANNER_NAME);
-        CtoM(sret); targ = T_STR; return;
+        CtoM(sret);
+        targ = T_STR;
+        return;
     }
     if (checkstring(ep, (unsigned char *)"HEAP") ||
         checkstring(ep, (unsigned char *)"MEMORY")) {
-        iret = (int64_t)MMHeap; targ = T_INT; return;
+        iret = (int64_t)MMHeap;
+        targ = T_INT;
+        return;
     }
-    iret = 0; targ = T_INT;
+    iret = 0;
+    targ = T_INT;
 }

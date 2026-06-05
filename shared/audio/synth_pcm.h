@@ -27,27 +27,27 @@ extern "C" {
 #endif
 
 /* --- TONE voice state (set by PLAY TONE / PLAY VOLUME) --- */
-extern volatile float PhaseAC_left, PhaseAC_right;   /* phase accumulators */
-extern volatile float PhaseM_left, PhaseM_right;     /* phase increments   */
-extern volatile int vol_left, vol_right;             /* master volume 0..100 */
-extern volatile uint8_t mono;                        /* L==R fast path */
+extern volatile float PhaseAC_left, PhaseAC_right; /* phase accumulators */
+extern volatile float PhaseM_left, PhaseM_right;   /* phase increments   */
+extern volatile int vol_left, vol_right;           /* master volume 0..100 */
+extern volatile uint8_t mono;                      /* L==R fast path */
 
 /* --- SOUND voice state (set by PLAY SOUND), one entry per slot --- */
 extern volatile float sound_PhaseAC_left[], sound_PhaseAC_right[];
 extern volatile float sound_PhaseM_left[], sound_PhaseM_right[];
-extern volatile int sound_v_left[], sound_v_right[];           /* per-slot vol */
+extern volatile int sound_v_left[], sound_v_right[];                    /* per-slot vol */
 extern volatile unsigned short *sound_mode_left[], *sound_mode_right[]; /* table ptr */
 
 /* --- wavetables / volume map (read-only) --- */
 extern const unsigned short SineTable[4096];
 extern const unsigned short triangletable[4096];
-extern const unsigned short squaretable[1];   /* sentinel {99} */
-extern const unsigned short nulltable[1];      /* sentinel {97} = silence */
-extern const unsigned short sawtable[1];       /* sentinel {98} */
-extern const unsigned short whitenoise[2];     /* sentinel = white noise */
-extern const int mapping[101];                 /* volume -> gain lookup */
-extern unsigned short *noisetable;             /* periodic-noise table ("P") */
-extern unsigned short *usertable;              /* PLAY LOAD SOUND table ("U") */
+extern const unsigned short squaretable[1]; /* sentinel {99} */
+extern const unsigned short nulltable[1];   /* sentinel {97} = silence */
+extern const unsigned short sawtable[1];    /* sentinel {98} */
+extern const unsigned short whitenoise[2];  /* sentinel = white noise */
+extern const int mapping[101];              /* volume -> gain lookup */
+extern unsigned short * noisetable;         /* periodic-noise table ("P") */
+extern unsigned short * usertable;          /* PLAY LOAD SOUND table ("U") */
 
 /* Allocate the periodic-noise table on first use ("P" waveform). */
 void setnoise(void);
@@ -60,9 +60,9 @@ int getsound(int i, int mode);
 
 /* Produce one stereo frame and advance the relevant phase accumulators.
  * Output is full 32-bit scale (sample == frame >> 16). */
-void synth_pcm_sound_sample(int *left, int *right);
-void synth_pcm_tone_frame(int32_t *left, int32_t *right);
-void synth_pcm_sound_frame(int32_t *left, int32_t *right);
+void synth_pcm_sound_sample(int * left, int * right);
+void synth_pcm_tone_frame(int32_t * left, int32_t * right);
+void synth_pcm_sound_frame(int32_t * left, int32_t * right);
 
 #ifdef __cplusplus
 }

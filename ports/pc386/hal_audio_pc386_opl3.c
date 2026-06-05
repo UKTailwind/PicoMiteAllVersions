@@ -16,14 +16,14 @@
 #include "hal/hal_time.h"
 #include "io.h"
 
-#define OPL_ADDR        0x388u
-#define OPL_DATA        0x389u
-#define OPL3_ADDR       0x38Au
-#define OPL3_DATA       0x38Bu
+#define OPL_ADDR 0x388u
+#define OPL_DATA 0x389u
+#define OPL3_ADDR 0x38Au
+#define OPL3_DATA 0x38Bu
 
-#define OPL_TONE_LEFT_CH  4
+#define OPL_TONE_LEFT_CH 4
 #define OPL_TONE_RIGHT_CH 5
-#define OPL_TONE_VOICES   2
+#define OPL_TONE_VOICES 2
 #define OPL_SOUND_VOICES 4
 
 typedef struct {
@@ -42,51 +42,47 @@ static int opl_paused;
 static int master_left = 100;
 static int master_right = 100;
 
-static const uint8_t opl_mod_offset[9] = { 0, 1, 2, 8, 9, 10, 16, 17, 18 };
+static const uint8_t opl_mod_offset[9] = {0, 1, 2, 8, 9, 10, 16, 17, 18};
 
-static void opl_delay_addr(void)
-{
+static void opl_delay_addr(void) {
     for (int i = 0; i < 6; i++) (void)inb(OPL_ADDR);
 }
 
-static void opl_delay_data(void)
-{
+static void opl_delay_data(void) {
     for (int i = 0; i < 35; i++) (void)inb(OPL_ADDR);
 }
 
-static void opl_write_bank(uint16_t addr_port, uint16_t data_port, uint8_t reg, uint8_t val)
-{
+static void opl_write_bank(uint16_t addr_port, uint16_t data_port, uint8_t reg, uint8_t val) {
     outb(addr_port, reg);
     opl_delay_addr();
     outb(data_port, val);
     opl_delay_data();
 }
 
-static void opl_write(uint8_t reg, uint8_t val)
-{
+static void opl_write(uint8_t reg, uint8_t val) {
     opl_write_bank(OPL_ADDR, OPL_DATA, reg, val);
 }
 
-static void opl_write3(uint8_t reg, uint8_t val)
-{
+static void opl_write3(uint8_t reg, uint8_t val) {
     opl_write_bank(OPL3_ADDR, OPL3_DATA, reg, val);
 }
 
-static uint8_t carrier_for(uint8_t ch)
-{
+static uint8_t carrier_for(uint8_t ch) {
     return (uint8_t)(opl_mod_offset[ch] + 3u);
 }
 
-static uint8_t attenuation_for(uint8_t volume, uint8_t pan)
-{
+static uint8_t attenuation_for(uint8_t volume, uint8_t pan) {
     int v = volume;
     if (v < 0) v = 0;
     if (v > 25) v = 25;
 
     int master = 0;
-    if (pan == 0x10) master = master_left;
-    else if (pan == 0x20) master = master_right;
-    else master = (master_left + master_right) / 2;
+    if (pan == 0x10)
+        master = master_left;
+    else if (pan == 0x20)
+        master = master_right;
+    else
+        master = (master_left + master_right) / 2;
 
     int scaled = v * master;
     int level = 63 - (scaled * 63 + 1250) / 2500;
@@ -95,28 +91,31 @@ static uint8_t attenuation_for(uint8_t volume, uint8_t pan)
     return (uint8_t)level;
 }
 
-static uint8_t wave_for(uint8_t type)
-{
+static uint8_t wave_for(uint8_t type) {
     switch (type) {
-        case 'Q': return 1; /* clipped/half sine: square-ish */
-        case 'T': return 6; /* OPL3 waveform, triangle-ish */
-        case 'W': return 4; /* double-speed sine: brighter saw-ish */
-        case 'P':
-        case 'N': return 7; /* harshest OPL3 waveform; not true noise */
-        case 'S':
-        default:  return 0;
+    case 'Q':
+        return 1; /* clipped/half sine: square-ish */
+    case 'T':
+        return 6; /* OPL3 waveform, triangle-ish */
+    case 'W':
+        return 4; /* double-speed sine: brighter saw-ish */
+    case 'P':
+    case 'N':
+        return 7; /* harshest OPL3 waveform; not true noise */
+    case 'S':
+    default:
+        return 0;
     }
 }
 
-static void opl_patch_voice(uint8_t ch, uint8_t type, uint8_t volume, uint8_t pan)
-{
+static void opl_patch_voice(uint8_t ch, uint8_t type, uint8_t volume, uint8_t pan) {
     uint8_t mod = opl_mod_offset[ch];
     uint8_t car = carrier_for(ch);
     uint8_t wave = wave_for(type);
     uint8_t carrier_level = attenuation_for(volume, pan);
 
     uint8_t mod_level = 0x16;
-    uint8_t feedback = 0x08;  /* FM connection with light feedback for audible tones. */
+    uint8_t feedback = 0x08; /* FM connection with light feedback for audible tones. */
     uint8_t mod_env = 0xF0;
     uint8_t car_env = 0xF0;
     uint8_t mod_sr = 0x05;
@@ -143,8 +142,8 @@ static void opl_patch_voice(uint8_t ch, uint8_t type, uint8_t volume, uint8_t pa
         car_sr = 0x11;
     }
 
-    opl_write((uint8_t)(0x20u + mod), 0x21);             /* modulator mult, sustain */
-    opl_write((uint8_t)(0x20u + car), 0x21);             /* carrier mult, sustain */
+    opl_write((uint8_t)(0x20u + mod), 0x21); /* modulator mult, sustain */
+    opl_write((uint8_t)(0x20u + car), 0x21); /* carrier mult, sustain */
     opl_write((uint8_t)(0x40u + mod), mod_level);
     opl_write((uint8_t)(0x40u + car), carrier_level);
     opl_write((uint8_t)(0x60u + mod), mod_env);
@@ -156,8 +155,7 @@ static void opl_patch_voice(uint8_t ch, uint8_t type, uint8_t volume, uint8_t pa
     opl_write((uint8_t)(0xC0u + ch), (uint8_t)(pan | feedback));
 }
 
-static unsigned opl_fnum_for(double hz, uint8_t *block_out)
-{
+static unsigned opl_fnum_for(double hz, uint8_t * block_out) {
     if (hz < 1.0) hz = 1.0;
     if (hz > 6208.0) hz = 6208.0;
 
@@ -176,28 +174,25 @@ static unsigned opl_fnum_for(double hz, uint8_t *block_out)
     return fnum;
 }
 
-static void opl_key_off(uint8_t ch)
-{
+static void opl_key_off(uint8_t ch) {
     opl_write((uint8_t)(0xB0u + ch), 0x00);
 }
 
-static void opl_key_on(uint8_t ch, double hz)
-{
+static void opl_key_on(uint8_t ch, double hz) {
     uint8_t block = 0;
     unsigned fnum = opl_fnum_for(hz, &block);
     opl_write((uint8_t)(0xA0u + ch), (uint8_t)(fnum & 0xFFu));
     opl_write((uint8_t)(0xB0u + ch), (uint8_t)(0x20u | ((block & 7u) << 2) | ((fnum >> 8) & 3u)));
 }
 
-static void opl_reset(void)
-{
+static void opl_reset(void) {
     for (unsigned r = 0; r < 256; r++) opl_write((uint8_t)r, 0);
     for (unsigned r = 0; r < 256; r++) opl_write3((uint8_t)r, 0);
 
     opl_write3(0x05, 0x01); /* OPL3 mode, enables stereo pan bits. */
     opl_write(0x01, 0x20);  /* Waveform select enable. */
     opl_write(0x08, 0x00);
-    opl_write(0xBD, 0x00);  /* Rhythm mode off. */
+    opl_write(0xBD, 0x00); /* Rhythm mode off. */
 
     for (uint8_t ch = 0; ch < 9; ch++) {
         opl_patch_voice(ch, 'S', 0, 0x30);
@@ -205,8 +200,7 @@ static void opl_reset(void)
     }
 }
 
-void hal_audio_init(void)
-{
+void hal_audio_init(void) {
     master_left = 100;
     master_right = 100;
     opl_paused = 0;
@@ -216,25 +210,23 @@ void hal_audio_init(void)
     opl_ready = 1;
 }
 
-static void ensure_ready(void)
-{
+static void ensure_ready(void) {
     if (!opl_ready) hal_audio_init();
 }
 
-void hal_audio_tone(double left_hz, double right_hz, int has_duration, int64_t duration_ms)
-{
+void hal_audio_tone(double left_hz, double right_hz, int has_duration, int64_t duration_ms) {
     ensure_ready();
     hal_audio_stop();
 
     if (left_hz <= 0.0 && right_hz <= 0.0) return;
 
     if (left_hz > 0.0) {
-        tone_voice[0] = (opl_voice_t){ 1, OPL_TONE_LEFT_CH, 0x10, 'S', 25, left_hz };
+        tone_voice[0] = (opl_voice_t){1, OPL_TONE_LEFT_CH, 0x10, 'S', 25, left_hz};
         opl_patch_voice(tone_voice[0].ch, tone_voice[0].type, tone_voice[0].volume, tone_voice[0].pan);
         opl_key_on(tone_voice[0].ch, tone_voice[0].hz);
     }
     if (right_hz > 0.0) {
-        tone_voice[1] = (opl_voice_t){ 1, OPL_TONE_RIGHT_CH, 0x20, 'S', 25, right_hz };
+        tone_voice[1] = (opl_voice_t){1, OPL_TONE_RIGHT_CH, 0x20, 'S', 25, right_hz};
         opl_patch_voice(tone_voice[1].ch, tone_voice[1].type, tone_voice[1].volume, tone_voice[1].pan);
         opl_key_on(tone_voice[1].ch, tone_voice[1].hz);
     }
@@ -255,8 +247,7 @@ void hal_audio_tone(double left_hz, double right_hz, int has_duration, int64_t d
     }
 }
 
-void hal_audio_sound(int slot, const char *ch, const char *type, double freq_hz, int volume)
-{
+void hal_audio_sound(int slot, const char * ch, const char * type, double freq_hz, int volume) {
     ensure_ready();
     if (slot < 1 || slot > OPL_SOUND_VOICES) return;
 
@@ -275,17 +266,18 @@ void hal_audio_sound(int slot, const char *ch, const char *type, double freq_hz,
     }
 
     uint8_t pan = 0x30;
-    if (ch && mytoupper(ch[0]) == 'L') pan = 0x10;
-    else if (ch && mytoupper(ch[0]) == 'R') pan = 0x20;
+    if (ch && mytoupper(ch[0]) == 'L')
+        pan = 0x10;
+    else if (ch && mytoupper(ch[0]) == 'R')
+        pan = 0x20;
 
     if (volume > 25) volume = 25;
-    sound_voice[idx] = (opl_voice_t){ 1, voice_ch, pan, wave, (uint8_t)volume, freq_hz };
+    sound_voice[idx] = (opl_voice_t){1, voice_ch, pan, wave, (uint8_t)volume, freq_hz};
     opl_patch_voice(voice_ch, wave, (uint8_t)volume, pan);
     opl_key_on(voice_ch, freq_hz);
 }
 
-void hal_audio_stop(void)
-{
+void hal_audio_stop(void) {
     ensure_ready();
     for (uint8_t ch = 0; ch < 9; ch++) opl_key_off(ch);
     memset(sound_voice, 0, sizeof(sound_voice));
@@ -293,8 +285,7 @@ void hal_audio_stop(void)
     opl_paused = 0;
 }
 
-void hal_audio_volume(int left_pct, int right_pct)
-{
+void hal_audio_volume(int left_pct, int right_pct) {
     ensure_ready();
     if (left_pct < 0) left_pct = 0;
     if (left_pct > 100) left_pct = 100;
@@ -313,16 +304,14 @@ void hal_audio_volume(int left_pct, int right_pct)
     }
 }
 
-void hal_audio_pause(void)
-{
+void hal_audio_pause(void) {
     ensure_ready();
     if (opl_paused) return;
     for (uint8_t ch = 0; ch < 9; ch++) opl_key_off(ch);
     opl_paused = 1;
 }
 
-void hal_audio_resume(void)
-{
+void hal_audio_resume(void) {
     ensure_ready();
     if (!opl_paused) return;
     opl_paused = 0;
@@ -334,28 +323,47 @@ void hal_audio_resume(void)
     }
 }
 
-void pc386_audio_apply_options(void) { }
+void pc386_audio_apply_options(void) {}
 
-void cmd_sb16(void)
-{
+void cmd_sb16(void) {
     error("SB16 audio backend not built; rebuild with PC386_AUDIO=sb16");
 }
 
 /* Streamed-sample sink: file-stream PCM is not routed to this backend
  * yet; report "always room, never queued" so a decode runs to completion
  * without stalling. */
-int  hal_audio_sample_begin(int sample_rate_hz) { (void)sample_rate_hz; return 0; }
+int hal_audio_sample_begin(int sample_rate_hz) {
+    (void)sample_rate_hz;
+    return 0;
+}
 void hal_audio_sample_end(void) {}
 void hal_audio_sample_eof(void) {}
-int  hal_audio_sample_space(void) { return 4096; }
-int  hal_audio_sample_queued(void) { return 0; }
-int  hal_audio_sample_push(const int16_t *frames, int n) { (void)frames; return n; }
-int  hal_audio_sample_acquire(int16_t **frames, int *frame_capacity) {
-    (void)frames; (void)frame_capacity; return 0;
+int hal_audio_sample_space(void) {
+    return 4096;
 }
-void hal_audio_sample_commit(int frame_count) { (void)frame_count; }
+int hal_audio_sample_queued(void) {
+    return 0;
+}
+int hal_audio_sample_push(const int16_t * frames, int n) {
+    (void)frames;
+    return n;
+}
+int hal_audio_sample_acquire(int16_t ** frames, int * frame_capacity) {
+    (void)frames;
+    (void)frame_capacity;
+    return 0;
+}
+void hal_audio_sample_commit(int frame_count) {
+    (void)frame_count;
+}
 
 #include <stdlib.h>
-void *hal_audio_workmem_alloc(unsigned long bytes) { return malloc((size_t)bytes); }
-void *hal_audio_workmem_realloc(void *p, unsigned long bytes) { return realloc(p, (size_t)bytes); }
-void  hal_audio_workmem_free(void *p) { free(p); }
+void * hal_audio_workmem_alloc(unsigned long bytes) {
+    return malloc((size_t)bytes);
+}
+void * hal_audio_workmem_realloc(void * p, unsigned long bytes) {
+    return realloc(p, (size_t)bytes);
+}
+void hal_audio_workmem_free(void * p) {
+    free(p);
+}

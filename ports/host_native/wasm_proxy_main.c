@@ -14,12 +14,12 @@
 #define DEFAULT_PORT 8000
 #define DEFAULT_WEB_ROOT "ports/host_wasm/web"
 
-static const char *k_extra_headers =
+static const char * k_extra_headers =
     "Cross-Origin-Opener-Policy: same-origin\r\n"
     "Cross-Origin-Embedder-Policy: require-corp\r\n"
     "Cache-Control: no-store\r\n";
 
-static const char *k_text_headers =
+static const char * k_text_headers =
     "Content-Type: text/plain\r\n"
     "Cross-Origin-Opener-Policy: same-origin\r\n"
     "Cross-Origin-Embedder-Policy: require-corp\r\n"
@@ -33,7 +33,7 @@ typedef struct wasm_proxy_server {
     int port;
     bool loopback_only;
     bool allow_public_bind;
-    volatile sig_atomic_t *running;
+    volatile sig_atomic_t * running;
 } wasm_proxy_server_t;
 
 static volatile sig_atomic_t g_running = 1;
@@ -43,7 +43,7 @@ static void on_signal(int signo) {
     g_running = 0;
 }
 
-static bool is_loopback_bind(const char *bind_addr) {
+static bool is_loopback_bind(const char * bind_addr) {
     if (!bind_addr || !*bind_addr) return false;
     return strcmp(bind_addr, "127.0.0.1") == 0 ||
            strncmp(bind_addr, "127.", 4) == 0 ||
@@ -52,14 +52,14 @@ static bool is_loopback_bind(const char *bind_addr) {
            strcmp(bind_addr, "[::1]") == 0;
 }
 
-static void usage(FILE *out, const char *argv0) {
+static void usage(FILE * out, const char * argv0) {
     fprintf(out,
             "Usage: %s [--bind 127.0.0.1] [--port 8000] "
             "[--web-root ports/host_wasm/web] [--allow-public-bind]\n",
             argv0 ? argv0 : "wasm_network_proxy");
 }
 
-static int parse_args(int argc, char **argv, wasm_proxy_server_t *s) {
+static int parse_args(int argc, char ** argv, wasm_proxy_server_t * s) {
     snprintf(s->bind_addr, sizeof(s->bind_addr), "%s", DEFAULT_BIND);
     s->port = DEFAULT_PORT;
     snprintf(s->web_root, sizeof(s->web_root), "%s", DEFAULT_WEB_ROOT);
@@ -68,7 +68,7 @@ static int parse_args(int argc, char **argv, wasm_proxy_server_t *s) {
         if (strcmp(argv[i], "--bind") == 0 && i + 1 < argc) {
             snprintf(s->bind_addr, sizeof(s->bind_addr), "%s", argv[++i]);
         } else if (strcmp(argv[i], "--port") == 0 && i + 1 < argc) {
-            char *end = NULL;
+            char * end = NULL;
             long port = strtol(argv[++i], &end, 10);
             if (!end || *end || port < 1 || port > 65535) {
                 fprintf(stderr, "Invalid --port value\n");
@@ -102,32 +102,34 @@ static int parse_args(int argc, char **argv, wasm_proxy_server_t *s) {
     return 0;
 }
 
-static int mg_str_to_cstr(struct mg_str s, char *dst, size_t dst_len) {
+static int mg_str_to_cstr(struct mg_str s, char * dst, size_t dst_len) {
     if (!dst || dst_len == 0 || s.len >= dst_len) return -1;
     memcpy(dst, s.buf, s.len);
     dst[s.len] = '\0';
     return 0;
 }
 
-static int parse_authority(const char *authority, char *host, size_t host_len,
-                           int *port) {
+static int parse_authority(const char * authority, char * host, size_t host_len,
+                           int * port) {
     if (!authority || !*authority || !host || host_len == 0 || !port)
         return -1;
     *port = 0;
     host[0] = '\0';
 
-    const char *host_start = authority;
-    const char *host_end = authority + strlen(authority);
-    const char *port_start = NULL;
+    const char * host_start = authority;
+    const char * host_end = authority + strlen(authority);
+    const char * port_start = NULL;
     if (*host_start == '[') {
         host_start++;
-        const char *close = strchr(host_start, ']');
+        const char * close = strchr(host_start, ']');
         if (!close) return -1;
         host_end = close;
-        if (close[1] == ':') port_start = close + 2;
-        else if (close[1] != '\0') return -1;
+        if (close[1] == ':')
+            port_start = close + 2;
+        else if (close[1] != '\0')
+            return -1;
     } else {
-        const char *colon = strrchr(authority, ':');
+        const char * colon = strrchr(authority, ':');
         if (colon && strchr(colon + 1, ':') == NULL) {
             host_end = colon;
             port_start = colon + 1;
@@ -140,7 +142,7 @@ static int parse_authority(const char *authority, char *host, size_t host_len,
     host[n] = '\0';
 
     if (port_start && *port_start) {
-        char *end = NULL;
+        char * end = NULL;
         long parsed = strtol(port_start, &end, 10);
         if (!end || *end || parsed < 1 || parsed > 65535) return -1;
         *port = (int)parsed;
@@ -148,7 +150,7 @@ static int parse_authority(const char *authority, char *host, size_t host_len,
     return 0;
 }
 
-static bool is_loopback_host(const char *host) {
+static bool is_loopback_host(const char * host) {
     if (!host || !*host) return false;
     return strcmp(host, "localhost") == 0 ||
            strcmp(host, "::1") == 0 ||
@@ -156,9 +158,9 @@ static bool is_loopback_host(const char *host) {
            strncmp(host, "127.", 4) == 0;
 }
 
-static bool parse_origin(const char *origin, char *host, size_t host_len,
-                         int *port) {
-    const char *scheme_end = strstr(origin, "://");
+static bool parse_origin(const char * origin, char * host, size_t host_len,
+                         int * port) {
+    const char * scheme_end = strstr(origin, "://");
     if (!scheme_end) return false;
     bool is_http = strncasecmp(origin, "http", 4) == 0 &&
                    scheme_end == origin + 4;
@@ -166,9 +168,9 @@ static bool parse_origin(const char *origin, char *host, size_t host_len,
                     scheme_end == origin + 5;
     if (!is_http && !is_https) return false;
 
-    const char *authority = scheme_end + 3;
+    const char * authority = scheme_end + 3;
     char authority_buf[256];
-    const char *end = strchr(authority, '/');
+    const char * end = strchr(authority, '/');
     size_t len = end ? (size_t)(end - authority) : strlen(authority);
     if (len == 0 || len >= sizeof(authority_buf)) return false;
     memcpy(authority_buf, authority, len);
@@ -179,10 +181,10 @@ static bool parse_origin(const char *origin, char *host, size_t host_len,
     return true;
 }
 
-static bool validate_ws_request(const wasm_proxy_server_t *s,
-                                struct mg_http_message *hm,
-                                char *reason, size_t reason_len) {
-    struct mg_str *host_hdr = mg_http_get_header(hm, "Host");
+static bool validate_ws_request(const wasm_proxy_server_t * s,
+                                struct mg_http_message * hm,
+                                char * reason, size_t reason_len) {
+    struct mg_str * host_hdr = mg_http_get_header(hm, "Host");
     if (!host_hdr || host_hdr->len == 0) {
         snprintf(reason, reason_len, "missing Host");
         return false;
@@ -208,7 +210,7 @@ static bool validate_ws_request(const wasm_proxy_server_t *s,
         return false;
     }
 
-    struct mg_str *origin_hdr = mg_http_get_header(hm, "Origin");
+    struct mg_str * origin_hdr = mg_http_get_header(hm, "Origin");
     if (!origin_hdr || origin_hdr->len == 0) return true;
 
     char origin_value[256];
@@ -227,7 +229,7 @@ static bool validate_ws_request(const wasm_proxy_server_t *s,
     return true;
 }
 
-static void send_caps(struct mg_connection *c, const wasm_proxy_server_t *s) {
+static void send_caps(struct mg_connection * c, const wasm_proxy_server_t * s) {
     char body[2048];
     wasm_proxy_caps_config_t cfg = {
         .bind_addr = s->bind_addr,
@@ -247,7 +249,7 @@ static void send_caps(struct mg_connection *c, const wasm_proxy_server_t *s) {
                   "%s\n", body);
 }
 
-static void send_ws_caps(struct mg_connection *c, const wasm_proxy_server_t *s) {
+static void send_ws_caps(struct mg_connection * c, const wasm_proxy_server_t * s) {
     char body[2048];
     wasm_proxy_caps_config_t cfg = {
         .bind_addr = s->bind_addr,
@@ -258,15 +260,15 @@ static void send_ws_caps(struct mg_connection *c, const wasm_proxy_server_t *s) 
     if (wasm_proxy_build_caps_json(body, sizeof(body), &cfg) == 0) {
         mg_ws_send(c, body, strlen(body), WEBSOCKET_OP_TEXT);
     } else {
-        const char *err = "{\"type\":\"error\",\"error\":\"caps\"}";
+        const char * err = "{\"type\":\"error\",\"error\":\"caps\"}";
         mg_ws_send(c, err, strlen(err), WEBSOCKET_OP_TEXT);
     }
 }
 
-static void send_binary_reply(struct mg_connection *c, int status,
-                              const void *body, size_t body_len,
+static void send_binary_reply(struct mg_connection * c, int status,
+                              const void * body, size_t body_len,
                               int truncated) {
-    const char *text = status == 200 ? "OK" : "Error";
+    const char * text = status == 200 ? "OK" : "Error";
     mg_printf(c,
               "HTTP/1.1 %d %s\r\n"
               "Content-Type: application/octet-stream\r\n"
@@ -281,25 +283,25 @@ static void send_binary_reply(struct mg_connection *c, int status,
     c->is_resp = 0;
 }
 
-static int parse_int_var(struct mg_http_message *hm, const char *name,
+static int parse_int_var(struct mg_http_message * hm, const char * name,
                          int min_value, int max_value, int default_value,
-                         int *out) {
+                         int * out) {
     char buf[32];
     int n = mg_http_get_var(&hm->query, name, buf, sizeof(buf));
     if (n <= 0) {
         *out = default_value;
         return 0;
     }
-    char *end = NULL;
+    char * end = NULL;
     long v = strtol(buf, &end, 10);
     if (!end || *end || v < min_value || v > max_value) return -1;
     *out = (int)v;
     return 0;
 }
 
-static void handle_http_proxy(struct mg_connection *c,
-                              const wasm_proxy_server_t *s,
-                              struct mg_http_message *hm) {
+static void handle_http_proxy(struct mg_connection * c,
+                              const wasm_proxy_server_t * s,
+                              struct mg_http_message * hm) {
     if (!mg_match(hm->method, mg_str("POST"), NULL)) {
         mg_http_reply(c, 405, k_extra_headers, "POST required\n");
         return;
@@ -340,9 +342,12 @@ static void handle_http_proxy(struct mg_connection *c,
         send_binary_reply(c, 200, resp.data, resp.len, resp.truncated);
     } else {
         int status = 502;
-        if (rc == WASM_PROXY_HTTP_BAD_REQUEST) status = 400;
-        else if (rc == WASM_PROXY_HTTP_TIMEOUT) status = 504;
-        else if (rc == WASM_PROXY_HTTP_NO_MEMORY) status = 500;
+        if (rc == WASM_PROXY_HTTP_BAD_REQUEST)
+            status = 400;
+        else if (rc == WASM_PROXY_HTTP_TIMEOUT)
+            status = 504;
+        else if (rc == WASM_PROXY_HTTP_NO_MEMORY)
+            status = 500;
         mg_http_reply(c, status, k_extra_headers, "%s\n",
                       resp.error[0] ? resp.error : "proxy request failed");
     }
@@ -357,9 +362,9 @@ static int tcp_status_to_http(int rc) {
     return 502;
 }
 
-static void handle_tcp_listen_proxy(struct mg_connection *c,
-                                    const wasm_proxy_server_t *s,
-                                    struct mg_http_message *hm) {
+static void handle_tcp_listen_proxy(struct mg_connection * c,
+                                    const wasm_proxy_server_t * s,
+                                    struct mg_http_message * hm) {
     if (!mg_match(hm->method, mg_str("POST"), NULL)) {
         mg_http_reply(c, 405, k_extra_headers, "POST required\n");
         return;
@@ -390,9 +395,9 @@ static void handle_tcp_listen_proxy(struct mg_connection *c,
     }
 }
 
-static void handle_tcp_listener_close_proxy(struct mg_connection *c,
-                                            const wasm_proxy_server_t *s,
-                                            struct mg_http_message *hm) {
+static void handle_tcp_listener_close_proxy(struct mg_connection * c,
+                                            const wasm_proxy_server_t * s,
+                                            struct mg_http_message * hm) {
     if (!mg_match(hm->method, mg_str("POST"), NULL)) {
         mg_http_reply(c, 405, k_extra_headers, "POST required\n");
         return;
@@ -417,8 +422,8 @@ static void handle_tcp_listener_close_proxy(struct mg_connection *c,
     }
 }
 
-static void send_tcp_accept_reply(struct mg_connection *c, int conn_id,
-                                  const void *body, size_t body_len) {
+static void send_tcp_accept_reply(struct mg_connection * c, int conn_id,
+                                  const void * body, size_t body_len) {
     mg_printf(c,
               "HTTP/1.1 200 OK\r\n"
               "Content-Type: application/octet-stream\r\n"
@@ -431,9 +436,9 @@ static void send_tcp_accept_reply(struct mg_connection *c, int conn_id,
     c->is_resp = 0;
 }
 
-static void handle_tcp_accept_proxy(struct mg_connection *c,
-                                    const wasm_proxy_server_t *s,
-                                    struct mg_http_message *hm) {
+static void handle_tcp_accept_proxy(struct mg_connection * c,
+                                    const wasm_proxy_server_t * s,
+                                    struct mg_http_message * hm) {
     if (!mg_match(hm->method, mg_str("POST"), NULL)) {
         mg_http_reply(c, 405, k_extra_headers, "POST required\n");
         return;
@@ -453,7 +458,7 @@ static void handle_tcp_accept_proxy(struct mg_connection *c,
         return;
     }
 
-    uint8_t *buf = (uint8_t *)malloc((size_t)max_bytes);
+    uint8_t * buf = (uint8_t *)malloc((size_t)max_bytes);
     if (!buf) {
         mg_http_reply(c, 500, k_extra_headers, "out of memory\n");
         return;
@@ -474,9 +479,9 @@ static void handle_tcp_accept_proxy(struct mg_connection *c,
     free(buf);
 }
 
-static void handle_tcp_accept_conn_proxy(struct mg_connection *c,
-                                         const wasm_proxy_server_t *s,
-                                         struct mg_http_message *hm) {
+static void handle_tcp_accept_conn_proxy(struct mg_connection * c,
+                                         const wasm_proxy_server_t * s,
+                                         struct mg_http_message * hm) {
     if (!mg_match(hm->method, mg_str("POST"), NULL)) {
         mg_http_reply(c, 405, k_extra_headers, "POST required\n");
         return;
@@ -506,9 +511,9 @@ static void handle_tcp_accept_conn_proxy(struct mg_connection *c,
     }
 }
 
-static void handle_tcp_conn_recv_proxy(struct mg_connection *c,
-                                       const wasm_proxy_server_t *s,
-                                       struct mg_http_message *hm) {
+static void handle_tcp_conn_recv_proxy(struct mg_connection * c,
+                                       const wasm_proxy_server_t * s,
+                                       struct mg_http_message * hm) {
     if (!mg_match(hm->method, mg_str("POST"), NULL)) {
         mg_http_reply(c, 405, k_extra_headers, "POST required\n");
         return;
@@ -528,7 +533,7 @@ static void handle_tcp_conn_recv_proxy(struct mg_connection *c,
         return;
     }
 
-    uint8_t *buf = (uint8_t *)malloc((size_t)max_bytes);
+    uint8_t * buf = (uint8_t *)malloc((size_t)max_bytes);
     if (!buf) {
         mg_http_reply(c, 500, k_extra_headers, "out of memory\n");
         return;
@@ -550,9 +555,9 @@ static void handle_tcp_conn_recv_proxy(struct mg_connection *c,
     (void)closed;
 }
 
-static void handle_tcp_conn_send_proxy(struct mg_connection *c,
-                                       const wasm_proxy_server_t *s,
-                                       struct mg_http_message *hm) {
+static void handle_tcp_conn_send_proxy(struct mg_connection * c,
+                                       const wasm_proxy_server_t * s,
+                                       struct mg_http_message * hm) {
     if (!mg_match(hm->method, mg_str("POST"), NULL)) {
         mg_http_reply(c, 405, k_extra_headers, "POST required\n");
         return;
@@ -588,9 +593,9 @@ static void handle_tcp_conn_send_proxy(struct mg_connection *c,
     }
 }
 
-static void handle_tcp_conn_close_proxy(struct mg_connection *c,
-                                        const wasm_proxy_server_t *s,
-                                        struct mg_http_message *hm) {
+static void handle_tcp_conn_close_proxy(struct mg_connection * c,
+                                        const wasm_proxy_server_t * s,
+                                        struct mg_http_message * hm) {
     if (!mg_match(hm->method, mg_str("POST"), NULL)) {
         mg_http_reply(c, 405, k_extra_headers, "POST required\n");
         return;
@@ -624,9 +629,9 @@ static int udp_status_to_http(int rc) {
     return 502;
 }
 
-static void handle_tcp_open_proxy(struct mg_connection *c,
-                                  const wasm_proxy_server_t *s,
-                                  struct mg_http_message *hm) {
+static void handle_tcp_open_proxy(struct mg_connection * c,
+                                  const wasm_proxy_server_t * s,
+                                  struct mg_http_message * hm) {
     if (!mg_match(hm->method, mg_str("POST"), NULL)) {
         mg_http_reply(c, 405, k_extra_headers, "POST required\n");
         return;
@@ -663,9 +668,9 @@ static void handle_tcp_open_proxy(struct mg_connection *c,
     }
 }
 
-static void handle_tcp_stream_proxy(struct mg_connection *c,
-                                    const wasm_proxy_server_t *s,
-                                    struct mg_http_message *hm) {
+static void handle_tcp_stream_proxy(struct mg_connection * c,
+                                    const wasm_proxy_server_t * s,
+                                    struct mg_http_message * hm) {
     if (!mg_match(hm->method, mg_str("POST"), NULL)) {
         mg_http_reply(c, 405, k_extra_headers, "POST required\n");
         return;
@@ -692,7 +697,7 @@ static void handle_tcp_stream_proxy(struct mg_connection *c,
         return;
     }
 
-    uint8_t *buf = (uint8_t *)malloc((size_t)max_bytes);
+    uint8_t * buf = (uint8_t *)malloc((size_t)max_bytes);
     if (!buf) {
         mg_http_reply(c, 500, k_extra_headers, "out of memory\n");
         return;
@@ -714,9 +719,9 @@ static void handle_tcp_stream_proxy(struct mg_connection *c,
     (void)closed;
 }
 
-static void handle_tcp_close_proxy(struct mg_connection *c,
-                                   const wasm_proxy_server_t *s,
-                                   struct mg_http_message *hm) {
+static void handle_tcp_close_proxy(struct mg_connection * c,
+                                   const wasm_proxy_server_t * s,
+                                   struct mg_http_message * hm) {
     if (!mg_match(hm->method, mg_str("POST"), NULL)) {
         mg_http_reply(c, 405, k_extra_headers, "POST required\n");
         return;
@@ -741,9 +746,9 @@ static void handle_tcp_close_proxy(struct mg_connection *c,
     }
 }
 
-static void handle_udp_bind_proxy(struct mg_connection *c,
-                                  const wasm_proxy_server_t *s,
-                                  struct mg_http_message *hm) {
+static void handle_udp_bind_proxy(struct mg_connection * c,
+                                  const wasm_proxy_server_t * s,
+                                  struct mg_http_message * hm) {
     if (!mg_match(hm->method, mg_str("POST"), NULL)) {
         mg_http_reply(c, 405, k_extra_headers, "POST required\n");
         return;
@@ -771,9 +776,9 @@ static void handle_udp_bind_proxy(struct mg_connection *c,
     }
 }
 
-static void handle_udp_close_proxy(struct mg_connection *c,
-                                   const wasm_proxy_server_t *s,
-                                   struct mg_http_message *hm) {
+static void handle_udp_close_proxy(struct mg_connection * c,
+                                   const wasm_proxy_server_t * s,
+                                   struct mg_http_message * hm) {
     if (!mg_match(hm->method, mg_str("POST"), NULL)) {
         mg_http_reply(c, 405, k_extra_headers, "POST required\n");
         return;
@@ -798,9 +803,9 @@ static void handle_udp_close_proxy(struct mg_connection *c,
     }
 }
 
-static void handle_udp_send_proxy(struct mg_connection *c,
-                                  const wasm_proxy_server_t *s,
-                                  struct mg_http_message *hm) {
+static void handle_udp_send_proxy(struct mg_connection * c,
+                                  const wasm_proxy_server_t * s,
+                                  struct mg_http_message * hm) {
     if (!mg_match(hm->method, mg_str("POST"), NULL)) {
         mg_http_reply(c, 405, k_extra_headers, "POST required\n");
         return;
@@ -843,8 +848,8 @@ static void handle_udp_send_proxy(struct mg_connection *c,
     }
 }
 
-static void send_udp_packet_reply(struct mg_connection *c,
-                                  const wasm_proxy_udp_packet_t *packet) {
+static void send_udp_packet_reply(struct mg_connection * c,
+                                  const wasm_proxy_udp_packet_t * packet) {
     mg_printf(c,
               "HTTP/1.1 200 OK\r\n"
               "Content-Type: application/octet-stream\r\n"
@@ -860,9 +865,9 @@ static void send_udp_packet_reply(struct mg_connection *c,
     c->is_resp = 0;
 }
 
-static void handle_udp_recv_proxy(struct mg_connection *c,
-                                  const wasm_proxy_server_t *s,
-                                  struct mg_http_message *hm) {
+static void handle_udp_recv_proxy(struct mg_connection * c,
+                                  const wasm_proxy_server_t * s,
+                                  struct mg_http_message * hm) {
     if (!mg_match(hm->method, mg_str("POST"), NULL)) {
         mg_http_reply(c, 405, k_extra_headers, "POST required\n");
         return;
@@ -882,7 +887,7 @@ static void handle_udp_recv_proxy(struct mg_connection *c,
         return;
     }
 
-    uint8_t *buf = (uint8_t *)malloc((size_t)max_bytes);
+    uint8_t * buf = (uint8_t *)malloc((size_t)max_bytes);
     if (!buf) {
         mg_http_reply(c, 500, k_extra_headers, "out of memory\n");
         return;
@@ -905,11 +910,11 @@ static void handle_udp_recv_proxy(struct mg_connection *c,
     free(buf);
 }
 
-static void ev_handler(struct mg_connection *c, int ev, void *ev_data) {
-    wasm_proxy_server_t *s = (wasm_proxy_server_t *)c->fn_data;
+static void ev_handler(struct mg_connection * c, int ev, void * ev_data) {
+    wasm_proxy_server_t * s = (wasm_proxy_server_t *)c->fn_data;
 
     if (ev == MG_EV_HTTP_MSG) {
-        struct mg_http_message *hm = (struct mg_http_message *)ev_data;
+        struct mg_http_message * hm = (struct mg_http_message *)ev_data;
         if (mg_match(hm->uri, mg_str("/__picomite_proxy/caps"), NULL)) {
             send_caps(c, s);
         } else if (mg_match(hm->uri, mg_str("/__picomite_proxy/http"), NULL)) {
@@ -976,19 +981,19 @@ static void ev_handler(struct mg_connection *c, int ev, void *ev_data) {
             mg_http_serve_dir(c, hm, &opts);
         }
     } else if (ev == MG_EV_WS_MSG) {
-        struct mg_ws_message *wm = (struct mg_ws_message *)ev_data;
+        struct mg_ws_message * wm = (struct mg_ws_message *)ev_data;
         if ((wm->flags & 0x0f) != WEBSOCKET_OP_TEXT) return;
         if (wasm_proxy_is_hello_message(wm->data.buf, wm->data.len)) {
             send_ws_caps(c, s);
         } else {
-            const char *err =
+            const char * err =
                 "{\"type\":\"error\",\"error\":\"expected hello\"}";
             mg_ws_send(c, err, strlen(err), WEBSOCKET_OP_TEXT);
         }
     }
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char ** argv) {
     wasm_proxy_server_t server;
     memset(&server, 0, sizeof(server));
     server.running = &g_running;
@@ -1003,7 +1008,7 @@ int main(int argc, char **argv) {
 
     mg_log_set(MG_LL_ERROR);
     mg_mgr_init(&server.mgr);
-    struct mg_connection *listener =
+    struct mg_connection * listener =
         mg_http_listen(&server.mgr, server.listen_url, ev_handler, &server);
     if (!listener) {
         fprintf(stderr, "Failed to listen on %s\n", server.listen_url);

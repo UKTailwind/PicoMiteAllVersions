@@ -13,7 +13,7 @@ static hal_net_udp_socket_t pico_tftp_socket;
 static mm_net_tftp_session_t pico_tftp_session;
 static int pico_tftp_fnbr;
 
-static int pico_tftp_peer_text(const mm_net_tftp_peer_t *peer, char *out,
+static int pico_tftp_peer_text(const mm_net_tftp_peer_t * peer, char * out,
                                size_t out_len) {
     if (!peer || !out || out_len == 0) return 0;
     if (peer->family != 4) return 0;
@@ -22,8 +22,8 @@ static int pico_tftp_peer_text(const mm_net_tftp_peer_t *peer, char *out,
     return 1;
 }
 
-static int pico_tftp_send(void *ctx, const mm_net_tftp_peer_t *peer,
-                          const void *buf, size_t len) {
+static int pico_tftp_send(void * ctx, const mm_net_tftp_peer_t * peer,
+                          const void * buf, size_t len) {
     (void)ctx;
     if (!pico_tftp_socket) return 0;
     char host[32];
@@ -32,8 +32,8 @@ static int pico_tftp_send(void *ctx, const mm_net_tftp_peer_t *peer,
                                    len, 1000) == HAL_NET_OK;
 }
 
-static int pico_tftp_open_file(void *ctx, const char *filename, int write,
-                               void **handle) {
+static int pico_tftp_open_file(void * ctx, const char * filename, int write,
+                               void ** handle) {
     (void)ctx;
     if (!InitSDCard()) return -1;
 
@@ -57,7 +57,7 @@ static int pico_tftp_open_file(void *ctx, const char *filename, int write,
     return 0;
 }
 
-static ssize_t pico_tftp_read_file(void *ctx, void *handle, void *buf,
+static ssize_t pico_tftp_read_file(void * ctx, void * handle, void * buf,
                                    size_t len) {
     (void)ctx;
     int fnbr = *(int *)handle;
@@ -65,7 +65,7 @@ static ssize_t pico_tftp_read_file(void *ctx, void *handle, void *buf,
     return n < 0 ? -1 : n;
 }
 
-static ssize_t pico_tftp_write_file(void *ctx, void *handle, const void *buf,
+static ssize_t pico_tftp_write_file(void * ctx, void * handle, const void * buf,
                                     size_t len) {
     (void)ctx;
     int fnbr = *(int *)handle;
@@ -75,7 +75,7 @@ static ssize_t pico_tftp_write_file(void *ctx, void *handle, const void *buf,
     return w < 0 ? -1 : w;
 }
 
-static void pico_tftp_close_file(void *ctx, void *handle) {
+static void pico_tftp_close_file(void * ctx, void * handle) {
     (void)ctx;
     int fnbr = *(int *)handle;
     FileClose(fnbr);

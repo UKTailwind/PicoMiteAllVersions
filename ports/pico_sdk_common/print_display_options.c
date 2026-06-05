@@ -19,17 +19,16 @@
 #include "hal/hal_i2c_keypad.h"
 #include "hal/hal_print_options.h"
 
-extern void PO(char *s1);
-extern void PO2Int(char *s1, int n1);
-extern void PO2Str(char *s1, char *s2);
+extern void PO(char * s1);
+extern void PO2Int(char * s1, int n1);
+extern void PO2Str(char * s1, char * s2);
 extern void PRet(void);
 extern void port_web_print_options(void);
 
 extern bool rp2350a;
-extern const char *KBrdList[];
+extern const char * KBrdList[];
 
-void port_print_keyboard_heartbeat(void)
-{
+void port_print_keyboard_heartbeat(void) {
     /* Keyboard layout / pins / mouse / REPEAT lines are emitted by
      * the per-keyboard-driver port_print_kb_layout hook (USB-host
      * driver vs PS/2 driver). */
@@ -47,29 +46,29 @@ void port_print_keyboard_heartbeat(void)
 #endif
 }
 
-void port_print_usb_kb_repeat(void)
-{
+void port_print_usb_kb_repeat(void) {
     /* USB-host driver emits OPTION KEYBOARD REPEAT here; PS/2 driver
      * provides a no-op stub (the PS/2 REPEAT line, if any, is
      * emitted earlier inside port_print_kb_layout). */
     port_print_kb_repeat();
 }
 
-void port_print_lcd_spi(void)
-{
+void port_print_lcd_spi(void) {
     /* LCD_CLK / LCD_MOSI / LCD_MISO exist in struct option_s on every
      * port (FileIO.h). The runtime guard makes the print inert on
      * ports that never configure a separate LCD SPI bus. */
     if (Option.LCD_CLK && !(Option.SYSTEM_CLK == Option.LCD_CLK)) {
         PO("LCD SPI");
-        MMPrintString((char *)PinDef[Option.LCD_CLK].pinname);  MMputchar(',', 1);
-        MMPrintString((char *)PinDef[Option.LCD_MOSI].pinname); MMputchar(',', 1);
-        MMPrintString((char *)PinDef[Option.LCD_MISO].pinname); MMPrintString("\r\n");
+        MMPrintString((char *)PinDef[Option.LCD_CLK].pinname);
+        MMputchar(',', 1);
+        MMPrintString((char *)PinDef[Option.LCD_MOSI].pinname);
+        MMputchar(',', 1);
+        MMPrintString((char *)PinDef[Option.LCD_MISO].pinname);
+        MMPrintString("\r\n");
     }
 }
 
-void port_print_display_options(void)
-{
+void port_print_display_options(void) {
     /* VGA-family ports print RESOLUTION + DEFAULT MODE + DISPLAY +
      * HDMI PINS; non-VGA ports print CPUSPEED + LCDPANEL + TOUCH.
      * Each hook is real on its own port shape and a no-op on the
@@ -79,13 +78,16 @@ void port_print_display_options(void)
     /* SDCARD print — VGA shares system SPI with SD when SD_CLK_PIN==0,
      * prints SYSTEM_CLK/MOSI/MISO in that case; non-VGA always uses
      * dedicated SD pins. */
-    if(Option.SD_CS){
+    if (Option.SD_CS) {
         PO("SDCARD");
         MMPrintString((char *)PinDef[Option.SD_CS].pinname);
-        if(Option.SD_CLK_PIN){
-            MMPrintString(", "); MMPrintString((char *)PinDef[Option.SD_CLK_PIN].pinname);
-            MMPrintString(", "); MMPrintString((char *)PinDef[Option.SD_MOSI_PIN].pinname);
-            MMPrintString(", "); MMPrintString((char *)PinDef[Option.SD_MISO_PIN].pinname);
+        if (Option.SD_CLK_PIN) {
+            MMPrintString(", ");
+            MMPrintString((char *)PinDef[Option.SD_CLK_PIN].pinname);
+            MMPrintString(", ");
+            MMPrintString((char *)PinDef[Option.SD_MOSI_PIN].pinname);
+            MMPrintString(", ");
+            MMPrintString((char *)PinDef[Option.SD_MISO_PIN].pinname);
         } else {
             port_print_sdcard_system_spi_share();
         }

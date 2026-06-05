@@ -8,9 +8,9 @@
 #include "shared/net/mm_net_http.h"
 #include "shared/net/mm_net_http_file.h"
 
-int mm_net_http_send_file(const char *fname, const char *content_type,
-                          const char *server_name,
-                          mm_net_http_send_fn send_fn, void *send_ctx) {
+int mm_net_http_send_file(const char * fname, const char * content_type,
+                          const char * server_name,
+                          mm_net_http_send_fn send_fn, void * send_ctx) {
     if (!fname || !*fname || !send_fn) return -1;
 
     struct hal_stat st;

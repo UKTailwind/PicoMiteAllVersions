@@ -10,15 +10,16 @@
 
 static int failures = 0;
 
-#define EXPECT_TRUE(expr) do { \
-    if (!(expr)) { \
-        fprintf(stderr, "FAIL %s:%d: %s\n", __FILE__, __LINE__, #expr); \
-        failures++; \
-    } \
-} while (0)
+#define EXPECT_TRUE(expr)                                                   \
+    do {                                                                    \
+        if (!(expr)) {                                                      \
+            fprintf(stderr, "FAIL %s:%d: %s\n", __FILE__, __LINE__, #expr); \
+            failures++;                                                     \
+        }                                                                   \
+    } while (0)
 
-static void expect_bytes(const uint8_t *got, const uint8_t *want, size_t len,
-                         const char *label) {
+static void expect_bytes(const uint8_t * got, const uint8_t * want, size_t len,
+                         const char * label) {
     if (memcmp(got, want, len) == 0) return;
     fprintf(stderr, "FAIL %s\n got :", label);
     for (size_t i = 0; i < len; i++) fprintf(stderr, " %02x", got[i]);
@@ -28,10 +29,10 @@ static void expect_bytes(const uint8_t *got, const uint8_t *want, size_t len,
     failures++;
 }
 
-static size_t make_masked_frame(uint8_t opcode, int fin, const uint8_t *payload,
-                                size_t payload_len, uint8_t *out,
+static size_t make_masked_frame(uint8_t opcode, int fin, const uint8_t * payload,
+                                size_t payload_len, uint8_t * out,
                                 size_t out_len) {
-    const uint8_t mask[] = { 0x12, 0x34, 0x56, 0x78 };
+    const uint8_t mask[] = {0x12, 0x34, 0x56, 0x78};
     size_t pos = 2;
     if (out_len < 6 || payload_len > 65535u) return 0;
     out[0] = (fin ? 0x80 : 0x00) | (opcode & 0x0f);
@@ -90,7 +91,7 @@ static void test_encode(void) {
     size_t n = 0;
     EXPECT_TRUE(mm_net_ws_encode_frame(MM_NET_WS_OPCODE_TEXT, "hi", 2, buf,
                                        sizeof(buf), &n) == MM_NET_WS_OK);
-    const uint8_t want_text[] = { 0x81, 0x02, 'h', 'i' };
+    const uint8_t want_text[] = {0x81, 0x02, 'h', 'i'};
     EXPECT_TRUE(n == sizeof(want_text));
     expect_bytes(buf, want_text, sizeof(want_text), "text frame");
 
@@ -126,7 +127,7 @@ static void test_decode_text_and_controls(void) {
     EXPECT_TRUE(decoded.payload_len == 5);
     EXPECT_TRUE(memcmp(payload_out, "hello", 5) == 0);
 
-    const uint8_t binary_payload[] = { 0xde, 0xad, 0xbe, 0xef };
+    const uint8_t binary_payload[] = {0xde, 0xad, 0xbe, 0xef};
     n = make_masked_frame(MM_NET_WS_OPCODE_BINARY, 1, binary_payload,
                           sizeof(binary_payload), frame, sizeof(frame));
     EXPECT_TRUE(mm_net_ws_decode_frame(frame, n, sizeof(payload_out),
@@ -153,7 +154,7 @@ static void test_decode_text_and_controls(void) {
     EXPECT_TRUE(decoded.opcode == MM_NET_WS_OPCODE_PONG);
     EXPECT_TRUE(payload_out[0] == '!');
 
-    const uint8_t close_payload[] = { 0x03, 0xe8 };
+    const uint8_t close_payload[] = {0x03, 0xe8};
     n = make_masked_frame(MM_NET_WS_OPCODE_CLOSE, 1, close_payload,
                           sizeof(close_payload), frame, sizeof(frame));
     EXPECT_TRUE(mm_net_ws_decode_frame(frame, n, sizeof(payload_out),
@@ -185,7 +186,7 @@ static void test_decode_rejections(void) {
                                        sizeof(payload_out), &decoded,
                                        &consumed) == MM_NET_WS_ERR_TOO_LARGE);
 
-    const uint8_t unmasked[] = { 0x81, 0x02, 'n', 'o' };
+    const uint8_t unmasked[] = {0x81, 0x02, 'n', 'o'};
     EXPECT_TRUE(mm_net_ws_decode_frame(unmasked, sizeof(unmasked),
                                        sizeof(payload_out), payload_out,
                                        sizeof(payload_out), &decoded,

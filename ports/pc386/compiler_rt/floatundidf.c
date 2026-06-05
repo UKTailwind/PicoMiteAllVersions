@@ -25,25 +25,25 @@
 // flag as a side-effect of this computation.
 
 COMPILER_RT_ABI double __floatundidf(du_int a) {
-  static const double twop52 = 4503599627370496.0;           // 0x1.0p52
-  static const double twop84 = 19342813113834066795298816.0; // 0x1.0p84
-  static const double twop84_plus_twop52 =
-      19342813118337666422669312.0; // 0x1.00000001p84
+    static const double twop52 = 4503599627370496.0;           // 0x1.0p52
+    static const double twop84 = 19342813113834066795298816.0; // 0x1.0p84
+    static const double twop84_plus_twop52 =
+        19342813118337666422669312.0; // 0x1.00000001p84
 
-  union {
-    uint64_t x;
-    double d;
-  } high = {.d = twop84};
-  union {
-    uint64_t x;
-    double d;
-  } low = {.d = twop52};
+    union {
+        uint64_t x;
+        double d;
+    } high = {.d = twop84};
+    union {
+        uint64_t x;
+        double d;
+    } low = {.d = twop52};
 
-  high.x |= a >> 32;
-  low.x |= a & UINT64_C(0x00000000ffffffff);
+    high.x |= a >> 32;
+    low.x |= a & UINT64_C(0x00000000ffffffff);
 
-  const double result = (high.d - twop84_plus_twop52) + low.d;
-  return result;
+    const double result = (high.d - twop84_plus_twop52) + low.d;
+    return result;
 }
 
 #else
@@ -55,12 +55,16 @@ COMPILER_RT_ABI double __floatundidf(du_int a) {
 #define DST_DOUBLE
 #include "int_to_fp_impl.inc"
 
-COMPILER_RT_ABI double __floatundidf(du_int a) { return __floatXiYf__(a); }
+COMPILER_RT_ABI double __floatundidf(du_int a) {
+    return __floatXiYf__(a);
+}
 #endif
 
 #if defined(__ARM_EABI__)
 #if defined(COMPILER_RT_ARMHF_TARGET)
-AEABI_RTABI double __aeabi_ul2d(du_int a) { return __floatundidf(a); }
+AEABI_RTABI double __aeabi_ul2d(du_int a) {
+    return __floatundidf(a);
+}
 #else
 COMPILER_RT_ALIAS(__floatundidf, __aeabi_ul2d)
 #endif

@@ -10,7 +10,7 @@
 #include "hal/hal_net.h"
 #include "shared/net/mm_net_wifi_cmd.h"
 
-void mm_net_wifi_parse_scan(unsigned char *arg, mm_net_scan_args_t *out) {
+void mm_net_wifi_parse_scan(unsigned char * arg, mm_net_scan_args_t * out) {
     memset(out, 0, sizeof(*out));
     if (!arg || !*arg) return;
 
@@ -21,11 +21,11 @@ void mm_net_wifi_parse_scan(unsigned char *arg, mm_net_scan_args_t *out) {
     out->dest[0] = 0;
 }
 
-void mm_net_wifi_scan_command(unsigned char *arg) {
+void mm_net_wifi_scan_command(unsigned char * arg) {
     mm_net_scan_args_t parsed;
     mm_net_wifi_parse_scan(arg, &parsed);
 
-    char *scan_out = parsed.buffer;
+    char * scan_out = parsed.buffer;
     size_t scan_cap = parsed.capacity;
     if (!parsed.dest) {
         scan_cap = 8192;
@@ -45,15 +45,15 @@ void mm_net_wifi_scan_command(unsigned char *arg) {
     }
 }
 
-static void copy_checked(char *dest, size_t dest_len, const char *src,
-                         const char *err) {
+static void copy_checked(char * dest, size_t dest_len, const char * src,
+                         const char * err) {
     if (strlen(src) >= dest_len) error((char *)err);
     strcpy(dest, src);
 }
 
-void mm_net_wifi_parse_credentials(unsigned char *arg,
-                                   const char *default_hostname,
-                                   mm_net_wifi_credentials_t *out) {
+void mm_net_wifi_parse_credentials(unsigned char * arg,
+                                   const char * default_hostname,
+                                   mm_net_wifi_credentials_t * out) {
     memset(out, 0, sizeof(*out));
     getargs(&arg, 11, (unsigned char *)",");
     if (!(argc == 3 || argc == 5 || argc == 11)) error("Syntax");

@@ -36,11 +36,11 @@
 
 /* MMBasic's graphics-target pointers. Re-declare DisplayBuf here so every
  * backend function below can see the visible drawing surface. */
-extern unsigned char *DisplayBuf;
+extern unsigned char * DisplayBuf;
 
-uint32_t *host_framebuffer = NULL;
+uint32_t * host_framebuffer = NULL;
 /* PicoCalc is a 320x320 square IPS LCD. */
-int host_fb_width  = 320;
+int host_fb_width = 320;
 int host_fb_height = 320;
 
 /* See host_fb.h. Bumped by every path that mutates the visible plane;
@@ -51,15 +51,15 @@ volatile uint32_t host_fb_generation = 0;
  * detect a MODE-N-driven dimension change. */
 volatile uint32_t host_fb_config_generation = 0;
 
-uint32_t *host_fastgfx_back = NULL;
+uint32_t * host_fastgfx_back = NULL;
 
-static uint32_t *host_fb_framebuffer = NULL;      /* FRAMEBUFFER CREATE back plane */
-static uint32_t *host_fb_layerbuffer = NULL;      /* LAYER back plane */
-static uint32_t  host_fb_layer_transparent = 0;
-static uint64_t  host_fb_next_merge_us = 0;
-static uint32_t *host_fb_copy_src = NULL;
-static uint32_t *host_fb_copy_dst = NULL;
-static int       host_fb_copy_pending = 0;
+static uint32_t * host_fb_framebuffer = NULL; /* FRAMEBUFFER CREATE back plane */
+static uint32_t * host_fb_layerbuffer = NULL; /* LAYER back plane */
+static uint32_t host_fb_layer_transparent = 0;
+static uint64_t host_fb_next_merge_us = 0;
+static uint32_t * host_fb_copy_src = NULL;
+static uint32_t * host_fb_copy_dst = NULL;
+static int host_fb_copy_pending = 0;
 
 /* ------------------------------------------------------------------------
  * Internal helpers.
@@ -89,7 +89,7 @@ static void host_fb_bind_display(void) {
     if (LayerBuf == NULL) LayerBuf = DisplayBuf;
 }
 
-static uint32_t *host_fb_buffer_for_target(unsigned char *target) {
+static uint32_t * host_fb_buffer_for_target(unsigned char * target) {
     if (!host_framebuffer) host_fb_ensure();
     if (!host_framebuffer) return NULL;
     host_fb_bind_display();
@@ -101,11 +101,11 @@ static uint32_t *host_fb_buffer_for_target(unsigned char *target) {
     return host_framebuffer;
 }
 
-uint32_t *host_fb_current_target(void) {
+uint32_t * host_fb_current_target(void) {
     return host_fb_buffer_for_target(WriteBuf);
 }
 
-static void host_fb_fill_buffer(uint32_t *buffer, uint32_t colour) {
+static void host_fb_fill_buffer(uint32_t * buffer, uint32_t colour) {
     size_t pixels = (size_t)host_fb_width * (size_t)host_fb_height;
     if (!buffer) return;
     for (size_t i = 0; i < pixels; ++i) buffer[i] = colour;
@@ -123,7 +123,7 @@ static void host_fb_merge_now(uint32_t transparent) {
     host_fb_bump_generation();
 }
 
-static void host_fb_copy_now(uint32_t *src, uint32_t *dst) {
+static void host_fb_copy_now(uint32_t * src, uint32_t * dst) {
     size_t pixels;
     if (!src || !dst) return;
     pixels = (size_t)host_fb_width * (size_t)host_fb_height;
@@ -152,7 +152,7 @@ static void host_fb_complete_pending_copy(void) {
  * ------------------------------------------------------------------------ */
 
 void host_fb_put_pixel(int x, int y, int c) {
-    uint32_t *target = host_fb_current_target();
+    uint32_t * target = host_fb_current_target();
     if (!target) return;
     if (x < 0 || y < 0 || x >= host_fb_width || y >= host_fb_height) return;
     target[(size_t)y * (size_t)host_fb_width + (size_t)x] = host_fb_colour24(c);
@@ -161,10 +161,18 @@ void host_fb_put_pixel(int x, int y, int c) {
 }
 
 void host_fb_fill_rect(int x1, int y1, int x2, int y2, int c) {
-    uint32_t *target = host_fb_current_target();
+    uint32_t * target = host_fb_current_target();
     if (!target) return;
-    if (x1 > x2) { int t = x1; x1 = x2; x2 = t; }
-    if (y1 > y2) { int t = y1; y1 = y2; y2 = t; }
+    if (x1 > x2) {
+        int t = x1;
+        x1 = x2;
+        x2 = t;
+    }
+    if (y1 > y2) {
+        int t = y1;
+        y1 = y2;
+        y2 = t;
+    }
     x1 = host_clamp_int(x1, 0, host_fb_width - 1);
     x2 = host_clamp_int(x2, 0, host_fb_width - 1);
     y1 = host_clamp_int(y1, 0, host_fb_height - 1);
@@ -173,7 +181,7 @@ void host_fb_fill_rect(int x1, int y1, int x2, int y2, int c) {
 
     uint32_t colour = host_fb_colour24(c);
     for (int y = y1; y <= y2; ++y) {
-        uint32_t *row = target + (size_t)y * (size_t)host_fb_width;
+        uint32_t * row = target + (size_t)y * (size_t)host_fb_width;
         for (int x = x1; x <= x2; ++x) {
             row[x] = colour;
         }
@@ -197,8 +205,8 @@ void host_fb_draw_rectangle(int x1, int y1, int x2, int y2, int c) {
 }
 
 void host_fb_draw_bitmap(int x1, int y1, int width, int height, int scale,
-                         int fc, int bc, unsigned char *bitmap) {
-    uint32_t *target = host_fb_current_target();
+                         int fc, int bc, unsigned char * bitmap) {
+    uint32_t * target = host_fb_current_target();
     if (!target || !bitmap) return;
     if (scale < 1) scale = 1;
     int total_bits = width * height;
@@ -209,7 +217,8 @@ void host_fb_draw_bitmap(int x1, int y1, int width, int height, int scale,
         for (int col = 0; col < width; ++col) {
             int bit_number = row * width + col;
             int on = (bitmap[bit_number / 8] >>
-                      ((total_bits - bit_number - 1) % 8)) & 1;
+                      ((total_bits - bit_number - 1) % 8)) &
+                     1;
             if (on) {
                 host_fb_fill_rect(x1 + col * scale,
                                   y1 + row * scale,
@@ -225,10 +234,12 @@ void host_fb_draw_bitmap(int x1, int y1, int width, int height, int scale,
             }
         }
     }
-    (void)total_bits; (void)fg; (void)bg;
+    (void)total_bits;
+    (void)fg;
+    (void)bg;
 }
 
-void host_fb_read_buffer(int x1, int y1, int x2, int y2, unsigned char *c) {
+void host_fb_read_buffer(int x1, int y1, int x2, int y2, unsigned char * c) {
     /* Backs the ReadBuffer function pointer. Device ReadBuffer (e.g.
      * ReadBuffer555 in Draw.c) writes THREE bytes per pixel packed as
      * B, G, R — the BMP on-wire order. Every shared caller assumes that
@@ -240,17 +251,25 @@ void host_fb_read_buffer(int x1, int y1, int x2, int y2, unsigned char *c) {
     if (!c) return;
     if (!host_framebuffer) host_fb_ensure();
     if (!host_framebuffer) return;
-    if (x1 > x2) { int t = x1; x1 = x2; x2 = t; }
-    if (y1 > y2) { int t = y1; y1 = y2; y2 = t; }
+    if (x1 > x2) {
+        int t = x1;
+        x1 = x2;
+        x2 = t;
+    }
+    if (y1 > y2) {
+        int t = y1;
+        y1 = y2;
+        y2 = t;
+    }
     for (int y = y1; y <= y2; ++y) {
         for (int x = x1; x <= x2; ++x) {
             uint32_t px = 0;
             if (x >= 0 && y >= 0 && x < host_fb_width && y < host_fb_height) {
                 px = host_framebuffer[(size_t)y * (size_t)host_fb_width + (size_t)x];
             }
-            c[0] = (unsigned char)(px & 0xFF);          /* B */
-            c[1] = (unsigned char)((px >> 8) & 0xFF);   /* G */
-            c[2] = (unsigned char)((px >> 16) & 0xFF);  /* R */
+            c[0] = (unsigned char)(px & 0xFF);         /* B */
+            c[1] = (unsigned char)((px >> 8) & 0xFF);  /* G */
+            c[2] = (unsigned char)((px >> 16) & 0xFF); /* R */
             c += 3;
         }
     }
@@ -277,7 +296,7 @@ void host_fb_scroll_lcd(int lines) {
         memmove(host_framebuffer,
                 host_framebuffer + lines * row_pixels,
                 (size_t)(host_fb_height - lines) * (size_t)row_pixels * sizeof(uint32_t));
-        uint32_t *tail = host_framebuffer + (host_fb_height - lines) * row_pixels;
+        uint32_t * tail = host_framebuffer + (host_fb_height - lines) * row_pixels;
         for (int i = 0; i < lines * row_pixels; ++i) tail[i] = fill;
     } else {
         memmove(host_framebuffer + abs_lines * row_pixels,
@@ -334,7 +353,7 @@ void host_framebuffer_shutdown_runtime(void) {
 }
 
 void host_framebuffer_clear_target(int colour) {
-    uint32_t *target = host_fb_current_target();
+    uint32_t * target = host_fb_current_target();
     host_fb_fill_buffer(target, host_fb_colour24(colour));
     if (target == host_framebuffer) host_fb_bump_generation();
     if (host_sim_cmds_target_is_front()) host_sim_emit_cls(colour);
@@ -368,20 +387,20 @@ void host_framebuffer_layer(int has_colour, int colour) {
 void host_framebuffer_write(char which) {
     host_fb_bind_display();
     switch ((char)toupper((unsigned char)which)) {
-        case 'N':
-            if (mergerunning) error("Display in use for merged operation");
-            WriteBuf = NULL;
-            return;
-        case 'F':
-            if (FrameBuf == NULL || FrameBuf == DisplayBuf) error("Frame buffer not created");
-            WriteBuf = FrameBuf;
-            return;
-        case 'L':
-            if (LayerBuf == NULL || LayerBuf == DisplayBuf) error("Layer buffer not created");
-            WriteBuf = LayerBuf;
-            return;
-        default:
-            error("Syntax");
+    case 'N':
+        if (mergerunning) error("Display in use for merged operation");
+        WriteBuf = NULL;
+        return;
+    case 'F':
+        if (FrameBuf == NULL || FrameBuf == DisplayBuf) error("Frame buffer not created");
+        WriteBuf = FrameBuf;
+        return;
+    case 'L':
+        if (LayerBuf == NULL || LayerBuf == DisplayBuf) error("Layer buffer not created");
+        WriteBuf = LayerBuf;
+        return;
+    default:
+        error("Syntax");
     }
 }
 
@@ -417,28 +436,28 @@ void host_framebuffer_merge(int has_colour, int colour,
     if (FrameBuf == NULL || FrameBuf == DisplayBuf) error("Framebuffer not created");
     if (has_rate && rate_ms < 0) error("Number out of bounds");
     switch (mode) {
-        case BC_FB_MERGE_MODE_NOW:
-        case BC_FB_MERGE_MODE_B:
-            mergerunning = 0;
-            mergetimer = 0;
-            host_fb_next_merge_us = 0;
-            host_fb_merge_now(transparent);
-            return;
-        case BC_FB_MERGE_MODE_R:
-            host_fb_layer_transparent = transparent;
-            mergerunning = 1;
-            mergetimer = (uint32_t)(has_rate ? rate_ms : 0);
-            if (WriteBuf == NULL || WriteBuf == DisplayBuf) WriteBuf = FrameBuf;
-            host_fb_merge_now(transparent);
-            host_fb_next_merge_us = host_now_us() + (uint64_t)mergetimer * 1000ULL;
-            return;
-        case BC_FB_MERGE_MODE_A:
-            mergerunning = 0;
-            mergetimer = 0;
-            host_fb_next_merge_us = 0;
-            return;
-        default:
-            error("Syntax");
+    case BC_FB_MERGE_MODE_NOW:
+    case BC_FB_MERGE_MODE_B:
+        mergerunning = 0;
+        mergetimer = 0;
+        host_fb_next_merge_us = 0;
+        host_fb_merge_now(transparent);
+        return;
+    case BC_FB_MERGE_MODE_R:
+        host_fb_layer_transparent = transparent;
+        mergerunning = 1;
+        mergetimer = (uint32_t)(has_rate ? rate_ms : 0);
+        if (WriteBuf == NULL || WriteBuf == DisplayBuf) WriteBuf = FrameBuf;
+        host_fb_merge_now(transparent);
+        host_fb_next_merge_us = host_now_us() + (uint64_t)mergetimer * 1000ULL;
+        return;
+    case BC_FB_MERGE_MODE_A:
+        mergerunning = 0;
+        mergetimer = 0;
+        host_fb_next_merge_us = 0;
+        return;
+    default:
+        error("Syntax");
     }
 }
 
@@ -454,30 +473,34 @@ void host_framebuffer_wait(void) {
 }
 
 void host_framebuffer_copy(char from, char to, int background) {
-    uint32_t *src = NULL;
-    uint32_t *dst = NULL;
+    uint32_t * src = NULL;
+    uint32_t * dst = NULL;
 
     host_fb_bind_display();
     from = (char)toupper((unsigned char)from);
     to = (char)toupper((unsigned char)to);
 
-    if (from == 'N') src = host_framebuffer;
+    if (from == 'N')
+        src = host_framebuffer;
     else if (from == 'F') {
         if (FrameBuf == NULL || FrameBuf == DisplayBuf) error("Frame buffer not created");
         src = host_fb_framebuffer;
     } else if (from == 'L') {
         if (LayerBuf == NULL || LayerBuf == DisplayBuf) error("Layer buffer not created");
         src = host_fb_layerbuffer;
-    } else error("Syntax");
+    } else
+        error("Syntax");
 
-    if (to == 'N') dst = host_framebuffer;
+    if (to == 'N')
+        dst = host_framebuffer;
     else if (to == 'F') {
         if (FrameBuf == NULL || FrameBuf == DisplayBuf) error("Frame buffer not created");
         dst = host_fb_framebuffer;
     } else if (to == 'L') {
         if (LayerBuf == NULL || LayerBuf == DisplayBuf) error("Layer buffer not created");
         dst = host_fb_layerbuffer;
-    } else error("Syntax");
+    } else
+        error("Syntax");
 
     if (src == dst) return;
     if (background && dst == host_framebuffer) {
@@ -510,8 +533,12 @@ uint32_t host_runtime_get_pixel(int x, int y) {
     return host_framebuffer[(size_t)y * (size_t)host_fb_width + (size_t)x];
 }
 
-int host_runtime_width(void)  { return host_fb_width; }
-int host_runtime_height(void) { return host_fb_height; }
+int host_runtime_width(void) {
+    return host_fb_width;
+}
+int host_runtime_height(void) {
+    return host_fb_height;
+}
 
 /*
  * The --sim build runs a background Mongoose thread that reads the
@@ -519,7 +546,7 @@ int host_runtime_height(void) { return host_fb_height; }
  * writes the buffer without locking; at worst a torn frame is visible
  * for 16ms before the next broadcast overwrites it.
  */
-size_t host_sim_framebuffer_copy(uint32_t *dst, size_t dst_pixels) {
+size_t host_sim_framebuffer_copy(uint32_t * dst, size_t dst_pixels) {
     if (!host_framebuffer) host_fb_ensure();
     if (!host_framebuffer || !dst) return 0;
     size_t have = (size_t)host_fb_width * (size_t)host_fb_height;
@@ -528,7 +555,7 @@ size_t host_sim_framebuffer_copy(uint32_t *dst, size_t dst_pixels) {
     return n;
 }
 
-void host_sim_framebuffer_dims(int *w, int *h) {
+void host_sim_framebuffer_dims(int * w, int * h) {
     if (w) *w = host_fb_width;
     if (h) *h = host_fb_height;
 }
@@ -539,19 +566,19 @@ void host_sim_framebuffer_dims(int *w, int *h) {
  * happens. HRes/VRes mirror host_fb_width/height so MMBasic's geometry
  * math (Option.Width = HRes/font_width, etc.) sees the same values. */
 void host_sim_set_framebuffer_size(int w, int h) {
-    if (w < 80)   w = 80;
-    if (h < 60)   h = 60;
+    if (w < 80) w = 80;
+    if (h < 60) h = 60;
     if (w > 2048) w = 2048;
     if (h > 2048) h = 2048;
-    host_fb_width  = w;
+    host_fb_width = w;
     host_fb_height = h;
     HRes = (short)w;
     VRes = (short)h;
 }
 
 void host_fb_resize(int w, int h) {
-    if (w < 80)   w = 80;
-    if (h < 60)   h = 60;
+    if (w < 80) w = 80;
+    if (h < 60) h = 60;
     if (w > 2048) w = 2048;
     if (h > 2048) h = 2048;
     if (w == host_fb_width && h == host_fb_height) return;
@@ -559,16 +586,28 @@ void host_fb_resize(int w, int h) {
     /* Free everything that's sized to the old framebuffer.  Secondary
      * planes (FRAMEBUFFER CREATE, LAYER, FASTGFX back) are re-allocated
      * lazily by their owning subsystems on next use. */
-    if (host_framebuffer)     { free(host_framebuffer);     host_framebuffer     = NULL; }
-    if (host_fb_framebuffer)  { free(host_fb_framebuffer);  host_fb_framebuffer  = NULL; }
-    if (host_fb_layerbuffer)  { free(host_fb_layerbuffer);  host_fb_layerbuffer  = NULL; }
-    if (host_fastgfx_back)    { free(host_fastgfx_back);    host_fastgfx_back    = NULL; }
+    if (host_framebuffer) {
+        free(host_framebuffer);
+        host_framebuffer = NULL;
+    }
+    if (host_fb_framebuffer) {
+        free(host_fb_framebuffer);
+        host_fb_framebuffer = NULL;
+    }
+    if (host_fb_layerbuffer) {
+        free(host_fb_layerbuffer);
+        host_fb_layerbuffer = NULL;
+    }
+    if (host_fastgfx_back) {
+        free(host_fastgfx_back);
+        host_fastgfx_back = NULL;
+    }
 
     host_fb_copy_src = NULL;
     host_fb_copy_dst = NULL;
     host_fb_copy_pending = 0;
 
-    host_fb_width  = w;
+    host_fb_width = w;
     host_fb_height = h;
     HRes = (short)w;
     VRes = (short)h;
@@ -579,20 +618,20 @@ void host_fb_resize(int w, int h) {
      * WriteBuf — drawing primitives lazily route through the dispatch
      * helpers. */
     DisplayBuf = (unsigned char *)host_framebuffer;
-    FrameBuf   = DisplayBuf;
-    LayerBuf   = DisplayBuf;
-    WriteBuf   = NULL;
+    FrameBuf = DisplayBuf;
+    LayerBuf = DisplayBuf;
+    WriteBuf = NULL;
 
     host_fb_config_generation++;
     host_fb_bump_generation();
 }
 
-void host_fb_write_screenshot(const char *path) {
+void host_fb_write_screenshot(const char * path) {
     if (!path || !*path) return;
     host_fb_ensure();
     if (!host_framebuffer) return;
 
-    FILE *fp = fopen(path, "wb");
+    FILE * fp = fopen(path, "wb");
     if (!fp) return;
 
     fprintf(fp, "P6\n%d %d\n255\n", host_fb_width, host_fb_height);

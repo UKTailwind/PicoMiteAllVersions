@@ -26,32 +26,32 @@ static inline void outb(uint16_t port, uint8_t val) {
     __asm__ volatile("outb %0, %1" : : "a"(val), "Nd"(port));
 }
 
-#define VGA_COLS        80
-#define VGA_ROWS        25
-#define VGA_BUFFER      ((volatile uint16_t *) 0xB8000)
-#define VGA_CRTC_INDEX  0x3D4
-#define VGA_CRTC_DATA   0x3D5
+#define VGA_COLS 80
+#define VGA_ROWS 25
+#define VGA_BUFFER ((volatile uint16_t *)0xB8000)
+#define VGA_CRTC_INDEX 0x3D4
+#define VGA_CRTC_DATA 0x3D5
 
 static struct {
-    uint8_t  row;
-    uint8_t  col;
-    uint8_t  attr;
+    uint8_t row;
+    uint8_t col;
+    uint8_t attr;
 } vga = {
-    .row  = 0,
-    .col  = 0,
+    .row = 0,
+    .col = 0,
     .attr = (VGA_BLACK << 4) | VGA_LIGHT_GRAY,
 };
 
 static inline uint16_t cell(char c) {
-    return ((uint16_t) vga.attr << 8) | (uint8_t) c;
+    return ((uint16_t)vga.attr << 8) | (uint8_t)c;
 }
 
 static void update_hw_cursor(void) {
-    uint16_t pos = (uint16_t) vga.row * VGA_COLS + vga.col;
+    uint16_t pos = (uint16_t)vga.row * VGA_COLS + vga.col;
     outb(VGA_CRTC_INDEX, 0x0F);
-    outb(VGA_CRTC_DATA,  (uint8_t) (pos & 0xFF));
+    outb(VGA_CRTC_DATA, (uint8_t)(pos & 0xFF));
     outb(VGA_CRTC_INDEX, 0x0E);
-    outb(VGA_CRTC_DATA,  (uint8_t) ((pos >> 8) & 0xFF));
+    outb(VGA_CRTC_DATA, (uint8_t)((pos >> 8) & 0xFF));
 }
 
 static void scroll_up_one(void) {
@@ -69,14 +69,14 @@ static void scroll_up_one(void) {
 }
 
 void vga_text_init(void) {
-    vga.row  = 0;
-    vga.col  = 0;
+    vga.row = 0;
+    vga.col = 0;
     vga.attr = (VGA_BLACK << 4) | VGA_LIGHT_GRAY;
     vga_text_clear();
 }
 
 void vga_text_clear(void) {
-    for (size_t i = 0; i < (size_t) VGA_COLS * VGA_ROWS; i++) {
+    for (size_t i = 0; i < (size_t)VGA_COLS * VGA_ROWS; i++) {
         VGA_BUFFER[i] = cell(' ');
     }
     vga.row = 0;
@@ -85,33 +85,33 @@ void vga_text_clear(void) {
 }
 
 void vga_text_set_color(enum vga_color fg, enum vga_color bg) {
-    vga.attr = (uint8_t) ((bg & 0xF) << 4) | (uint8_t) (fg & 0xF);
+    vga.attr = (uint8_t)((bg & 0xF) << 4) | (uint8_t)(fg & 0xF);
 }
 
 void vga_text_putc(char c) {
     switch (c) {
-        case '\n':
-            vga.col = 0;
-            vga.row++;
-            break;
-        case '\r':
-            vga.col = 0;
-            break;
-        case '\b':
-            if (vga.col > 0) {
-                vga.col--;
-                VGA_BUFFER[(size_t) vga.row * VGA_COLS + vga.col] = cell(' ');
-            }
-            break;
-        case '\t':
-            do {
-                vga_text_putc(' ');
-            } while (vga.col % 8 != 0 && vga.col < VGA_COLS);
-            return;
-        default:
-            VGA_BUFFER[(size_t) vga.row * VGA_COLS + vga.col] = cell(c);
-            vga.col++;
-            break;
+    case '\n':
+        vga.col = 0;
+        vga.row++;
+        break;
+    case '\r':
+        vga.col = 0;
+        break;
+    case '\b':
+        if (vga.col > 0) {
+            vga.col--;
+            VGA_BUFFER[(size_t)vga.row * VGA_COLS + vga.col] = cell(' ');
+        }
+        break;
+    case '\t':
+        do {
+            vga_text_putc(' ');
+        } while (vga.col % 8 != 0 && vga.col < VGA_COLS);
+        return;
+    default:
+        VGA_BUFFER[(size_t)vga.row * VGA_COLS + vga.col] = cell(c);
+        vga.col++;
+        break;
     }
 
     if (vga.col >= VGA_COLS) {
@@ -124,7 +124,7 @@ void vga_text_putc(char c) {
     update_hw_cursor();
 }
 
-void vga_text_puts(const char *s) {
+void vga_text_puts(const char * s) {
     while (*s) {
         vga_text_putc(*s++);
     }

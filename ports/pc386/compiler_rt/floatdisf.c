@@ -23,11 +23,15 @@
 #define DST_SINGLE
 #include "int_to_fp_impl.inc"
 
-COMPILER_RT_ABI float __floatdisf(di_int a) { return __floatXiYf__(a); }
+COMPILER_RT_ABI float __floatdisf(di_int a) {
+    return __floatXiYf__(a);
+}
 
 #if defined(__ARM_EABI__)
 #if defined(COMPILER_RT_ARMHF_TARGET)
-AEABI_RTABI float __aeabi_l2f(di_int a) { return __floatdisf(a); }
+AEABI_RTABI float __aeabi_l2f(di_int a) {
+    return __floatdisf(a);
+}
 #else
 COMPILER_RT_ALIAS(__floatdisf, __aeabi_l2f)
 #endif

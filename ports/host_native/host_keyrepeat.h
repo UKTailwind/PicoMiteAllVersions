@@ -19,6 +19,6 @@
  */
 
 void host_keyrepeat_configure(int start_ms, int rate_ms);
-int  host_keyrepeat_filter(int byte);
+int host_keyrepeat_filter(int byte);
 
 #endif

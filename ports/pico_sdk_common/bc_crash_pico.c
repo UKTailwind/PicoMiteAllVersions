@@ -18,9 +18,9 @@ uint32_t port_bc_crash_get_sp(void) {
     return sp_val;
 }
 
-void port_bc_crash_save_fault_regs(BCCrashInfo *info) {
-    info->cfsr  = *(volatile uint32_t *)0xE000ED28;  /* CFSR  */
-    info->hfsr  = *(volatile uint32_t *)0xE000ED2C;  /* HFSR  */
-    info->bfar  = *(volatile uint32_t *)0xE000ED38;  /* BFAR  */
-    info->mmfar = *(volatile uint32_t *)0xE000ED34;  /* MMFAR */
+void port_bc_crash_save_fault_regs(BCCrashInfo * info) {
+    info->cfsr = *(volatile uint32_t *)0xE000ED28;  /* CFSR  */
+    info->hfsr = *(volatile uint32_t *)0xE000ED2C;  /* HFSR  */
+    info->bfar = *(volatile uint32_t *)0xE000ED38;  /* BFAR  */
+    info->mmfar = *(volatile uint32_t *)0xE000ED34; /* MMFAR */
 }

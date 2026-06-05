@@ -22,7 +22,7 @@
 
 /* Latch the CLI/env key script + delay. Safe to call zero-or-more times;
  * the last call wins. Called from host_main.c while parsing argv. */
-void host_runtime_configure_keys(const char *keys, int delay_ms);
+void host_runtime_configure_keys(const char * keys, int delay_ms);
 
 /* Decode the latched script into the internal buffer and arm the
  * "not ready until T+delay" timer. Called from mmbasic_runtime_port_begin

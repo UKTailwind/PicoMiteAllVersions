@@ -46,10 +46,10 @@ void port_web_clear_runtime_state(void);
 static hal_net_tcp_client_t host_tcp_client;
 static int host_tcp_client_open;
 static int host_tcp_client_stream_active;
-static uint8_t *host_tcp_client_stream_buf;
+static uint8_t * host_tcp_client_stream_buf;
 static int host_tcp_client_stream_size;
-static int64_t *host_tcp_client_stream_read;
-static int64_t *host_tcp_client_stream_write;
+static int64_t * host_tcp_client_stream_read;
+static int64_t * host_tcp_client_stream_write;
 static mm_net_tcp_service_t host_tcp_server;
 static mm_net_udp_service_t host_udp_server;
 static hal_net_udp_socket_t host_tftp_server;
@@ -153,7 +153,7 @@ static void host_lifecycle_clear_tcp_requests(void) {
     mm_net_tcp_service_clear_requests(&host_tcp_server);
 }
 
-static const char *host_info_tcp_path(int slot) {
+static const char * host_info_tcp_path(int slot) {
     return mm_net_tcp_service_path(&host_tcp_server, slot);
 }
 
@@ -165,7 +165,7 @@ static void host_info_before_query(void) {
     ProcessWeb(0);
 }
 
-static int host_info_ip_address(char *out, size_t out_len) {
+static int host_info_ip_address(char * out, size_t out_len) {
     host_web_ensure_net();
     if (hal_net_ip_address(out, out_len) != HAL_NET_OK) {
         if (out_len) out[0] = 0;
@@ -200,10 +200,10 @@ static int host_lifecycle_open_udp(uint16_t port) {
 }
 
 static uint16_t host_tftp_port(void) {
-    const char *env = getenv("MMBASIC_HOST_TFTP_PORT");
+    const char * env = getenv("MMBASIC_HOST_TFTP_PORT");
     if (!env || !*env) env = getenv("HOST_TFTP_PORT");
     if (env && *env) {
-        char *end = NULL;
+        char * end = NULL;
         long port = strtol(env, &end, 10);
         if (end && *end == 0 && port > 0 && port <= 65535)
             return (uint16_t)port;
@@ -212,16 +212,16 @@ static uint16_t host_tftp_port(void) {
 }
 
 static int host_tftp_has_port_override(void) {
-    const char *env = getenv("MMBASIC_HOST_TFTP_PORT");
+    const char * env = getenv("MMBASIC_HOST_TFTP_PORT");
     if (!env || !*env) env = getenv("HOST_TFTP_PORT");
     return env && *env;
 }
 
 static uint16_t host_telnet_port(void) {
-    const char *env = getenv("MMBASIC_HOST_TELNET_PORT");
+    const char * env = getenv("MMBASIC_HOST_TELNET_PORT");
     if (!env || !*env) env = getenv("HOST_TELNET_PORT");
     if (env && *env) {
-        char *end = NULL;
+        char * end = NULL;
         long port = strtol(env, &end, 10);
         if (end && *end == 0 && port > 0 && port <= 65535)
             return (uint16_t)port;
@@ -230,7 +230,7 @@ static uint16_t host_telnet_port(void) {
 }
 
 static int host_telnet_has_port_override(void) {
-    const char *env = getenv("MMBASIC_HOST_TELNET_PORT");
+    const char * env = getenv("MMBASIC_HOST_TELNET_PORT");
     if (!env || !*env) env = getenv("HOST_TELNET_PORT");
     return env && *env;
 }
@@ -269,7 +269,7 @@ static int host_lifecycle_open_tftp(void) {
     return 1;
 }
 
-static int host_tftp_peer_text(const mm_net_tftp_peer_t *peer, char *out,
+static int host_tftp_peer_text(const mm_net_tftp_peer_t * peer, char * out,
                                size_t out_len) {
     if (peer->family == 4) {
         return inet_ntop(AF_INET, peer->bytes, out, out_len) != NULL;
@@ -280,8 +280,8 @@ static int host_tftp_peer_text(const mm_net_tftp_peer_t *peer, char *out,
     return 0;
 }
 
-static int host_tftp_send(void *ctx, const mm_net_tftp_peer_t *peer,
-                          const void *buf, size_t len) {
+static int host_tftp_send(void * ctx, const mm_net_tftp_peer_t * peer,
+                          const void * buf, size_t len) {
     (void)ctx;
     char host[INET6_ADDRSTRLEN];
     if (!host_tftp_peer_text(peer, host, sizeof(host))) return 0;
@@ -289,8 +289,8 @@ static int host_tftp_send(void *ctx, const mm_net_tftp_peer_t *peer,
                                    len, 1000) == HAL_NET_OK;
 }
 
-static int host_tftp_open_file(void *ctx, const char *filename, int write,
-                               void **handle) {
+static int host_tftp_open_file(void * ctx, const char * filename, int write,
+                               void ** handle) {
     (void)ctx;
     hal_fs_fd_t fd;
     int flags = write ? (HAL_FS_O_WRONLY | HAL_FS_O_CREAT | HAL_FS_O_TRUNC)
@@ -300,19 +300,19 @@ static int host_tftp_open_file(void *ctx, const char *filename, int write,
     return 0;
 }
 
-static ssize_t host_tftp_read_file(void *ctx, void *handle, void *buf,
+static ssize_t host_tftp_read_file(void * ctx, void * handle, void * buf,
                                    size_t len) {
     (void)ctx;
     return hal_fs_read((hal_fs_fd_t)(intptr_t)handle, buf, len);
 }
 
-static ssize_t host_tftp_write_file(void *ctx, void *handle, const void *buf,
+static ssize_t host_tftp_write_file(void * ctx, void * handle, const void * buf,
                                     size_t len) {
     (void)ctx;
     return hal_fs_write((hal_fs_fd_t)(intptr_t)handle, buf, len);
 }
 
-static void host_tftp_close_file(void *ctx, void *handle) {
+static void host_tftp_close_file(void * ctx, void * handle) {
     (void)ctx;
     hal_fs_close((hal_fs_fd_t)(intptr_t)handle);
 }
@@ -418,7 +418,7 @@ void host_telnet_putc(int c, int flush) {
 
 /* RFC 854 IAC parser + ConsoleRxBuf delivery live in
  * shared/net/mm_net_telnet_rx.c — shared across every port. */
-static void host_telnet_receive_bytes(const uint8_t *data, size_t len) {
+static void host_telnet_receive_bytes(const uint8_t * data, size_t len) {
     mm_net_telnet_rx_feed(data, len);
 }
 
@@ -525,7 +525,7 @@ void ProcessWeb(int mode) {
     mm_net_lifecycle_poll(&hooks, mode, 1);
 }
 
-static void host_tcp_client_open_cmd(unsigned char *arg) {
+static void host_tcp_client_open_cmd(unsigned char * arg) {
     mm_net_tcp_client_open_args_t parsed;
     mm_net_tcp_client_parse_open(arg, &parsed);
 
@@ -540,7 +540,7 @@ static void host_tcp_client_open_cmd(unsigned char *arg) {
     if (!optionsuppressstatus) MMPrintString("Connected\r\n");
 }
 
-static void host_tcp_client_request_cmd(unsigned char *arg) {
+static void host_tcp_client_request_cmd(unsigned char * arg) {
     if (!host_tcp_client_open) error("No connection");
     if (host_tcp_client_stream_active) error("Connection busy");
 
@@ -572,7 +572,7 @@ static void host_tcp_client_request_cmd(unsigned char *arg) {
     parsed.dest[0] = total;
 }
 
-static void host_tcp_client_stream_cmd(unsigned char *arg) {
+static void host_tcp_client_stream_cmd(unsigned char * arg) {
     if (!host_tcp_client_open) error("No connection");
 
     mm_net_tcp_client_stream_args_t parsed;
@@ -595,8 +595,8 @@ static void host_tcp_client_stream_cmd(unsigned char *arg) {
     host_tcp_client_stream_active = 1;
 }
 
-static int host_tcp_client_cmd(unsigned char *line) {
-    unsigned char *tp;
+static int host_tcp_client_cmd(unsigned char * line) {
+    unsigned char * tp;
     if ((tp = checkstring(line, (unsigned char *)"OPEN TCP CLIENT"))) {
         host_tcp_client_open_cmd(tp);
         return 1;
@@ -622,7 +622,7 @@ static int host_tcp_client_cmd(unsigned char *line) {
     return 0;
 }
 
-static int host_tcp_send_cb(void *ctx, const void *buf, size_t len) {
+static int host_tcp_send_cb(void * ctx, const void * buf, size_t len) {
     int pcb = *(int *)ctx;
     if (!mm_net_tcp_service_conn(&host_tcp_server, pcb))
         return 0;
@@ -632,7 +632,7 @@ static int host_tcp_send_cb(void *ctx, const void *buf, size_t len) {
 
 static void host_tcp_transmit_status(int pcb, int status) {
     char body[64];
-    const char *reason = mm_net_http_status_reason(status);
+    const char * reason = mm_net_http_status_reason(status);
     int body_len = mm_net_http_format_status_body(body, sizeof(body), status,
                                                   reason);
     if (body_len < 0) error("Transmit failed");
@@ -643,16 +643,16 @@ static void host_tcp_transmit_status(int pcb, int status) {
     host_tcp_close_slot(pcb);
 }
 
-static void host_tcp_transmit_file(int pcb, const char *fname,
-                                   const char *content_type) {
+static void host_tcp_transmit_file(int pcb, const char * fname,
+                                   const char * content_type) {
     if (mm_net_http_send_file(fname, content_type, "MMBasic-Host",
                               host_tcp_send_cb, &pcb) != 0)
         error("File not found");
     host_tcp_close_slot(pcb);
 }
 
-static void host_tcp_transmit_page(int pcb, const char *fname, int extra) {
-    char *rendered = NULL;
+static void host_tcp_transmit_page(int pcb, const char * fname, int extra) {
+    char * rendered = NULL;
     size_t rendered_len = 0;
     if (mm_net_http_render_page(fname, extra, &rendered, &rendered_len) != 0)
         error("File not found");
@@ -664,32 +664,32 @@ static void host_tcp_transmit_page(int pcb, const char *fname, int extra) {
     host_tcp_close_slot(pcb);
 }
 
-static int host_transmit_cmd(unsigned char *arg) {
+static int host_transmit_cmd(unsigned char * arg) {
     mm_net_transmit_args_t parsed;
     if (!mm_net_transmit_parse(arg, HOST_WEB_MAX_PCB, &parsed)) return 0;
     if (!mm_net_tcp_service_conn(&host_tcp_server, parsed.pcb))
         error("Not connected");
     switch (parsed.kind) {
-        case MM_NET_TRANSMIT_CODE:
-            host_tcp_transmit_status(parsed.pcb, parsed.status);
-            return 1;
-        case MM_NET_TRANSMIT_FILE:
-        case MM_NET_TRANSMIT_CSS:
-        case MM_NET_TRANSMIT_JS:
-        case MM_NET_TRANSMIT_IMAGE:
-            host_tcp_transmit_file(parsed.pcb, parsed.filename,
-                                   parsed.content_type);
-            return 1;
-        case MM_NET_TRANSMIT_PAGE:
-            host_tcp_transmit_page(parsed.pcb, parsed.filename, parsed.extra);
-            return 1;
-        default:
-            return 0;
+    case MM_NET_TRANSMIT_CODE:
+        host_tcp_transmit_status(parsed.pcb, parsed.status);
+        return 1;
+    case MM_NET_TRANSMIT_FILE:
+    case MM_NET_TRANSMIT_CSS:
+    case MM_NET_TRANSMIT_JS:
+    case MM_NET_TRANSMIT_IMAGE:
+        host_tcp_transmit_file(parsed.pcb, parsed.filename,
+                               parsed.content_type);
+        return 1;
+    case MM_NET_TRANSMIT_PAGE:
+        host_tcp_transmit_page(parsed.pcb, parsed.filename, parsed.extra);
+        return 1;
+    default:
+        return 0;
     }
 }
 
-static int host_tcp_server_cmd(unsigned char *arg) {
-    unsigned char *tp;
+static int host_tcp_server_cmd(unsigned char * arg) {
+    unsigned char * tp;
     if ((tp = checkstring(arg, (unsigned char *)"INTERRUPT"))) {
         TCPreceiveInterrupt = mm_net_tcp_server_parse_interrupt(tp);
         InterruptUsed = true;
@@ -729,8 +729,8 @@ static int host_tcp_server_cmd(unsigned char *arg) {
     return 0;
 }
 
-static int host_udp_cmd(unsigned char *arg) {
-    unsigned char *tp = checkstring(arg, (unsigned char *)"INTERRUPT");
+static int host_udp_cmd(unsigned char * arg) {
+    unsigned char * tp = checkstring(arg, (unsigned char *)"INTERRUPT");
     if (tp) {
         UDPinterrupt = mm_net_udp_parse_interrupt(tp);
         InterruptUsed = true;
@@ -753,7 +753,7 @@ static void host_ntp_apply(uint32_t unix_seconds, MMFLOAT offset_hours) {
     time_t adjusted = (time_t)unix_seconds + (time_t)(offset_hours * 3600.0);
     struct tm utc_buf;
     hal_calendar_epoch_to_tm(adjusted, &utc_buf);
-    struct tm *utc = &utc_buf;
+    struct tm * utc = &utc_buf;
 
     day_of_week = utc->tm_wday;
     if (day_of_week == 0) day_of_week = 7;
@@ -771,12 +771,12 @@ static void host_ntp_apply(uint32_t unix_seconds, MMFLOAT offset_hours) {
     }
 }
 
-static void host_ntp_cmd(unsigned char *arg) {
+static void host_ntp_cmd(unsigned char * arg) {
     getargs(&arg, 5, (unsigned char *)",");
     if (!(argc == 0 || argc == 1 || argc == 3 || argc == 5)) error("Syntax");
 
     MMFLOAT offset = 0.0;
-    const char *server = "pool.ntp.org";
+    const char * server = "pool.ntp.org";
     int timeout_ms = 5000;
     uint16_t port = 123;
 
@@ -790,7 +790,7 @@ static void host_ntp_cmd(unsigned char *arg) {
     char hostbuf[STRINGSIZE];
     strncpy(hostbuf, server, sizeof(hostbuf) - 1);
     hostbuf[sizeof(hostbuf) - 1] = 0;
-    char *colon = strrchr(hostbuf, ':');
+    char * colon = strrchr(hostbuf, ':');
     if (colon && colon[1]) {
         int parsed_port = atoi(colon + 1);
         if (parsed_port > 0 && parsed_port <= 65535) {
@@ -819,7 +819,7 @@ static void host_mqtt_after_subscribe(void) {
     ProcessWeb(0);
 }
 
-static int host_mqtt_cmd(unsigned char *line) {
+static int host_mqtt_cmd(unsigned char * line) {
     const mm_net_mqtt_hal_context_t ctx = {
         .client = &host_mqtt_client,
         .connected = &host_mqtt_connected,
@@ -830,7 +830,7 @@ static int host_mqtt_cmd(unsigned char *line) {
     return mm_net_mqtt_hal_cmd(line, &ctx);
 }
 
-static void host_web_connect_cmd(unsigned char *arg) {
+static void host_web_connect_cmd(unsigned char * arg) {
     if (*arg) error("WiFi not supported on host");
     host_web_ensure_net();
     if (mm_net_lifecycle_on_network_ready(&host_lifecycle_hooks) !=
@@ -838,7 +838,7 @@ static void host_web_connect_cmd(unsigned char *arg) {
         error("Failed to create network service");
 }
 
-static void host_web_scan_cmd(unsigned char *arg) {
+static void host_web_scan_cmd(unsigned char * arg) {
     (void)arg;
     error("WiFi scan not supported on host");
 }
@@ -870,14 +870,14 @@ void port_web_print_options(void) {
     mm_net_print_service_options((int)Option.Telnet, Option.disabletftp);
 }
 
-int port_web_option_setter(unsigned char *cmdline) {
+int port_web_option_setter(unsigned char * cmdline) {
     return mm_net_lifecycle_handle_option_result(
         mm_net_lifecycle_option_setter(cmdline, &host_lifecycle_hooks),
         NULL);
 }
 
-int port_web_mminfo(unsigned char *ep, int64_t *out_iret,
-                    unsigned char *out_sret, int *out_targ) {
+int port_web_mminfo(unsigned char * ep, int64_t * out_iret,
+                    unsigned char * out_sret, int * out_targ) {
     const mm_net_info_hooks_t hooks = {
         .before_query = host_info_before_query,
         .tcp_path = host_info_tcp_path,
@@ -902,7 +902,7 @@ void port_web_clear_runtime_state(void) {
     mm_net_lifecycle_runtime_reset(&hooks);
 }
 
-int port_web_get_ssid(unsigned char *out_sret, int *out_targ) {
+int port_web_get_ssid(unsigned char * out_sret, int * out_targ) {
     out_sret[0] = 0;
     out_sret[1] = 0;
     *out_targ = T_STR;

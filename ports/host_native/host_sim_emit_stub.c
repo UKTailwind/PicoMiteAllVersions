@@ -33,17 +33,28 @@ HOST_SIM_WEAK void host_sim_emit_cls(int colour) {
 }
 
 HOST_SIM_WEAK void host_sim_emit_rect(int x1, int y1, int x2, int y2, int colour) {
-    (void)x1; (void)y1; (void)x2; (void)y2; (void)colour;
+    (void)x1;
+    (void)y1;
+    (void)x2;
+    (void)y2;
+    (void)colour;
 }
 
 HOST_SIM_WEAK void host_sim_emit_pixel(int x, int y, int colour) {
-    (void)x; (void)y; (void)colour;
+    (void)x;
+    (void)y;
+    (void)colour;
 }
 
 HOST_SIM_WEAK void host_sim_emit_scroll(int lines, int bg) {
-    (void)lines; (void)bg;
+    (void)lines;
+    (void)bg;
 }
 
-HOST_SIM_WEAK void host_sim_emit_blit(int x, int y, int w, int h, const uint32_t *pixels) {
-    (void)x; (void)y; (void)w; (void)h; (void)pixels;
+HOST_SIM_WEAK void host_sim_emit_blit(int x, int y, int w, int h, const uint32_t * pixels) {
+    (void)x;
+    (void)y;
+    (void)w;
+    (void)h;
+    (void)pixels;
 }

@@ -12,8 +12,13 @@
 #include "Hardware_Includes.h"
 
 void closeMQTT(void) {}
-void ProcessWeb(int mode) { (void)mode; }
-void TelnetPutC(int c, int flush) { (void)c; (void)flush; }
+void ProcessWeb(int mode) {
+    (void)mode;
+}
+void TelnetPutC(int c, int flush) {
+    (void)c;
+    (void)flush;
+}
 void WebConnect(void) {}
 /* port_repl_wifi_arch_init_and_connect is a no-op on non-WiFi ports;
  * the WiFi init call from MMBasic_REPL.c falls through to nothing. */
@@ -22,16 +27,20 @@ void port_repl_wifi_arch_init_and_connect(void) {}
  * port_tokens.h palette; non-WiFi ports use a different palette and
  * never invoke this stub. The definition keeps the symbol available
  * if some build path adds the token regardless. */
-void cmd_web(void) { error("WEB not supported on this port"); }
+void cmd_web(void) {
+    error("WEB not supported on this port");
+}
 
 /* Whether the WiFi telnet client is configured (Option.Telnet != -1).
  * Real impl on WiFi ports lives in MMtelnet.c; stub returns 1 on
  * non-WiFi so the stdio console path runs unconditionally. */
-int wifi_serial_telnet_configured(void) { return 1; }
+int wifi_serial_telnet_configured(void) {
+    return 1;
+}
 
-int  startupcomplete = 0;
+int startupcomplete = 0;
 
-void port_fun_mm_mqtt_copy(int which, unsigned char *out) {
+void port_fun_mm_mqtt_copy(int which, unsigned char * out) {
     (void)which;
     out[0] = 0;
     out[1] = 0;
@@ -49,20 +58,31 @@ void cleanserver(void) {}
 void close_tcpclient(void) {}
 
 void port_web_print_options(void) {}
-int  port_web_option_setter(unsigned char *cmdline) { (void)cmdline; return 0; }
-int  port_web_mminfo(unsigned char *ep, int64_t *out_iret,
-                     unsigned char *out_sret, int *out_targ)
-{ (void)ep; (void)out_iret; (void)out_sret; (void)out_targ; return 0; }
-int  port_web_get_ssid(unsigned char *out_sret, int *out_targ)
-{ (void)out_sret; (void)out_targ; return 0; }
+int port_web_option_setter(unsigned char * cmdline) {
+    (void)cmdline;
+    return 0;
+}
+int port_web_mminfo(unsigned char * ep, int64_t * out_iret,
+                    unsigned char * out_sret, int * out_targ) {
+    (void)ep;
+    (void)out_iret;
+    (void)out_sret;
+    (void)out_targ;
+    return 0;
+}
+int port_web_get_ssid(unsigned char * out_sret, int * out_targ) {
+    (void)out_sret;
+    (void)out_targ;
+    return 0;
+}
 
 #include "hal/hal_option_setters.h"
 #include "hal/hal_pin.h"
 
 /* OPTION PICO ON/OFF — exposes/hides CYW43-shadow pins (41/42/44).
  * RP2350B not supported (no shadow needed). */
-int port_setter_pico_pins(unsigned char *cmdline) {
-    unsigned char *tp = checkstring(cmdline, (unsigned char *)"PICO");
+int port_setter_pico_pins(unsigned char * cmdline) {
+    unsigned char * tp = checkstring(cmdline, (unsigned char *)"PICO");
     if (!tp) return 0;
 #ifdef rp2350
     if (!rp2350a) error("Invalid for RP2350B");
@@ -71,7 +91,8 @@ int port_setter_pico_pins(unsigned char *cmdline) {
         Option.AllPins = 1;
     else if (checkstring(tp, (unsigned char *)"ON") || checkstring(tp, (unsigned char *)"ENABLE"))
         Option.AllPins = 0;
-    else error("Syntax");
+    else
+        error("Syntax");
     SaveOptions();
     if (Option.AllPins == 0) {
         if (CheckPin(41, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED)) ExtCfg(41, EXT_DIG_OUT, Option.PWM);
@@ -122,13 +143,13 @@ void hal_pwm_mode_shadow_apply(void) {
 
 /* OPTION HEARTBEAT — non-WiFi ports allow pin reassignment in addition
  * to ON/OFF. */
-int port_setter_heartbeat(unsigned char *cmdline) {
-    unsigned char *tp = checkstring(cmdline, (unsigned char *)"HEARTBEAT");
+int port_setter_heartbeat(unsigned char * cmdline) {
+    unsigned char * tp = checkstring(cmdline, (unsigned char *)"HEARTBEAT");
     if (!tp) return 0;
     if (checkstring(tp, (unsigned char *)"OFF") || checkstring(tp, (unsigned char *)"DISABLE")) {
         Option.NoHeartbeat = 1;
     } else {
-        unsigned char *p = NULL;
+        unsigned char * p = NULL;
         p = checkstring(tp, (unsigned char *)"ON");
         if (p == NULL) p = checkstring(tp, (unsigned char *)"ENABLE");
         if (p) {
@@ -145,15 +166,19 @@ int port_setter_heartbeat(unsigned char *cmdline) {
                 SaveOptions();
                 _excep_code = RESET_COMMAND;
                 SoftReset();
-            } else Option.NoHeartbeat = 0;
-        } else error("Syntax");
+            } else
+                Option.NoHeartbeat = 0;
+        } else
+            error("Syntax");
     }
     SaveOptions();
     if (CheckPin(HEARTBEATpin, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED)) {
         if (Option.NoHeartbeat == 0) {
             hal_pin_set_mode(PinDef[HEARTBEATpin].GPno, HAL_PIN_MODE_OUTPUT);
             ExtCurrentConfig[PinDef[HEARTBEATpin].pin] = EXT_HEARTBEAT;
-        } else ExtCfg(HEARTBEATpin, EXT_NOT_CONFIG, 0);
-    } else error("Pin %/| is reserved", HEARTBEATpin, HEARTBEATpin);
+        } else
+            ExtCfg(HEARTBEATpin, EXT_NOT_CONFIG, 0);
+    } else
+        error("Pin %/| is reserved", HEARTBEATpin, HEARTBEATpin);
     return 1;
 }

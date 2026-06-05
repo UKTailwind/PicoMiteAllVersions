@@ -35,7 +35,7 @@ int hal_i2c_keypad_owns_i2c_bus(void);
  * character to enqueue. Real impl is the PicoCalc scancode map;
  * stub is the legacy generic-I²C-keyboard map (0x1203/0x1202
  * sentinels, ESC/F1/F2/F4 only). */
-int hal_i2c_keypad_translate(uint16_t buff, int *ctrlheld_inout);
+int hal_i2c_keypad_translate(uint16_t buff, int * ctrlheld_inout);
 
 /* OPTION LIST line for the keypad-controlled keyboard backlight.
  * Real prints `Option.KEYBOARDBL` if non-zero; stub no-op. */

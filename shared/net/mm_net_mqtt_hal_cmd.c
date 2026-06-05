@@ -14,17 +14,17 @@
 extern bool optionsuppressstatus;
 extern int InterruptUsed;
 
-static int mqtt_is_connected(const mm_net_mqtt_hal_context_t *ctx) {
+static int mqtt_is_connected(const mm_net_mqtt_hal_context_t * ctx) {
     return ctx->connected ? *ctx->connected : (*ctx->client != 0);
 }
 
-static void mqtt_set_connected(const mm_net_mqtt_hal_context_t *ctx, int value) {
+static void mqtt_set_connected(const mm_net_mqtt_hal_context_t * ctx, int value) {
     if (ctx->connected) *ctx->connected = value;
 }
 
-int mm_net_mqtt_hal_cmd(unsigned char *line,
-                        const mm_net_mqtt_hal_context_t *ctx) {
-    unsigned char *tp;
+int mm_net_mqtt_hal_cmd(unsigned char * line,
+                        const mm_net_mqtt_hal_context_t * ctx) {
+    unsigned char * tp;
 
     if (!ctx || !ctx->client) error("Internal error");
 

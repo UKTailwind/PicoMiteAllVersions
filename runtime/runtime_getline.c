@@ -13,22 +13,22 @@
 #include "Hardware_Includes.h"
 
 // filenbr == 0 means the console input
-void MMgetline(int filenbr, char *p) {
+void MMgetline(int filenbr, char * p) {
     int c, nbrchars = 0;
-    char *tp;
+    char * tp;
 
     while (1) {
         CheckAbort();
         if (FileTable[filenbr].com > MAXCOMPORTS && FileEOF(filenbr)) break;
         c = MMfgetc(filenbr);
-        if (c <= 0) continue;                                       // keep looping if there are no chars
+        if (c <= 0) continue; // keep looping if there are no chars
 
         // if this is the console, check for a programmed function key and insert the text
         if (filenbr == 0) {
             tp = NULL;
-            if (c == F2)  tp = "RUN";
-            if (c == F3)  tp = "LIST";
-            if (c == F4)  tp = "EDIT";
+            if (c == F2) tp = "RUN";
+            if (c == F3) tp = "LIST";
+            if (c == F4) tp = "EDIT";
             if (c == F10) tp = "AUTOSAVE";
             if (c == F11) tp = "XMODEM RECEIVE";
             if (c == F12) tp = "XMODEM SEND";
@@ -40,12 +40,15 @@ void MMgetline(int filenbr, char *p) {
             if (c == F9) tp = (char *)Option.F9key;
             if (tp) {
                 strcpy(p, tp);
-                if (EchoOption) { MMPrintString(tp); MMPrintString("\r\n"); }
+                if (EchoOption) {
+                    MMPrintString(tp);
+                    MMPrintString("\r\n");
+                }
                 return;
             }
         }
 
-        if (c == '\t') {                                            // expand tabs to spaces
+        if (c == '\t') { // expand tabs to spaces
             do {
                 if (++nbrchars > MAXSTRLEN) error("Line is too long");
                 *p++ = ' ';
@@ -54,7 +57,7 @@ void MMgetline(int filenbr, char *p) {
             continue;
         }
 
-        if (c == '\b') {                                            // handle the backspace
+        if (c == '\b') { // handle the backspace
             if (nbrchars) {
                 if (filenbr == 0 && EchoOption) MMPrintString("\b \b");
                 nbrchars--;
@@ -63,23 +66,23 @@ void MMgetline(int filenbr, char *p) {
             continue;
         }
 
-        if (c == '\n') {                                            // what to do with a newline
-            break;                                                  // a newline terminates a line (for a file)
+        if (c == '\n') { // what to do with a newline
+            break;       // a newline terminates a line (for a file)
         }
 
         if (c == '\r') {
             if (filenbr == 0 && EchoOption) {
                 MMPrintString("\r\n");
-                break;                                              // on the console this means the end of the line - stop collecting
+                break; // on the console this means the end of the line - stop collecting
             } else
-                continue;                                           // for files loop around looking for the following newline
+                continue; // for files loop around looking for the following newline
         }
 
         if (isprint(c)) {
-            if (filenbr == 0 && EchoOption) MMputchar((char)c, 1);  // The console requires that chars be echoed
+            if (filenbr == 0 && EchoOption) MMputchar((char)c, 1); // The console requires that chars be echoed
         }
-        if (++nbrchars > MAXSTRLEN) error("Line is too long");      // stop collecting if maximum length
-        *p++ = (char)c;                                             // save our char
+        if (++nbrchars > MAXSTRLEN) error("Line is too long"); // stop collecting if maximum length
+        *p++ = (char)c;                                        // save our char
     }
     *p = 0;
 }

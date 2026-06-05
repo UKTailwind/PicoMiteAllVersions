@@ -40,7 +40,7 @@ extern char MMputchar(char c, int flush);
 extern char SerialConsolePutC(char c, int flush);
 
 static void bulk_flush(void) {
-    const mm_runtime_console_adapter *a = mmbasic_runtime_console_get_adapter();
+    const mm_runtime_console_adapter * a = mmbasic_runtime_console_get_adapter();
     if (a && a->stdout_flush) {
         a->stdout_flush();
     } else {
@@ -51,12 +51,12 @@ static void bulk_flush(void) {
     }
 }
 
-void MMPrintString(char *s) {
+void MMPrintString(char * s) {
     while (*s) MMputchar(*s++, 0);
     bulk_flush();
 }
 
-void SSPrintString(char *s) {
+void SSPrintString(char * s) {
     while (*s) SerialConsolePutC(*s++, 0);
     bulk_flush();
 }

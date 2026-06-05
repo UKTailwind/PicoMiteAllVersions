@@ -16,10 +16,10 @@
 #include "../host_native/port_tokens.h"
 
 #undef HAL_PORT_VIDEO_CMD_TOKENS
-#define HAL_PORT_VIDEO_CMD_TOKENS \
-    { (unsigned char *)"Camera",  T_CMD, 0, cmd_camera }, \
-    { (unsigned char *)"Refresh", T_CMD, 0, cmd_refresh }, \
-    { (unsigned char *)"MODE",    T_CMD, 0, cmd_mode },   \
-    { (unsigned char *)"QUIT",    T_CMD, 0, cmd_quit },
+#define HAL_PORT_VIDEO_CMD_TOKENS                            \
+    {(unsigned char *)"Camera", T_CMD, 0, cmd_camera},       \
+        {(unsigned char *)"Refresh", T_CMD, 0, cmd_refresh}, \
+        {(unsigned char *)"MODE", T_CMD, 0, cmd_mode},       \
+        {(unsigned char *)"QUIT", T_CMD, 0, cmd_quit},
 
 #endif /* PORT_TOKENS_ANSI_H */

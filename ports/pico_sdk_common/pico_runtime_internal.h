@@ -70,13 +70,13 @@ extern volatile unsigned int KeyCheck;
 extern volatile unsigned int NunchuckTimer;
 extern volatile bool processtick;
 extern uint32_t restart_reason;
-extern const uint8_t *flash_libmemory;
-extern const uint8_t *flash_target_contents;
+extern const uint8_t * flash_libmemory;
+extern const uint8_t * flash_target_contents;
 extern unsigned int CFuncmSec;
 extern void CallCFuncmSec(void);
 
 extern repeating_timer_t timer;
-bool timer_callback(repeating_timer_t *rt);
+bool timer_callback(repeating_timer_t * rt);
 uint64_t __not_in_flash_func(uSecFunc)(uint64_t a);
 void sigbus(void);
 void updatebootcount(void);

@@ -15,53 +15,45 @@
  * reach the slot through runtime_console_printstring.c. */
 #define console_adapter mmbasic_runtime_console_get_adapter()
 
-static void console_service(void)
-{
+static void console_service(void) {
     if (console_adapter && console_adapter->service) console_adapter->service();
 }
 
-static int console_raw_mode_active(void)
-{
+static int console_raw_mode_active(void) {
     return console_adapter && console_adapter->raw_mode_active
-        ? console_adapter->raw_mode_active()
-        : 0;
+               ? console_adapter->raw_mode_active()
+               : 0;
 }
 
-static int console_read_byte_nonblock(void)
-{
+static int console_read_byte_nonblock(void) {
     return console_adapter && console_adapter->read_byte_nonblock
-        ? console_adapter->read_byte_nonblock()
-        : -1;
+               ? console_adapter->read_byte_nonblock()
+               : -1;
 }
 
-static int console_read_byte_blocking_ms(int ms)
-{
+static int console_read_byte_blocking_ms(int ms) {
     return console_adapter && console_adapter->read_byte_blocking_ms
-        ? console_adapter->read_byte_blocking_ms(ms)
-        : -1;
+               ? console_adapter->read_byte_blocking_ms(ms)
+               : -1;
 }
 
-static void console_push_back_byte(int c)
-{
+static void console_push_back_byte(int c) {
     if (console_adapter && console_adapter->push_back_byte) {
         console_adapter->push_back_byte(c);
     }
 }
 
-static void console_sleep_us(uint32_t us)
-{
+static void console_sleep_us(uint32_t us) {
     if (console_adapter && console_adapter->sleep_us) console_adapter->sleep_us(us);
 }
 
-static int console_repl_mode(void)
-{
+static int console_repl_mode(void) {
     return console_adapter && console_adapter->repl_mode
-        ? console_adapter->repl_mode()
-        : 0;
+               ? console_adapter->repl_mode()
+               : 0;
 }
 
-static void console_stdout_flush(void)
-{
+static void console_stdout_flush(void) {
     if (console_adapter && console_adapter->stdout_flush) {
         console_adapter->stdout_flush();
     } else {
@@ -69,22 +61,19 @@ static void console_stdout_flush(void)
     }
 }
 
-static void console_telnet_putc(int c, int flush)
-{
+static void console_telnet_putc(int c, int flush) {
     if (console_adapter && console_adapter->telnet_putc) {
         console_adapter->telnet_putc(c, flush);
     }
 }
 
-static void console_display_putc(char c)
-{
+static void console_display_putc(char c) {
     if (console_adapter && console_adapter->display_putc) {
         console_adapter->display_putc(c);
     }
 }
 
-static char console_serial_putc(char c, int flush)
-{
+static char console_serial_putc(char c, int flush) {
     if (console_adapter && console_adapter->serial_putc) {
         return console_adapter->serial_putc(c, flush);
     }
@@ -93,8 +82,7 @@ static char console_serial_putc(char c, int flush)
     return c;
 }
 
-void mmbasic_runtime_console_print_raw(const char *text, int len)
-{
+void mmbasic_runtime_console_print_raw(const char * text, int len) {
     if (!text || len <= 0) return;
     if (console_adapter && console_adapter->raw_write) {
         console_adapter->raw_write(text, len);
@@ -110,13 +98,11 @@ static int host_escdecode_read_byte_ms(int timeout_ms) {
     return console_read_byte_blocking_ms(timeout_ms);
 }
 
-int mmbasic_runtime_console_decode_escape_sequence(void)
-{
+int mmbasic_runtime_console_decode_escape_sequence(void) {
     return mmbasic_escdecode_run(host_escdecode_read_byte_ms);
 }
 
-int MMInkey(void)
-{
+int MMInkey(void) {
     console_service();
 
     /* Drain any chars left over from an earlier unrecognised escape
@@ -173,8 +159,7 @@ int MMInkey(void)
     return -1;
 }
 
-int MMgetchar(void)
-{
+int MMgetchar(void) {
     int ch;
     do {
         ShowCursor(1);
@@ -185,8 +170,7 @@ int MMgetchar(void)
     return ch;
 }
 
-void putConsole(int c, int flush)
-{
+void putConsole(int c, int flush) {
     if (OptionConsole & 2) console_display_putc((char)c);
     if (OptionConsole & 1) {
         console_serial_putc((char)c, flush);

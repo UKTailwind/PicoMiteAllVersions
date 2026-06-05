@@ -33,14 +33,14 @@
  * pending input here so Ctrl-C breaks runaway loops even when MMInkey
  * isn't being called (e.g. tight FOR/NEXT). Non-Ctrl-C bytes get
  * pushed back so MMInkey sees them on the next poll. */
-extern int  esp32_console_read_byte_nonblock(void);
+extern int esp32_console_read_byte_nonblock(void);
 extern void esp32_console_push_back_byte(int c);
 extern volatile bool TCPreceived;
-extern char *TCPreceiveInterrupt;
+extern char * TCPreceiveInterrupt;
 extern volatile bool UDPreceive;
-extern char *UDPinterrupt;
+extern char * UDPinterrupt;
 extern volatile bool MQTTComplete;
-extern char *MQTTInterrupt;
+extern char * MQTTInterrupt;
 extern bool g_TempMemoryIsChanged;
 extern int esp32_tcp_interrupt_pending(void);
 extern int esp32_udp_interrupt_pending(void);
@@ -54,7 +54,7 @@ static int s_save_errno;
 static char s_interrupt_return_token[3];
 static int s_network_service_active;
 
-static inline CommandToken esp32_commandtbl_decode(const unsigned char *p) {
+static inline CommandToken esp32_commandtbl_decode(const unsigned char * p) {
     return ((CommandToken)(p[0] & 0x7f)) | ((CommandToken)(p[1] & 0x7f) << 7);
 }
 
@@ -134,10 +134,12 @@ void routinechecks(void) {
     mmbasic_runtime_routinechecks(&s_abort_adapter);
 }
 
-void port_bc_runtime_free_source(const char **source) {
+void port_bc_runtime_free_source(const char ** source) {
     if (source && *source) {
-        if (bc_compile_owns(*source)) BC_COMPILER_FREE((void *)*source);
-        else BC_FREE((void *)*source);
+        if (bc_compile_owns(*source))
+            BC_COMPILER_FREE((void *)*source);
+        else
+            BC_FREE((void *)*source);
         *source = NULL;
     }
 }
@@ -146,8 +148,11 @@ void port_bc_runtime_free_source(const char **source) {
  * support — the `_S` / `_F` flash regions Pico CFUNCTIONs live in
  * don't have an ESP-IDF analogue. cmd_cfunction errors before this
  * runs; the symbol exists only because Commands.c references it. */
-int64_t CallCFunction(unsigned char *cmd, unsigned char *args, unsigned char *def, unsigned char *caller) {
-    (void)cmd; (void)args; (void)def; (void)caller;
+int64_t CallCFunction(unsigned char * cmd, unsigned char * args, unsigned char * def, unsigned char * caller) {
+    (void)cmd;
+    (void)args;
+    (void)def;
+    (void)caller;
     return 0;
 }
 
@@ -155,7 +160,9 @@ int64_t CallCFunction(unsigned char *cmd, unsigned char *args, unsigned char *de
  * REPL goes through MMBasic_RunPromptLoop's normal tokenize-and-execute
  * path; this trampoline is unreachable but referenced from the editor
  * stub. */
-void CallExecuteProgram(char *p) { (void)p; }
+void CallExecuteProgram(char * p) {
+    (void)p;
+}
 
 /* core1stack — the magic-number sentinel MMBasic.c checks for stack
  * overflow on the second core. ESP32-S3 has dual Xtensa LX7 cores but
@@ -166,7 +173,7 @@ uint32_t core1stack[256] = {[0] = 0x12345678};
 /* ON-interrupt-return state, used when an ON KEY / ON ERROR / etc.
  * handler is mid-flight. Initialized to NULL/0 — no interrupts
  * currently registered on this port. */
-unsigned char *InterruptReturn = NULL;
+unsigned char * InterruptReturn = NULL;
 int InterruptUsed = 0;
 
 /* Diagnostic timer — bumped from a 1 ms tick on Pico, observed by

@@ -36,8 +36,6 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "Hardware_Includes.h"
 #include <errno.h>
 
-
-
 /********************************************************************************************************************************************
  basic operators
  each function is responsible for decoding a basic operator
@@ -59,181 +57,153 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 
  ********************************************************************************************************************************************/
 
-
-
-
-void  MMB_HOT_FUNC(op_invalid)(void) {
-	error("Syntax error");
+void MMB_HOT_FUNC(op_invalid)(void) {
+    error("Syntax error");
 }
 /*  @endcond */
 
-void  MMB_HOT_FUNC(op_exp)(void) {
-    int64_t  i;
-    if(targ & T_NBR){
+void MMB_HOT_FUNC(op_exp)(void) {
+    int64_t i;
+    if (targ & T_NBR) {
         fret = (MMFLOAT)pow(farg1, farg2);
-        if(fret==INFINITY) error("Overflow");
-    }
-    else {
-        if(iarg2 < 0) {
+        if (fret == INFINITY) error("Overflow");
+    } else {
+        if (iarg2 < 0) {
             targ = T_NBR;
             fret = (MMFLOAT)pow((MMFLOAT)iarg1, (MMFLOAT)iarg2);
         } else
-            for(iret = i = 1; i <= iarg2; i++) iret *= iarg1;
+            for (iret = i = 1; i <= iarg2; i++) iret *= iarg1;
     }
 }
 
-
-void  MMB_HOT_FUNC(op_mul)(void) {
-    if(targ & T_NBR){
+void MMB_HOT_FUNC(op_mul)(void) {
+    if (targ & T_NBR) {
         fret = farg1 * farg2;
-        if(fret==INFINITY) error("Overflow");
-    }
-    else
+        if (fret == INFINITY) error("Overflow");
+    } else
         iret = iarg1 * iarg2;
 }
 
-
 // division will always return a float even if given integer arguments
-void  MMB_HOT_FUNC(op_div)(void) {
-    if(farg2 == 0) error("Divide by zero");
+void MMB_HOT_FUNC(op_div)(void) {
+    if (farg2 == 0) error("Divide by zero");
     fret = farg1 / farg2;
-    if(fret==INFINITY) error("Overflow");
+    if (fret == INFINITY) error("Overflow");
     targ = T_NBR;
 }
 
-
-void  MMB_HOT_FUNC(op_divint)(void) {
-    if(iarg2 == 0) error("Divide by zero");
+void MMB_HOT_FUNC(op_divint)(void) {
+    if (iarg2 == 0) error("Divide by zero");
     iret = iarg1 / iarg2;
 }
 
-
-void  MMB_HOT_FUNC(op_add)(void) {
-	if(targ & T_NBR){
-		fret = farg1 + farg2;
-        if(fret==INFINITY) error("Overflow");
-    }
-	else if(targ & T_INT)
-		iret = iarg1 + iarg2;
+void MMB_HOT_FUNC(op_add)(void) {
+    if (targ & T_NBR) {
+        fret = farg1 + farg2;
+        if (fret == INFINITY) error("Overflow");
+    } else if (targ & T_INT)
+        iret = iarg1 + iarg2;
     else {
-		if(*sarg1 + *sarg2 > MAXSTRLEN) error("String too long");
-		sret = GetTempMemory(STRINGSIZE);								// this will last for the life of the command
-		Mstrcpy(sret, sarg1);
-		Mstrcat(sret, sarg2);
-	}
+        if (*sarg1 + *sarg2 > MAXSTRLEN) error("String too long");
+        sret = GetTempMemory(STRINGSIZE); // this will last for the life of the command
+        Mstrcpy(sret, sarg1);
+        Mstrcat(sret, sarg2);
+    }
 }
 
-void  MMB_HOT_FUNC(op_subtract)(void) {
-	if(targ & T_NBR)
-		fret = farg1 - farg2;
-	else
-		iret = iarg1 - iarg2;
+void MMB_HOT_FUNC(op_subtract)(void) {
+    if (targ & T_NBR)
+        fret = farg1 - farg2;
+    else
+        iret = iarg1 - iarg2;
 }
 
-
-void  MMB_HOT_FUNC(op_mod)(void) {
-    if(iarg2 == 0) error("Divide by zero");
+void MMB_HOT_FUNC(op_mod)(void) {
+    if (iarg2 == 0) error("Divide by zero");
     iret = iarg1 % iarg2;
 }
-
 
 /*
  * @cond
  * The following section will be excluded from the documentation.
  */
 
-static inline int64_t (compare)(void) {
-    int64_t  r;
+static inline int64_t(compare)(void) {
+    int64_t r;
     MMFLOAT f;
-    if(targ & T_NBR) {
-		f = farg1 - farg2;
-        if(f > 0)
+    if (targ & T_NBR) {
+        f = farg1 - farg2;
+        if (f > 0)
             r = 1;
-        else if(f < 0)
+        else if (f < 0)
             r = -1;
         else
             r = 0;
-    }
-	else
-        if(targ & T_INT)
-            r = iarg1 - iarg2;
-        else
-            r = Mstrcmp(sarg1, sarg2);
-     targ = T_INT;									// always return an float, even if the args are string
-     return r;
+    } else if (targ & T_INT)
+        r = iarg1 - iarg2;
+    else
+        r = Mstrcmp(sarg1, sarg2);
+    targ = T_INT; // always return an float, even if the args are string
+    return r;
 }
 /*  @endcond */
 
-void  MMB_HOT_FUNC(op_ne)(void) {
-    if(targ & T_INT)
+void MMB_HOT_FUNC(op_ne)(void) {
+    if (targ & T_INT)
         iret = iarg1 != iarg2;
     else
         iret = (compare() != 0);
 }
 
-
-
-void  MMB_HOT_FUNC(op_gte)(void) {
+void MMB_HOT_FUNC(op_gte)(void) {
     iret = (compare() >= 0);
 }
 
-
-void  MMB_HOT_FUNC(op_lte)(void) {
+void MMB_HOT_FUNC(op_lte)(void) {
     iret = (compare() <= 0);
 }
 
-
-void  MMB_HOT_FUNC(op_lt)(void) {
+void MMB_HOT_FUNC(op_lt)(void) {
     iret = (compare() < 0);
 }
 
-
-void  MMB_HOT_FUNC(op_gt)(void) {
+void MMB_HOT_FUNC(op_gt)(void) {
     iret = (compare() > 0);
 }
 
-
-void  MMB_HOT_FUNC(op_equal)(void) {
-    if(targ & T_INT)
+void MMB_HOT_FUNC(op_equal)(void) {
+    if (targ & T_INT)
         iret = iarg1 == iarg2;
     else
         iret = (compare() == 0);
 }
 
-
-void  MMB_HOT_FUNC(op_shiftleft)(void) {
-    iret = (int64_t )((unsigned long long int )iarg1 << (int64_t )iarg2);
+void MMB_HOT_FUNC(op_shiftleft)(void) {
+    iret = (int64_t)((unsigned long long int)iarg1 << (int64_t)iarg2);
 }
 
-
-void  MMB_HOT_FUNC(op_shiftright)(void) {
-    iret = (int64_t )((unsigned long long int )iarg1 >> (int64_t )iarg2);
+void MMB_HOT_FUNC(op_shiftright)(void) {
+    iret = (int64_t)((unsigned long long int)iarg1 >> (int64_t)iarg2);
 }
 
-
-void  MMB_HOT_FUNC(op_and)(void) {
-    iret = (int64_t )((unsigned long long int )iarg1 & (unsigned long long int )iarg2);
+void MMB_HOT_FUNC(op_and)(void) {
+    iret = (int64_t)((unsigned long long int)iarg1 & (unsigned long long int)iarg2);
 }
 
-
-void  MMB_HOT_FUNC(op_or)(void) {
-    iret = (int64_t )((unsigned long long int )iarg1 | (unsigned long long int )iarg2);
+void MMB_HOT_FUNC(op_or)(void) {
+    iret = (int64_t)((unsigned long long int)iarg1 | (unsigned long long int)iarg2);
 }
 
-
-void  MMB_HOT_FUNC(op_xor)(void) {
-    iret = (int64_t )((unsigned long long int )iarg1 ^ (unsigned long long int )iarg2);
+void MMB_HOT_FUNC(op_xor)(void) {
+    iret = (int64_t)((unsigned long long int)iarg1 ^ (unsigned long long int)iarg2);
 }
 
-
-
-void  MMB_HOT_FUNC(op_not)(void){
-	// don't do anything, just a place holder
-	error("Syntax error");
+void MMB_HOT_FUNC(op_not)(void) {
+    // don't do anything, just a place holder
+    error("Syntax error");
 }
 
-void  MMB_HOT_FUNC(op_inv)(void){
-	// don't do anything, just a place holder
-	error("Syntax error");
+void MMB_HOT_FUNC(op_inv)(void) {
+    // don't do anything, just a place holder
+    error("Syntax error");
 }
-

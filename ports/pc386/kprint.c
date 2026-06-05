@@ -18,7 +18,7 @@ void kputc(char c) {
     vga_text_putc(c);
 }
 
-void kputs(const char *s) {
+void kputs(const char * s) {
     while (*s) {
         kputc(*s++);
     }
@@ -56,8 +56,8 @@ void kputu32(uint32_t v) {
         kputc('0');
         return;
     }
-    while (v > 0 && n < (int) sizeof(buf)) {
-        buf[n++] = (char) ('0' + (v % 10));
+    while (v > 0 && n < (int)sizeof(buf)) {
+        buf[n++] = (char)('0' + (v % 10));
         v /= 10;
     }
     while (n > 0) {
@@ -73,8 +73,8 @@ void kputu64(uint64_t v) {
         kputc('0');
         return;
     }
-    while (v > 0 && n < (int) sizeof(buf)) {
-        buf[n++] = (char) ('0' + (v % 10));
+    while (v > 0 && n < (int)sizeof(buf)) {
+        buf[n++] = (char)('0' + (v % 10));
         v /= 10;
     }
     while (n > 0) {

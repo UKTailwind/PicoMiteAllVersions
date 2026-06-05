@@ -30,7 +30,7 @@
 #include "Hardware_Includes.h"
 #include "runtime/runtime.h"
 
-extern const uint8_t *flash_progmemory;
+extern const uint8_t * flash_progmemory;
 /* Sized to mirror the device program-flash region: MAX_PROG_SIZE +
  * the CFunction trailing area. Pre-refactor this was a hardcoded
  * 256 KB regardless of variant; now it tracks MAX_PROG_SIZE so wasm's
@@ -41,7 +41,7 @@ uint8_t flash_prog_buf[2 * MAX_PROG_SIZE];
  * host_main.c's capture mode. In WASM there is nothing to capture to —
  * console output already reaches the framebuffer via DisplayPutC — so
  * we leave the hook NULL permanently. */
-void (*host_output_hook)(const char *text, int len) = NULL;
+void (*host_output_hook)(const char * text, int len) = NULL;
 
 /* Declared in host_runtime.c; also referenced here to run the shared
  * REPL setup without going through host_main.c. */
@@ -49,10 +49,10 @@ extern char MMErrMsg[];
 extern int MMerrno;
 extern int host_repl_mode;
 extern int bc_opt_level;
-extern const char *host_sd_root;
+extern const char * host_sd_root;
 
-void host_runtime_configure(int timeout_ms, const char *screenshot_path);
-void host_runtime_configure_keys(const char *keys, int delay_ms);
+void host_runtime_configure(int timeout_ms, const char * screenshot_path);
+void host_runtime_configure_keys(const char * keys, int delay_ms);
 void host_runtime_finish(void);
 
 void vm_host_fat_reset(void);
@@ -133,27 +133,27 @@ static void wasm_configure_display_console(void) {
     extern short gui_font_width, gui_font_height;
 
     Option.DISPLAY_CONSOLE = 1;
-    OptionConsole = 2;  /* screen only — no UART in the browser */
+    OptionConsole = 2; /* screen only — no UART in the browser */
 
     /* 0x01 = font 0 (the built-in 8x12 font1) at 1x scale. Scale MUST
      * be nonzero; on error, MMBasic.c calls SetFont(Option.DefaultFont)
      * during recovery, and a scale of 0 zeroes out gui_font_width/
      * height and strands the cursor at column 0 forever. */
     gui_font = 0x01;
-    gui_font_width  = 8;
+    gui_font_width = 8;
     gui_font_height = 12;
-    Option.Tab         = 4;
+    Option.Tab = 4;
     Option.DefaultFont = 0x01;
-    Option.ColourCode  = 1;
+    Option.ColourCode = 1;
 
     /* PicoCalc-style green phosphor. Mirrored into Default* so
      * ResetDisplay (error path) restores the same look. */
-    gui_fcolour       = 0x00FF00;
-    gui_bcolour       = 0x000000;
-    PromptFC          = 0x00FF00;
-    PromptBC          = 0x000000;
-    Option.DefaultFC  = 0x00FF00;
-    Option.DefaultBC  = 0x000000;
+    gui_fcolour = 0x00FF00;
+    gui_bcolour = 0x000000;
+    PromptFC = 0x00FF00;
+    PromptBC = 0x000000;
+    Option.DefaultFC = 0x00FF00;
+    Option.DefaultBC = 0x000000;
 }
 
 static void wasm_memory_backing_init(void) {
@@ -168,7 +168,7 @@ static const mm_runtime_adapter wasm_boot_adapter = {
     .memory_backing_init = wasm_memory_backing_init,
 };
 
-static void *wasm_runtime_thread(void *arg) {
+static void * wasm_runtime_thread(void * arg) {
     (void)arg;
 
     mmbasic_runtime_init_common(&wasm_boot_adapter,
@@ -192,8 +192,8 @@ static void *wasm_runtime_thread(void *arg) {
     mmbasic_runtime_port_begin();
 
     wasm_configure_display_console();
-    Option.Width  = HRes / gui_font_width;   /* 320/8 = 40 cols */
-    Option.Height = VRes / gui_font_height;  /* 320/12 = 26 rows */
+    Option.Width = HRes / gui_font_width;   /* 320/8 = 40 cols */
+    Option.Height = VRes / gui_font_height; /* 320/12 = 26 rows */
 
     /* Re-snapshot Option into flash_option_buf AFTER the display
      * console is configured. mmbasic_runtime_port_begin took its snapshot
@@ -204,7 +204,7 @@ static void *wasm_runtime_thread(void *arg) {
     host_options_snapshot();
 
     MMBasic_PrintBanner();
-    mmbasic_runtime_enter_repl(NULL, 0);  /* never returns under normal operation */
+    mmbasic_runtime_enter_repl(NULL, 0); /* never returns under normal operation */
 
     host_runtime_finish();
     (void)wasm_consume_break;
@@ -238,8 +238,8 @@ void wasm_boot(void) {
  * code, with this file retaining the compatibility wrapper.
  * ------------------------------------------------------------------------ */
 
-char *read_basic_source_file(const char *filename) {
-    FILE *f = fopen(filename, "r");
+char * read_basic_source_file(const char * filename) {
+    FILE * f = fopen(filename, "r");
     if (!f) {
         fprintf(stderr, "Cannot open %s\n", filename);
         return NULL;
@@ -248,8 +248,11 @@ char *read_basic_source_file(const char *filename) {
     fseek(f, 0, SEEK_END);
     long fsize = ftell(f);
     fseek(f, 0, SEEK_SET);
-    char *source = malloc((size_t)fsize + 1);
-    if (!source) { fclose(f); return NULL; }
+    char * source = malloc((size_t)fsize + 1);
+    if (!source) {
+        fclose(f);
+        return NULL;
+    }
     fread(source, 1, (size_t)fsize, f);
     source[fsize] = '\0';
     fclose(f);

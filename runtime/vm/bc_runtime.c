@@ -12,7 +12,7 @@
 #include "bc_source.h"
 #include "vm_device_support.h"
 #include "MMBasic.h"
-#include "FileIO.h"            /* hal_fds[], BasicFileOpen, FileGetChar, FileEOF, FileClose, FindFreeFileNbr */
+#include "FileIO.h" /* hal_fds[], BasicFileOpen, FileGetChar, FileEOF, FileClose, FindFreeFileNbr */
 #include "hal/hal_filesystem.h"
 #include "vm_sys_file.h"
 /* vm_device_support.h (above) pulls in Hardware_Includes.h transitively
@@ -28,7 +28,7 @@ extern unsigned int bc_alloc_fail_longest;
 extern unsigned int bc_alloc_fail_total;
 #include "vm_sys_graphics.h"
 
-#define VMRUN_DBG(s)       ((void)0)
+#define VMRUN_DBG(s) ((void)0)
 #define VMRUN_DBGF(fmt...) ((void)0)
 
 /* Runtime diagnostic state. Populated per VM stage by
@@ -51,18 +51,28 @@ typedef struct {
 
 static BCRunDiagState g_run_diag;
 
-static const char *bc_run_vm_stage_name(BCRunVmStage stage) {
+static const char * bc_run_vm_stage_name(BCRunVmStage stage) {
     switch (stage) {
-        case BC_RUN_VM_ENTRY: return "entry";
-        case BC_RUN_VM_COMPILER_ALLOC_FAIL: return "compiler_alloc_fail";
-        case BC_RUN_VM_COMPILER_ALLOC_OK: return "compiler_alloc_ok";
-        case BC_RUN_VM_COMPILE_OK: return "compile_ok";
-        case BC_RUN_VM_COMPACT_FAIL: return "compact_fail";
-        case BC_RUN_VM_COMPACT_OK: return "compact_ok";
-        case BC_RUN_VM_COMPILE_RELEASED: return "compile_released";
-        case BC_RUN_VM_RUNTIME_ALLOC_FAIL: return "runtime_alloc_fail";
-        case BC_RUN_VM_RUNTIME_ALLOC_OK: return "runtime_alloc_ok";
-        default: return "none";
+    case BC_RUN_VM_ENTRY:
+        return "entry";
+    case BC_RUN_VM_COMPILER_ALLOC_FAIL:
+        return "compiler_alloc_fail";
+    case BC_RUN_VM_COMPILER_ALLOC_OK:
+        return "compiler_alloc_ok";
+    case BC_RUN_VM_COMPILE_OK:
+        return "compile_ok";
+    case BC_RUN_VM_COMPACT_FAIL:
+        return "compact_fail";
+    case BC_RUN_VM_COMPACT_OK:
+        return "compact_ok";
+    case BC_RUN_VM_COMPILE_RELEASED:
+        return "compile_released";
+    case BC_RUN_VM_RUNTIME_ALLOC_FAIL:
+        return "runtime_alloc_fail";
+    case BC_RUN_VM_RUNTIME_ALLOC_OK:
+        return "runtime_alloc_ok";
+    default:
+        return "none";
     }
 }
 
@@ -117,7 +127,7 @@ void bc_run_diag_note_vm_stage(BCRunVmStage stage, unsigned vm_used, unsigned vm
     g_run_diag.vm_cap = cap;
 }
 
-void bc_run_diag_dump(const char *reason) {
+void bc_run_diag_dump(const char * reason) {
     char b[160];
     MMPrintString("\r\n");
     snprintf(b, sizeof(b), "RUNMEM fail=%s vmstage=%s\r\n",
@@ -158,13 +168,13 @@ void bc_run_diag_dump(const char *reason) {
  * boundary, so this path must free only its own allocations and must not reset
  * the heap wholesale.
  */
-void bc_run_source_string_ex(const char *source, const char *source_name, int is_immediate);
+void bc_run_source_string_ex(const char * source, const char * source_name, int is_immediate);
 
 /* Free the source buffer between compile and runtime-table allocation.
  * Each port must provide exactly one strong definition. Heap-tight
  * device ports usually BC_FREE the source buffer; host ports keep it
  * because their test harness may own malloc-backed source memory. */
-void port_bc_runtime_free_source(const char **source);
+void port_bc_runtime_free_source(const char ** source);
 #define bc_release_source(p) port_bc_runtime_free_source(p)
 
 /* FRUN / RUN load their source through BasicFileOpen + FileGetChar
@@ -172,11 +182,11 @@ void port_bc_runtime_free_source(const char **source);
  * through hal_fs_*, so any port with a real HAL gets file I/O for free
  * here — no per-port indirection. */
 
-void bc_run_source_string(const char *source, const char *source_name) {
+void bc_run_source_string(const char * source, const char * source_name) {
     bc_run_source_string_ex(source, source_name, 0);
 }
 
-void bc_run_source_string_ex(const char *source, const char *source_name, int is_immediate) {
+void bc_run_source_string_ex(const char * source, const char * source_name, int is_immediate) {
     int err;
     if (!is_immediate) {
         bc_fastgfx_reset();
@@ -194,9 +204,9 @@ void bc_run_source_string_ex(const char *source, const char *source_name, int is
                               (unsigned)bc_alloc_bytes_capacity());
 
     bc_crash_checkpoint(BC_CK_VM_ALLOC_CS, "alloc BCCompiler");
-    BCCompiler *cs = (BCCompiler *)BC_ALLOC(sizeof(BCCompiler));
+    BCCompiler * cs = (BCCompiler *)BC_ALLOC(sizeof(BCCompiler));
     bc_crash_checkpoint(BC_CK_VM_ALLOC_VM, "alloc BCVMState");
-    BCVMState  *vm = (BCVMState  *)BC_ALLOC(sizeof(BCVMState));
+    BCVMState * vm = (BCVMState *)BC_ALLOC(sizeof(BCVMState));
     if (!cs || !vm) {
         if (cs) BC_FREE(cs);
         if (vm) BC_FREE(vm);
@@ -404,9 +414,9 @@ void bc_run_source_string_ex(const char *source, const char *source_name, int is
      * whatever ProgMemory pointed at before FRUN (REPL: empty), which is
      * how `Cannot find label` surfaces in bridged TILEMAP CREATE under
      * FRUN. Skip the swap in immediate mode (no source program). */
-    unsigned char *saved_prog_memory = ProgMemory;
+    unsigned char * saved_prog_memory = ProgMemory;
     if (!is_immediate) {
-        unsigned char *bridge_buf = bc_bridge_get_prog_buf();
+        unsigned char * bridge_buf = bc_bridge_get_prog_buf();
         if (bridge_buf) ProgMemory = bridge_buf;
     }
 
@@ -437,7 +447,7 @@ void bc_run_source_string_ex(const char *source, const char *source_name, int is
  *
  * Call before bc_vm_execute to redirect PRINT output to a string buffer.
  */
-void bc_vm_start_capture(BCVMState *vm, char *buf, int capacity) {
+void bc_vm_start_capture(BCVMState * vm, char * buf, int capacity) {
     vm->capture_buf = buf;
     vm->capture_len = 0;
     vm->capture_cap = capacity;
@@ -447,7 +457,7 @@ void bc_vm_start_capture(BCVMState *vm, char *buf, int capacity) {
 /*
  * Helper: append to capture buffer (used by VM print operations)
  */
-void bc_vm_capture_write(BCVMState *vm, const char *text, int len) {
+void bc_vm_capture_write(BCVMState * vm, const char * text, int len) {
     if (!vm->capture_buf) return;
     if (vm->capture_len + len >= vm->capture_cap) {
         len = vm->capture_cap - vm->capture_len - 1;
@@ -458,11 +468,11 @@ void bc_vm_capture_write(BCVMState *vm, const char *text, int len) {
     vm->capture_buf[vm->capture_len] = '\0';
 }
 
-void bc_vm_capture_char(BCVMState *vm, char c) {
+void bc_vm_capture_char(BCVMState * vm, char c) {
     bc_vm_capture_write(vm, &c, 1);
 }
 
-void bc_vm_capture_string(BCVMState *vm, const char *s) {
+void bc_vm_capture_string(BCVMState * vm, const char * s) {
     bc_vm_capture_write(vm, s, strlen(s));
 }
 
@@ -472,9 +482,9 @@ void bc_vm_capture_string(BCVMState *vm, const char *s) {
  * Does NOT call error() -- safe to use as a probe.
  * Caller must have called bc_alloc_reset() first.
  */
-int bc_try_compile_line(const char *line) {
+int bc_try_compile_line(const char * line) {
     int err;
-    BCCompiler *cs = (BCCompiler *)BC_ALLOC(sizeof(BCCompiler));
+    BCCompiler * cs = (BCCompiler *)BC_ALLOC(sizeof(BCCompiler));
     if (!cs) return 0;
     memset(cs, 0, sizeof(BCCompiler));
     if (bc_compiler_alloc(cs) != 0) {
@@ -495,7 +505,7 @@ int bc_try_compile_line(const char *line) {
  * Compile and execute a single line of BASIC (immediate mode).
  * Resets the VM heap, compiles, executes, and cleans up.
  */
-void bc_run_immediate(const char *line) {
+void bc_run_immediate(const char * line) {
     bc_alloc_reset();
     bc_run_source_string_ex(line, "<immediate>", 1);
 }
@@ -508,7 +518,7 @@ void bc_run_immediate(const char *line) {
  * NUL-terminated source string the caller can hand to
  * bc_run_source_string and FreeMemory afterwards.
  */
-static char *bc_load_source_via_hal(const char *fname_buf) {
+static char * bc_load_source_via_hal(const char * fname_buf) {
     int fnbr = FindFreeFileNbr();
     if (!BasicFileOpen((char *)fname_buf, fnbr, FA_READ)) error("File not found");
 
@@ -518,10 +528,13 @@ static char *bc_load_source_via_hal(const char *fname_buf) {
         error("File too large");
     }
 
-    char *source = (char *)GetMemory(fsize + 1);
-    if (!source) { FileClose(fnbr); error("NEM[frun:src] want=%", fsize + 1); }
+    char * source = (char *)GetMemory(fsize + 1);
+    if (!source) {
+        FileClose(fnbr);
+        error("NEM[frun:src] want=%", fsize + 1);
+    }
 
-    char *p = source;
+    char * p = source;
     while (!FileEOF(fnbr)) {
         if ((p - source) >= fsize) break;
         int c = FileGetChar(fnbr) & 0x7f;
@@ -542,7 +555,7 @@ static char *bc_load_source_via_hal(const char *fname_buf) {
  * Called from the interpreter prompt like any command.
  */
 void cmd_frun(void) {
-    unsigned char *filename = getCstring(cmdline);
+    unsigned char * filename = getCstring(cmdline);
     if (!*filename) error("Syntax");
 
     char fname_buf[STRINGSIZE];
@@ -555,7 +568,7 @@ void cmd_frun(void) {
      * OPTION EXPLICIT must not leak into the next file. */
     ClearRuntime(true);
 
-    char *source = bc_load_source_via_hal(fname_buf);
+    char * source = bc_load_source_via_hal(fname_buf);
     bc_run_source_string(source, fname_buf);
     /* On heap-tight ports the hook inside bc_run_source_string already
      * freed source; on host it's a no-op there and we own the release. */
@@ -568,7 +581,7 @@ void cmd_frun(void) {
  * back to the caller's mark — the outer VM is abandoned. Reads through
  * vm_sys_file_* since the outer VM owns the file table here.
  */
-void bc_run_file(const char *filename) {
+void bc_run_file(const char * filename) {
     char fname_buf[STRINGSIZE];
 
     strncpy(fname_buf, filename, STRINGSIZE - 5);
@@ -578,10 +591,13 @@ void bc_run_file(const char *filename) {
     int fnbr = 1;
     vm_sys_file_open(fname_buf, fnbr, VM_FILE_MODE_INPUT);
     int fsize = vm_sys_file_lof(fnbr);
-    char *source = (char *)BC_ALLOC((size_t)fsize + 1);
-    if (!source) { vm_sys_file_close(fnbr); error("Not enough memory"); }
+    char * source = (char *)BC_ALLOC((size_t)fsize + 1);
+    if (!source) {
+        vm_sys_file_close(fnbr);
+        error("Not enough memory");
+    }
 
-    char *p = source;
+    char * p = source;
     while (vm_sys_file_eof(fnbr) == 0) {
         if ((p - source) >= fsize) break;
         int c = vm_sys_file_getc(fnbr) & 0x7f;

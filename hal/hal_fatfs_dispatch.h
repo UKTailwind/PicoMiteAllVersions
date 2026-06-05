@@ -25,16 +25,16 @@
 extern "C" {
 #endif
 
-FRESULT hal_ff_findfirst(DIR *dp, FILINFO *fi, const TCHAR *path,
-                         const TCHAR *pattern);
-FRESULT hal_ff_findnext (DIR *dp, FILINFO *fi);
-FRESULT hal_ff_closedir (DIR *dp);
-FRESULT hal_ff_unlink   (const TCHAR *path);
-FRESULT hal_ff_chdir    (const TCHAR *path);
-FRESULT hal_ff_getcwd   (TCHAR *buf, UINT len);
+FRESULT hal_ff_findfirst(DIR * dp, FILINFO * fi, const TCHAR * path,
+                         const TCHAR * pattern);
+FRESULT hal_ff_findnext(DIR * dp, FILINFO * fi);
+FRESULT hal_ff_closedir(DIR * dp);
+FRESULT hal_ff_unlink(const TCHAR * path);
+FRESULT hal_ff_chdir(const TCHAR * path);
+FRESULT hal_ff_getcwd(TCHAR * buf, UINT len);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif  /* HAL_FATFS_DISPATCH_H */
+#endif /* HAL_FATFS_DISPATCH_H */

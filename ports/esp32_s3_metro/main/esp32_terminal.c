@@ -20,7 +20,7 @@
 
 extern char SerialConsolePutC(char c, int flush);
 
-static void emit(const char *s) {
+static void emit(const char * s) {
     while (*s) SerialConsolePutC(*s++, 0);
 }
 

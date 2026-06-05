@@ -14,7 +14,7 @@
 #ifndef INT_ENDIANNESS_H
 #define INT_ENDIANNESS_H
 
-#if defined(__BYTE_ORDER__) && defined(__ORDER_BIG_ENDIAN__) &&                \
+#if defined(__BYTE_ORDER__) && defined(__ORDER_BIG_ENDIAN__) && \
     defined(__ORDER_LITTLE_ENDIAN__)
 
 // Clang and GCC provide built-in endianness definitions.
@@ -45,7 +45,7 @@
 
 // ..
 
-#if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__DragonFly__) ||   \
+#if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__DragonFly__) || \
     defined(__minix)
 #include <sys/endian.h>
 

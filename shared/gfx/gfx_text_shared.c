@@ -1,20 +1,20 @@
 #include "vm_device_support.h"
 #include "gfx_text_shared.h"
 
-static void gfx_text_fail_msg(const GfxTextOps *ops, const char *msg) {
+static void gfx_text_fail_msg(const GfxTextOps * ops, const char * msg) {
     if (ops && ops->fail_msg) ops->fail_msg(ops->ctx, msg);
 }
 
-static void gfx_text_fail_range(const GfxTextOps *ops, int value, int min, int max) {
+static void gfx_text_fail_range(const GfxTextOps * ops, int value, int min, int max) {
     if (ops && ops->fail_range) ops->fail_range(ops->ctx, value, min, max);
 }
 
-void gfx_text_execute(const GfxTextArg *args, int field_count, const GfxTextOps *ops) {
+void gfx_text_execute(const GfxTextArg * args, int field_count, const GfxTextOps * ops) {
     int x, y, font, scale, fc, bc;
     int jh = 0, jv = 0, jo = 0;
     const int max_colour = (int)WHITE;
-    char *text;
-    char *just;
+    char * text;
+    char * just;
 
     if (field_count < 3 || field_count > GFX_TEXT_ARG_COUNT) {
         gfx_text_fail_msg(ops, "Argument count");
@@ -42,7 +42,8 @@ void gfx_text_execute(const GfxTextArg *args, int field_count, const GfxTextOps 
         }
     }
 
-    if (ops && ops->get_defaults) ops->get_defaults(ops->ctx, &font, &scale, &fc, &bc);
+    if (ops && ops->get_defaults)
+        ops->get_defaults(ops->ctx, &font, &scale, &fc, &bc);
     else {
         font = (gui_font >> 4) + 1;
         scale = gui_font & 0x0F;

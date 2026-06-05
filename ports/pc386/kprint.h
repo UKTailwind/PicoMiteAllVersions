@@ -16,10 +16,10 @@
 #include <stdint.h>
 
 void kputc(char c);
-void kputs(const char *s);
+void kputs(const char * s);
 void kputhex32(uint32_t v);
 void kputhex64(uint64_t v);
-void kputu32(uint32_t v);    /* unsigned decimal, no leading zeroes */
+void kputu32(uint32_t v); /* unsigned decimal, no leading zeroes */
 void kputu64(uint64_t v);
 
 #endif

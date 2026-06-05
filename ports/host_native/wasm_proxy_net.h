@@ -34,7 +34,7 @@ typedef enum wasm_proxy_udp_status {
 } wasm_proxy_udp_status_t;
 
 typedef struct wasm_proxy_udp_packet {
-    uint8_t *data;
+    uint8_t * data;
     size_t cap;
     size_t len;
     char address[80];
@@ -42,42 +42,42 @@ typedef struct wasm_proxy_udp_packet {
     int port;
 } wasm_proxy_udp_packet_t;
 
-int wasm_proxy_tcp_open(const char *host, int port, int timeout_ms,
-                        int *out_id, char *error, size_t error_len);
-int wasm_proxy_tcp_write_read(int id, const uint8_t *write_data,
-                              size_t write_len, uint8_t *read_data,
-                              size_t read_cap, size_t *out_read_len,
-                              int timeout_ms, int *out_closed,
-                              char *error, size_t error_len);
+int wasm_proxy_tcp_open(const char * host, int port, int timeout_ms,
+                        int * out_id, char * error, size_t error_len);
+int wasm_proxy_tcp_write_read(int id, const uint8_t * write_data,
+                              size_t write_len, uint8_t * read_data,
+                              size_t read_cap, size_t * out_read_len,
+                              int timeout_ms, int * out_closed,
+                              char * error, size_t error_len);
 int wasm_proxy_tcp_close(int id);
 void wasm_proxy_tcp_close_all(void);
 
-int wasm_proxy_tcp_listen(int port, int backlog, int *out_id,
-                          char *error, size_t error_len);
+int wasm_proxy_tcp_listen(int port, int backlog, int * out_id,
+                          char * error, size_t error_len);
 int wasm_proxy_tcp_listener_close(int id);
-int wasm_proxy_tcp_accept_conn(int listener_id, int *out_conn_id,
-                               char *error, size_t error_len);
-int wasm_proxy_tcp_accept_event(int listener_id, uint8_t *read_data,
-                                size_t read_cap, size_t *out_read_len,
-                                int *out_conn_id, char *error,
+int wasm_proxy_tcp_accept_conn(int listener_id, int * out_conn_id,
+                               char * error, size_t error_len);
+int wasm_proxy_tcp_accept_event(int listener_id, uint8_t * read_data,
+                                size_t read_cap, size_t * out_read_len,
+                                int * out_conn_id, char * error,
                                 size_t error_len);
-int wasm_proxy_tcp_conn_recv(int conn_id, uint8_t *read_data,
-                             size_t read_cap, size_t *out_read_len,
-                             int *out_closed, char *error,
+int wasm_proxy_tcp_conn_recv(int conn_id, uint8_t * read_data,
+                             size_t read_cap, size_t * out_read_len,
+                             int * out_closed, char * error,
                              size_t error_len);
-int wasm_proxy_tcp_conn_send(int conn_id, const uint8_t *data, size_t len,
-                             int timeout_ms, char *error, size_t error_len);
+int wasm_proxy_tcp_conn_send(int conn_id, const uint8_t * data, size_t len,
+                             int timeout_ms, char * error, size_t error_len);
 int wasm_proxy_tcp_conn_close(int conn_id);
 void wasm_proxy_tcp_listeners_close_all(void);
 
-int wasm_proxy_udp_bind(int port, int *out_id, char *error,
+int wasm_proxy_udp_bind(int port, int * out_id, char * error,
                         size_t error_len);
 int wasm_proxy_udp_close(int id);
-int wasm_proxy_udp_send(int id, const char *host, int port,
-                        const uint8_t *data, size_t len, int timeout_ms,
-                        char *error, size_t error_len);
-int wasm_proxy_udp_recv(int id, wasm_proxy_udp_packet_t *packet,
-                        char *error, size_t error_len);
+int wasm_proxy_udp_send(int id, const char * host, int port,
+                        const uint8_t * data, size_t len, int timeout_ms,
+                        char * error, size_t error_len);
+int wasm_proxy_udp_recv(int id, wasm_proxy_udp_packet_t * packet,
+                        char * error, size_t error_len);
 void wasm_proxy_udp_close_all(void);
 
 #endif

@@ -14,7 +14,7 @@
 
 extern uint I2SOff;
 
-void port_audio_i2s_pio_add_program(void *pio_v) {
+void port_audio_i2s_pio_add_program(void * pio_v) {
     PIO pio = (PIO)pio_v;
 #ifdef rp2350
     if (PinDef[Option.audio_i2s_bclk].GPno + 1 > 31 ||

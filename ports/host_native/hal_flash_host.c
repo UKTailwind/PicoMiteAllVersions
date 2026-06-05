@@ -27,63 +27,59 @@
  * signatures so core code that still calls flash_range_erase /
  * flash_range_program keeps compiling; we route through them so there's a
  * single source of truth for the backing-buffer semantics. */
-extern void flash_range_erase  (uint32_t off, uint32_t count);
-extern void flash_range_program(uint32_t off, const uint8_t *data, uint32_t count);
-extern const uint8_t *flash_option_contents;
+extern void flash_range_erase(uint32_t off, uint32_t count);
+extern void flash_range_program(uint32_t off, const uint8_t * data, uint32_t count);
+extern const uint8_t * flash_option_contents;
 extern void host_options_snapshot(void);
 
-int hal_flash_erase(uint32_t offset, size_t len)
-{
+int hal_flash_erase(uint32_t offset, size_t len) {
     if (len == 0) return 0;
     flash_range_erase(offset, (uint32_t)len);
     return 0;
 }
 
-int hal_flash_program(uint32_t offset, const void *buf, size_t len)
-{
+int hal_flash_program(uint32_t offset, const void * buf, size_t len) {
     if (len == 0) return 0;
     if (buf == NULL) return -EINVAL;
     flash_range_program(offset, (const uint8_t *)buf, (uint32_t)len);
     return 0;
 }
 
-int hal_flash_unique_id(uint8_t out[8])
-{
+int hal_flash_unique_id(uint8_t out[8]) {
     if (out == NULL) return -EINVAL;
     /* Host has no hardware unique ID. Return a fixed recognisable value;
      * if a caller ever needs a stable-per-install ID, this is the place
      * to derive one (e.g. hash of /etc/machine-id). */
-    static const uint8_t host_id[8] = { 'H','O','S','T','B','U','I','L' };
+    static const uint8_t host_id[8] = {'H', 'O', 'S', 'T', 'B', 'U', 'I', 'L'};
     memcpy(out, host_id, 8);
     return 0;
 }
 
-int hal_flash_read_jedec_id(uint8_t out[4])
-{
+int hal_flash_read_jedec_id(uint8_t out[4]) {
     if (out == NULL) return -EINVAL;
     /* Canned JEDEC response for an 8 MB flash, matching what the existing
      * host flash_do_cmd stub returned. Callers use out[3] = 23 as the
      * capacity code (1 << 23 = 8 MB). */
-    out[0] = 0;     /* command echo */
-    out[1] = 0;     /* mfg */
-    out[2] = 0;     /* memory type */
-    out[3] = 23;    /* log2(8 MB) */
+    out[0] = 0;  /* command echo */
+    out[1] = 0;  /* mfg */
+    out[2] = 0;  /* memory type */
+    out[3] = 23; /* log2(8 MB) */
     return 0;
 }
 
 void hal_flash_write_begin(void) {}
 void hal_flash_write_end(void) {}
-int hal_flash_write_active(void) { return 0; }
+int hal_flash_write_active(void) {
+    return 0;
+}
 
-int hal_flash_read_options(void *buf, size_t len)
-{
+int hal_flash_read_options(void * buf, size_t len) {
     if (buf == NULL) return -EINVAL;
     memcpy(buf, flash_option_contents, len);
     return 0;
 }
 
-int hal_flash_write_options(const void *buf, size_t len)
-{
+int hal_flash_write_options(const void * buf, size_t len) {
     if (buf == NULL) return -EINVAL;
     /* The host keeps Option and its flash-backing buffer in sync via
      * host_options_snapshot(). When core calls SaveOptions() after
@@ -94,8 +90,7 @@ int hal_flash_write_options(const void *buf, size_t len)
     return 0;
 }
 
-int hal_flash_erase_program_area(void)
-{
+int hal_flash_erase_program_area(void) {
     /* Program area on host starts at offset 0 in flash_prog_buf and runs
      * for MAX_PROG_SIZE bytes — matching host_main.c's initial erase. */
     flash_range_erase(0, MAX_PROG_SIZE);

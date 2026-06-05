@@ -5,8 +5,8 @@
 #include "shared/net/mm_net_interrupts.h"
 
 volatile bool TCPreceived = false;
-char *TCPreceiveInterrupt = 0;
+char * TCPreceiveInterrupt = 0;
 volatile bool UDPreceive = false;
-char *UDPinterrupt = 0;
+char * UDPinterrupt = 0;
 volatile bool MQTTComplete = false;
-char *MQTTInterrupt = 0;
+char * MQTTInterrupt = 0;

@@ -23,10 +23,10 @@
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 
-unsigned int psmap[6*1024*1024/ PAGESIZE / PAGESPERWORD] = {0};
+unsigned int psmap[6 * 1024 * 1024 / PAGESIZE / PAGESPERWORD] = {0};
 const unsigned int psmap_size_bytes = sizeof(psmap);
 
-unsigned int __not_in_flash_func(SBitsGet)(unsigned char *addr) {
+unsigned int __not_in_flash_func(SBitsGet)(unsigned char * addr) {
     unsigned int i, *p;
     addr -= (unsigned int)PSRAMbase;
     p = &psmap[((unsigned int)addr / PAGESIZE) / PAGESPERWORD];
@@ -34,7 +34,7 @@ unsigned int __not_in_flash_func(SBitsGet)(unsigned char *addr) {
     return (*p >> i) & ((1 << PAGEBITS) - 1);
 }
 
-void __not_in_flash_func(SBitsSet)(unsigned char *addr, int bits) {
+void __not_in_flash_func(SBitsSet)(unsigned char * addr, int bits) {
     unsigned int i, *p;
     addr -= (unsigned int)PSRAMbase;
     p = &psmap[((unsigned int)addr / PAGESIZE) / PAGESPERWORD];
@@ -42,9 +42,9 @@ void __not_in_flash_func(SBitsSet)(unsigned char *addr, int bits) {
     *p = (bits << i) | (*p & (~(((1 << PAGEBITS) - 1) << i)));
 }
 
-void __not_in_flash_func(*GetPSMemory)(int size) {
+void __not_in_flash_func (*GetPSMemory)(int size) {
     unsigned int j, n;
-    unsigned char *addr;
+    unsigned char * addr;
     j = n = (size + PAGESIZE - 1) / PAGESIZE;
     for (addr = (unsigned char *)(PSRAMbase + PSRAMsize - PAGESIZE);
          addr >= (unsigned char *)PSRAMbase;

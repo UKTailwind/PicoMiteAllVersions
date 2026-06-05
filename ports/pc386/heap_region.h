@@ -18,7 +18,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-void  *heap_region_base(void);
+void * heap_region_base(void);
 size_t heap_region_size(void);
 
 #endif

@@ -15,20 +15,20 @@ unsigned char topicbuff[STRINGSIZE] = {0};
 unsigned char messagebuff[STRINGSIZE] = {0};
 unsigned char addressbuff[20] = {0};
 
-static unsigned char *select_buffer(int which, size_t *cap_out) {
+static unsigned char * select_buffer(int which, size_t * cap_out) {
     switch (which) {
-        case MM_NET_STATE_MESSAGE:
-            if (cap_out) *cap_out = sizeof(messagebuff);
-            return messagebuff;
-        case MM_NET_STATE_ADDRESS:
-            if (cap_out) *cap_out = sizeof(addressbuff);
-            return addressbuff;
-        case MM_NET_STATE_TOPIC:
-            if (cap_out) *cap_out = sizeof(topicbuff);
-            return topicbuff;
-        default:
-            if (cap_out) *cap_out = 0;
-            return NULL;
+    case MM_NET_STATE_MESSAGE:
+        if (cap_out) *cap_out = sizeof(messagebuff);
+        return messagebuff;
+    case MM_NET_STATE_ADDRESS:
+        if (cap_out) *cap_out = sizeof(addressbuff);
+        return addressbuff;
+    case MM_NET_STATE_TOPIC:
+        if (cap_out) *cap_out = sizeof(topicbuff);
+        return topicbuff;
+    default:
+        if (cap_out) *cap_out = 0;
+        return NULL;
     }
 }
 
@@ -38,8 +38,8 @@ void mm_net_state_clear_messages(void) {
     memset(topicbuff, 0, sizeof(topicbuff));
 }
 
-void mm_net_state_copy_mstring(int which, unsigned char *out) {
-    unsigned char *src = select_buffer(which, NULL);
+void mm_net_state_copy_mstring(int which, unsigned char * out) {
+    unsigned char * src = select_buffer(which, NULL);
     if (!src) {
         out[0] = 0;
         out[1] = 0;
@@ -48,9 +48,9 @@ void mm_net_state_copy_mstring(int which, unsigned char *out) {
     Mstrcpy(out, src);
 }
 
-void mm_net_state_set_mstring(int which, const void *data, size_t len) {
+void mm_net_state_set_mstring(int which, const void * data, size_t len) {
     size_t cap = 0;
-    unsigned char *dst = select_buffer(which, &cap);
+    unsigned char * dst = select_buffer(which, &cap);
     if (!dst || cap == 0) return;
     if (len > cap - 1) len = cap - 1;
     memset(dst, 0, cap);
@@ -71,6 +71,6 @@ void mm_net_state_set_ipv4_address(const uint8_t bytes[4]) {
 /* Functions.c calls this port hook for MM.MESSAGE$ / MM.ADDRESS$ /
  * MM.TOPIC$. Keeping the symbol here lets ports share the state without
  * pulling network-specific logic into Functions.c. */
-void port_fun_mm_mqtt_copy(int which, unsigned char *out) {
+void port_fun_mm_mqtt_copy(int which, unsigned char * out) {
     mm_net_state_copy_mstring(which, out);
 }

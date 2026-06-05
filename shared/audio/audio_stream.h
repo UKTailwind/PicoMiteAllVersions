@@ -19,11 +19,11 @@ extern "C" {
 /* Start background playback of a WAV file. Appends ".wav" if no
  * extension. Returns 0 on success, negative on open/decode failure.
  * Sets CurrentlyPlaying = P_WAV. */
-int  audio_stream_play_wav(char *fname);
-int  audio_stream_play_mp3(char *fname);
-int  audio_stream_play_flac(char *fname);
-int  audio_stream_play_mod(char *fname);
-int  audio_stream_play_mod_noloop(char *fname, int noloop);
+int audio_stream_play_wav(char * fname);
+int audio_stream_play_mp3(char * fname);
+int audio_stream_play_flac(char * fname);
+int audio_stream_play_mod(char * fname);
+int audio_stream_play_mod_noloop(char * fname, int noloop);
 
 /* Pump: decode and push as much as the backend queue will take; on
  * end-of-stream tear down and raise the completion interrupt. Safe to
@@ -34,7 +34,7 @@ void audio_stream_service(void);
 void audio_stream_stop(void);
 
 /* Non-zero while a file stream is active. */
-int  audio_stream_active(void);
+int audio_stream_active(void);
 
 #ifdef __cplusplus
 }

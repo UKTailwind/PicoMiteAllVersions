@@ -106,7 +106,7 @@ void bc_fastgfx_set_fps(int fps) {
 }
 
 void cmd_fastgfx(void) {
-    unsigned char *p;
+    unsigned char * p;
 
     if ((p = checkstring(cmdline, (unsigned char *)"CREATE"))) {
         checkend(p);
@@ -137,7 +137,7 @@ void cmd_fastgfx(void) {
 }
 
 void cmd_framebuffer(void) {
-    unsigned char *p = NULL;
+    unsigned char * p = NULL;
 
     if ((p = checkstring(cmdline, (unsigned char *)"CREATE"))) {
         if (checkstring(p, (unsigned char *)"FAST")) {
@@ -174,11 +174,15 @@ void cmd_framebuffer(void) {
         getargs(&p, 1, (unsigned char *)",");
         if (argc != 1) error("Syntax");
         {
-            char *q = (char *)getCstring(argv[0]);
-            if (strcasecmp(q, "N") == 0) host_framebuffer_write('N');
-            else if (strcasecmp(q, "F") == 0) host_framebuffer_write('F');
-            else if (strcasecmp(q, "L") == 0) host_framebuffer_write('L');
-            else error("Syntax");
+            char * q = (char *)getCstring(argv[0]);
+            if (strcasecmp(q, "N") == 0)
+                host_framebuffer_write('N');
+            else if (strcasecmp(q, "F") == 0)
+                host_framebuffer_write('F');
+            else if (strcasecmp(q, "L") == 0)
+                host_framebuffer_write('L');
+            else
+                error("Syntax");
         }
         return;
     }
@@ -198,25 +202,39 @@ void cmd_framebuffer(void) {
         int background = 0;
         getargs(&p, 5, (unsigned char *)",");
         if (!(argc == 3 || argc == 5)) error("Syntax");
-        if (checkstring(argv[0], (unsigned char *)"N")) from = 'N';
-        else if (checkstring(argv[0], (unsigned char *)"F")) from = 'F';
-        else if (checkstring(argv[0], (unsigned char *)"L")) from = 'L';
+        if (checkstring(argv[0], (unsigned char *)"N"))
+            from = 'N';
+        else if (checkstring(argv[0], (unsigned char *)"F"))
+            from = 'F';
+        else if (checkstring(argv[0], (unsigned char *)"L"))
+            from = 'L';
         else {
-            char *q = (char *)getCstring(argv[0]);
-            if (strcasecmp(q, "N") == 0) from = 'N';
-            else if (strcasecmp(q, "F") == 0) from = 'F';
-            else if (strcasecmp(q, "L") == 0) from = 'L';
-            else error("Syntax");
+            char * q = (char *)getCstring(argv[0]);
+            if (strcasecmp(q, "N") == 0)
+                from = 'N';
+            else if (strcasecmp(q, "F") == 0)
+                from = 'F';
+            else if (strcasecmp(q, "L") == 0)
+                from = 'L';
+            else
+                error("Syntax");
         }
-        if (checkstring(argv[2], (unsigned char *)"N")) to = 'N';
-        else if (checkstring(argv[2], (unsigned char *)"F")) to = 'F';
-        else if (checkstring(argv[2], (unsigned char *)"L")) to = 'L';
+        if (checkstring(argv[2], (unsigned char *)"N"))
+            to = 'N';
+        else if (checkstring(argv[2], (unsigned char *)"F"))
+            to = 'F';
+        else if (checkstring(argv[2], (unsigned char *)"L"))
+            to = 'L';
         else {
-            char *q = (char *)getCstring(argv[2]);
-            if (strcasecmp(q, "N") == 0) to = 'N';
-            else if (strcasecmp(q, "F") == 0) to = 'F';
-            else if (strcasecmp(q, "L") == 0) to = 'L';
-            else error("Syntax");
+            char * q = (char *)getCstring(argv[2]);
+            if (strcasecmp(q, "N") == 0)
+                to = 'N';
+            else if (strcasecmp(q, "F") == 0)
+                to = 'F';
+            else if (strcasecmp(q, "L") == 0)
+                to = 'L';
+            else
+                error("Syntax");
         }
         if (argc == 5) {
             if (!checkstring(argv[4], (unsigned char *)"B")) error("Syntax");
@@ -237,10 +255,14 @@ void cmd_framebuffer(void) {
             has_colour = 1;
         }
         if (argc >= 3 && *argv[2]) {
-            if (checkstring(argv[2], (unsigned char *)"B")) mode = BC_FB_MERGE_MODE_B;
-            else if (checkstring(argv[2], (unsigned char *)"R")) mode = BC_FB_MERGE_MODE_R;
-            else if (checkstring(argv[2], (unsigned char *)"A")) mode = BC_FB_MERGE_MODE_A;
-            else error("Syntax");
+            if (checkstring(argv[2], (unsigned char *)"B"))
+                mode = BC_FB_MERGE_MODE_B;
+            else if (checkstring(argv[2], (unsigned char *)"R"))
+                mode = BC_FB_MERGE_MODE_R;
+            else if (checkstring(argv[2], (unsigned char *)"A"))
+                mode = BC_FB_MERGE_MODE_A;
+            else
+                error("Syntax");
         }
         if (argc == 5 && *argv[4]) {
             rate_ms = getint(argv[4], 0, 600000);

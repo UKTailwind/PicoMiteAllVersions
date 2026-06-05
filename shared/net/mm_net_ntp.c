@@ -12,8 +12,8 @@ void mm_net_ntp_build_request(uint8_t packet[MM_NET_NTP_PACKET_LEN]) {
     packet[0] = 0x1b; /* LI=0, version=3, mode=3 client. */
 }
 
-int mm_net_ntp_parse_unix_seconds(const uint8_t *packet, size_t len,
-                                  uint32_t *unix_seconds) {
+int mm_net_ntp_parse_unix_seconds(const uint8_t * packet, size_t len,
+                                  uint32_t * unix_seconds) {
     if (!packet || len < MM_NET_NTP_PACKET_LEN || !unix_seconds) return 0;
     uint8_t mode = packet[0] & 0x07u;
     uint8_t stratum = packet[1];

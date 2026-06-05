@@ -30,15 +30,14 @@
 #include "esp32_tftp.h"
 #include "esp32_udp.h"
 
-static const char *TAG = "mmbasic_wifi";
+static const char * TAG = "mmbasic_wifi";
 
 volatile int WIFIconnected = 0;
 int startupcomplete = 0;
 
 void WebConnect(void);
 
-void ProcessWeb(int mode)
-{
+void ProcessWeb(int mode) {
     static const mm_net_lifecycle_poll_hooks_t hooks = {
         .poll_udp = esp32_udp_poll,
         .poll_tftp = esp32_tftp_poll,
@@ -49,8 +48,7 @@ void ProcessWeb(int mode)
     mm_net_lifecycle_poll(&hooks, mode, 1);
 }
 
-static void esp32_wifi_default_hostname(char *out, size_t out_len)
-{
+static void esp32_wifi_default_hostname(char * out, size_t out_len) {
     uint8_t mac[6] = {0};
     if (esp_efuse_mac_get_default(mac) == ESP_OK) {
         snprintf(out, out_len, "ESP32-%02X%02X%02X", mac[3], mac[4], mac[5]);
@@ -60,8 +58,7 @@ static void esp32_wifi_default_hostname(char *out, size_t out_len)
 }
 
 static void esp32_validate_static_ip(
-    const mm_net_wifi_credentials_t *credentials)
-{
+    const mm_net_wifi_credentials_t * credentials) {
     esp_ip4_addr_t ipaddr;
     if (esp_netif_str_to_ip4(credentials->ipaddress, &ipaddr) != ESP_OK)
         error("Invalid IP address");
@@ -71,23 +68,20 @@ static void esp32_validate_static_ip(
         error("Invalid gateway address");
 }
 
-static void esp32_wifi_set_credentials(unsigned char *tp)
-{
+static void esp32_wifi_set_credentials(unsigned char * tp) {
     char default_hostname[32];
     esp32_wifi_default_hostname(default_hostname, sizeof default_hostname);
     mm_net_lifecycle_store_wifi_credentials(tp, default_hostname,
                                             esp32_validate_static_ip);
 }
 
-static mm_net_lifecycle_result_t esp32_lifecycle_apply_wifi(unsigned char *arg)
-{
+static mm_net_lifecycle_result_t esp32_lifecycle_apply_wifi(unsigned char * arg) {
     esp32_wifi_set_credentials(arg);
     WebConnect();
     return MM_NET_LIFECYCLE_OK;
 }
 
-static int esp32_lifecycle_open_web_console(void)
-{
+static int esp32_lifecycle_open_web_console(void) {
     /* Auto-start WiFi if needed; the actual listening socket is the
      * shared TCP server, which esp32_web_console_open() brings up. */
     if (!WIFIconnected) WebConnect();
@@ -108,13 +102,11 @@ static const mm_net_lifecycle_hooks_t esp32_lifecycle_hooks = {
     .close_web_console = esp32_web_console_close,
 };
 
-static void esp32_info_before_query(void)
-{
+static void esp32_info_before_query(void) {
     ProcessWeb(0);
 }
 
-void WebConnect(void)
-{
+void WebConnect(void) {
     static const mm_net_lifecycle_wifi_connect_t connect = {
         .hooks = &esp32_lifecycle_hooks,
         .default_hostname = "ESP32",
@@ -124,8 +116,7 @@ void WebConnect(void)
     (void)mm_net_lifecycle_wifi_connect(&connect);
 }
 
-void port_repl_wifi_arch_init_and_connect(void)
-{
+void port_repl_wifi_arch_init_and_connect(void) {
     /*
      * Keep ESP-IDF WiFi out of the early REPL boot path. The ESP32 USB
      * Serial/JTAG console is the only control channel on this port, so
@@ -134,24 +125,21 @@ void port_repl_wifi_arch_init_and_connect(void)
      */
 }
 
-int esp32_wifi_option_setter(unsigned char *cmdline)
-{
+int esp32_wifi_option_setter(unsigned char * cmdline) {
     return mm_net_lifecycle_handle_option_result(
         mm_net_lifecycle_option_setter(cmdline, &esp32_lifecycle_hooks),
         NULL);
 }
 
-int esp32_wifi_get_ssid(unsigned char *out_sret, int *out_targ)
-{
+int esp32_wifi_get_ssid(unsigned char * out_sret, int * out_targ) {
     strcpy((char *)out_sret, (char *)Option.SSID);
     CtoM(out_sret);
     *out_targ = T_STR;
     return 1;
 }
 
-int esp32_wifi_mminfo(unsigned char *ep, int64_t *out_iret,
-                      unsigned char *out_sret, int *out_targ)
-{
+int esp32_wifi_mminfo(unsigned char * ep, int64_t * out_iret,
+                      unsigned char * out_sret, int * out_targ) {
     const mm_net_info_hooks_t hooks = {
         .before_query = esp32_info_before_query,
         .tcp_path = esp32_tcp_server_path,
@@ -166,24 +154,20 @@ int esp32_wifi_mminfo(unsigned char *ep, int64_t *out_iret,
     return mm_net_mminfo(ep, out_iret, out_sret, out_targ, &hooks);
 }
 
-static void esp32_wifi_scan(unsigned char *arg)
-{
+static void esp32_wifi_scan(unsigned char * arg) {
     mm_net_wifi_scan_command(arg);
 }
 
-static void esp32_web_connect_cmd(unsigned char *arg)
-{
+static void esp32_web_connect_cmd(unsigned char * arg) {
     if (*arg) esp32_wifi_set_credentials(arg);
     WebConnect();
 }
 
-static int esp32_web_is_connected(void)
-{
+static int esp32_web_is_connected(void) {
     return WIFIconnected ? 1 : 0;
 }
 
-void cmd_web(void)
-{
+void cmd_web(void) {
     static const mm_net_web_dispatch_t dispatch = {
         .connect = esp32_web_connect_cmd,
         .scan = esp32_wifi_scan,
@@ -199,8 +183,7 @@ void cmd_web(void)
     mm_net_web_dispatch(cmdline, &dispatch);
 }
 
-void esp32_wifi_print_options(void)
-{
+void esp32_wifi_print_options(void) {
     mm_net_print_wifi_option((char *)Option.SSID, (char *)Option.PASSWORD,
                              Option.hostname, Option.ipaddress, Option.mask,
                              Option.gateway);

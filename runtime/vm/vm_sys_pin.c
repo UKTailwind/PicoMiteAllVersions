@@ -25,7 +25,6 @@ static int vm_pwm_pin_a[VM_PWM_SLICE_COUNT];
 static int vm_pwm_pin_b[VM_PWM_SLICE_COUNT];
 static unsigned char vm_pwm_started[VM_PWM_SLICE_COUNT];
 
-
 #include "hardware/adc.h"
 #include "hardware/gpio.h"
 #include "hardware/pwm.h"
@@ -44,8 +43,7 @@ enum {
 static const uint8_t vm_pin_gpio_map[48] = {
     1, 2, 4, 5, 6, 7, 9, 10, 11, 12, 14, 15, 16, 17, 19, 20,
     21, 22, 24, 25, 26, 27, 29, 41, 42, 43, 31, 32, 34, 44, 45, 46,
-    47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62
-};
+    47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62};
 
 extern volatile int ExtCurrentConfig[NBRPINS + 1];
 extern uint32_t pinmask;
@@ -145,33 +143,58 @@ static void vm_pin_clear_pwm_assignment(int pin) {
 
 static int vm_pin_pwm_mode_valid_for_pin(int pin, int mode) {
     switch (mode) {
-        case VM_PIN_MODE_PWM0A: return (PinDef[pin].mode & PWM0A) != 0;
-        case VM_PIN_MODE_PWM0B: return (PinDef[pin].mode & PWM0B) != 0;
-        case VM_PIN_MODE_PWM1A: return (PinDef[pin].mode & PWM1A) != 0;
-        case VM_PIN_MODE_PWM1B: return (PinDef[pin].mode & PWM1B) != 0;
-        case VM_PIN_MODE_PWM2A: return (PinDef[pin].mode & PWM2A) != 0;
-        case VM_PIN_MODE_PWM2B: return (PinDef[pin].mode & PWM2B) != 0;
-        case VM_PIN_MODE_PWM3A: return (PinDef[pin].mode & PWM3A) != 0;
-        case VM_PIN_MODE_PWM3B: return (PinDef[pin].mode & PWM3B) != 0;
-        case VM_PIN_MODE_PWM4A: return (PinDef[pin].mode & PWM4A) != 0;
-        case VM_PIN_MODE_PWM4B: return (PinDef[pin].mode & PWM4B) != 0;
-        case VM_PIN_MODE_PWM5A: return (PinDef[pin].mode & PWM5A) != 0;
-        case VM_PIN_MODE_PWM5B: return (PinDef[pin].mode & PWM5B) != 0;
-        case VM_PIN_MODE_PWM6A: return (PinDef[pin].mode & PWM6A) != 0;
-        case VM_PIN_MODE_PWM6B: return (PinDef[pin].mode & PWM6B) != 0;
-        case VM_PIN_MODE_PWM7A: return (PinDef[pin].mode & PWM7A) != 0;
-        case VM_PIN_MODE_PWM7B: return (PinDef[pin].mode & PWM7B) != 0;
-        /* PWM8..11 mask bits are unconditional in configuration.h;
+    case VM_PIN_MODE_PWM0A:
+        return (PinDef[pin].mode & PWM0A) != 0;
+    case VM_PIN_MODE_PWM0B:
+        return (PinDef[pin].mode & PWM0B) != 0;
+    case VM_PIN_MODE_PWM1A:
+        return (PinDef[pin].mode & PWM1A) != 0;
+    case VM_PIN_MODE_PWM1B:
+        return (PinDef[pin].mode & PWM1B) != 0;
+    case VM_PIN_MODE_PWM2A:
+        return (PinDef[pin].mode & PWM2A) != 0;
+    case VM_PIN_MODE_PWM2B:
+        return (PinDef[pin].mode & PWM2B) != 0;
+    case VM_PIN_MODE_PWM3A:
+        return (PinDef[pin].mode & PWM3A) != 0;
+    case VM_PIN_MODE_PWM3B:
+        return (PinDef[pin].mode & PWM3B) != 0;
+    case VM_PIN_MODE_PWM4A:
+        return (PinDef[pin].mode & PWM4A) != 0;
+    case VM_PIN_MODE_PWM4B:
+        return (PinDef[pin].mode & PWM4B) != 0;
+    case VM_PIN_MODE_PWM5A:
+        return (PinDef[pin].mode & PWM5A) != 0;
+    case VM_PIN_MODE_PWM5B:
+        return (PinDef[pin].mode & PWM5B) != 0;
+    case VM_PIN_MODE_PWM6A:
+        return (PinDef[pin].mode & PWM6A) != 0;
+    case VM_PIN_MODE_PWM6B:
+        return (PinDef[pin].mode & PWM6B) != 0;
+    case VM_PIN_MODE_PWM7A:
+        return (PinDef[pin].mode & PWM7A) != 0;
+    case VM_PIN_MODE_PWM7B:
+        return (PinDef[pin].mode & PWM7B) != 0;
+    /* PWM8..11 mask bits are unconditional in configuration.h;
          * on rp2040 no PinDef entry ever sets them so these return 0. */
-        case VM_PIN_MODE_PWM8A: return (PinDef[pin].mode & PWM8A) != 0;
-        case VM_PIN_MODE_PWM8B: return (PinDef[pin].mode & PWM8B) != 0;
-        case VM_PIN_MODE_PWM9A: return (PinDef[pin].mode & PWM9A) != 0;
-        case VM_PIN_MODE_PWM9B: return (PinDef[pin].mode & PWM9B) != 0;
-        case VM_PIN_MODE_PWM10A: return (PinDef[pin].mode & PWM10A) != 0;
-        case VM_PIN_MODE_PWM10B: return (PinDef[pin].mode & PWM10B) != 0;
-        case VM_PIN_MODE_PWM11A: return (PinDef[pin].mode & PWM11A) != 0;
-        case VM_PIN_MODE_PWM11B: return (PinDef[pin].mode & PWM11B) != 0;
-        default: return 0;
+    case VM_PIN_MODE_PWM8A:
+        return (PinDef[pin].mode & PWM8A) != 0;
+    case VM_PIN_MODE_PWM8B:
+        return (PinDef[pin].mode & PWM8B) != 0;
+    case VM_PIN_MODE_PWM9A:
+        return (PinDef[pin].mode & PWM9A) != 0;
+    case VM_PIN_MODE_PWM9B:
+        return (PinDef[pin].mode & PWM9B) != 0;
+    case VM_PIN_MODE_PWM10A:
+        return (PinDef[pin].mode & PWM10A) != 0;
+    case VM_PIN_MODE_PWM10B:
+        return (PinDef[pin].mode & PWM10B) != 0;
+    case VM_PIN_MODE_PWM11A:
+        return (PinDef[pin].mode & PWM11A) != 0;
+    case VM_PIN_MODE_PWM11B:
+        return (PinDef[pin].mode & PWM11B) != 0;
+    default:
+        return 0;
     }
 }
 
@@ -392,7 +415,7 @@ void vm_sys_pwm_configure(int slice, MMFLOAT frequency,
                  high1, high2, delaystart);
 }
 
-void vm_sys_pwm_sync(uint16_t present_mask, const MMFLOAT *counts) {
+void vm_sys_pwm_sync(uint16_t present_mask, const MMFLOAT * counts) {
     uint32_t enabled = pwm_hw->en;
 
     for (int slice = 0; slice <= vm_pwm_max_slice(); slice++) {

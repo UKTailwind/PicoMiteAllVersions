@@ -33,7 +33,7 @@ void host_sim_audio_stop(void);
  *   freq: Hz, 1..20000
  *   vol:  0..25 (PicoMite per-slot cap)
  */
-void host_sim_audio_sound(int slot, const char *ch, const char *type,
+void host_sim_audio_sound(int slot, const char * ch, const char * type,
                           double freq_hz, int volume);
 
 /* Master volume 0..100 per channel (PLAY VOLUME). */
@@ -51,10 +51,10 @@ void host_sim_audio_resume(void);
  *
  * Returns 0 when the queue is empty (and *out_buf == NULL).
  */
-size_t host_sim_audio_drain(char ***out_msgs, int *out_count);
+size_t host_sim_audio_drain(char *** out_msgs, int * out_count);
 
 /* Release a message array previously returned by host_sim_audio_drain. */
-void host_sim_audio_free_drain(char **msgs, int count);
+void host_sim_audio_free_drain(char ** msgs, int count);
 
 #ifdef __cplusplus
 }

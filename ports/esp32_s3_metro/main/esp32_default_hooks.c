@@ -32,25 +32,35 @@
 
 /* bc_bridge — funtbl[] subfun-hash rebuild on rp2350; no-op elsewhere. */
 void port_bc_bridge_clear_subfun_hash(void) {}
-void port_bc_bridge_rehash_subfun(unsigned char **subfun_arr) { (void)subfun_arr; }
+void port_bc_bridge_rehash_subfun(unsigned char ** subfun_arr) {
+    (void)subfun_arr;
+}
 
 /* bc_debug crash trail — read current stack pointer for crash dump. ESP32
  * has FreeRTOS task stacks; without a forcing function, just return 0
  * (the crash trail still records the most-recent VM op trail without it). */
-uint32_t port_bc_crash_get_sp(void) { return 0; }
-void port_bc_crash_save_fault_regs(BCCrashInfo *info) { (void)info; }
+uint32_t port_bc_crash_get_sp(void) {
+    return 0;
+}
+void port_bc_crash_save_fault_regs(BCCrashInfo * info) {
+    (void)info;
+}
 
 /* clear_runtime / error display — frame-buffer / LCD-banner no-ops on a
  * stdio-only port. */
 void port_clear_runtime_display_reset(void) {}
 void port_error_restore_console_surface(void) {}
-void port_error_show_lcd_banner(int line_num, const char *source_line, const char *err_msg) {
-    (void)line_num; (void)source_line; (void)err_msg;
+void port_error_show_lcd_banner(int line_num, const char * source_line, const char * err_msg) {
+    (void)line_num;
+    (void)source_line;
+    (void)err_msg;
 }
 
 /* prepare_program subfun finalisation — rp2350 / pico-only path. No-op
  * on ESP32 (the funtbl hash rebuild used elsewhere isn't built here). */
-void port_prepare_program_finalize_subfun(int ErrAbort) { (void)ErrAbort; }
+void port_prepare_program_finalize_subfun(int ErrAbort) {
+    (void)ErrAbort;
+}
 
 /* Runtime END/Clear cleanup. ESP32 stdio scope has no DMA/watchdog
  * resources owned by the shared Pico paths. */
@@ -67,17 +77,23 @@ void port_set_default_options(void) {}
 
 /* funtbl[] hash-table queries — pico drives a real hash; host + ESP32
  * fall back to linear scans (return 0 = "not handled, do linear scan"). */
-int port_try_check_var_subfun_collision(const unsigned char *name, int namelen) {
-    (void)name; (void)namelen; return 0;
+int port_try_check_var_subfun_collision(const unsigned char * name, int namelen) {
+    (void)name;
+    (void)namelen;
+    return 0;
 }
-int port_try_find_label_hash(unsigned char *labelptr, unsigned char **out_ptr) {
-    (void)labelptr; (void)out_ptr; return 0;
+int port_try_find_label_hash(unsigned char * labelptr, unsigned char ** out_ptr) {
+    (void)labelptr;
+    (void)out_ptr;
+    return 0;
 }
-int port_try_find_subfun_hash(unsigned char *p, int *out_index) {
-    (void)p; (void)out_index; return 0;
+int port_try_find_subfun_hash(unsigned char * p, int * out_index) {
+    (void)p;
+    (void)out_index;
+    return 0;
 }
 
-int port_vm_time_get_tm(struct tm *out) {
+int port_vm_time_get_tm(struct tm * out) {
     extern int64_t TimeOffsetToUptime;
     time_t epochnow = (time_t)(hal_time_us_64() / 1000000 + TimeOffsetToUptime);
     hal_calendar_epoch_to_tm(epochnow, out);

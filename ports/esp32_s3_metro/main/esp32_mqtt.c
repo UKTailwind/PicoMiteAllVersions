@@ -12,8 +12,7 @@ extern volatile bool MQTTComplete;
 static hal_net_mqtt_client_t s_mqtt_client;
 static int s_mqtt_connected;
 
-void esp32_mqtt_poll(void)
-{
+void esp32_mqtt_poll(void) {
     if (!s_mqtt_client) return;
 
     char topic[MAXSTRLEN + 1];
@@ -28,21 +27,18 @@ void esp32_mqtt_poll(void)
     }
 }
 
-static void esp32_mqtt_close(void)
-{
+static void esp32_mqtt_close(void) {
     if (!s_mqtt_client) return;
     hal_net_mqtt_close(s_mqtt_client);
     s_mqtt_client = 0;
     s_mqtt_connected = 0;
 }
 
-void closeMQTT(void)
-{
+void closeMQTT(void) {
     esp32_mqtt_close();
 }
 
-int esp32_mqtt_cmd(unsigned char *line)
-{
+int esp32_mqtt_cmd(unsigned char * line) {
     const mm_net_mqtt_hal_context_t ctx = {
         .client = &s_mqtt_client,
         .connected = &s_mqtt_connected,

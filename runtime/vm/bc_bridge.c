@@ -21,7 +21,7 @@
  * impl: ports/pico_sdk_common/bc_bridge_pico.c; host stub:
  * ports/host_native/host_runtime.c. */
 extern void port_bc_bridge_clear_subfun_hash(void);
-extern void port_bc_bridge_rehash_subfun(unsigned char **subfun_arr);
+extern void port_bc_bridge_rehash_subfun(unsigned char ** subfun_arr);
 
 /* ------------------------------------------------------------------ */
 /*  Variable sync: VM globals <-> MMBasic variable table               */
@@ -42,7 +42,7 @@ static int slot_map_initialized = 0;
 int bc_bridge_last_vm_line = 0;
 /* First 80 chars of the de-tokenised bridge statement, for error diag. */
 char bc_bridge_last_stmt[80] = {0};
-extern unsigned char *llist(unsigned char *b, unsigned char *p);
+extern unsigned char * llist(unsigned char * b, unsigned char * p);
 
 void bc_bridge_reset_sync(void) {
     memset(slot_to_vartbl, -1, sizeof(slot_to_vartbl));
@@ -65,23 +65,27 @@ void bc_bridge_reset_sync(void) {
 static int sync_find_action(uint8_t slot_type) {
     int base = V_FIND | T_IMPLIED;
     switch (slot_type) {
-        case T_INT: return base | T_INT;
-        case T_NBR: return base | T_NBR;
-        case T_STR: return base | T_STR;
-        default:    return V_FIND;
+    case T_INT:
+        return base | T_INT;
+    case T_NBR:
+        return base | T_NBR;
+    case T_STR:
+        return base | T_STR;
+    default:
+        return V_FIND;
     }
 }
 
-static void sync_vm_to_mmbasic(BCVMState *vm) {
-    BCCompiler *cs = vm->compiler;
+static void sync_vm_to_mmbasic(BCVMState * vm) {
+    BCCompiler * cs = vm->compiler;
     if (!cs) return;
 
     for (uint16_t i = 0; i < cs->slot_count; i++) {
-        BCSlot *slot = &cs->slots[i];
+        BCSlot * slot = &cs->slots[i];
 
         if (!slot->name[0] || !isnamestart((unsigned char)slot->name[0])) continue;
         if (vm->arrays[i].data || slot->is_array) continue;
-        if (slot->type == T_STRUCT) continue;   // handled by the struct-only pass below
+        if (slot->type == T_STRUCT) continue; // handled by the struct-only pass below
 
         if (!slot->is_const && (!vm->global_valid || !vm->global_valid[i])) continue;
 
@@ -96,7 +100,7 @@ static void sync_vm_to_mmbasic(BCVMState *vm) {
         }
 
         int vi = slot_to_vartbl[i];
-        struct s_vartbl *v = &g_vartbl[vi];
+        struct s_vartbl * v = &g_vartbl[vi];
 
         /* Const-inlined globals (source_compile_const sets slot->is_const
          * and rolls back the runtime store) never touch vm->globals. Read
@@ -132,7 +136,7 @@ static void sync_vm_to_mmbasic(BCVMState *vm) {
      * also copy g_vartbl's dims[] into vm->arrays[i].dims so the element
      * opcodes can compute multi-dim linear indices without re-reading g_vartbl. */
     for (uint16_t i = 0; i < cs->slot_count; i++) {
-        BCSlot *slot = &cs->slots[i];
+        BCSlot * slot = &cs->slots[i];
         if (!slot->name[0] || !isnamestart((unsigned char)slot->name[0])) continue;
         if (slot->type != T_STRUCT) continue;
 
@@ -151,7 +155,7 @@ static void sync_vm_to_mmbasic(BCVMState *vm) {
         if (vi < 0) continue;
         slot_to_vartbl[i] = vi;
 
-        struct s_vartbl *v = &g_vartbl[vi];
+        struct s_vartbl * v = &g_vartbl[vi];
         if (v->val.s != NULL) {
             vm->arrays[i].data = (BCValue *)v->val.s;
             vm->arrays[i].data_external = 1;
@@ -168,7 +172,7 @@ static void sync_vm_to_mmbasic(BCVMState *vm) {
 
     /* Sync arrays — point MMBasic's array data to VM's array data */
     for (uint16_t i = 0; i < cs->slot_count; i++) {
-        BCSlot *slot = &cs->slots[i];
+        BCSlot * slot = &cs->slots[i];
         if (!slot->name[0] || !isnamestart((unsigned char)slot->name[0])) continue;
         if (!slot->is_array) continue;
         if (!vm->arrays[i].data) continue;
@@ -178,7 +182,7 @@ static void sync_vm_to_mmbasic(BCVMState *vm) {
         memcpy(namebuf, slot->name, nlen);
         namebuf[nlen] = 0;
 
-        BCArray *arr = &vm->arrays[i];
+        BCArray * arr = &vm->arrays[i];
         int action = sync_find_action(slot->type);
 
         if (!slot_map_initialized || slot_to_vartbl[i] < 0) {
@@ -193,14 +197,14 @@ static void sync_vm_to_mmbasic(BCVMState *vm) {
                 slot_to_vartbl[i] = g_VarIndex;
             }
 
-            struct s_vartbl *v = &g_vartbl[slot_to_vartbl[i]];
+            struct s_vartbl * v = &g_vartbl[slot_to_vartbl[i]];
             for (int d = 0; d < MAXDIM; d++) {
                 v->dims[d] = (d < arr->ndims) ? arr->dims[d] : 0;
             }
         }
 
         int vi = slot_to_vartbl[i];
-        struct s_vartbl *v = &g_vartbl[vi];
+        struct s_vartbl * v = &g_vartbl[vi];
 
         if (slot->type == T_INT) {
             v->val.ia = (int64_t *)arr->data;
@@ -217,17 +221,17 @@ static void sync_vm_to_mmbasic(BCVMState *vm) {
 /*
  * Sync MMBasic variable table -> VM globals (post-bridge-call).
  */
-static void sync_mmbasic_to_vm(BCVMState *vm) {
-    BCCompiler *cs = vm->compiler;
+static void sync_mmbasic_to_vm(BCVMState * vm) {
+    BCCompiler * cs = vm->compiler;
     if (!cs || !slot_map_initialized) return;
 
     for (uint16_t i = 0; i < cs->slot_count; i++) {
-        BCSlot *slot = &cs->slots[i];
+        BCSlot * slot = &cs->slots[i];
         if (!slot->name[0] || !isnamestart((unsigned char)slot->name[0])) continue;
-        if (vm->arrays[i].data) continue;  /* arrays handled separately below */
+        if (vm->arrays[i].data) continue; /* arrays handled separately below */
         if (slot_to_vartbl[i] < 0) continue;
 
-        struct s_vartbl *v = &g_vartbl[slot_to_vartbl[i]];
+        struct s_vartbl * v = &g_vartbl[slot_to_vartbl[i]];
 
         if (slot->type == T_INT) {
             vm->globals[i].i = v->val.i;
@@ -259,7 +263,7 @@ static void sync_mmbasic_to_vm(BCVMState *vm) {
      * Since VM string arrays now use g_vartbl's contiguous layout
      * (STRINGSIZE per element), T_STR is included in this pass. */
     for (uint16_t i = 0; i < cs->slot_count; i++) {
-        BCSlot *slot = &cs->slots[i];
+        BCSlot * slot = &cs->slots[i];
         if (!slot->name[0] || !isnamestart((unsigned char)slot->name[0])) continue;
         if (!slot->is_array) continue;
         if (vm->arrays[i].data) continue;
@@ -283,14 +287,14 @@ static void sync_mmbasic_to_vm(BCVMState *vm) {
         }
         if (vi < 0) continue;
 
-        struct s_vartbl *v = &g_vartbl[vi];
-        void *ptr = (slot->type == T_INT) ? (void *)v->val.ia :
-                    (slot->type == T_NBR) ? (void *)v->val.fa :
-                    (slot->type == T_STR) ? (void *)v->val.s  : NULL;
+        struct s_vartbl * v = &g_vartbl[vi];
+        void * ptr = (slot->type == T_INT) ? (void *)v->val.ia : (slot->type == T_NBR) ? (void *)v->val.fa
+                                                             : (slot->type == T_STR)   ? (void *)v->val.s
+                                                                                       : NULL;
         if (!ptr) continue;
 
         slot_to_vartbl[i] = vi;
-        BCArray *arr = &vm->arrays[i];
+        BCArray * arr = &vm->arrays[i];
         arr->data = (BCValue *)ptr;
         arr->data_external = 1;
 
@@ -323,10 +327,10 @@ static void sync_mmbasic_to_vm(BCVMState *vm) {
      * we flag it data_external = 1 to prevent bc_array_release from
      * bc_free-ing interpreter-owned memory at program teardown. */
     for (uint16_t i = 0; i < cs->slot_count; i++) {
-        BCSlot *slot = &cs->slots[i];
+        BCSlot * slot = &cs->slots[i];
         if (!slot->name[0] || !isnamestart((unsigned char)slot->name[0])) continue;
         if (!vm->arrays[i].data) continue;
-        if (slot->type == T_STRUCT) continue;   // struct rebinding pass handles these
+        if (slot->type == T_STRUCT) continue; // struct rebinding pass handles these
 
         unsigned char namebuf[MAXVARLEN + 4];
         int nlen = strlen(slot->name);
@@ -336,20 +340,19 @@ static void sync_mmbasic_to_vm(BCVMState *vm) {
         namebuf[nlen] = '(';
         namebuf[nlen + 1] = ')';
         namebuf[nlen + 2] = 0;
-        void *vp = findvar(namebuf, action | V_EMPTY_OK | V_NOFIND_NULL);
+        void * vp = findvar(namebuf, action | V_EMPTY_OK | V_NOFIND_NULL);
         if (vp == NULL) {
             namebuf[nlen] = 0;
             vp = findvar(namebuf, action | V_NOFIND_NULL);
         }
-        if (vp == NULL) continue;  /* variable was erased — leave VM array as-is */
+        if (vp == NULL) continue; /* variable was erased — leave VM array as-is */
         slot_to_vartbl[i] = g_VarIndex;
 
-        struct s_vartbl *v = &g_vartbl[slot_to_vartbl[i]];
-        void *new_ptr = (slot->type == T_INT) ? (void *)v->val.ia :
-                        (slot->type == T_NBR) ? (void *)v->val.fa :
-                                                (void *)v->val.s;
+        struct s_vartbl * v = &g_vartbl[slot_to_vartbl[i]];
+        void * new_ptr = (slot->type == T_INT) ? (void *)v->val.ia : (slot->type == T_NBR) ? (void *)v->val.fa
+                                                                                           : (void *)v->val.s;
 
-        BCArray *arr = &vm->arrays[i];
+        BCArray * arr = &vm->arrays[i];
 
         /* Refresh dims and total_elements from the interpreter's view —
          * always, not just on pointer change. REDIM can return the same
@@ -368,7 +371,7 @@ static void sync_mmbasic_to_vm(BCVMState *vm) {
             int size = v->dims[d];
             arr->dims[d] = size;
             if (size > 0) {
-                total *= (uint32_t)(size + 1);  /* 0..N inclusive, matches OP_DIM_ARR_* */
+                total *= (uint32_t)(size + 1); /* 0..N inclusive, matches OP_DIM_ARR_* */
                 ndims = d + 1;
             }
         }
@@ -382,7 +385,7 @@ static void sync_mmbasic_to_vm(BCVMState *vm) {
      * without re-calling findvar on every access.  Array dims also flow back
      * so multi-dim element indexing can use vm->arrays[i].dims. */
     for (uint16_t i = 0; i < cs->slot_count; i++) {
-        BCSlot *slot = &cs->slots[i];
+        BCSlot * slot = &cs->slots[i];
         if (!slot->name[0] || !isnamestart((unsigned char)slot->name[0])) continue;
         if (slot->type != T_STRUCT) continue;
 
@@ -399,7 +402,7 @@ static void sync_mmbasic_to_vm(BCVMState *vm) {
         if (vi < 0) continue;
         slot_to_vartbl[i] = vi;
 
-        struct s_vartbl *v = &g_vartbl[vi];
+        struct s_vartbl * v = &g_vartbl[vi];
         if (v->val.s == NULL) continue;
 
         if (slot->is_array && v->dims[0] != 0) {
@@ -411,7 +414,7 @@ static void sync_mmbasic_to_vm(BCVMState *vm) {
             }
         }
 
-        if (vm->arrays[i].data == (BCValue *)v->val.s) continue;   // unchanged
+        if (vm->arrays[i].data == (BCValue *)v->val.s) continue; // unchanged
         vm->arrays[i].data = (BCValue *)v->val.s;
         vm->arrays[i].data_external = 1;
     }
@@ -421,14 +424,14 @@ static void sync_mmbasic_to_vm(BCVMState *vm) {
  * Sync VM locals -> MMBasic local variables (pre-bridge-call).
  * Returns the local scope level (for ClearVars cleanup).
  */
-static int sync_vm_locals_to_mmbasic(BCVMState *vm, int *local_map) {
-    BCCompiler *cs = vm->compiler;
+static int sync_vm_locals_to_mmbasic(BCVMState * vm, int * local_map) {
+    BCCompiler * cs = vm->compiler;
     if (!cs || vm->csp <= 0) return 0;
 
-    BCCallFrame *cf = &vm->call_stack[vm->csp - 1];
+    BCCallFrame * cf = &vm->call_stack[vm->csp - 1];
     if (cf->subfun_idx >= cs->subfun_count) return 0;
 
-    BCSubFun *sf = &cs->subfuns[cf->subfun_idx];
+    BCSubFun * sf = &cs->subfuns[cf->subfun_idx];
     uint16_t locals_base = cs->subfun_locals_base[cf->subfun_idx];
     if (sf->nlocals == 0) return 0;
 
@@ -439,7 +442,7 @@ static int sync_vm_locals_to_mmbasic(BCVMState *vm, int *local_map) {
         int slot = vm->frame_base + i;
         if (slot < 0 || slot >= VM_MAX_LOCALS) continue;
 
-        BCLocalMeta *meta = &cs->local_meta[locals_base + i];
+        BCLocalMeta * meta = &cs->local_meta[locals_base + i];
         if (!meta->name[0] || !isnamestart((unsigned char)meta->name[0])) continue;
 
         unsigned char namebuf[MAXVARLEN + 4];
@@ -453,7 +456,7 @@ static int sync_vm_locals_to_mmbasic(BCVMState *vm, int *local_map) {
         }
 
         if (meta->is_array) {
-            BCArray *arr = &vm->local_arrays[slot];
+            BCArray * arr = &vm->local_arrays[slot];
             namebuf[nlen] = '(';
             namebuf[nlen + 1] = ')';
             namebuf[nlen + 2] = 0;
@@ -461,20 +464,23 @@ static int sync_vm_locals_to_mmbasic(BCVMState *vm, int *local_map) {
             local_map[slot] = g_VarIndex;
 
             if (arr->data) {
-                struct s_vartbl *v = &g_vartbl[g_VarIndex];
+                struct s_vartbl * v = &g_vartbl[g_VarIndex];
                 for (int d = 0; d < MAXDIM; d++) {
                     v->dims[d] = (d < arr->ndims) ? arr->dims[d] : 0;
                 }
-                if (meta->type == T_INT) v->val.ia = (int64_t *)arr->data;
-                else if (meta->type == T_NBR) v->val.fa = (MMFLOAT *)arr->data;
-                else if (meta->type == T_STR) v->val.s = (unsigned char *)arr->data;
+                if (meta->type == T_INT)
+                    v->val.ia = (int64_t *)arr->data;
+                else if (meta->type == T_NBR)
+                    v->val.fa = (MMFLOAT *)arr->data;
+                else if (meta->type == T_STR)
+                    v->val.s = (unsigned char *)arr->data;
             }
             continue;
         }
 
         findvar(namebuf, action);
         local_map[slot] = g_VarIndex;
-        struct s_vartbl *v = &g_vartbl[g_VarIndex];
+        struct s_vartbl * v = &g_vartbl[g_VarIndex];
         if (meta->type == T_INT) {
             v->val.i = vm->locals[slot].i;
         } else if (meta->type == T_NBR) {
@@ -491,31 +497,31 @@ static int sync_vm_locals_to_mmbasic(BCVMState *vm, int *local_map) {
 /*
  * Sync MMBasic locals -> VM locals (post-bridge-call).
  */
-static void sync_mmbasic_locals_to_vm(BCVMState *vm, const int *local_map) {
-    BCCompiler *cs = vm->compiler;
+static void sync_mmbasic_locals_to_vm(BCVMState * vm, const int * local_map) {
+    BCCompiler * cs = vm->compiler;
     if (!cs || vm->csp <= 0) return;
 
-    BCCallFrame *cf = &vm->call_stack[vm->csp - 1];
+    BCCallFrame * cf = &vm->call_stack[vm->csp - 1];
     if (cf->subfun_idx >= cs->subfun_count) return;
 
-    BCSubFun *sf = &cs->subfuns[cf->subfun_idx];
+    BCSubFun * sf = &cs->subfuns[cf->subfun_idx];
     uint16_t locals_base = cs->subfun_locals_base[cf->subfun_idx];
     for (uint16_t i = 0; i < sf->nlocals; i++) {
         int slot = vm->frame_base + i;
         if (slot < 0 || slot >= VM_MAX_LOCALS) continue;
         if (local_map[slot] < 0) continue;
 
-        BCLocalMeta *meta = &cs->local_meta[locals_base + i];
+        BCLocalMeta * meta = &cs->local_meta[locals_base + i];
         if (meta->is_array) continue;
 
-        struct s_vartbl *v = &g_vartbl[local_map[slot]];
+        struct s_vartbl * v = &g_vartbl[local_map[slot]];
         vm->local_types[slot] = meta->type;
         if (meta->type == T_INT) {
             vm->locals[slot].i = v->val.i;
         } else if (meta->type == T_NBR) {
             vm->locals[slot].f = v->val.f;
         } else if (meta->type == T_STR && v->val.s) {
-            uint8_t *temp = &vm->str_temp[vm->str_temp_idx % 4][0];
+            uint8_t * temp = &vm->str_temp[vm->str_temp_idx % 4][0];
             vm->str_temp_idx++;
             Mstrcpy(temp, v->val.s);
             vm->locals[slot].s = temp;
@@ -530,7 +536,7 @@ static void sync_mmbasic_locals_to_vm(BCVMState *vm, const int *local_map) {
 /*
  * Decode a 2-byte command token to get the commandtbl index.
  */
-static inline int bridge_decode_cmd(const uint8_t *p) {
+static inline int bridge_decode_cmd(const uint8_t * p) {
     return (p[0] & 0x7f) | ((p[1] & 0x7f) << 7);
 }
 
@@ -543,12 +549,12 @@ static inline int bridge_decode_cmd(const uint8_t *p) {
  * The tokenized form starts with a 2-byte command token, followed by
  * the tokenized arguments, terminated by 0x00.
  */
-void bc_bridge_call_cmd(BCVMState *vm, const uint8_t *tok, uint16_t len) {
+void bc_bridge_call_cmd(BCVMState * vm, const uint8_t * tok, uint16_t len) {
     if (len < 2) return;
 
     /* Copy tokenized bytes to temp memory — command handlers may modify
      * the buffer during parsing. */
-    unsigned char *buf = GetTempMemory(len + 1);
+    unsigned char * buf = GetTempMemory(len + 1);
     memcpy(buf, tok, len);
     buf[len] = 0;
 
@@ -559,9 +565,9 @@ void bc_bridge_call_cmd(BCVMState *vm, const uint8_t *tok, uint16_t len) {
 
     /* Save interpreter context */
     int saved_cmdtoken = cmdtoken;
-    unsigned char *saved_cmdline = cmdline;
-    unsigned char *saved_nextstmt = nextstmt;
-    unsigned char *saved_current_line = CurrentLinePtr;
+    unsigned char * saved_cmdline = cmdline;
+    unsigned char * saved_nextstmt = nextstmt;
+    unsigned char * saved_current_line = CurrentLinePtr;
     int saved_local_index = g_LocalIndex;
     int local_map[VM_MAX_LOCALS];
 
@@ -623,7 +629,7 @@ void bc_bridge_call_cmd(BCVMState *vm, const uint8_t *tok, uint16_t len) {
             return;
         }
         static unsigned char sub_ret_sentinel[4] = {0, 0, 0, 0};
-        unsigned char *pre_nextstmt = nextstmt;
+        unsigned char * pre_nextstmt = nextstmt;
         cmdline = buf;
         nextstmt = sub_ret_sentinel;
         DefinedSubFun(false, buf, idx, NULL, NULL, NULL, NULL);
@@ -678,7 +684,7 @@ void bc_bridge_call_cmd(BCVMState *vm, const uint8_t *tok, uint16_t len) {
  * Sets up the interpreter's function-call globals (ep, targ) and calls
  * the function handler, then pushes the result onto the VM stack.
  */
-void bc_bridge_call_fun(BCVMState *vm, uint16_t fun_idx, const uint8_t *args, uint16_t arg_len, uint8_t ret_type) {
+void bc_bridge_call_fun(BCVMState * vm, uint16_t fun_idx, const uint8_t * args, uint16_t arg_len, uint8_t ret_type) {
     if (fun_idx >= (unsigned)TokenTableSize - 1) {
         bc_vm_error(vm, "Bridge: invalid function index %d", fun_idx);
         return;
@@ -686,10 +692,10 @@ void bc_bridge_call_fun(BCVMState *vm, uint16_t fun_idx, const uint8_t *args, ui
 
     /* Save interpreter context */
     int saved_targ = targ;
-    unsigned char *saved_ep = ep;
+    unsigned char * saved_ep = ep;
     MMFLOAT saved_fret = fret;
     int64_t saved_iret = iret;
-    unsigned char *saved_sret = sret;
+    unsigned char * saved_sret = sret;
     int saved_local_index = g_LocalIndex;
     int local_map[VM_MAX_LOCALS];
     int bridge_level = 0;
@@ -716,7 +722,7 @@ void bc_bridge_call_fun(BCVMState *vm, uint16_t fun_idx, const uint8_t *args, ui
     /* Capture result before cleanup */
     MMFLOAT result_f = fret;
     int64_t result_i = iret;
-    unsigned char *result_s = sret;
+    unsigned char * result_s = sret;
 
     /* Sync modified variables back to VM.  See bc_bridge_call_cmd for why
      * the local frame must be dropped before sync_mmbasic_to_vm. */
@@ -728,18 +734,24 @@ void bc_bridge_call_fun(BCVMState *vm, uint16_t fun_idx, const uint8_t *args, ui
 
     /* Push result onto VM stack */
     if (ret_type == T_INT) {
-        if (vm->sp + 1 >= VM_STACK_SIZE) { bc_vm_error(vm, "Stack overflow"); goto cleanup; }
+        if (vm->sp + 1 >= VM_STACK_SIZE) {
+            bc_vm_error(vm, "Stack overflow");
+            goto cleanup;
+        }
         vm->sp++;
         vm->stack[vm->sp].i = result_i;
         vm->stack_types[vm->sp] = T_INT;
     } else if (ret_type == T_NBR) {
-        if (vm->sp + 1 >= VM_STACK_SIZE) { bc_vm_error(vm, "Stack overflow"); goto cleanup; }
+        if (vm->sp + 1 >= VM_STACK_SIZE) {
+            bc_vm_error(vm, "Stack overflow");
+            goto cleanup;
+        }
         vm->sp++;
         vm->stack[vm->sp].f = result_f;
         vm->stack_types[vm->sp] = T_NBR;
     } else if (ret_type == T_STR) {
         /* Copy string to VM temp storage before ClearTempMemory */
-        uint8_t *temp = &vm->str_temp[vm->str_temp_idx & 3][0];
+        uint8_t * temp = &vm->str_temp[vm->str_temp_idx & 3][0];
         vm->str_temp_idx = (vm->str_temp_idx + 1) & 3;
         if (result_s) {
             int slen = *result_s;
@@ -747,7 +759,10 @@ void bc_bridge_call_fun(BCVMState *vm, uint16_t fun_idx, const uint8_t *args, ui
         } else {
             temp[0] = 0;
         }
-        if (vm->sp + 1 >= VM_STACK_SIZE) { bc_vm_error(vm, "Stack overflow"); goto cleanup; }
+        if (vm->sp + 1 >= VM_STACK_SIZE) {
+            bc_vm_error(vm, "Stack overflow");
+            goto cleanup;
+        }
         vm->sp++;
         vm->stack[vm->sp].s = temp;
         vm->stack_types[vm->sp] = T_STR;
@@ -788,9 +803,9 @@ cleanup:
  * bc_bridge_release_subfun_buffer frees the buffer and nulls subfun[].
  */
 
-static unsigned char *g_bridge_prog_buf = NULL;
+static unsigned char * g_bridge_prog_buf = NULL;
 
-unsigned char *bc_bridge_get_prog_buf(void) {
+unsigned char * bc_bridge_get_prog_buf(void) {
     return g_bridge_prog_buf;
 }
 
@@ -803,7 +818,7 @@ void bc_bridge_release_subfun_buffer(void) {
     port_bc_bridge_clear_subfun_hash();
 }
 
-int bc_bridge_prepare_subfun(const char *source) {
+int bc_bridge_prepare_subfun(const char * source) {
     if (!source || !*source) {
         bc_bridge_release_subfun_buffer();
         return 0;
@@ -826,7 +841,7 @@ int bc_bridge_prepare_subfun(const char *source) {
      * program). Keep the whole program tokenised. */
     size_t src_len = strlen(source);
     size_t cap = src_len + 64;
-    unsigned char *buf = (unsigned char *)BC_ALLOC(cap);
+    unsigned char * buf = (unsigned char *)BC_ALLOC(cap);
     if (!buf) return -1;
     bc_bridge_release_subfun_buffer();
     /* 0xff fill so the tail acts as the end-of-program sentinel that
@@ -839,10 +854,10 @@ int bc_bridge_prepare_subfun(const char *source) {
     memcpy(saved_inpbuf, inpbuf, STRINGSIZE);
     memcpy(saved_tknbuf, tknbuf, STRINGSIZE);
 
-    unsigned char *pm = buf;
-    const char *line = source;
+    unsigned char * pm = buf;
+    const char * line = source;
     while (*line) {
-        const char *eol = strchr(line, '\n');
+        const char * eol = strchr(line, '\n');
         size_t len = eol ? (size_t)(eol - line) : strlen(line);
         if (len > 0 && line[len - 1] == '\r') len--;
         if (len >= STRINGSIZE) len = STRINGSIZE - 1;
@@ -855,18 +870,18 @@ int bc_bridge_prepare_subfun(const char *source) {
             /* tokenise() terminates tknbuf with two zero bytes. T_LINENBR
              * embeds single zero bytes, so walk until two consecutive
              * zeros (same pattern used by SaveProgramToFlash). */
-            unsigned char *tp = tknbuf;
+            unsigned char * tp = tknbuf;
             while (!(tp[0] == 0 && tp[1] == 0)) {
                 if ((size_t)(pm - buf) >= cap - 3) goto buf_full;
                 *pm++ = *tp++;
             }
-            *pm++ = 0;  /* element terminator */
+            *pm++ = 0; /* element terminator */
         }
         line = eol ? eol + 1 : line + strlen(line);
     }
 buf_full:
-    *pm++ = 0;  /* program terminator byte 1 */
-    *pm++ = 0;  /* program terminator byte 2 */
+    *pm++ = 0; /* program terminator byte 1 */
+    *pm++ = 0; /* program terminator byte 2 */
 
     memcpy(inpbuf, saved_inpbuf, STRINGSIZE);
     memcpy(tknbuf, saved_tknbuf, STRINGSIZE);
@@ -876,18 +891,21 @@ buf_full:
      * ErrAbort / CFunction-scanning paths. */
     for (int i = 0; i < MAXSUBFUN; i++) subfun[i] = NULL;
     int si = 0;
-    unsigned char *p = buf;
+    unsigned char * p = buf;
     while (*p != 0xff && si < MAXSUBFUN) {
         /* Skip leading whitespace / label prefix. The interpreter walks
          * this via GetNextCommand; for a pristine tokeniser output stream
          * skipspace is enough. */
         while (*p == ' ' || *p == T_NEWLINE || *p == T_LINENBR) {
-            if (*p == T_LINENBR) { p += 3; continue; }
+            if (*p == T_LINENBR) {
+                p += 3;
+                continue;
+            }
             p++;
         }
         if (*p == 0) {
             p++;
-            if (*p == 0) break;  /* double-zero = end-of-program */
+            if (*p == 0) break; /* double-zero = end-of-program */
             continue;
         }
         /* Inline commandtbl_decode — it's static inline in MMBasic.c and
@@ -896,7 +914,7 @@ buf_full:
         if (tkn == cmdSUB || tkn == cmdFUN || tkn == cmdCSUB) {
             subfun[si++] = p;
         }
-        while (*p) p++;  /* skip to end-of-element */
+        while (*p) p++; /* skip to end-of-element */
     }
 
     /* Rebuild the rp2350-only funtbl[] hash for FindSubFun's fast

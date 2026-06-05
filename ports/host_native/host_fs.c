@@ -19,7 +19,7 @@
 #include "host_fs.h"
 
 /* Tiny glob matcher — handles '*' and '?'. Case-insensitive. */
-static int host_fs_match(const char *pattern, const char *name) {
+static int host_fs_match(const char * pattern, const char * name) {
     while (*pattern) {
         if (*pattern == '*') {
             pattern++;
@@ -44,14 +44,14 @@ static int host_fs_match(const char *pattern, const char *name) {
     return *name == '\0';
 }
 
-int host_fs_list_dir(const char *dir, const char *pattern, host_fs_emit_line emit) {
-    DIR *d = opendir(dir);
+int host_fs_list_dir(const char * dir, const char * pattern, host_fs_emit_line emit) {
+    DIR * d = opendir(dir);
     if (!d) return -1;
 
-    const char *pat = (pattern && *pattern) ? pattern : "*";
-    struct dirent *de;
+    const char * pat = (pattern && *pattern) ? pattern : "*";
+    struct dirent * de;
     while ((de = readdir(d)) != NULL) {
-        if (de->d_name[0] == '.') continue;  /* hide dotfiles and . / .. */
+        if (de->d_name[0] == '.') continue; /* hide dotfiles and . / .. */
         if (!host_fs_match(pat, de->d_name)) continue;
         emit(de->d_name);
     }
@@ -60,16 +60,19 @@ int host_fs_list_dir(const char *dir, const char *pattern, host_fs_emit_line emi
 }
 
 struct host_fs_walker {
-    DIR *d;
+    DIR * d;
     char dir[4096];
     char pattern[256];
 };
 
-host_fs_walker_t *host_fs_walk_open(const char *dir, const char *pattern) {
-    DIR *d = opendir(dir);
+host_fs_walker_t * host_fs_walk_open(const char * dir, const char * pattern) {
+    DIR * d = opendir(dir);
     if (!d) return NULL;
-    host_fs_walker_t *w = calloc(1, sizeof(*w));
-    if (!w) { closedir(d); return NULL; }
+    host_fs_walker_t * w = calloc(1, sizeof(*w));
+    if (!w) {
+        closedir(d);
+        return NULL;
+    }
     w->d = d;
     snprintf(w->dir, sizeof(w->dir), "%s", dir);
     snprintf(w->pattern, sizeof(w->pattern), "%s",
@@ -77,13 +80,13 @@ host_fs_walker_t *host_fs_walk_open(const char *dir, const char *pattern) {
     return w;
 }
 
-int host_fs_walk_next(host_fs_walker_t *w,
-                      char *name_out, int name_cap,
-                      int *is_dir_out,
-                      unsigned long long *size_out,
-                      int64_t *mtime_epoch_out) {
+int host_fs_walk_next(host_fs_walker_t * w,
+                      char * name_out, int name_cap,
+                      int * is_dir_out,
+                      unsigned long long * size_out,
+                      int64_t * mtime_epoch_out) {
     if (!w || !w->d) return 0;
-    struct dirent *de;
+    struct dirent * de;
     char path[4096];
     while ((de = readdir(w->d)) != NULL) {
         if (de->d_name[0] == '.') continue;
@@ -102,15 +105,27 @@ int host_fs_walk_next(host_fs_walker_t *w,
     return 0;
 }
 
-void host_fs_walk_close(host_fs_walker_t *w) {
+void host_fs_walk_close(host_fs_walker_t * w) {
     if (!w) return;
     if (w->d) closedir(w->d);
     free(w);
 }
 
-int host_fs_unlink(const char *path) { return unlink(path) == 0 ? 0 : -1; }
-int host_fs_rename(const char *from, const char *to) { return rename(from, to) == 0 ? 0 : -1; }
-int host_fs_mkdir(const char *path) { return host_mkdir(path); }
-int host_fs_rmdir(const char *path) { return rmdir(path) == 0 ? 0 : -1; }
-int host_fs_chdir(const char *path) { return chdir(path) == 0 ? 0 : -1; }
-int host_fs_getcwd(char *out, int out_cap) { return getcwd(out, (size_t)out_cap) ? 0 : -1; }
+int host_fs_unlink(const char * path) {
+    return unlink(path) == 0 ? 0 : -1;
+}
+int host_fs_rename(const char * from, const char * to) {
+    return rename(from, to) == 0 ? 0 : -1;
+}
+int host_fs_mkdir(const char * path) {
+    return host_mkdir(path);
+}
+int host_fs_rmdir(const char * path) {
+    return rmdir(path) == 0 ? 0 : -1;
+}
+int host_fs_chdir(const char * path) {
+    return chdir(path) == 0 ? 0 : -1;
+}
+int host_fs_getcwd(char * out, int out_cap) {
+    return getcwd(out, (size_t)out_cap) ? 0 : -1;
+}

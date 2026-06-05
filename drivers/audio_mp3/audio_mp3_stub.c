@@ -16,23 +16,28 @@
 
 #include "dr_mp3.h"
 
-DRMP3_API drmp3_bool32 drmp3_init(drmp3 *pMP3,
+DRMP3_API drmp3_bool32 drmp3_init(drmp3 * pMP3,
                                   drmp3_read_proc onRead,
                                   drmp3_seek_proc onSeek,
-                                  void *pUserData,
-                                  const drmp3_allocation_callbacks *pAllocationCallbacks) {
-    (void)onRead; (void)onSeek; (void)pUserData; (void)pAllocationCallbacks;
+                                  void * pUserData,
+                                  const drmp3_allocation_callbacks * pAllocationCallbacks) {
+    (void)onRead;
+    (void)onSeek;
+    (void)pUserData;
+    (void)pAllocationCallbacks;
     if (pMP3) memset(pMP3, 0, sizeof(*pMP3));
     return DRMP3_FALSE;
 }
 
-DRMP3_API void drmp3_uninit(drmp3 *pMP3) {
+DRMP3_API void drmp3_uninit(drmp3 * pMP3) {
     (void)pMP3;
 }
 
-DRMP3_API drmp3_uint64 drmp3_read_pcm_frames_s16(drmp3 *pMP3,
+DRMP3_API drmp3_uint64 drmp3_read_pcm_frames_s16(drmp3 * pMP3,
                                                  drmp3_uint64 framesToRead,
-                                                 drmp3_int16 *pBufferOut) {
-    (void)pMP3; (void)framesToRead; (void)pBufferOut;
+                                                 drmp3_int16 * pBufferOut) {
+    (void)pMP3;
+    (void)framesToRead;
+    (void)pBufferOut;
     return 0;
 }

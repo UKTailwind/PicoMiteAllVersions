@@ -19,13 +19,12 @@
 /* Symbols not reachable through Hardware_Includes.h's PICOMITEWEB-gated
  * sections — declare here so this TU compiles across every port. All
  * are defined in core (FileIO.c / PicoMite.c). */
-extern int MemLoadProgram(unsigned char *fname, unsigned char *ram);
-extern const uint8_t *flash_target_contents;
-extern const uint8_t *flash_progmemory;
-extern unsigned char *LibMemory;
+extern int MemLoadProgram(unsigned char * fname, unsigned char * ram);
+extern const uint8_t * flash_target_contents;
+extern const uint8_t * flash_progmemory;
+extern unsigned char * LibMemory;
 
-static void psram_test_fail(const char *phase, uintptr_t addr, uint32_t expected, uint32_t actual)
-{
+static void psram_test_fail(const char * phase, uintptr_t addr, uint32_t expected, uint32_t actual) {
     char msg[160];
     snprintf(msg, sizeof(msg),
              "RAM TEST FAIL %s addr=&H%08lx expected=&H%08lx actual=&H%08lx\r\n",
@@ -34,8 +33,7 @@ static void psram_test_fail(const char *phase, uintptr_t addr, uint32_t expected
     error("PSRAM test failed");
 }
 
-static uint32_t psram_test_pattern(uintptr_t addr, size_t index)
-{
+static uint32_t psram_test_pattern(uintptr_t addr, size_t index) {
     uint32_t x = (uint32_t)addr ^ (uint32_t)(index * 0x9E3779B9u);
     x ^= x >> 16;
     x *= 0x7FEB352Du;
@@ -48,8 +46,7 @@ typedef enum {
     PSRAM_TEST_NOCACHE
 } psram_test_mode_t;
 
-static void psram_test_barrier(psram_test_mode_t mode)
-{
+static void psram_test_barrier(psram_test_mode_t mode) {
     if (mode == PSRAM_TEST_CACHED) {
         hal_psram_cache_sync();
     }
@@ -58,9 +55,8 @@ static void psram_test_barrier(psram_test_mode_t mode)
      * test loop already orders the accesses. */
 }
 
-static void psram_march_test(uint8_t *base, size_t bytes, psram_test_mode_t mode)
-{
-    volatile uint32_t *mem = (volatile uint32_t *)base;
+static void psram_march_test(uint8_t * base, size_t bytes, psram_test_mode_t mode) {
+    volatile uint32_t * mem = (volatile uint32_t *)base;
     size_t words = bytes / sizeof(uint32_t);
     hal_psram_cache_sync();
     MMPrintString("RAM TEST phase 0 fill zero\r\n");
@@ -108,24 +104,23 @@ static void psram_march_test(uint8_t *base, size_t bytes, psram_test_mode_t mode
     }
 }
 
-void MIPS16 cmd_psram(void)
-{
+void MIPS16 cmd_psram(void) {
     if (!PSRAMsize) error("PSRAM not enabled");
-    unsigned char *p;
+    unsigned char * p;
     if ((p = checkstring(cmdline, (unsigned char *)"TEST"))) {
         size_t bytes = PSRAMsize;
-        uint8_t *test_base = (uint8_t *)PSRAMbase;
+        uint8_t * test_base = (uint8_t *)PSRAMbase;
         psram_test_mode_t mode = PSRAM_TEST_CACHED;
         skipspace(p);
-        unsigned char *tp;
-        unsigned char *nocache_kw = NULL;
+        unsigned char * tp;
+        unsigned char * nocache_kw = NULL;
         if ((tp = checkstring(p, (unsigned char *)"NOCACHE"))) {
             nocache_kw = tp;
         } else if ((tp = checkstring(p, (unsigned char *)"NC"))) {
             nocache_kw = tp;
         }
         if (nocache_kw) {
-            uint8_t *alias = hal_psram_nocache_alias((uint8_t *)PSRAMbase);
+            uint8_t * alias = hal_psram_nocache_alias((uint8_t *)PSRAMbase);
             if (alias == NULL) error("NOCACHE not supported on this port");
             test_base = alias;
             mode = PSRAM_TEST_NOCACHE;
@@ -157,17 +152,17 @@ void MIPS16 cmd_psram(void)
         memset((void *)PSRAMblock, 0, PSRAMblocksize);
     } else if ((p = checkstring(cmdline, (unsigned char *)"ERASE"))) {
         int i = getint(p, 1, MAXRAMSLOTS);
-        uint8_t *j = (uint8_t *)PSRAMblock + ((i - 1) * MAX_PROG_SIZE);
+        uint8_t * j = (uint8_t *)PSRAMblock + ((i - 1) * MAX_PROG_SIZE);
         memset(j, 0, MAX_PROG_SIZE);
     } else if ((p = checkstring(cmdline, (unsigned char *)"OVERWRITE"))) {
         int i = getint(p, 1, MAXRAMSLOTS);
-        uint8_t *j = (uint8_t *)PSRAMblock + ((i - 1) * MAX_PROG_SIZE);
+        uint8_t * j = (uint8_t *)PSRAMblock + ((i - 1) * MAX_PROG_SIZE);
         memset(j, 0, MAX_PROG_SIZE);
-        uint8_t *q = ProgMemory;
+        uint8_t * q = ProgMemory;
         memcpy(j, q, MAX_PROG_SIZE);
     } else if ((p = checkstring(cmdline, (unsigned char *)"LIST"))) {
         int j, i, k;
-        int *pp;
+        int * pp;
         getargs(&p, 3, (unsigned char *)",");
         if (argc) {
             int i = getint(argv[0], 1, MAXRAMSLOTS);
@@ -198,7 +193,7 @@ void MIPS16 cmd_psram(void)
                         MMPrintString(" in use");
                         pp--;
                         if ((unsigned char)*pp == T_NEWLINE) {
-                            char *p = (char *)pp;
+                            char * p = (char *)pp;
                             MMPrintString(": \"");
                             buff[0] = '\'';
                             buff[1] = '#';
@@ -231,7 +226,7 @@ void MIPS16 cmd_psram(void)
             else
                 error("Syntax");
         }
-        uint8_t *c = (uint8_t *)(PSRAMblock + ((i - 1) * MAX_PROG_SIZE));
+        uint8_t * c = (uint8_t *)(PSRAMblock + ((i - 1) * MAX_PROG_SIZE));
         if (*c != 0x0 && overwrite == 0) error("Already programmed");
         memset(c, 0xFF, MAX_PROG_SIZE);
         ClearTempMemory();
@@ -240,9 +235,9 @@ void MIPS16 cmd_psram(void)
         RestoreContext(false);
     } else if ((p = checkstring(cmdline, (unsigned char *)"SAVE"))) {
         int i = getint(p, 1, MAXRAMSLOTS);
-        uint8_t *c = (uint8_t *)(PSRAMblock + ((i - 1) * MAX_PROG_SIZE));
+        uint8_t * c = (uint8_t *)(PSRAMblock + ((i - 1) * MAX_PROG_SIZE));
         if (*c != 0x0) error("Already programmed");
-        uint8_t *q = ProgMemory;
+        uint8_t * q = ProgMemory;
         memcpy(c, q, MAX_PROG_SIZE);
     } else if ((p = checkstring(cmdline, (unsigned char *)"LOAD"))) {
         if (CurrentLinePtr) error("Invalid in program");
@@ -252,12 +247,12 @@ void MIPS16 cmd_psram(void)
         fileio_flash_write_end();
         j = (MAX_PROG_SIZE >> 2);
         uSec(250000);
-        int *pp = (int *)flash_progmemory;
+        int * pp = (int *)flash_progmemory;
         while (j--)
             if (*pp++ != 0xFFFFFFFF) error("Erase error");
         fileio_flash_write_begin();
-        uint8_t *q = (uint8_t *)(PSRAMblock + ((i - 1) * MAX_PROG_SIZE));
-        uint8_t *writebuff = GetTempMemory(4096);
+        uint8_t * q = (uint8_t *)(PSRAMblock + ((i - 1) * MAX_PROG_SIZE));
+        uint8_t * writebuff = GetTempMemory(4096);
         if (*q == 0xFF) {
             fileio_flash_write_end();
             FlashWriteInit(PROGRAM_FLASH);

@@ -36,24 +36,24 @@
 #include "VS1053.h"
 #include "vs1053b-patches.h"
 #define LOG(...)
-extern void __not_in_flash_func(spi_write_fast)(spi_inst_t *spi, const uint8_t *src, size_t len);
-extern void __not_in_flash_func(spi_finish)(spi_inst_t *spi);
+extern void __not_in_flash_func(spi_write_fast)(spi_inst_t * spi, const uint8_t * src, size_t len);
+extern void __not_in_flash_func(spi_finish)(spi_inst_t * spi);
 //#define LOG printf
-#define _BV( bit ) ( 1<<(bit) )
-uint8_t cs_pin;                         // Pin where CS line is connected
-uint8_t dcs_pin;                        // Pin where DCS line is connected
-uint8_t dreq_pin;                       // Pin where DREQ line is connected
-uint8_t reset_pin;                       // Pin where DREQ line is connected
-uint8_t curvol;                         // Current volume setting 0..100%
-int8_t  curbalance = 0;                 // Current balance setting -100..100
-uint8_t endFillByte;                    // Byte to send when stopping song
+#define _BV(bit) (1 << (bit))
+uint8_t cs_pin;        // Pin where CS line is connected
+uint8_t dcs_pin;       // Pin where DCS line is connected
+uint8_t dreq_pin;      // Pin where DREQ line is connected
+uint8_t reset_pin;     // Pin where DREQ line is connected
+uint8_t curvol;        // Current volume setting 0..100%
+int8_t curbalance = 0; // Current balance setting -100..100
+uint8_t endFillByte;   // Byte to send when stopping song
 const uint8_t vs1053_chunk_size = 32;
 // SCI Register
 const uint8_t SCI_MODE = 0x0;
 const uint8_t SCI_STATUS = 0x1;
 const uint8_t SCI_BASS = 0x2;
 const uint8_t SCI_CLOCKF = 0x3;
-const uint8_t SCI_DECODE_TIME = 0x4;        // current decoded time in full seconds
+const uint8_t SCI_DECODE_TIME = 0x4; // current decoded time in full seconds
 const uint8_t SCI_AUDATA = 0x5;
 const uint8_t SCI_WRAM = 0x6;
 const uint8_t SCI_WRAMADDR = 0x7;
@@ -63,32 +63,34 @@ const uint8_t SCI_AICTRL0 = 0xC;
 const uint8_t SCI_AICTRL1 = 0xD;
 const uint8_t SCI_num_registers = 0xF;
 // SCI_MODE bits
-const uint8_t SM_SDINEW = 11;           // Bitnumber in SCI_MODE always on
-const uint8_t SM_RESET = 2;             // Bitnumber in SCI_MODE soft reset
-const uint8_t SM_CANCEL = 3;            // Bitnumber in SCI_MODE cancel song
-const uint8_t SM_TESTS = 5;             // Bitnumber in SCI_MODE for tests
-const uint8_t SM_LINE1 = 14;            // Bitnumber in SCI_MODE for Line input
-const uint8_t SM_STREAM = 6;            // Bitnumber in SCI_MODE for Streaming Mode
+const uint8_t SM_SDINEW = 11; // Bitnumber in SCI_MODE always on
+const uint8_t SM_RESET = 2;   // Bitnumber in SCI_MODE soft reset
+const uint8_t SM_CANCEL = 3;  // Bitnumber in SCI_MODE cancel song
+const uint8_t SM_TESTS = 5;   // Bitnumber in SCI_MODE for tests
+const uint8_t SM_LINE1 = 14;  // Bitnumber in SCI_MODE for Line input
+const uint8_t SM_STREAM = 6;  // Bitnumber in SCI_MODE for Streaming Mode
 const uint8_t SM_LAYER12 = 1;
 const uint16_t ADDR_REG_GPIO_DDR_RW = 0xc017;
 const uint16_t ADDR_REG_GPIO_VAL_R = 0xc018;
 const uint16_t ADDR_REG_GPIO_ODATA_RW = 0xc019;
 const uint16_t ADDR_REG_I2S_CONFIG_RW = 0xc040;
-#define xmit_multi(a,b) spi_write_blocking((AUDIO_SPI==1 ? spi0 : spi1),a,b);
-static BYTE __not_in_flash_func(xchg)(BYTE data_out){
-	BYTE data_in=0;
-	spi_write_read_blocking((AUDIO_SPI==1 ? spi0 : spi1),&data_out,&data_in,1);
-	return data_in;
+#define xmit_multi(a, b) spi_write_blocking((AUDIO_SPI == 1 ? spi0 : spi1), a, b);
+static BYTE __not_in_flash_func(xchg)(BYTE data_out) {
+    BYTE data_in = 0;
+    spi_write_read_blocking((AUDIO_SPI == 1 ? spi0 : spi1), &data_out, &data_in, 1);
+    return data_in;
 }
 
-uint8_t stdmax(int a, int b){
-    if(a>b)return a;
+uint8_t stdmax(int a, int b) {
+    if (a > b) return a;
     return b;
 }
-int stdmap(int v){
-    v=(v*80)/100;
-    if(v==0)return 0xFE;
-    else return 100-v;
+int stdmap(int v) {
+    v = (v * 80) / 100;
+    if (v == 0)
+        return 0xFE;
+    else
+        return 100 - v;
 }
 void await_data_request() {
     while (!(gpio_get(dreq_pin))) {
@@ -96,28 +98,28 @@ void await_data_request() {
 }
 
 void control_mode_on() {
-        gpio_put(dcs_pin,GPIO_PIN_SET);
-        gpio_put(cs_pin,GPIO_PIN_RESET);
+    gpio_put(dcs_pin, GPIO_PIN_SET);
+    gpio_put(cs_pin, GPIO_PIN_RESET);
 }
 
-void control_mode_off()  {
-        gpio_put(cs_pin,GPIO_PIN_SET);
+void control_mode_off() {
+    gpio_put(cs_pin, GPIO_PIN_SET);
 }
 
 void __not_in_flash_func(data_mode_on()) {
-        gpio_put(cs_pin,GPIO_PIN_SET);
-        gpio_put(dcs_pin,GPIO_PIN_RESET);
+    gpio_put(cs_pin, GPIO_PIN_SET);
+    gpio_put(dcs_pin, GPIO_PIN_RESET);
 }
 
 void __not_in_flash_func(data_mode_off()) {
-        gpio_put(dcs_pin,GPIO_PIN_SET);
+    gpio_put(dcs_pin, GPIO_PIN_SET);
 }
 
 bool data_request() {
     return (gpio_get(dreq_pin) == 1);
 }
 
-uint16_t read_register(uint8_t _reg){
+uint16_t read_register(uint8_t _reg) {
     uint16_t result;
 
     control_mode_on();
@@ -131,22 +133,22 @@ uint16_t read_register(uint8_t _reg){
     return result;
 }
 
-void writeRegister(uint8_t _reg, uint16_t _value){
+void writeRegister(uint8_t _reg, uint16_t _value) {
     control_mode_on();
-    xchg(2);        // Write operation
-    xchg(_reg);     // Register to write (0..0xF)
-    xchg(_value>>8);
+    xchg(2);    // Write operation
+    xchg(_reg); // Register to write (0..0xF)
+    xchg(_value >> 8);
     xchg(_value & 0xFF);
-//    SPI.write16(_value); // Send 16 bits data
+    //    SPI.write16(_value); // Send 16 bits data
     await_data_request();
     control_mode_off();
 }
 
-void __not_in_flash_func(sdi_send_buffer)(uint8_t *data, size_t len) {
+void __not_in_flash_func(sdi_send_buffer)(uint8_t * data, size_t len) {
     size_t chunk_length; // Length of chunk 32 byte or shorter
 
-    gpio_put(cs_pin,GPIO_PIN_SET);
-    gpio_put(dcs_pin,GPIO_PIN_RESET);
+    gpio_put(cs_pin, GPIO_PIN_SET);
+    gpio_put(dcs_pin, GPIO_PIN_RESET);
     while (len) // More to do?
     {
         while (!(gpio_get(dreq_pin))) {
@@ -156,14 +158,18 @@ void __not_in_flash_func(sdi_send_buffer)(uint8_t *data, size_t len) {
             chunk_length = vs1053_chunk_size;
         }
         len -= chunk_length;
-        if(PinDef[Option.AUDIO_CLK_PIN].mode & SPI0SCK)spi_write_fast(spi0, data, chunk_length);
-        else spi_write_fast(spi1, data, chunk_length);
-//        xmit_multi(data, chunk_length);
+        if (PinDef[Option.AUDIO_CLK_PIN].mode & SPI0SCK)
+            spi_write_fast(spi0, data, chunk_length);
+        else
+            spi_write_fast(spi1, data, chunk_length);
+        //        xmit_multi(data, chunk_length);
         data += chunk_length;
     }
-	if(PinDef[Option.AUDIO_CLK_PIN].mode & SPI0SCK)spi_finish(spi0);
-	else spi_finish(spi1);
-    gpio_put(dcs_pin,GPIO_PIN_SET);
+    if (PinDef[Option.AUDIO_CLK_PIN].mode & SPI0SCK)
+        spi_finish(spi0);
+    else
+        spi_finish(spi1);
+    gpio_put(dcs_pin, GPIO_PIN_SET);
 }
 
 void sdi_send_fillers(size_t len) {
@@ -192,16 +198,16 @@ void wram_write(uint16_t address, uint16_t data) {
 
 uint16_t wram_read(uint16_t address) {
     writeRegister(SCI_WRAMADDR, address); // Start reading from WRAM
-    return read_register(SCI_WRAM);        // Read back result
+    return read_register(SCI_WRAM);       // Read back result
 }
-uint16_t VS1053free(void){
-    uint16_t wrp, rdp; // VS1053b read and write pointers
+uint16_t VS1053free(void) {
+    uint16_t wrp, rdp;                   // VS1053b read and write pointers
     writeRegister(SCI_WRAMADDR, 0x5A7D); // Start reading from WRAM
     wrp = read_register(SCI_WRAM);
-    rdp = read_register(SCI_WRAM);  
-    return (wrp-rdp) & 1023;    
+    rdp = read_register(SCI_WRAM);
+    return (wrp - rdp) & 1023;
 }
-bool testComm(const char *header) {
+bool testComm(const char * header) {
     // Test the communication with the VS1053 module.  The result wille be returned.
     // If DREQ is low, there is problably no VS1053 connected.  Pull the line HIGH
     // in order to prevent an endless loop waiting for this signal.  The rest of the
@@ -213,8 +219,8 @@ bool testComm(const char *header) {
     if (!gpio_get(dreq_pin)) {
         error("VS1053 not properly installed!");
         // Allow testing without the VS1053 module
-//        pinMode(dreq_pin, INPUT_PULLUP); // DREQ is now input with pull-up
-        return false;                    // Return bad result
+        //        pinMode(dreq_pin, INPUT_PULLUP); // DREQ is now input with pull-up
+        return false; // Return bad result
     }
     // Further TESTING.  Check if SCI bus can write and read without errors.
     // We will use the volume setting for this.
@@ -224,10 +230,10 @@ bool testComm(const char *header) {
         delta = 30; // Fast SPI, more loops
     }
 
-    LOG("%s", header);  // Show a header
+    LOG("%s", header); // Show a header
 
     for (i = 0; (i < 0xFFFF) && (cnt < 20); i += delta) {
-        writeRegister(SCI_VOL, i);         // Write data to SCI_VOL
+        writeRegister(SCI_VOL, i);          // Write data to SCI_VOL
         r1 = read_register(SCI_VOL);        // Read back for the first time
         r2 = read_register(SCI_VOL);        // Read back a second time
         if (r1 != r2 || i != r1 || i != r2) // Check for 2 equal reads
@@ -239,30 +245,30 @@ bool testComm(const char *header) {
     }
     return (cnt == 0); // Return the result
 }
-void VS1053reset(uint8_t _reset_pin){
-    reset_pin=_reset_pin;
-    PinSetBit(PINMAP[reset_pin],LATCLR);
+void VS1053reset(uint8_t _reset_pin) {
+    reset_pin = _reset_pin;
+    PinSetBit(PINMAP[reset_pin], LATCLR);
     uSec(20000);
-    PinSetBit(PINMAP[reset_pin],LATSET);
-    PinSetBit(PINMAP[dreq_pin],CNPUSET);
+    PinSetBit(PINMAP[reset_pin], LATSET);
+    PinSetBit(PINMAP[dreq_pin], CNPUSET);
     uSec(100000);
 }
-void VS1053(uint8_t _cs_pin, uint8_t _dcs_pin, uint8_t _dreq_pin, uint8_t _reset_pin){
-    dreq_pin=_dreq_pin;
-    cs_pin=_cs_pin;
-    dcs_pin=_dcs_pin;
-    reset_pin=_reset_pin;
-    PinSetBit(PINMAP[reset_pin],LATCLR);
+void VS1053(uint8_t _cs_pin, uint8_t _dcs_pin, uint8_t _dreq_pin, uint8_t _reset_pin) {
+    dreq_pin = _dreq_pin;
+    cs_pin = _cs_pin;
+    dcs_pin = _dcs_pin;
+    reset_pin = _reset_pin;
+    PinSetBit(PINMAP[reset_pin], LATCLR);
     uSec(20000);
-    PinSetBit(PINMAP[reset_pin],LATSET);
-    PinSetBit(PINMAP[dreq_pin],CNPUSET);
+    PinSetBit(PINMAP[reset_pin], LATSET);
+    PinSetBit(PINMAP[dreq_pin], CNPUSET);
     uSec(100000);
-        LOG("\r\n");
+    LOG("\r\n");
     LOG("Reset VS1053...\r\n");
     LOG("End reset VS1053...\r\n");
     // Init SPI in slow mode ( 0.2 MHz )
-    spi_init((AUDIO_SPI==1 ? spi0 : spi1), 8000);
-	spi_set_format((AUDIO_SPI==1 ? spi0 : spi1), 8, 0,0, SPI_MSB_FIRST);
+    spi_init((AUDIO_SPI == 1 ? spi0 : spi1), 8000);
+    spi_set_format((AUDIO_SPI == 1 ? spi0 : spi1), 8, 0, 0, SPI_MSB_FIRST);
     // printDetails("Right after reset/startup");
     uSec(20000);
     // printDetails("20 msec after reset");
@@ -273,9 +279,9 @@ void VS1053(uint8_t _cs_pin, uint8_t _dcs_pin, uint8_t _dreq_pin, uint8_t _reset
         // The next clocksetting allows SPI clocking at 5 MHz, 4 MHz is safe then.
         writeRegister(SCI_CLOCKF, 0xE000); // Normal clock settings multiplyer 3.0 = 12.2 MHz
         // SPI Clock to 4 MHz. Now you can set high speed SPI clock.
-        spi_init((AUDIO_SPI==1 ? spi0 : spi1), 5400000);
-//        PInt(spi_get_baudrate(AUDIO_SPI==1 ? spi0 : spi1));PRet();
-        spi_set_format((AUDIO_SPI==1 ? spi0 : spi1), 8, 0,0, SPI_MSB_FIRST);
+        spi_init((AUDIO_SPI == 1 ? spi0 : spi1), 5400000);
+        //        PInt(spi_get_baudrate(AUDIO_SPI==1 ? spi0 : spi1));PRet();
+        spi_set_format((AUDIO_SPI == 1 ? spi0 : spi1), 8, 0, 0, SPI_MSB_FIRST);
         uSec(5000);
         writeRegister(SCI_MODE, _BV(SM_SDINEW) | _BV(SM_LINE1) | _BV(SM_LAYER12));
         testComm("Fast SPI, Testing VS1053 read/write registers again...\r\n");
@@ -293,7 +299,7 @@ void setVolume(uint8_t vol) {
     // Input value is 0..100.  100 is the loudest.
     uint8_t valueL, valueR; // Values to send to SCI_VOL
 
-    curvol = vol;                         // Save for later use
+    curvol = vol; // Save for later use
     valueL = vol;
     valueR = vol;
 
@@ -303,14 +309,14 @@ void setVolume(uint8_t vol) {
         valueL = stdmax(0, vol - curbalance);
     }
 
-    valueL = stdmap(valueL); // 0..100% to left channel
-    valueR = stdmap(valueR); // 0..100% to right channel
+    valueL = stdmap(valueL);                        // 0..100% to left channel
+    valueR = stdmap(valueR);                        // 0..100% to right channel
     writeRegister(SCI_VOL, (valueL << 8) | valueR); // Volume left and right
 }
 void setVolumes(int valueL, int valueR) {
     valueL = stdmap(valueL); // 0..100% to left channel
     valueR = stdmap(valueR); // 0..100% to right channel
-    int value=((valueL << 8) | valueR);
+    int value = ((valueL << 8) | valueR);
     writeRegister(SCI_VOL, value); // Volume left and right
 }
 
@@ -324,7 +330,7 @@ void setBalance(int8_t balance) {
     }
 }
 
-void setTone(uint8_t *rtone) { // Set bass/treble (4 nibbles)
+void setTone(uint8_t * rtone) { // Set bass/treble (4 nibbles)
     // Set tone characteristics.  See documentation for the 4 nibbles.
     uint16_t value = 0; // Value to send to SCI_BASS
     int i;              // Loop control
@@ -347,7 +353,7 @@ void startSong() {
     sdi_send_fillers(10);
 }
 
-void __not_in_flash_func(playChunk)(uint8_t *data, size_t len) {
+void __not_in_flash_func(playChunk)(uint8_t * data, size_t len) {
     sdi_send_buffer(data, len);
 }
 
@@ -371,10 +377,10 @@ void stopSong() {
     printDetails("Song stopped incorrectly!");
 }
 void LoadUserCode(void) {
-  int i;
-  for (i=0;i<CODE_SIZE;i++) {
-    writeRegister(atab[i], dtab[i]);
-  }
+    int i;
+    for (i = 0; i < CODE_SIZE; i++) {
+        writeRegister(atab[i], dtab[i]);
+    }
 }
 
 void softReset() {
@@ -407,7 +413,7 @@ void streamModeOff() {
     await_data_request();
 }
 
-void printDetails(const char *header) {
+void printDetails(const char * header) {
     uint16_t regbuf[16];
     uint8_t i;
     (void)regbuf;
@@ -433,14 +439,12 @@ void printDetails(const char *header) {
  * Read more here: http://www.bajdi.com/lcsoft-vs1053-mp3-module/#comment-33773
  */
 void switchToMp3Mode() {
-    wram_write(ADDR_REG_GPIO_DDR_RW, 3); // GPIO DDR = 3
+    wram_write(ADDR_REG_GPIO_DDR_RW, 3);   // GPIO DDR = 3
     wram_write(ADDR_REG_GPIO_ODATA_RW, 0); // GPIO ODATA = 0
     uSec(10000);
     LOG("Switched to mp3 mode\r\n");
     softReset();
 }
-
-
 
 /**
  * A lightweight method to check if VS1053 is correctly wired up (power supply and connection to SPI interface).
@@ -456,12 +460,12 @@ bool isChipConnected() {
 /**
  * get the Version Number for the VLSI chip
  * VLSI datasheet: 0 for VS1001, 1 for VS1011, 2 for VS1002, 3 for VS1003, 4 for VS1053 and VS8053,
- * 5 for VS1033, 7 for VS1103, and 6 for VS1063. 
+ * 5 for VS1033, 7 for VS1103, and 6 for VS1063.
  */
 uint16_t getChipVersion() {
     uint16_t status = read_register(SCI_STATUS);
-       
-    return ( (status & 0x00F0) >> 4);
+
+    return ((status & 0x00F0) >> 4);
 }
 
 /**
@@ -519,147 +523,174 @@ void adjustRate(long ppm2) {
  * Load the latest generic firmware patch
  */
 void loadDefaultVs1053Patches() {
-   LoadUserCode();
-   LOG("Loaded latest patch\r\n");
+    LoadUserCode();
+    LOG("Loaded latest patch\r\n");
 };
 
 #define PLUGIN_SIZE 28
-const unsigned short plugin[28] = { /* Compressed plugin */
-  0x0007, 0x0001, 0x8050, 0x0006, 0x0014, 0x0030, 0x0715, 0xb080, /*    0 */
-  0x3400, 0x0007, 0x9255, 0x3d00, 0x0024, 0x0030, 0x0295, 0x6890, /*    8 */
-  0x3400, 0x0030, 0x0495, 0x3d00, 0x0024, 0x2908, 0x4d40, 0x0030, /*   10 */
-  0x0200, 0x000a, 0x0001, 0x0050,
+const unsigned short plugin[28] = {
+    /* Compressed plugin */
+    0x0007,
+    0x0001,
+    0x8050,
+    0x0006,
+    0x0014,
+    0x0030,
+    0x0715,
+    0xb080, /*    0 */
+    0x3400,
+    0x0007,
+    0x9255,
+    0x3d00,
+    0x0024,
+    0x0030,
+    0x0295,
+    0x6890, /*    8 */
+    0x3400,
+    0x0030,
+    0x0495,
+    0x3d00,
+    0x0024,
+    0x2908,
+    0x4d40,
+    0x0030, /*   10 */
+    0x0200,
+    0x000a,
+    0x0001,
+    0x0050,
 };
 
 void RTLoadUserCode(void) {
-  int i = 0;
+    int i = 0;
 
-  while (i<sizeof(plugin)/sizeof(plugin[0])) {
-    unsigned short addr, n, val;
-    addr = plugin[i++];
-    n = plugin[i++];
-    if (n & 0x8000U) { /* RLE run, replicate n samples */
-      n &= 0x7FFF;
-      val = plugin[i++];
-      while (n--) {
-        writeRegister(addr, val);
-      }
-    } else {           /* Copy run, copy n samples */
-      while (n--) {
-        val = plugin[i++];
-        writeRegister(addr, val);
-      }
+    while (i < sizeof(plugin) / sizeof(plugin[0])) {
+        unsigned short addr, n, val;
+        addr = plugin[i++];
+        n = plugin[i++];
+        if (n & 0x8000U) { /* RLE run, replicate n samples */
+            n &= 0x7FFF;
+            val = plugin[i++];
+            while (n--) {
+                writeRegister(addr, val);
+            }
+        } else { /* Copy run, copy n samples */
+            while (n--) {
+                val = plugin[i++];
+                writeRegister(addr, val);
+            }
+        }
     }
-  }
 }
 
-
-void sendMIDI(uint8_t data)
-{
-  xchg(0);
-  xchg(data);
+void sendMIDI(uint8_t data) {
+    xchg(0);
+    xchg(data);
 }
 
 //Plays a MIDI note. Doesn't check to see that cmd is greater than 127, or that data values are less than 127
 void talkMIDI(uint8_t cmd, uint8_t data1, uint8_t data2) {
-  //
-  // Wait for chip to be ready (Unlikely to be an issue with real time MIDI)
-  //
+    //
+    // Wait for chip to be ready (Unlikely to be an issue with real time MIDI)
+    //
     await_data_request();
     data_mode_on();
     sendMIDI(cmd);
-    //Some commands only have one data byte. All cmds less than 0xBn have 2 data bytes 
+    //Some commands only have one data byte. All cmds less than 0xBn have 2 data bytes
     //(sort of: http://253.ccarh.org/handout/midiprotocol/)
-    if( (cmd & 0xF0) <= 0xB0 || (cmd & 0xF0) >= 0xE0) {
+    if ((cmd & 0xF0) <= 0xB0 || (cmd & 0xF0) >= 0xE0) {
         sendMIDI(data1);
         sendMIDI(data2);
     } else {
         sendMIDI(data1);
     }
-    data_mode_off() ;
+    data_mode_off();
 }
 
 //Send a MIDI note-on message.  Like pressing a piano key
 //channel ranges from 0-15
 void noteOn(uint8_t channel, uint8_t note, uint8_t attack_velocity) {
-  talkMIDI( (0x90 | channel), note, attack_velocity);
+    talkMIDI((0x90 | channel), note, attack_velocity);
 }
 
 //Send a MIDI note-off message.  Like releasing a piano key
 void noteOff(uint8_t channel, uint8_t note, uint8_t release_velocity) {
-  talkMIDI( (0x80 | channel), note, release_velocity);
+    talkMIDI((0x80 | channel), note, release_velocity);
 }
 
 void miditest(int test) {
     RTLoadUserCode();
     uSec(100000);
-    if(test==0)return;
-  
+    if (test == 0) return;
+
     talkMIDI(0xB0, 0x07, 120); //0xB0 is channel message, set channel volume to near max (127)
 
-    if(test==1){
+    if (test == 1) {
         //Demo Basic MIDI instruments, GM1
         //=================================================================
         MMPrintString("Basic Instruments\r\n");
         talkMIDI(0xB0, 0, 0x00); //Default bank GM1
 
         //Change to different instrument
-        for(int instrument = 0 ; instrument < 127 ; instrument++) {
+        for (int instrument = 0; instrument < 127; instrument++) {
             CheckAbort();
 
             MMPrintString(" Instrument: ");
-            PInt(instrument);PRet();
+            PInt(instrument);
+            PRet();
 
             talkMIDI(0xC0, instrument, 0); //Set instrument number. 0xC0 is a 1 data byte command
 
             //Play notes from F#-0 (30) to F#-5 (90):
-            for (int note = 30 ; note < 40 ; note++) {
-            MMPrintString("N:");
-            PInt(note);PRet();
-            
-            //Note on channel 1 (0x90), some note value (note), middle velocity (0x45):
-            noteOn(0, note, 127);
-            uSec(200000);
+            for (int note = 30; note < 40; note++) {
+                MMPrintString("N:");
+                PInt(note);
+                PRet();
 
-            //Turn off the note with a given off/release velocity
-            noteOff(0, note, 127);
-            uSec(50000);
+                //Note on channel 1 (0x90), some note value (note), middle velocity (0x45):
+                noteOn(0, note, 127);
+                uSec(200000);
+
+                //Turn off the note with a given off/release velocity
+                noteOff(0, note, 127);
+                uSec(50000);
             }
 
             uSec(100000); //uSec between instruments
         }
-    } else if(test==2){
+    } else if (test == 2) {
         //Demo GM2 / Fancy sounds
         //=================================================================
         MMPrintString("Demo Fancy Sounds\r\n");
         talkMIDI(0xB0, 0, 0x78); //Bank select drums
 
         //For this bank 0x78, the instrument does not matter, only the note
-        for(int instrument = 30 ; instrument < 31 ; instrument++) {
+        for (int instrument = 30; instrument < 31; instrument++) {
             CheckAbort();
 
             MMPrintString(" Instrument: ");
-            PInt(instrument);PRet();
+            PInt(instrument);
+            PRet();
 
             talkMIDI(0xC0, instrument, 0); //Set instrument number. 0xC0 is a 1 data byte command
 
             //Play fancy sounds from 'High Q' to 'Open Surdo [EXC 6]'
-            for (int note = 27 ; note < 87 ; note++) {
-            MMPrintString("N:");
-            PInt(note);PRet();
-            
-            //Note on channel 1 (0x90), some note value (note), middle velocity (0x45):
-            noteOn(0, note, 127);
-            uSec(50000);
+            for (int note = 27; note < 87; note++) {
+                MMPrintString("N:");
+                PInt(note);
+                PRet();
 
-            //Turn off the note with a given off/release velocity
-            noteOff(0, note, 127);
-            uSec(50000);
+                //Note on channel 1 (0x90), some note value (note), middle velocity (0x45):
+                noteOn(0, note, 127);
+                uSec(50000);
+
+                //Turn off the note with a given off/release velocity
+                noteOff(0, note, 127);
+                uSec(50000);
             }
 
             uSec(100000); //uSec between instruments
         }
-    } else if(test==3){
+    } else if (test == 3) {
         //Demo Melodic
         //=================================================================
         MMPrintString("Demo Melodic? Sounds\r\n");
@@ -667,31 +698,32 @@ void miditest(int test) {
         //These don't sound different from the main bank to me
 
         //Change to different instrument
-        for(int instrument = 27 ; instrument < 87 ; instrument++) {
+        for (int instrument = 27; instrument < 87; instrument++) {
             CheckAbort();
 
             MMPrintString(" Instrument: ");
-            PInt(instrument);PRet();
+            PInt(instrument);
+            PRet();
 
             talkMIDI(0xC0, instrument, 0); //Set instrument number. 0xC0 is a 1 data byte command
 
             //Play notes from F#-0 (30) to F#-5 (90):
-            for (int note = 30 ; note < 40 ; note++) {
-            MMPrintString("N:");PRet();
-            PInt(note);
-            
-            //Note on channel 1 (0x90), some note value (note), middle velocity (0x45):
-            noteOn(0, note, 127);
-            uSec(500000);
+            for (int note = 30; note < 40; note++) {
+                MMPrintString("N:");
+                PRet();
+                PInt(note);
 
-            //Turn off the note with a given off/release velocity
-            noteOff(0, note, 127);
-            uSec(50000);
+                //Note on channel 1 (0x90), some note value (note), middle velocity (0x45):
+                noteOn(0, note, 127);
+                uSec(500000);
+
+                //Turn off the note with a given off/release velocity
+                noteOff(0, note, 127);
+                uSec(50000);
             }
 
             uSec(100000); //uSec between instruments
         }
     }
 }
-  //=================================================================
-
+//=================================================================

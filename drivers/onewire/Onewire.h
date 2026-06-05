@@ -26,7 +26,7 @@ option) any later version.
 #if !defined(INCLUDE_COMMAND_TABLE) && !defined(INCLUDE_TOKEN_TABLE)
 #ifndef ONEWIRE_HEADER
 #define ONEWIRE_HEADER
-extern int64_t *ds18b20Timers;
+extern int64_t * ds18b20Timers;
 extern int mmOWvalue;
 #endif
 #endif

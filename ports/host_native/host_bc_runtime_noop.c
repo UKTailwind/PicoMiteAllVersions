@@ -18,4 +18,6 @@
  * It is *not* linked into device ports; they provide their own strong
  * runtime hook.
  */
-void port_bc_runtime_free_source(const char **source) { (void)source; }
+void port_bc_runtime_free_source(const char ** source) {
+    (void)source;
+}

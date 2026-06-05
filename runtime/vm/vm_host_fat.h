@@ -7,7 +7,7 @@
 
 FRESULT vm_host_fat_mount(void);
 void vm_host_fat_reset(void);
-const char *vm_host_fat_path(const char *filename);
+const char * vm_host_fat_path(const char * filename);
 
 #endif
 

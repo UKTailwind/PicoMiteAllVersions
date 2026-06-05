@@ -14,26 +14,26 @@
 
 #include "string.h"
 
-void *memcpy(void *dst, const void *src, size_t n) {
-    unsigned char       *d = dst;
-    const unsigned char *s = src;
+void * memcpy(void * dst, const void * src, size_t n) {
+    unsigned char * d = dst;
+    const unsigned char * s = src;
     while (n--) {
         *d++ = *s++;
     }
     return dst;
 }
 
-void *memset(void *s, int c, size_t n) {
-    unsigned char *p = s;
+void * memset(void * s, int c, size_t n) {
+    unsigned char * p = s;
     while (n--) {
-        *p++ = (unsigned char) c;
+        *p++ = (unsigned char)c;
     }
     return s;
 }
 
-void *memmove(void *dst, const void *src, size_t n) {
-    unsigned char       *d = dst;
-    const unsigned char *s = src;
+void * memmove(void * dst, const void * src, size_t n) {
+    unsigned char * d = dst;
+    const unsigned char * s = src;
     if (d == s || n == 0) return dst;
     if (d < s) {
         while (n--) *d++ = *s++;
@@ -45,38 +45,46 @@ void *memmove(void *dst, const void *src, size_t n) {
     return dst;
 }
 
-int memcmp(const void *a, const void *b, size_t n) {
-    const unsigned char *p = a;
-    const unsigned char *q = b;
+int memcmp(const void * a, const void * b, size_t n) {
+    const unsigned char * p = a;
+    const unsigned char * q = b;
     while (n--) {
-        if (*p != *q) return (int) *p - (int) *q;
-        p++; q++;
+        if (*p != *q) return (int)*p - (int)*q;
+        p++;
+        q++;
     }
     return 0;
 }
 
-size_t strlen(const char *s) {
-    const char *p = s;
+size_t strlen(const char * s) {
+    const char * p = s;
     while (*p) p++;
-    return (size_t) (p - s);
+    return (size_t)(p - s);
 }
 
-int strcmp(const char *a, const char *b) {
-    while (*a && *a == *b) { a++; b++; }
-    return (int) (unsigned char) *a - (int) (unsigned char) *b;
+int strcmp(const char * a, const char * b) {
+    while (*a && *a == *b) {
+        a++;
+        b++;
+    }
+    return (int)(unsigned char)*a - (int)(unsigned char)*b;
 }
 
-int strncmp(const char *a, const char *b, size_t n) {
-    while (n && *a && *a == *b) { a++; b++; n--; }
+int strncmp(const char * a, const char * b, size_t n) {
+    while (n && *a && *a == *b) {
+        a++;
+        b++;
+        n--;
+    }
     if (n == 0) return 0;
-    return (int) (unsigned char) *a - (int) (unsigned char) *b;
+    return (int)(unsigned char)*a - (int)(unsigned char)*b;
 }
 
-char *strchr(const char *s, int c) {
-    char target = (char) c;
+char * strchr(const char * s, int c) {
+    char target = (char)c;
     while (*s) {
-        if (*s == target) return (char *) s;
+        if (*s == target) return (char *)s;
         s++;
     }
-    return target == '\0' ? (char *) s : NULL;
+    return target == '\0' ? (char *)s : NULL;
 }

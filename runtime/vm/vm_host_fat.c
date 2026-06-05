@@ -9,9 +9,9 @@
 #include "diskio.h"
 
 #define HOST_FAT_SECTOR_SIZE 512
-#define HOST_FAT_SECTORS     16384
+#define HOST_FAT_SECTORS 16384
 
-static BYTE *host_fat_disk;
+static BYTE * host_fat_disk;
 static FATFS host_fat_fs;
 static int host_fat_mounted;
 static char host_fat_path_buf[FF_MAX_LFN + 1];
@@ -36,7 +36,7 @@ FRESULT vm_host_fat_mount(void) {
     if (host_fat_mounted) return FR_OK;
     if (!host_fat_ready()) return FR_NOT_ENOUGH_CORE;
 
-    MKFS_PARM opt = { FM_FAT | FM_SFD, 0, 0, 0, 0 };
+    MKFS_PARM opt = {FM_FAT | FM_SFD, 0, 0, 0, 0};
     BYTE work[HOST_FAT_SECTOR_SIZE];
     FRESULT res = f_mkfs("", &opt, work, sizeof(work));
     if (res != FR_OK) return res;
@@ -46,8 +46,8 @@ FRESULT vm_host_fat_mount(void) {
     return res;
 }
 
-const char *vm_host_fat_path(const char *filename) {
-    const char *name = filename;
+const char * vm_host_fat_path(const char * filename) {
+    const char * name = filename;
 
     if (name[0] == '/' &&
         (name[1] == 'B' || name[1] == 'b' || name[1] == 'C' || name[1] == 'c') &&
@@ -79,7 +79,7 @@ DSTATUS disk_status(BYTE pdrv) {
     return 0;
 }
 
-DRESULT disk_read(BYTE pdrv, BYTE *buff, LBA_t sector, UINT count) {
+DRESULT disk_read(BYTE pdrv, BYTE * buff, LBA_t sector, UINT count) {
     if (pdrv >= FF_VOLUMES || !host_fat_disk || !buff) return RES_NOTRDY;
     if (sector + count > HOST_FAT_SECTORS) return RES_PARERR;
     memcpy(buff, host_fat_disk + (size_t)sector * HOST_FAT_SECTOR_SIZE,
@@ -87,7 +87,7 @@ DRESULT disk_read(BYTE pdrv, BYTE *buff, LBA_t sector, UINT count) {
     return RES_OK;
 }
 
-DRESULT disk_write(BYTE pdrv, const BYTE *buff, LBA_t sector, UINT count) {
+DRESULT disk_write(BYTE pdrv, const BYTE * buff, LBA_t sector, UINT count) {
     if (pdrv >= FF_VOLUMES || !host_fat_disk || !buff) return RES_NOTRDY;
     if (sector + count > HOST_FAT_SECTORS) return RES_PARERR;
     memcpy(host_fat_disk + (size_t)sector * HOST_FAT_SECTOR_SIZE, buff,
@@ -95,23 +95,23 @@ DRESULT disk_write(BYTE pdrv, const BYTE *buff, LBA_t sector, UINT count) {
     return RES_OK;
 }
 
-DRESULT disk_ioctl(BYTE pdrv, BYTE cmd, void *buff) {
+DRESULT disk_ioctl(BYTE pdrv, BYTE cmd, void * buff) {
     if (pdrv >= FF_VOLUMES || !host_fat_disk) return RES_NOTRDY;
 
     switch (cmd) {
-        case CTRL_SYNC:
-            return RES_OK;
-        case GET_SECTOR_COUNT:
-            *(LBA_t *)buff = HOST_FAT_SECTORS;
-            return RES_OK;
-        case GET_SECTOR_SIZE:
-            *(WORD *)buff = HOST_FAT_SECTOR_SIZE;
-            return RES_OK;
-        case GET_BLOCK_SIZE:
-            *(DWORD *)buff = 1;
-            return RES_OK;
-        default:
-            return RES_PARERR;
+    case CTRL_SYNC:
+        return RES_OK;
+    case GET_SECTOR_COUNT:
+        *(LBA_t *)buff = HOST_FAT_SECTORS;
+        return RES_OK;
+    case GET_SECTOR_SIZE:
+        *(WORD *)buff = HOST_FAT_SECTOR_SIZE;
+        return RES_OK;
+    case GET_BLOCK_SIZE:
+        *(DWORD *)buff = 1;
+        return RES_OK;
+    default:
+        return RES_PARERR;
     }
 }
 

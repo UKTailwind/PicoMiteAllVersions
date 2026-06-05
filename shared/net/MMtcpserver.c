@@ -36,11 +36,11 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "shared/net/mm_net_transmit_cmd.h"
 #include "lwip/ip4_addr.h"
 #include "lwip/netif.h"
-bool optionsuppressstatus=0;
+bool optionsuppressstatus = 0;
 
 //#define //DEBUG_printf printf
 #define DEBUG_printf
-const char httpheadersfail[]="HTTP/1.0 404\r\n\r\n";
+const char httpheadersfail[] = "HTTP/1.0 404\r\n\r\n";
 jmp_buf recover;
 
 extern int pico_telnet_open(void);
@@ -52,7 +52,7 @@ extern void port_web_clear_runtime_state(void);
 
 static mm_net_tcp_service_t pico_tcp_server;
 static mm_net_tcp_service_slot_t pico_tcp_slots[MaxPcb];
-static uint8_t *pico_tcp_recv_buf[MaxPcb];
+static uint8_t * pico_tcp_recv_buf[MaxPcb];
 static char pico_tcp_path[MaxPcb][128];
 static int pico_tcp_server_inited;
 
@@ -80,30 +80,30 @@ int pico_tcp_server_request_pending(int pcb) {
     return mm_net_tcp_service_request_pending(&pico_tcp_server, pcb);
 }
 
-const char *pico_tcp_server_path(int pcb) {
+const char * pico_tcp_server_path(int pcb) {
     pico_tcp_server_service_init();
     return mm_net_tcp_service_path(&pico_tcp_server, pcb);
 }
 
-static int pico_http_send_cb(void *ctx, const void *buf, size_t len) {
+static int pico_http_send_cb(void * ctx, const void * buf, size_t len) {
     int pcb = *(int *)ctx;
     return mm_net_tcp_service_send(&pico_tcp_server, pcb, buf, len, 5000) ==
            HAL_NET_OK;
 }
 
-void cleanserver(void){
+void cleanserver(void) {
     port_web_clear_runtime_state();
 }
-void cmd_transmit(unsigned char *cmd){
+void cmd_transmit(unsigned char * cmd) {
     mm_net_transmit_args_t parsed;
-    if(!mm_net_transmit_parse(cmd, MaxPcb, &parsed)) error("Invalid option");
+    if (!mm_net_transmit_parse(cmd, MaxPcb, &parsed)) error("Invalid option");
     if (!mm_net_tcp_service_conn(&pico_tcp_server, parsed.pcb))
         error("Not connected");
-    if(parsed.kind == MM_NET_TRANSMIT_CODE){
+    if (parsed.kind == MM_NET_TRANSMIT_CODE) {
         int pcb = parsed.pcb;
-        int tlen=parsed.status;
-        if(setjmp(recover) != 0)error("Transmit failed");
-        const char *reason = mm_net_http_status_reason(tlen);
+        int tlen = parsed.status;
+        if (setjmp(recover) != 0) error("Transmit failed");
+        const char * reason = mm_net_http_status_reason(tlen);
         char body[96];
         int body_len = mm_net_http_format_status_body(body, sizeof body,
                                                       tlen, reason);
@@ -111,131 +111,132 @@ void cmd_transmit(unsigned char *cmd){
         if (mm_net_http_send_response(tlen, reason, "text/plain",
                                       body, (size_t)body_len, "CPi",
                                       pico_http_send_cb, &pcb) != 0) {
-                error("Transmit failed");
+            error("Transmit failed");
         }
         mm_net_tcp_service_close_slot(&pico_tcp_server, pcb);
         return;
     }
 
-    if(parsed.kind == MM_NET_TRANSMIT_FILE ||
-       parsed.kind == MM_NET_TRANSMIT_CSS ||
-       parsed.kind == MM_NET_TRANSMIT_JS ||
-       parsed.kind == MM_NET_TRANSMIT_IMAGE){
-        char *fname;
-        char *ctype;
+    if (parsed.kind == MM_NET_TRANSMIT_FILE ||
+        parsed.kind == MM_NET_TRANSMIT_CSS ||
+        parsed.kind == MM_NET_TRANSMIT_JS ||
+        parsed.kind == MM_NET_TRANSMIT_IMAGE) {
+        char * fname;
+        char * ctype;
         int pcb = parsed.pcb;
-        fname=(char *)parsed.filename;
-        ctype=(char *)parsed.content_type;
-        if(*fname == 0) error("Cannot find file");
-        if(setjmp(recover) != 0)error("Transmit failed");
+        fname = (char *)parsed.filename;
+        ctype = (char *)parsed.content_type;
+        if (*fname == 0) error("Cannot find file");
+        if (setjmp(recover) != 0) error("Transmit failed");
         int rc = mm_net_http_send_file(fname, ctype, "CPi",
                                        pico_http_send_cb, &pcb);
         if (rc == -1) {
-                mm_net_tcp_service_send(&pico_tcp_server, pcb, httpheadersfail,
-                                        strlen(httpheadersfail), 5000);
+            mm_net_tcp_service_send(&pico_tcp_server, pcb, httpheadersfail,
+                                    strlen(httpheadersfail), 5000);
         }
         mm_net_tcp_service_close_slot(&pico_tcp_server, pcb);
         return;
     }
-    if(parsed.kind == MM_NET_TRANSMIT_PAGE){
-        char *fname;
+    if (parsed.kind == MM_NET_TRANSMIT_PAGE) {
+        char * fname;
         int pcb = parsed.pcb;
-        fname=(char *)parsed.filename;
-        if(*fname == 0) error("Cannot find file");
-        char *rendered = NULL;
+        fname = (char *)parsed.filename;
+        if (*fname == 0) error("Cannot find file");
+        char * rendered = NULL;
         size_t rendered_len = 0;
         int rc = mm_net_http_render_page(fname, parsed.extra, &rendered, &rendered_len);
         if (rc == 0) {
-                if(setjmp(recover) != 0)error("Transmit failed");
-                if (mm_net_http_send_response(200, NULL, "text/html",
-                                              rendered, rendered_len, "CPi",
-                                              pico_http_send_cb,
-                                              &pcb) != 0) {
-                        FreeMemory((void *)rendered);
-                        error("Transmit failed");
-                }
+            if (setjmp(recover) != 0) error("Transmit failed");
+            if (mm_net_http_send_response(200, NULL, "text/html",
+                                          rendered, rendered_len, "CPi",
+                                          pico_http_send_cb,
+                                          &pcb) != 0) {
                 FreeMemory((void *)rendered);
+                error("Transmit failed");
+            }
+            FreeMemory((void *)rendered);
         } else {
-                mm_net_tcp_service_send(&pico_tcp_server, pcb, httpheadersfail,
-                                        strlen(httpheadersfail), 5000);
+            mm_net_tcp_service_send(&pico_tcp_server, pcb, httpheadersfail,
+                                    strlen(httpheadersfail), 5000);
         }
         mm_net_tcp_service_close_slot(&pico_tcp_server, pcb);
         return;
     }
     error("Invalid option");
 }
-int open_tcp_server(uint16_t port){
-        pico_tcp_server_service_init();
-        if(port && WIFIconnected && !optionsuppressstatus){
-                MMPrintString("Starting TCP server at ");
-                MMPrintString(ip4addr_ntoa(netif_ip4_addr(netif_list)));
-                MMPrintString(" on port ");
-                PInt(port);PRet();
-        }
-        if (port && !mm_net_tcp_service_open(&pico_tcp_server, port, MaxPcb)) {
-                MMPrintString("Failed to create TCP server\r\n");
-                return 0;
-        }
-        return 1;
+int open_tcp_server(uint16_t port) {
+    pico_tcp_server_service_init();
+    if (port && WIFIconnected && !optionsuppressstatus) {
+        MMPrintString("Starting TCP server at ");
+        MMPrintString(ip4addr_ntoa(netif_ip4_addr(netif_list)));
+        MMPrintString(" on port ");
+        PInt(port);
+        PRet();
+    }
+    if (port && !mm_net_tcp_service_open(&pico_tcp_server, port, MaxPcb)) {
+        MMPrintString("Failed to create TCP server\r\n");
+        return 0;
+    }
+    return 1;
 }
 
-void close_tcp_server(void){
-        pico_tcp_server_service_init();
-        mm_net_tcp_service_stop(&pico_tcp_server);
+void close_tcp_server(void) {
+    pico_tcp_server_service_init();
+    mm_net_tcp_service_stop(&pico_tcp_server);
 }
 
 static void pico_lifecycle_clear_tcp_requests(void) {
-        if (!pico_tcp_server_inited) return;
-        mm_net_tcp_service_clear_requests(&pico_tcp_server);
+    if (!pico_tcp_server_inited) return;
+    mm_net_tcp_service_clear_requests(&pico_tcp_server);
 }
 
-int cmd_tcpserver(void){
-    unsigned char *tp;
-            tp=checkstring(cmdline, (unsigned char *)"TCP INTERRUPT");
-        if(tp){
-                TCPreceiveInterrupt=mm_net_tcp_server_parse_interrupt(tp);
-                InterruptUsed=true;
-                TCPreceived=0;
-                return 1;
-        }
-        tp=checkstring(cmdline, (unsigned char *)"TCP CLOSE");
-        if(tp){
-                mm_net_tcp_server_slot_args_t parsed;
-                mm_net_tcp_server_parse_slot(tp, MaxPcb, &parsed);
-                mm_net_tcp_service_close_slot(&pico_tcp_server, parsed.pcb);
-                return 1;
-        }
-        tp=checkstring(cmdline, (unsigned char *)"TRANSMIT");
-        if(tp){
-                cmd_transmit(tp);
+int cmd_tcpserver(void) {
+    unsigned char * tp;
+    tp = checkstring(cmdline, (unsigned char *)"TCP INTERRUPT");
+    if (tp) {
+        TCPreceiveInterrupt = mm_net_tcp_server_parse_interrupt(tp);
+        InterruptUsed = true;
+        TCPreceived = 0;
+        return 1;
+    }
+    tp = checkstring(cmdline, (unsigned char *)"TCP CLOSE");
+    if (tp) {
+        mm_net_tcp_server_slot_args_t parsed;
+        mm_net_tcp_server_parse_slot(tp, MaxPcb, &parsed);
+        mm_net_tcp_service_close_slot(&pico_tcp_server, parsed.pcb);
+        return 1;
+    }
+    tp = checkstring(cmdline, (unsigned char *)"TRANSMIT");
+    if (tp) {
+        cmd_transmit(tp);
 
-                return 1;
-        }
+        return 1;
+    }
 
-        tp=checkstring(cmdline, (unsigned char *)"TCP READ");
-        if(tp){
-                mm_net_tcp_server_read_args_t parsed;
-                mm_net_tcp_server_parse_read(tp, MaxPcb, &parsed);
-                int rc = mm_net_tcp_service_read(&pico_tcp_server, parsed.pcb,
-                                                 parsed.dest, parsed.buffer,
-                                                 (size_t)parsed.payload_capacity,
-                                                 (size_t)parsed.array_bytes);
-                if (rc == HAL_NET_WOULD_BLOCK) return 1;
-                if (rc != HAL_NET_OK) error("array too small");
-                return 1;
-        }
-        tp=checkstring(cmdline, (unsigned char *)"TCP SEND");
-        if(tp){
-                mm_net_tcp_server_send_args_t parsed;
-                mm_net_tcp_server_parse_send(tp, MaxPcb, &parsed);
-                if (mm_net_tcp_service_send(&pico_tcp_server, parsed.pcb,
-                                            parsed.payload,
-                                            parsed.payload_len, 5000) !=
-                    HAL_NET_OK)
-                        error("write failed");
-                return 1;
-        }
-        return 0;
+    tp = checkstring(cmdline, (unsigned char *)"TCP READ");
+    if (tp) {
+        mm_net_tcp_server_read_args_t parsed;
+        mm_net_tcp_server_parse_read(tp, MaxPcb, &parsed);
+        int rc = mm_net_tcp_service_read(&pico_tcp_server, parsed.pcb,
+                                         parsed.dest, parsed.buffer,
+                                         (size_t)parsed.payload_capacity,
+                                         (size_t)parsed.array_bytes);
+        if (rc == HAL_NET_WOULD_BLOCK) return 1;
+        if (rc != HAL_NET_OK) error("array too small");
+        return 1;
+    }
+    tp = checkstring(cmdline, (unsigned char *)"TCP SEND");
+    if (tp) {
+        mm_net_tcp_server_send_args_t parsed;
+        mm_net_tcp_server_parse_send(tp, MaxPcb, &parsed);
+        if (mm_net_tcp_service_send(&pico_tcp_server, parsed.pcb,
+                                    parsed.payload,
+                                    parsed.payload_len, 5000) !=
+            HAL_NET_OK)
+            error("write failed");
+        return 1;
+    }
+    return 0;
 }
 
 /* 3D sprite-builder teardown: real implementation lives in

@@ -26,9 +26,9 @@
 #include "shared/audio/audio_runtime.h"
 
 /* Provided by esp32_console.c. */
-extern void esp32_console_write_bytes(const char *text, int len);
-extern int  esp32_console_read_byte_nonblock(void);
-extern int  esp32_console_read_byte_blocking_ms(int ms);
+extern void esp32_console_write_bytes(const char * text, int len);
+extern int esp32_console_read_byte_nonblock(void);
+extern int esp32_console_read_byte_blocking_ms(int ms);
 extern void esp32_console_push_back_byte(int c);
 
 volatile int esp32_console_display_rendering;
@@ -83,7 +83,9 @@ void putConsole(int c, int flush) {
 // telnet at end-of-bulk when console_adapter->telnet_putc is plugged —
 // ESP32 deliberately leaves it NULL.
 
-void myprintf(char *s) { MMPrintString(s); }
+void myprintf(char * s) {
+    MMPrintString(s);
+}
 
 static int esp32_console_ring_pop(void) {
     if (ConsoleRxBufHead == ConsoleRxBufTail) return -1;
@@ -166,7 +168,7 @@ int MMInkey(void) {
      * (USB stdin + telnet ring buffer) need escape-sequence assembly.
      * esp32_decode_escape_sequence drains continuation bytes from whichever
      * source they arrived on. */
-    if (from_web) return c;  /* web console delivers pre-decoded key codes */
+    if (from_web) return c; /* web console delivers pre-decoded key codes */
     if (c == 0x1b) return mmbasic_escdecode_run(esp32_escdecode_read_byte_ms);
     return mmbasic_console_normalise_byte(c);
 }
@@ -192,7 +194,7 @@ int MMgetchar(void) {
         if (c < 0) c = esp32_console_read_byte_blocking_ms(1);
     } while (c < 0);
     ShowCursor(0);
-    if (from_web) return c;  /* web console delivers pre-decoded key codes */
+    if (from_web) return c; /* web console delivers pre-decoded key codes */
     if (c == 0x1b) return mmbasic_escdecode_run(esp32_escdecode_read_byte_ms);
     return mmbasic_console_normalise_byte(c);
 }
@@ -204,10 +206,10 @@ int MMgetchar(void) {
  * from configuration.h via HAL_PORT_CONSOLE_RX_BUF_SIZE; TX has its own
  * fixed CONSOLE_TX_BUF_SIZE. */
 volatile char ConsoleRxBuf[CONSOLE_RX_BUF_SIZE] = {0};
-volatile int  ConsoleRxBufHead = 0;
-volatile int  ConsoleRxBufTail = 0;
-volatile int  ConsoleTxBufHead = 0;
-volatile int  ConsoleTxBufTail = 0;
+volatile int ConsoleRxBufHead = 0;
+volatile int ConsoleRxBufTail = 0;
+volatile int ConsoleTxBufHead = 0;
+volatile int ConsoleTxBufTail = 0;
 
 /* MMgetline — read a line into p, stripping CR / expanding TAB / honouring
  * MAXSTRLEN. Body lifted from host_runtime.c. Routes through FileIO's

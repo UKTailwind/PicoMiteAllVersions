@@ -35,8 +35,8 @@
 #include "synth_pcm.h"
 #include "audio_play_common.h"
 
-#define AUDIO_RATE        HAL_PORT_AUDIO_SAMPLE_RATE
-#define FRAMES_PER_CHUNK  256                       /* stereo frames per write */
+#define AUDIO_RATE HAL_PORT_AUDIO_SAMPLE_RATE
+#define FRAMES_PER_CHUNK 256 /* stereo frames per write */
 
 typedef enum {
     AUDIO_BACKEND_NONE = 0,
@@ -48,17 +48,17 @@ typedef enum {
 extern volatile e_CurrentlyPlaying CurrentlyPlaying;
 extern volatile bool WAVcomplete;
 
-static const char *TAG = "mmaudio";
+static const char * TAG = "mmaudio";
 
 static i2s_chan_handle_t s_tx;
-static TaskHandle_t      s_task;
-static volatile uint64_t s_tone_frames;   /* remaining TONE frames; UINT64_MAX = forever */
-static volatile bool     s_tone_finite;
-static volatile bool     s_tone_completion_reported;
-static portMUX_TYPE      s_tone_mux = portMUX_INITIALIZER_UNLOCKED;
-static _Atomic bool      s_paused;
-static volatile bool     s_ready;
-static audio_backend_t   s_backend;
+static TaskHandle_t s_task;
+static volatile uint64_t s_tone_frames; /* remaining TONE frames; UINT64_MAX = forever */
+static volatile bool s_tone_finite;
+static volatile bool s_tone_completion_reported;
+static portMUX_TYPE s_tone_mux = portMUX_INITIALIZER_UNLOCKED;
+static _Atomic bool s_paused;
+static volatile bool s_ready;
+static audio_backend_t s_backend;
 
 /* Audio-DMA channel globals referenced by core SOUND/ADC bookkeeping.
  * The shared synth path does not use them, but the symbols must exist. */
@@ -72,23 +72,23 @@ bool dmarunning = 0;
  * (audio_task) ring of 16-bit stereo frames in PSRAM. Free-running 32-bit
  * head/tail counters publish frame availability; the stream mux only
  * protects reset/session changes and single-frame consumer claims. */
-#define SAMPLE_RING_FRAMES 32768u            /* 128 KB in PSRAM, ~0.74s @ 44.1k */
-static int16_t          *s_ring;             /* SAMPLE_RING_FRAMES * 2 int16 */
-static _Atomic uint32_t  s_ring_head, s_ring_tail;
-static _Atomic uint32_t  s_stream_inflight_frames;
-static _Atomic uint32_t  s_stream_drain_frames;
-static _Atomic uint32_t  s_stream_tail_hold_until;
-static _Atomic bool      s_stream_eof_seen;
-static _Atomic uint32_t  s_stream_generation;
-static _Atomic int       s_stream_rate;
-static portMUX_TYPE      s_stream_mux = portMUX_INITIALIZER_UNLOCKED;
+#define SAMPLE_RING_FRAMES 32768u /* 128 KB in PSRAM, ~0.74s @ 44.1k */
+static int16_t * s_ring;          /* SAMPLE_RING_FRAMES * 2 int16 */
+static _Atomic uint32_t s_ring_head, s_ring_tail;
+static _Atomic uint32_t s_stream_inflight_frames;
+static _Atomic uint32_t s_stream_drain_frames;
+static _Atomic uint32_t s_stream_tail_hold_until;
+static _Atomic bool s_stream_eof_seen;
+static _Atomic uint32_t s_stream_generation;
+static _Atomic int s_stream_rate;
+static portMUX_TYPE s_stream_mux = portMUX_INITIALIZER_UNLOCKED;
 
 static int is_file_mode(int m) {
     return m == P_WAV || m == P_FLAC || m == P_MP3 ||
            m == P_MOD || m == P_ARRAY || m == P_STREAM;
 }
 
-static _Atomic int s_pending_rate;   /* requested by sample_begin/end */
+static _Atomic int s_pending_rate; /* requested by sample_begin/end */
 
 static int default_audio_rate(void) {
     return AUDIO_RATE;
@@ -110,7 +110,7 @@ static uint32_t stream_count_clamped(uint32_t head, uint32_t tail) {
     return count > SAMPLE_RING_FRAMES ? SAMPLE_RING_FRAMES : count;
 }
 
-static bool stream_load_stable_counters(uint32_t *head, uint32_t *tail) {
+static bool stream_load_stable_counters(uint32_t * head, uint32_t * tail) {
     uint32_t gen = atomic_load_explicit(&s_stream_generation, memory_order_acquire);
     if (gen & 1u) return false;
     *head = atomic_load_explicit(&s_ring_head, memory_order_acquire);
@@ -130,7 +130,7 @@ static uint32_t stream_space_frames(void) {
 
 static bool stream_generation_active(uint32_t generation) {
     return !(generation & 1u) &&
-        atomic_load_explicit(&s_stream_generation, memory_order_acquire) == generation;
+           atomic_load_explicit(&s_stream_generation, memory_order_acquire) == generation;
 }
 
 static void stream_reset_state(void) {
@@ -146,7 +146,7 @@ static void stream_reset_state(void) {
     portEXIT_CRITICAL(&s_stream_mux);
 }
 
-static bool stream_pop_frame(uint32_t generation, int16_t *left, int16_t *right) {
+static bool stream_pop_frame(uint32_t generation, int16_t * left, int16_t * right) {
     bool popped = false;
     portENTER_CRITICAL(&s_stream_mux);
     if (!stream_generation_active(generation)) {
@@ -269,7 +269,7 @@ static void apply_pending_rate(void) {
 }
 
 int hal_audio_sample_begin(int sample_rate_hz) {
-    hal_audio_init();                        /* ensure I2S + task are up */
+    hal_audio_init(); /* ensure I2S + task are up */
     if (s_backend == AUDIO_BACKEND_NONE) return -1;
     atomic_store_explicit(&s_paused, false, memory_order_release);
     if (!s_ring) {
@@ -285,7 +285,7 @@ int hal_audio_sample_begin(int sample_rate_hz) {
 
 void hal_audio_sample_end(void) {
     stream_reset_state();
-    stream_set_rate(default_audio_rate());   /* restore the synth rate */
+    stream_set_rate(default_audio_rate()); /* restore the synth rate */
 }
 
 void hal_audio_sample_eof(void) {
@@ -313,17 +313,19 @@ int hal_audio_sample_queued(void) {
 /* Decoder + MOD-file working memory from PSRAM (the 36 KB internal heap
  * is too small for MP3/FLAC/MOD); falls back to internal heap if PSRAM is
  * unavailable. */
-void *hal_audio_workmem_alloc(unsigned long bytes) {
-    void *p = heap_caps_malloc((size_t)bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+void * hal_audio_workmem_alloc(unsigned long bytes) {
+    void * p = heap_caps_malloc((size_t)bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     return p ? p : malloc((size_t)bytes);
 }
-void *hal_audio_workmem_realloc(void *p, unsigned long bytes) {
-    void *n = heap_caps_realloc(p, (size_t)bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+void * hal_audio_workmem_realloc(void * p, unsigned long bytes) {
+    void * n = heap_caps_realloc(p, (size_t)bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     return n ? n : realloc(p, (size_t)bytes);
 }
-void hal_audio_workmem_free(void *p) { heap_caps_free(p); }
+void hal_audio_workmem_free(void * p) {
+    heap_caps_free(p);
+}
 
-int hal_audio_sample_push(const int16_t *frames, int frame_count) {
+int hal_audio_sample_push(const int16_t * frames, int frame_count) {
     if (!s_ring || frame_count <= 0) return 0;
     uint32_t generation = atomic_load_explicit(&s_stream_generation, memory_order_acquire);
     if (generation & 1u) return 0;
@@ -334,7 +336,7 @@ int hal_audio_sample_push(const int16_t *frames, int frame_count) {
     uint32_t next_head = head;
     for (int i = 0; i < frame_count; i++) {
         uint32_t idx = (next_head & (SAMPLE_RING_FRAMES - 1u)) * 2u;
-        s_ring[idx]     = frames[2 * i];
+        s_ring[idx] = frames[2 * i];
         s_ring[idx + 1] = frames[2 * i + 1];
         next_head++;
     }
@@ -348,7 +350,7 @@ int hal_audio_sample_push(const int16_t *frames, int frame_count) {
     return frame_count;
 }
 
-int hal_audio_sample_acquire(int16_t **frames, int *frame_capacity) {
+int hal_audio_sample_acquire(int16_t ** frames, int * frame_capacity) {
     (void)frames;
     (void)frame_capacity;
     return 0;
@@ -359,17 +361,35 @@ void hal_audio_sample_commit(int frame_count) {
 }
 
 /* Map a PLAY SOUND waveform letter to its synth wavetable. */
-static const unsigned short *audio_table_for(char type) {
+static const unsigned short * audio_table_for(char type) {
     switch (type) {
-        case 'O': case 'o': return nulltable;
-        case 'Q': case 'q': return squaretable;
-        case 'T': case 't': return triangletable;
-        case 'W': case 'w': return sawtable;
-        case 'S': case 's': return SineTable;
-        case 'P': case 'p': setnoise(); return noisetable;
-        case 'N': case 'n': return whitenoise;
-        case 'U': case 'u': return usertable;
-        default:            return NULL;
+    case 'O':
+    case 'o':
+        return nulltable;
+    case 'Q':
+    case 'q':
+        return squaretable;
+    case 'T':
+    case 't':
+        return triangletable;
+    case 'W':
+    case 'w':
+        return sawtable;
+    case 'S':
+    case 's':
+        return SineTable;
+    case 'P':
+    case 'p':
+        setnoise();
+        return noisetable;
+    case 'N':
+    case 'n':
+        return whitenoise;
+    case 'U':
+    case 'u':
+        return usertable;
+    default:
+        return NULL;
     }
 }
 
@@ -397,7 +417,7 @@ static void tone_publish_completion_if_done(void) {
     portEXIT_CRITICAL(&s_tone_mux);
 }
 
-static void render_frame(int mode, int16_t *left, int16_t *right) {
+static void render_frame(int mode, int16_t * left, int16_t * right) {
     if (mode == P_TONE) {
         int32_t l, r;
         if (!tone_claim_frame()) {
@@ -419,14 +439,14 @@ static void render_frame(int mode, int16_t *left, int16_t *right) {
     *left = *right = 0;
 }
 
-static void audio_task(void *arg) {
+static void audio_task(void * arg) {
     (void)arg;
     int16_t buf[FRAMES_PER_CHUNK * 2];
     for (;;) {
-        apply_pending_rate();          /* safe rate switch between writes */
+        apply_pending_rate(); /* safe rate switch between writes */
         int mode = atomic_load_explicit(&s_paused, memory_order_acquire)
-            ? P_NOTHING
-            : (int)CurrentlyPlaying;
+                       ? P_NOTHING
+                       : (int)CurrentlyPlaying;
         if (s_backend != AUDIO_BACKEND_I2S && s_backend != AUDIO_BACKEND_PDM) {
             vTaskDelay(pdMS_TO_TICKS(20));
             continue;
@@ -485,10 +505,10 @@ void hal_audio_init(void) {
     /* All SOUND slots start silent; the synth dereferences the table
      * pointer per frame, so every slot must point at nulltable. */
     for (i = 0; i < MAXSOUNDS; i++) {
-        sound_mode_left[i]  = (unsigned short *)nulltable;
+        sound_mode_left[i] = (unsigned short *)nulltable;
         sound_mode_right[i] = (unsigned short *)nulltable;
         sound_PhaseAC_left[i] = sound_PhaseAC_right[i] = 0.0f;
-        sound_PhaseM_left[i]  = sound_PhaseM_right[i]  = 0.0f;
+        sound_PhaseM_left[i] = sound_PhaseM_right[i] = 0.0f;
     }
 
     if (s_backend == AUDIO_BACKEND_I2S) {
@@ -501,16 +521,16 @@ void hal_audio_init(void) {
             return;
         }
         i2s_std_config_t std_cfg = {
-            .clk_cfg  = I2S_STD_CLK_DEFAULT_CONFIG(default_rate),
+            .clk_cfg = I2S_STD_CLK_DEFAULT_CONFIG(default_rate),
             .slot_cfg = I2S_STD_PHILIPS_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_16BIT,
                                                             I2S_SLOT_MODE_STEREO),
             .gpio_cfg = {
                 .mclk = I2S_GPIO_UNUSED,
                 .bclk = bclk_gpio,
-                .ws   = ws_gpio,
+                .ws = ws_gpio,
                 .dout = data_gpio,
-                .din  = I2S_GPIO_UNUSED,
-                .invert_flags = { .mclk_inv = false, .bclk_inv = false, .ws_inv = false },
+                .din = I2S_GPIO_UNUSED,
+                .invert_flags = {.mclk_inv = false, .bclk_inv = false, .ws_inv = false},
             },
         };
         if (i2s_channel_init_std_mode(s_tx, &std_cfg) != ESP_OK) {
@@ -527,7 +547,7 @@ void hal_audio_init(void) {
             return;
         }
         i2s_pdm_tx_config_t pdm_cfg = {
-            .clk_cfg  = I2S_PDM_TX_CLK_DAC_DEFAULT_CONFIG(default_rate),
+            .clk_cfg = I2S_PDM_TX_CLK_DAC_DEFAULT_CONFIG(default_rate),
             .slot_cfg = I2S_PDM_TX_SLOT_DAC_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_16BIT,
                                                            I2S_SLOT_MODE_STEREO),
             .gpio_cfg = {
@@ -536,7 +556,7 @@ void hal_audio_init(void) {
 #if SOC_I2S_PDM_MAX_TX_LINES > 1
                 .dout2 = right_gpio,
 #endif
-                .invert_flags = { .clk_inv = false },
+                .invert_flags = {.clk_inv = false},
             },
         };
         if (i2s_channel_init_pdm_tx_mode(s_tx, &pdm_cfg) != ESP_OK) {
@@ -545,7 +565,7 @@ void hal_audio_init(void) {
         }
         i2s_channel_enable(s_tx);
     }
-    atomic_store_explicit(&s_stream_rate, default_rate, memory_order_release);  /* channel starts at the synth rate */
+    atomic_store_explicit(&s_stream_rate, default_rate, memory_order_release); /* channel starts at the synth rate */
     atomic_store_explicit(&s_pending_rate, default_rate, memory_order_release);
 
     if (xTaskCreate(audio_task, "mmaudio", 4096, NULL, 5, &s_task) != pdPASS) {
@@ -561,17 +581,17 @@ void hal_audio_tone(double left_hz, double right_hz,
     atomic_store_explicit(&s_paused, false, memory_order_release);
     int rate = active_audio_rate();
     mono = (left_hz == right_hz && vol_left == vol_right) ? 1 : 0;
-    PhaseM_left  = (float)(left_hz  / (double)rate * 4096.0);
+    PhaseM_left = (float)(left_hz / (double)rate * 4096.0);
     PhaseM_right = (float)(right_hz / (double)rate * 4096.0);
-    if (CurrentlyPlaying != P_TONE) {          /* fresh start: reset phase */
+    if (CurrentlyPlaying != P_TONE) { /* fresh start: reset phase */
         PhaseAC_left = 0.0f;
         PhaseAC_right = 0.0f;
     }
     portENTER_CRITICAL(&s_tone_mux);
     s_tone_completion_reported = true;
     s_tone_frames = has_duration
-        ? (uint64_t)((double)duration_ms / 1000.0 * (double)rate)
-        : UINT64_MAX;
+                        ? (uint64_t)((double)duration_ms / 1000.0 * (double)rate)
+                        : UINT64_MAX;
     s_tone_finite = has_duration;
     s_tone_completion_reported = !has_duration;
     portEXIT_CRITICAL(&s_tone_mux);
@@ -582,19 +602,19 @@ int hal_audio_tone_interrupt_supported(void) {
     return s_ready && (s_backend == AUDIO_BACKEND_I2S || s_backend == AUDIO_BACKEND_PDM);
 }
 
-void hal_audio_sound(int slot, const char *ch, const char *type,
+void hal_audio_sound(int slot, const char * ch, const char * type,
                      double freq_hz, int volume) {
     int channel = slot - 1;
     if (channel < 0 || channel >= MAXSOUNDS) return;
-    const unsigned short *tbl = audio_table_for(type[0]);
+    const unsigned short * tbl = audio_table_for(type[0]);
     if (!tbl) return;
 
     hal_audio_init();
     atomic_store_explicit(&s_paused, false, memory_order_release);
     int rate = active_audio_rate();
 
-    int left  = (ch[0] == 'L' || ch[0] == 'l' || ch[0] == 'B' || ch[0] == 'b' ||
-                 ch[0] == 'M' || ch[0] == 'm');
+    int left = (ch[0] == 'L' || ch[0] == 'l' || ch[0] == 'B' || ch[0] == 'b' ||
+                ch[0] == 'M' || ch[0] == 'm');
     int right = (ch[0] == 'R' || ch[0] == 'r' || ch[0] == 'B' || ch[0] == 'b' ||
                  ch[0] == 'M' || ch[0] == 'm');
 
@@ -630,7 +650,7 @@ void hal_audio_stop(void) {
     s_tone_completion_reported = true;
     portEXIT_CRITICAL(&s_tone_mux);
     for (i = 0; i < MAXSOUNDS; i++) {
-        sound_mode_left[i]  = (unsigned short *)nulltable;
+        sound_mode_left[i] = (unsigned short *)nulltable;
         sound_mode_right[i] = (unsigned short *)nulltable;
     }
 }
@@ -641,5 +661,9 @@ void hal_audio_volume(int left_pct, int right_pct) {
     if (CurrentlyPlaying == P_TONE && vol_left != vol_right) mono = 0;
 }
 
-void hal_audio_pause(void)  { atomic_store_explicit(&s_paused, true, memory_order_release); }
-void hal_audio_resume(void) { atomic_store_explicit(&s_paused, false, memory_order_release); }
+void hal_audio_pause(void) {
+    atomic_store_explicit(&s_paused, true, memory_order_release);
+}
+void hal_audio_resume(void) {
+    atomic_store_explicit(&s_paused, false, memory_order_release);
+}

@@ -55,9 +55,9 @@ static volatile bool dispatch_installed = false;
 
 static void __not_in_flash_func(pico_gpio_irq_dispatch)(void) {
     uint64_t mask = pico_gpio_registered_mask;
-    io_bank0_irq_ctrl_hw_t *ctrl = get_core_num()
-        ? &io_bank0_hw->proc1_irq_ctrl
-        : &io_bank0_hw->proc0_irq_ctrl;
+    io_bank0_irq_ctrl_hw_t * ctrl = get_core_num()
+                                        ? &io_bank0_hw->proc1_irq_ctrl
+                                        : &io_bank0_hw->proc0_irq_ctrl;
     for (uint gpio = 0; gpio < NUM_BANK0_GPIOS; gpio += 8) {
         uint32_t events8 = ctrl->ints[gpio >> 3u];
         for (uint i = gpio; events8 && i < gpio + 8; i++) {
@@ -91,8 +91,10 @@ void __not_in_flash_func(pico_gpio_irq_set_enabled)(unsigned int gpio,
      * ack/dispatch vs. what to leave for other handlers. Update is
      * atomic wrt. IRQs via the save_and_disable guard. */
     uint32_t save = save_and_disable_interrupts();
-    if (enabled) pico_gpio_registered_mask |=  (1ull << gpio);
-    else         pico_gpio_registered_mask &= ~(1ull << gpio);
+    if (enabled)
+        pico_gpio_registered_mask |= (1ull << gpio);
+    else
+        pico_gpio_registered_mask &= ~(1ull << gpio);
     restore_interrupts(save);
 
     gpio_set_irq_enabled(gpio, events, enabled);

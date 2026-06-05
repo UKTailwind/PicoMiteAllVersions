@@ -18,9 +18,11 @@
 #include "hal/hal_editor_console.h"
 #include "hal/hal_keyboard.h"
 
-void ScrollLCDSPISCR(int lines) { (void)lines; }
+void ScrollLCDSPISCR(int lines) {
+    (void)lines;
+}
 
-void hal_editor_tile_save(int xt, int yt, uint16_t *fc_out, uint16_t *bc_out) {
+void hal_editor_tile_save(int xt, int yt, uint16_t * fc_out, uint16_t * bc_out) {
     if (fc_out) *fc_out = tilefcols[yt * X_TILE + xt];
     if (bc_out) *bc_out = tilebcols[yt * X_TILE + xt];
 }
@@ -90,9 +92,9 @@ extern int editactive;
 extern void ResetDisplay(void);
 extern void MX470Display(int fn);
 extern void PrintStatus(void);
-extern void PositionCursor(unsigned char *curp);
+extern void PositionCursor(unsigned char * curp);
 
-void hal_editor_display_enter(hal_editor_display_state_t *st) {
+void hal_editor_display_enter(hal_editor_display_state_t * st) {
     st->modmode = 0;
     st->oldmode = DISPLAY_TYPE;
     st->oldfont = PromptFont;
@@ -116,7 +118,7 @@ void hal_editor_display_enter(hal_editor_display_state_t *st) {
     if (VRes % ytileheight) Y_TILE++;
 }
 
-void hal_editor_display_exit(const hal_editor_display_state_t *st) {
+void hal_editor_display_exit(const hal_editor_display_state_t * st) {
     Y_TILE = st->Y_TILE_save;
     ytileheight = st->ytileheight_save;
     if (st->modmode) {
@@ -124,7 +126,7 @@ void hal_editor_display_exit(const hal_editor_display_state_t *st) {
         ResetDisplay();
         SetFont(st->oldfont);
         PromptFont = st->oldfont;
-        MX470Display(1);   /* DISPLAY_CLS == 1 */
+        MX470Display(1); /* DISPLAY_CLS == 1 */
     }
 }
 
@@ -144,8 +146,8 @@ static short s_lastx1 = 9999, s_lasty1 = 9999;
 static uint16_t s_lastfc, s_lastbc;
 static bool s_leftpushed = false, s_rightpushed = false, s_middlepushed = false;
 
-extern unsigned char *txtp;
-extern unsigned char *EdBuff;
+extern unsigned char * txtp;
+extern unsigned char * EdBuff;
 extern int curx, cury;
 extern int VWidth, VHeight;
 
@@ -167,16 +169,19 @@ static void mouse_track_and_highlight(int fontinc) {
     }
 }
 
-int hal_editor_mouse_main_pump(int fontinc, int *c_inout) {
+int hal_editor_mouse_main_pump(int fontinc, int * c_inout) {
     if (!hal_keyboard_external_mouse_active() || DISPLAY_TYPE != SCREENMODE1)
         return 1;
     mouse_track_and_highlight(fontinc);
     if ((nunstruct[2].L && !s_leftpushed && !s_rightpushed && !s_middlepushed) ||
         (nunstruct[2].R && !s_leftpushed && !s_rightpushed && !s_middlepushed) ||
         (nunstruct[2].C && !s_leftpushed && !s_rightpushed && !s_middlepushed)) {
-        if (nunstruct[2].L) s_leftpushed = true;
-        else if (nunstruct[2].R) s_rightpushed = true;
-        else s_middlepushed = true;
+        if (nunstruct[2].L)
+            s_leftpushed = true;
+        else if (nunstruct[2].R)
+            s_rightpushed = true;
+        else
+            s_middlepushed = true;
         if (s_lastx1 >= 0 && s_lastx1 < VWidth && s_lasty1 >= 0 && s_lasty1 < VHeight) {
             ShowCursor(false);
             while (*txtp != 0 && s_lasty1 > cury)
@@ -191,24 +196,32 @@ int hal_editor_mouse_main_pump(int fontinc, int *c_inout) {
             hal_editor_tile_paint_saved(s_lastx1 * fontinc, (s_lastx1 + 1) * fontinc,
                                         s_lasty1, s_lastfc, s_lastbc);
         }
-        if (s_rightpushed)       { *c_inout = F4; return 0; }
-        else if (s_middlepushed) { *c_inout = F5; return 0; }
+        if (s_rightpushed) {
+            *c_inout = F4;
+            return 0;
+        } else if (s_middlepushed) {
+            *c_inout = F5;
+            return 0;
+        }
     }
     return 1;
 }
 
-int hal_editor_mouse_mark_pump(int fontinc, int *c_inout, unsigned char **mark_io) {
+int hal_editor_mouse_mark_pump(int fontinc, int * c_inout, unsigned char ** mark_io) {
     if (!hal_keyboard_external_mouse_active() || DISPLAY_TYPE != SCREENMODE1)
         return 1;
     mouse_track_and_highlight(fontinc);
     if ((nunstruct[2].L && !s_leftpushed && !s_rightpushed && !s_middlepushed) ||
         (nunstruct[2].R && !s_leftpushed && !s_rightpushed && !s_middlepushed) ||
         (nunstruct[2].C && !s_leftpushed && !s_rightpushed && !s_middlepushed)) {
-        if (nunstruct[2].L) s_leftpushed = true;
-        else if (nunstruct[2].R) s_rightpushed = true;
-        else s_middlepushed = true;
+        if (nunstruct[2].L)
+            s_leftpushed = true;
+        else if (nunstruct[2].R)
+            s_rightpushed = true;
+        else
+            s_middlepushed = true;
         if (s_lastx1 >= 0 && s_lastx1 < VWidth && s_lasty1 >= 0 && s_lasty1 < VHeight) {
-            unsigned char *p = txtp;
+            unsigned char * p = txtp;
             while (*p != 0 && s_lasty1 > cury)
                 if (*p++ == '\n') cury++;
             while (p != EdBuff && s_lasty1 < cury)
@@ -218,9 +231,18 @@ int hal_editor_mouse_mark_pump(int fontinc, int *c_inout, unsigned char **mark_i
             PositionCursor(p);
             *mark_io = p;
         }
-        if (s_rightpushed)       { *c_inout = F4;   return 0; }
-        if (s_middlepushed)      { *c_inout = F5;   return 0; }
-        if (s_leftpushed)        { *c_inout = 9999; return 0; }
+        if (s_rightpushed) {
+            *c_inout = F4;
+            return 0;
+        }
+        if (s_middlepushed) {
+            *c_inout = F5;
+            return 0;
+        }
+        if (s_leftpushed) {
+            *c_inout = 9999;
+            return 0;
+        }
     }
     return 1;
 }

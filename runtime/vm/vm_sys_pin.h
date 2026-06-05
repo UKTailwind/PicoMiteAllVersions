@@ -54,7 +54,7 @@ void vm_sys_pwm_configure(int slice, MMFLOAT frequency,
                           int has_duty1, MMFLOAT duty1,
                           int has_duty2, MMFLOAT duty2,
                           int phase_correct, int delaystart);
-void vm_sys_pwm_sync(uint16_t present_mask, const MMFLOAT *counts);
+void vm_sys_pwm_sync(uint16_t present_mask, const MMFLOAT * counts);
 void vm_sys_pwm_off(int slice);
 void vm_sys_servo_configure(int slice,
                             int has_pos1, MMFLOAT pos1,

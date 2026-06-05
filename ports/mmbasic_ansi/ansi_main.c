@@ -29,7 +29,7 @@
  * Windows, host_platform.h's <io.h> pre-include already declares
  * getcwd (with a slightly different signature), so skip it. */
 #ifndef _WIN32
-char *getcwd(char *buf, size_t size);
+char * getcwd(char * buf, size_t size);
 #endif
 
 #include "MMBasic_Includes.h"
@@ -53,10 +53,10 @@ extern jmp_buf mark;
 
 /* host_native symbols we rely on. */
 extern void host_runtime_finish(void);
-extern void host_runtime_configure(int timeout_ms, const char *screenshot_path);
-extern void host_runtime_configure_keys(const char *keys, int delay_ms);
-extern int  host_repl_mode;
-extern const char *host_sd_root;
+extern void host_runtime_configure(int timeout_ms, const char * screenshot_path);
+extern void host_runtime_configure_keys(const char * keys, int delay_ms);
+extern int host_repl_mode;
+extern const char * host_sd_root;
 extern void MMBasic_PrintBanner(void);
 extern unsigned char OptionConsole;
 extern short gui_font_width, gui_font_height;
@@ -66,15 +66,15 @@ extern void (*host_runtime_poll_hook)(void);
 /* Framebuffer backing for programs loaded into ProgMemory. Mirrors
  * host_main.c's flash_prog_buf — first half zeroed (program), second
  * half 0xFF (erased flash). */
-extern const uint8_t *flash_progmemory;
+extern const uint8_t * flash_progmemory;
 uint8_t flash_prog_buf[2 * MAX_PROG_SIZE];
 
 extern void vm_host_fat_reset(void);
 extern void vm_sys_file_reset(void);
 extern void vm_sys_pin_reset(void);
 
-extern void bc_run_source_string(const char *source, const char *source_name);
-extern int  bc_opt_level;
+extern void bc_run_source_string(const char * source, const char * source_name);
+extern int bc_opt_level;
 
 /* Output hook defined by host_main.c in the host_native build; we
  * own this symbol here since we don't link host_main.c. Setting it
@@ -83,12 +83,13 @@ extern int  bc_opt_level;
  * into the render thread's ANSI stream. All real BASIC output
  * already goes through DisplayPutC → host_framebuffer because
  * OptionConsole = 2. */
-void (*host_output_hook)(const char *text, int len) = NULL;
-static void ansi_swallow(const char *text, int len) {
-    (void)text; (void)len;
+void (*host_output_hook)(const char * text, int len) = NULL;
+static void ansi_swallow(const char * text, int len) {
+    (void)text;
+    (void)len;
 }
 
-static void ansi_stdout(const char *text, int len) {
+static void ansi_stdout(const char * text, int len) {
     fwrite(text, 1, (size_t)len, stdout);
 }
 
@@ -120,14 +121,17 @@ void port_terminal_emit_colour(int fg, int bg, int has_bg) {
 /* Source loading */
 /* ----------------------------------------------------------------- */
 
-static char *read_file(const char *filename) {
-    FILE *f = fopen(filename, "r");
+static char * read_file(const char * filename) {
+    FILE * f = fopen(filename, "r");
     if (!f) return NULL;
     fseek(f, 0, SEEK_END);
     long fsize = ftell(f);
     fseek(f, 0, SEEK_SET);
-    char *source = malloc((size_t)fsize + 1);
-    if (!source) { fclose(f); return NULL; }
+    char * source = malloc((size_t)fsize + 1);
+    if (!source) {
+        fclose(f);
+        return NULL;
+    }
     fread(source, 1, (size_t)fsize, f);
     source[fsize] = '\0';
     fclose(f);
@@ -143,28 +147,28 @@ static void configure_display(int width, int height) {
     host_sim_set_framebuffer_size(width, height);
 
     Option.DISPLAY_CONSOLE = 1;
-    OptionConsole = 2;                /* SCREEN only — no UART/stdout. */
+    OptionConsole = 2; /* SCREEN only — no UART/stdout. */
 
     gui_font = 0x01;
     gui_font_width = 8;
     gui_font_height = 12;
-    Option.Width  = width  / gui_font_width;
+    Option.Width = width / gui_font_width;
     Option.Height = height / gui_font_height;
-    Option.Tab    = 4;
+    Option.Tab = 4;
     Option.DefaultFont = 0x01;
     /* PicoCalc green phosphor palette. */
     extern int gui_fcolour, gui_bcolour;
     gui_fcolour = 0x00FF00;
     gui_bcolour = 0x000000;
-    PromptFC    = 0x00FF00;
-    PromptBC    = 0x000000;
+    PromptFC = 0x00FF00;
+    PromptBC = 0x000000;
     Option.DefaultFC = 0x00FF00;
     Option.DefaultBC = 0x000000;
 }
 
 static void configure_text_console(int cols, int rows) {
     Option.DISPLAY_CONSOLE = 0;
-    OptionConsole = 1;                /* UART/stdout only. */
+    OptionConsole = 1; /* UART/stdout only. */
 
     if (cols <= 0) cols = 80;
     if (rows <= 0) rows = 24;
@@ -174,9 +178,9 @@ static void configure_text_console(int cols, int rows) {
     gui_font = 0x01;
     gui_font_width = 8;
     gui_font_height = 12;
-    Option.Width  = cols;
+    Option.Width = cols;
     Option.Height = rows;
-    Option.Tab    = 4;
+    Option.Tab = 4;
     Option.DefaultFont = 0x01;
 }
 
@@ -216,10 +220,10 @@ static const mm_runtime_adapter ansi_boot_adapter = {
 
 static int ansi_boot(int width, int height, int console_only, int interactive) {
     if (mmbasic_runtime_init_common(&ansi_boot_adapter,
-            MMBASIC_RUNTIME_INIT_FLAG_LOAD_OPTIONS |
-            MMBASIC_RUNTIME_INIT_FLAG_INIT_BASIC |
-            MMBASIC_RUNTIME_INIT_FLAG_INIT_HEAP |
-            MMBASIC_RUNTIME_INIT_FLAG_CLEAR_ERROR) != 0) {
+                                    MMBASIC_RUNTIME_INIT_FLAG_LOAD_OPTIONS |
+                                        MMBASIC_RUNTIME_INIT_FLAG_INIT_BASIC |
+                                        MMBASIC_RUNTIME_INIT_FLAG_INIT_HEAP |
+                                        MMBASIC_RUNTIME_INIT_FLAG_CLEAR_ERROR) != 0) {
         return -1;
     }
 
@@ -272,8 +276,8 @@ static void ansi_shutdown(void) {
 /* Script mode.                                                      */
 /* ----------------------------------------------------------------- */
 
-static int run_script(const char *filename, int use_interpreter) {
-    char *source = read_file(filename);
+static int run_script(const char * filename, int use_interpreter) {
+    char * source = read_file(filename);
     if (!source) {
         fprintf(stderr, "mmbasic_ansi: cannot read %s: %s\n",
                 filename, strerror(errno));
@@ -288,9 +292,9 @@ static int run_script(const char *filename, int use_interpreter) {
 
     if (use_interpreter) {
         rc = mmbasic_runtime_run_source(NULL, source,
-            MMBASIC_SOURCE_FLAGS_BATCH_LOAD |
-            MMBASIC_RUNTIME_RUN_FLAG_CLEAR_RUNTIME |
-            MMBASIC_RUNTIME_RUN_FLAG_PREPARE_PROGRAM);
+                                        MMBASIC_SOURCE_FLAGS_BATCH_LOAD |
+                                            MMBASIC_RUNTIME_RUN_FLAG_CLEAR_RUNTIME |
+                                            MMBASIC_RUNTIME_RUN_FLAG_PREPARE_PROGRAM);
     } else {
         if (setjmp(mark) == 0) {
             bc_run_source_string(source, filename);
@@ -320,7 +324,7 @@ static int run_repl(void) {
     vm_sys_pin_reset();
     ClearRuntime(true);
 
-    mmbasic_runtime_enter_repl(NULL, 0);   /* does not return under normal use */
+    mmbasic_runtime_enter_repl(NULL, 0); /* does not return under normal use */
     host_runtime_finish();
     return 0;
 }
@@ -329,32 +333,34 @@ static int run_repl(void) {
 /* Entry.                                                            */
 /* ----------------------------------------------------------------- */
 
-#define ANSI_MIN_FB_WIDTH   80
-#define ANSI_MIN_FB_HEIGHT  60
-#define ANSI_MAX_FB_WIDTH   2048
-#define ANSI_MAX_FB_HEIGHT  2048
+#define ANSI_MIN_FB_WIDTH 80
+#define ANSI_MIN_FB_HEIGHT 60
+#define ANSI_MAX_FB_WIDTH 2048
+#define ANSI_MAX_FB_HEIGHT 2048
 
 /* Parse `1:WxH,2:WxH,...` and apply each entry via ansi_mode_set.
  * Returns 0 on success, -1 on parse error. */
-static int parse_modes_arg(const char *spec, unsigned int *mode_mask) {
-    const char *p = spec;
+static int parse_modes_arg(const char * spec, unsigned int * mode_mask) {
+    const char * p = spec;
     while (*p) {
         int n = 0, w = 0, h = 0, consumed = 0;
         if (sscanf(p, "%d:%dx%d%n", &n, &w, &h, &consumed) != 3) return -1;
         if (ansi_mode_set(n, w, h) != 0) return -1;
         if (mode_mask) *mode_mask |= 1u << n;
         p += consumed;
-        if (*p == ',') p++;
-        else if (*p) return -1;
+        if (*p == ',')
+            p++;
+        else if (*p)
+            return -1;
     }
     return 0;
 }
 
-static void clamp_framebuffer_size(int *w, int *h) {
-    if (*w < ANSI_MIN_FB_WIDTH)   *w = ANSI_MIN_FB_WIDTH;
-    if (*h < ANSI_MIN_FB_HEIGHT)  *h = ANSI_MIN_FB_HEIGHT;
-    if (*w > ANSI_MAX_FB_WIDTH)   *w = ANSI_MAX_FB_WIDTH;
-    if (*h > ANSI_MAX_FB_HEIGHT)  *h = ANSI_MAX_FB_HEIGHT;
+static void clamp_framebuffer_size(int * w, int * h) {
+    if (*w < ANSI_MIN_FB_WIDTH) *w = ANSI_MIN_FB_WIDTH;
+    if (*h < ANSI_MIN_FB_HEIGHT) *h = ANSI_MIN_FB_HEIGHT;
+    if (*w > ANSI_MAX_FB_WIDTH) *w = ANSI_MAX_FB_WIDTH;
+    if (*h > ANSI_MAX_FB_HEIGHT) *h = ANSI_MAX_FB_HEIGHT;
 }
 
 static int framebuffer_fits_terminal(int w, int h, int cols, int rows) {
@@ -362,16 +368,16 @@ static int framebuffer_fits_terminal(int w, int h, int cols, int rows) {
     return cols >= w && rows >= need_rows;
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char ** argv) {
     host_options_set_executable_path(argc > 0 ? argv[0] : NULL);
 
-    int width = 0, height = 0;            /* 0 = auto-fit terminal */
+    int width = 0, height = 0; /* 0 = auto-fit terminal */
     int use_interpreter = 0;
-    const char *filename = NULL;
-    int  cli_repeat_start = 0, cli_repeat_rate = 0;   /* 0 = leave OS in charge */
-    int  cli_slowdown_us  = -1;                       /* -1 = leave default */
-    int  cli_memory_kb    = 0;                        /* 0 = leave default */
-    int  console_only      = 0;
+    const char * filename = NULL;
+    int cli_repeat_start = 0, cli_repeat_rate = 0; /* 0 = leave OS in charge */
+    int cli_slowdown_us = -1;                      /* -1 = leave default */
+    int cli_memory_kb = 0;                         /* 0 = leave default */
+    int console_only = 0;
     unsigned int cli_modes_mask = 0;
 
     for (int i = 1; i < argc; ++i) {
@@ -394,9 +400,9 @@ int main(int argc, char **argv) {
                 return 2;
             }
             cli_repeat_start = initial;
-            cli_repeat_rate  = rate;
+            cli_repeat_rate = rate;
         } else if (strcmp(argv[i], "--slowdown") == 0 && i + 1 < argc) {
-            char *end = NULL;
+            char * end = NULL;
             long us = strtol(argv[++i], &end, 10);
             if (end == argv[i] || *end != '\0' || us < 0 || us > 1000000) {
                 fprintf(stderr, "Bad --slowdown (expected microseconds 0..1000000)\n");
@@ -407,7 +413,7 @@ int main(int argc, char **argv) {
             if (parse_modes_arg(argv[++i], &cli_modes_mask) != 0) {
                 fprintf(stderr, "Bad --modes (expected N:WxH[,N:WxH...], "
                                 "e.g. 1:320x200,2:640x480; N is 1..%d)\n",
-                                ansi_mode_max());
+                        ansi_mode_max());
                 return 2;
             }
         } else if (strcmp(argv[i], "--memory") == 0 && i + 1 < argc) {
@@ -500,9 +506,9 @@ int main(int argc, char **argv) {
      * so big terminals don't allocate a huge buffer the user can't
      * use. */
     if (width == 0 || height == 0) {
-        width  = cols;
+        width = cols;
         height = rows * 2;
-        if (width  > 320) width  = 320;
+        if (width > 320) width = 320;
         if (height > 320) height = 320;
     }
 

@@ -19,6 +19,6 @@ void ansi_terminal_install_resize_handler(void);
 
 /* Query current terminal cell size. Returns 0 on success and writes
  * rows/cols; returns -1 if the size is unavailable. */
-int ansi_terminal_query_size(int *rows, int *cols);
+int ansi_terminal_query_size(int * rows, int * cols);
 
 #endif

@@ -21,7 +21,7 @@ extern "C" {
  *   returns: matching DISPLAY_TYPE constant, or 0 if `name` doesn't
  *   match any MEM332 entry (caller falls through to its default
  *   "unknown display type" error). */
-int hal_spi_lcd_mem332_match_option(unsigned char *name);
+int hal_spi_lcd_mem332_match_option(unsigned char * name);
 
 /* Run the MEM332-specific display init when DISPLAY_TYPE is set to a
  * MEM332 constant. Stub no-op; runtime never reaches the stub

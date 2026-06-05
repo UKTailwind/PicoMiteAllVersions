@@ -51,4 +51,4 @@ void hal_time_slowdown_tick(void);
 }
 #endif
 
-#endif  /* HAL_TIME_H */
+#endif /* HAL_TIME_H */

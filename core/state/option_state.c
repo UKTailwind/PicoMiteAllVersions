@@ -16,4 +16,4 @@
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 
-struct option_s __attribute__ ((aligned (256))) Option;
+struct option_s __attribute__((aligned(256))) Option;

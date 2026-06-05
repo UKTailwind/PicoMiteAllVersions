@@ -13,7 +13,7 @@
 
 extern int64_t TimeOffsetToUptime;
 
-int port_vm_time_get_tm(struct tm *out) {
+int port_vm_time_get_tm(struct tm * out) {
     uint64_t now_us = readusclock();
     time_t epoch = (time_t)(now_us / 1000000ULL + TimeOffsetToUptime);
     hal_calendar_epoch_to_tm(epoch, out);

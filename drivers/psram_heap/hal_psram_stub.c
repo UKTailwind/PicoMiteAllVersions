@@ -22,8 +22,7 @@
 void hal_psram_init(void) {}
 void hal_psram_cache_sync(void) {}
 
-uint8_t *hal_psram_nocache_alias(uint8_t *base)
-{
+uint8_t * hal_psram_nocache_alias(uint8_t * base) {
     (void)base;
     return NULL;
 }

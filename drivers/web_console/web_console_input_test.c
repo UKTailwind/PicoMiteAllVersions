@@ -8,12 +8,13 @@
 
 static int failures;
 
-#define EXPECT_TRUE(expr) do { \
-    if (!(expr)) { \
-        fprintf(stderr, "FAIL %s:%d: %s\n", __FILE__, __LINE__, #expr); \
-        failures++; \
-    } \
-} while (0)
+#define EXPECT_TRUE(expr)                                                   \
+    do {                                                                    \
+        if (!(expr)) {                                                      \
+            fprintf(stderr, "FAIL %s:%d: %s\n", __FILE__, __LINE__, #expr); \
+            failures++;                                                     \
+        }                                                                   \
+    } while (0)
 
 static void test_owner_queue(void) {
     uint8_t buf[4];
@@ -42,7 +43,7 @@ static void test_owner_queue(void) {
     EXPECT_TRUE(!web_console_input_available(&input));
 }
 
-static void expect_key(const char *key, int ctrl, int alt, int meta,
+static void expect_key(const char * key, int ctrl, int alt, int meta,
                        int shift, int want) {
     int got = -1;
     EXPECT_TRUE(web_console_key_code_from_dom(key, ctrl, alt, meta, shift,

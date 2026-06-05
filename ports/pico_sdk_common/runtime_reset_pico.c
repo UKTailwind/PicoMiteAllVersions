@@ -16,13 +16,11 @@ extern uint32_t dma_tx_chan2;
 extern uint32_t ADC_dma_chan;
 extern uint32_t ADC_dma_chan2;
 
-void port_runtime_disable_watchdog(void)
-{
+void port_runtime_disable_watchdog(void) {
     hw_clear_bits(&watchdog_hw->ctrl, WATCHDOG_CTRL_ENABLE_BITS);
 }
 
-void port_runtime_abort_dma(void)
-{
+void port_runtime_abort_dma(void) {
     irq_set_enabled(DMA_IRQ_1, false);
 
     dma_hw->abort = ((1u << dma_rx_chan2) | (1u << dma_rx_chan));

@@ -76,7 +76,7 @@ void hal_vga_setmode_mode1_pre_reset(void);
 /* Setmode font selection: HDMI applies a medium-res alternate font
  * path when !FullColour && !MediumRes. Returns 1 if the hook set
  * the font; 0 if the caller should run the common font logic. */
-int  hal_vga_setmode_select_alt_font(int display_type);
+int hal_vga_setmode_select_alt_font(int display_type);
 
 /* ReadBuffer16 / ReadBuffer16Fast / Read sprite-blit helpers: VGA can
  * have a LayerBuf sitting above DisplayBuf, and when `mergedread` is
@@ -101,8 +101,8 @@ uint8_t hal_vga_ops_layer_merge_rgb8(uint8_t primary, int x, int y);
  *  - non-VGA:   N → NULL (direct-to-LCD read/write path)
  *  - rp2350 VGA/HDMI: T → SecondLayer
  *  - others:    T not accepted (caller should error "Syntax") */
-volatile unsigned char *hal_vga_ops_fb_n_target(void);
-volatile unsigned char *hal_vga_ops_fb_t_target(void);
+volatile unsigned char * hal_vga_ops_fb_n_target(void);
+volatile unsigned char * hal_vga_ops_fb_t_target(void);
 int hal_vga_ops_fb_t_supported(void);
 
 /* DrawBitmap2 tile-alignment fast path for SCREENMODE1:
@@ -111,7 +111,7 @@ int hal_vga_ops_fb_t_supported(void);
  *  - fill_tile_colours(x1,y1,w_px,h_px,fc,bc) bulk-writes the tile fg
  *    and bg colour arrays for every tile covered by the bitmap.
  *    Caller only invokes when tilematch()==1. No-op on non-VGA. */
-int  hal_vga_ops_fb2_tilematch(int x1, int y1, int w_px, int h_px);
+int hal_vga_ops_fb2_tilematch(int x1, int y1, int w_px, int h_px);
 void hal_vga_ops_fb2_fill_tile_colours(int x1, int y1, int w_px, int h_px, int fc, int bc);
 
 /* ScrollLCD2 tile-colour scroll helper: when the pixel scroll lines
@@ -124,7 +124,7 @@ void hal_vga_ops_scroll_tile_colours(int lines);
  * reads need to translate 1/0 bits into the active tile's fg/bg
  * colour, which on VGA means consulting tilefcols[]/tilebcols[]. On
  * non-VGA the caller uses fixed white/black. */
-void hal_vga_ops_tile_colour(int x, int y, int *front, int *back);
+void hal_vga_ops_tile_colour(int x, int y, int * front, int * back);
 
 /* BLIT command COPY move for VGA — fast per-SCREENMODE path. The
  * function is monolithic on purpose: it owns byte-aligned memcpy

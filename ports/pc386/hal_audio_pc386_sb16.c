@@ -15,24 +15,24 @@
 #include "hal/hal_time.h"
 #include "io.h"
 
-#define SB_MIXER_ADDR       (sb_base + 0x04u)
-#define SB_MIXER_DATA       (sb_base + 0x05u)
-#define SB_DSP_RESET        (sb_base + 0x06u)
-#define SB_DSP_READ         (sb_base + 0x0Au)
-#define SB_DSP_WRITE        (sb_base + 0x0Cu)
-#define SB_DSP_READ_STATUS  (sb_base + 0x0Eu)
-#define SB_DSP_ACK8         (sb_base + 0x0Eu)
+#define SB_MIXER_ADDR (sb_base + 0x04u)
+#define SB_MIXER_DATA (sb_base + 0x05u)
+#define SB_DSP_RESET (sb_base + 0x06u)
+#define SB_DSP_READ (sb_base + 0x0Au)
+#define SB_DSP_WRITE (sb_base + 0x0Cu)
+#define SB_DSP_READ_STATUS (sb_base + 0x0Eu)
+#define SB_DSP_ACK8 (sb_base + 0x0Eu)
 
-#define DMA1_MASK           0x0Au
-#define DMA1_MODE           0x0Bu
-#define DMA1_CLEAR_FF       0x0Cu
-#define DMA1_CH1_ADDR       0x02u
-#define DMA1_CH1_COUNT      0x03u
-#define DMA1_CH1_PAGE       0x83u
+#define DMA1_MASK 0x0Au
+#define DMA1_MODE 0x0Bu
+#define DMA1_CLEAR_FF 0x0Cu
+#define DMA1_CH1_ADDR 0x02u
+#define DMA1_CH1_COUNT 0x03u
+#define DMA1_CH1_PAGE 0x83u
 
-#define SB_RATE_HZ          22050u
-#define SB_BUFFER_BYTES     65536u
-#define SB_BUFFER_FRAMES    (SB_BUFFER_BYTES / 2u)
+#define SB_RATE_HZ 22050u
+#define SB_BUFFER_BYTES 65536u
+#define SB_BUFFER_FRAMES (SB_BUFFER_BYTES / 2u)
 
 static uint8_t sb_dma_buffer[SB_BUFFER_BYTES] __attribute__((aligned(65536)));
 static uint16_t sb_base = 0x220u;
@@ -55,14 +55,13 @@ typedef struct {
 static sb_voice_t sb_sound_left[4];
 static sb_voice_t sb_sound_right[4];
 
-static const uint16_t dma_addr_ports[4] = { 0x00u, 0x02u, 0x04u, 0x06u };
-static const uint16_t dma_count_ports[4] = { 0x01u, 0x03u, 0x05u, 0x07u };
-static const uint16_t dma_page_ports[4] = { 0x87u, 0x83u, 0x81u, 0x82u };
+static const uint16_t dma_addr_ports[4] = {0x00u, 0x02u, 0x04u, 0x06u};
+static const uint16_t dma_count_ports[4] = {0x01u, 0x03u, 0x05u, 0x07u};
+static const uint16_t dma_page_ports[4] = {0x87u, 0x83u, 0x81u, 0x82u};
 
 static void sb_stop_dma(void);
 
-static unsigned u_gcd(unsigned a, unsigned b)
-{
+static unsigned u_gcd(unsigned a, unsigned b) {
     while (b != 0) {
         unsigned t = a % b;
         a = b;
@@ -71,8 +70,7 @@ static unsigned u_gcd(unsigned a, unsigned b)
     return a;
 }
 
-static unsigned u_lcm_bounded(unsigned a, unsigned b, unsigned limit)
-{
+static unsigned u_lcm_bounded(unsigned a, unsigned b, unsigned limit) {
     unsigned g = u_gcd(a, b);
     unsigned scaled = a / g;
     if (scaled > limit / b) return 0;
@@ -80,8 +78,7 @@ static unsigned u_lcm_bounded(unsigned a, unsigned b, unsigned limit)
     return out <= limit ? out : 0;
 }
 
-static unsigned tone_hz_int(double hz)
-{
+static unsigned tone_hz_int(double hz) {
     if (hz <= 0.0) return 0;
     unsigned rounded = (unsigned)(hz + 0.5);
     double diff = hz - (double)rounded;
@@ -89,18 +86,15 @@ static unsigned tone_hz_int(double hz)
     return diff < 0.001 ? rounded : 0;
 }
 
-static int dsp_read_ready(void)
-{
+static int dsp_read_ready(void) {
     return (inb(SB_DSP_READ_STATUS) & 0x80) != 0;
 }
 
-static int dsp_write_ready(void)
-{
+static int dsp_write_ready(void) {
     return (inb(SB_DSP_WRITE) & 0x80) == 0;
 }
 
-static int dsp_read_byte(uint8_t *out)
-{
+static int dsp_read_byte(uint8_t * out) {
     for (int i = 0; i < 100000; i++) {
         if (dsp_read_ready()) {
             *out = inb(SB_DSP_READ);
@@ -110,8 +104,7 @@ static int dsp_read_byte(uint8_t *out)
     return 0;
 }
 
-static int dsp_write_byte(uint8_t v)
-{
+static int dsp_write_byte(uint8_t v) {
     for (int i = 0; i < 100000; i++) {
         if (dsp_write_ready()) {
             outb(SB_DSP_WRITE, v);
@@ -121,8 +114,7 @@ static int dsp_write_byte(uint8_t v)
     return 0;
 }
 
-static int sb_reset(void)
-{
+static int sb_reset(void) {
     outb(SB_DSP_RESET, 1);
     hal_time_sleep_us(100);
     outb(SB_DSP_RESET, 0);
@@ -132,33 +124,29 @@ static int sb_reset(void)
     return dsp_read_byte(&v) && v == 0xAA;
 }
 
-static void sb_speaker_on(void)
-{
+static void sb_speaker_on(void) {
     (void)dsp_write_byte(0xD1);
 }
 
-static void sb_speaker_off(void)
-{
+static void sb_speaker_off(void) {
     (void)dsp_write_byte(0xD3);
 }
 
-static int sb_probe(void)
-{
+static int sb_probe(void) {
     if (sb_available) return 1;
 
     hal_time_us_64();
     sb_probe_attempted = 1;
     sb_available = sb_reset();
     if (sb_available) {
-        outb(SB_MIXER_ADDR, 0x22);      /* master volume */
+        outb(SB_MIXER_ADDR, 0x22); /* master volume */
         outb(SB_MIXER_DATA, 0xEE);
         sb_speaker_off();
     }
     return sb_available;
 }
 
-static void sb_config_from_options(void)
-{
+static void sb_config_from_options(void) {
     uint16_t base = Option.pc386_sb_base ? Option.pc386_sb_base : 0x220u;
     uint8_t irq = Option.pc386_sb_irq ? Option.pc386_sb_irq : 5u;
     uint8_t dma = Option.pc386_sb_dma;
@@ -174,16 +162,14 @@ static void sb_config_from_options(void)
     sb_probe_attempted = 0;
 }
 
-void pc386_audio_apply_options(void)
-{
+void pc386_audio_apply_options(void) {
     sb_config_from_options();
 }
 
-static void sb_stop_dma(void)
-{
+static void sb_stop_dma(void) {
     if (!sb_available) return;
-    (void)dsp_write_byte(0xD0);  /* pause 8-bit DMA */
-    (void)dsp_write_byte(0xDA);  /* exit 8-bit auto-init DMA */
+    (void)dsp_write_byte(0xD0); /* pause 8-bit DMA */
+    (void)dsp_write_byte(0xDA); /* exit 8-bit auto-init DMA */
     (void)inb(SB_DSP_ACK8);
     sb_speaker_off();
     outb(DMA1_MASK, 0x04u | sb_dma);
@@ -191,17 +177,15 @@ static void sb_stop_dma(void)
     sb_paused = 0;
 }
 
-static void sb_clear_sounds(void)
-{
+static void sb_clear_sounds(void) {
     memset(sb_sound_left, 0, sizeof(sb_sound_left));
     memset(sb_sound_right, 0, sizeof(sb_sound_right));
 }
 
-static void sb_program_dma(uintptr_t addr, unsigned count)
-{
+static void sb_program_dma(uintptr_t addr, unsigned count) {
     outb(DMA1_MASK, 0x04u | sb_dma);
     outb(DMA1_CLEAR_FF, 0);
-    outb(DMA1_MODE, (uint8_t)(0x58u | sb_dma));  /* auto-init, read, single */
+    outb(DMA1_MODE, (uint8_t)(0x58u | sb_dma)); /* auto-init, read, single */
 
     outb(dma_addr_ports[sb_dma], (uint8_t)(addr & 0xFF));
     outb(dma_addr_ports[sb_dma], (uint8_t)((addr >> 8) & 0xFF));
@@ -213,8 +197,7 @@ static void sb_program_dma(uintptr_t addr, unsigned count)
     outb(DMA1_MASK, sb_dma);
 }
 
-static uint8_t tone_sample(double hz, unsigned frame)
-{
+static uint8_t tone_sample(double hz, unsigned frame) {
     if (hz <= 0.0) return 128;
     double pos = (double)frame * hz / (double)SB_RATE_HZ;
     unsigned whole = (unsigned)pos;
@@ -222,16 +205,14 @@ static uint8_t tone_sample(double hz, unsigned frame)
     return frac < 0.5 ? 224 : 32;
 }
 
-static unsigned tone_period_frames(double hz)
-{
+static unsigned tone_period_frames(double hz) {
     unsigned hz_int = tone_hz_int(hz);
     if (hz_int == 0) return hz <= 0.0 ? 1u : 0u;
     unsigned g = u_gcd(SB_RATE_HZ, hz_int);
     return SB_RATE_HZ / g;
 }
 
-static unsigned sb_tone_frames(double left_hz, double right_hz)
-{
+static unsigned sb_tone_frames(double left_hz, double right_hz) {
     unsigned left_period = tone_period_frames(left_hz);
     unsigned right_period = tone_period_frames(right_hz);
     if (left_period != 0 && right_period != 0) {
@@ -241,8 +222,7 @@ static unsigned sb_tone_frames(double left_hz, double right_hz)
     return SB_BUFFER_FRAMES;
 }
 
-static unsigned sb_fill_tone(double left_hz, double right_hz)
-{
+static unsigned sb_fill_tone(double left_hz, double right_hz) {
     unsigned frames = sb_tone_frames(left_hz, right_hz);
     for (unsigned frame = 0; frame < frames; frame++) {
         sb_dma_buffer[frame * 2u + 0u] = tone_sample(left_hz, frame);
@@ -251,21 +231,19 @@ static unsigned sb_fill_tone(double left_hz, double right_hz)
     return frames;
 }
 
-static int voice_active(void)
-{
+static int voice_active(void) {
     for (int i = 0; i < 4; i++) {
         if (sb_sound_left[i].active || sb_sound_right[i].active) return 1;
     }
     return 0;
 }
 
-static unsigned sb_sound_frames(void)
-{
+static unsigned sb_sound_frames(void) {
     unsigned frames = 1;
     for (int i = 0; i < 4; i++) {
-        sb_voice_t *voices[2] = { &sb_sound_left[i], &sb_sound_right[i] };
+        sb_voice_t * voices[2] = {&sb_sound_left[i], &sb_sound_right[i]};
         for (int c = 0; c < 2; c++) {
-            sb_voice_t *v = voices[c];
+            sb_voice_t * v = voices[c];
             if (!v->active) continue;
             if (v->wave == 'N' || v->wave == 'P') return SB_BUFFER_FRAMES;
             unsigned period = tone_period_frames(v->hz);
@@ -277,8 +255,7 @@ static unsigned sb_sound_frames(void)
     return frames < 2 ? 2 : frames;
 }
 
-static uint32_t noise_hash(uint32_t x)
-{
+static uint32_t noise_hash(uint32_t x) {
     x ^= x >> 16;
     x *= 0x7feb352du;
     x ^= x >> 15;
@@ -287,14 +264,12 @@ static uint32_t noise_hash(uint32_t x)
     return x;
 }
 
-static int noise_value(uint32_t bucket, unsigned seed)
-{
+static int noise_value(uint32_t bucket, unsigned seed) {
     uint32_t x = noise_hash(bucket + seed * 0x9e3779b9u);
     return (int)((x >> 24) & 0xFF) - 128;
 }
 
-static int wave_sample(const sb_voice_t *v, unsigned frame, unsigned channel_seed)
-{
+static int wave_sample(const sb_voice_t * v, unsigned frame, unsigned channel_seed) {
     if (!v->active || v->volume == 0) return 0;
     if (v->wave == 'N') {
         unsigned dwell = v->hz > 1.0 ? (unsigned)(v->hz + 0.5) : 1u;
@@ -313,28 +288,27 @@ static int wave_sample(const sb_voice_t *v, unsigned frame, unsigned channel_see
     double frac = pos - (double)whole;
     int raw;
     switch (v->wave) {
-        case 'Q':
-            raw = frac < 0.5 ? 96 : -96;
-            break;
-        case 'W':
-            raw = (int)(frac * 192.0) - 96;
-            break;
-        case 'T':
-            raw = frac < 0.5 ? (int)(frac * 384.0) - 96 : 288 - (int)(frac * 384.0);
-            break;
-        case 'S':
-        default: {
-            double tri = frac < 0.5 ? frac * 4.0 - 1.0 : 3.0 - frac * 4.0;
-            double smooth = tri * (1.5 - 0.5 * tri * tri);
-            raw = (int)(smooth * 96.0);
-            break;
-        }
+    case 'Q':
+        raw = frac < 0.5 ? 96 : -96;
+        break;
+    case 'W':
+        raw = (int)(frac * 192.0) - 96;
+        break;
+    case 'T':
+        raw = frac < 0.5 ? (int)(frac * 384.0) - 96 : 288 - (int)(frac * 384.0);
+        break;
+    case 'S':
+    default: {
+        double tri = frac < 0.5 ? frac * 4.0 - 1.0 : 3.0 - frac * 4.0;
+        double smooth = tri * (1.5 - 0.5 * tri * tri);
+        raw = (int)(smooth * 96.0);
+        break;
+    }
     }
     return raw * (int)v->volume / 25;
 }
 
-static uint8_t mix_channel(unsigned frame, sb_voice_t voices[4], unsigned seed)
-{
+static uint8_t mix_channel(unsigned frame, sb_voice_t voices[4], unsigned seed) {
     int mix = 128;
     for (int i = 0; i < 4; i++) mix += wave_sample(&voices[i], frame, seed + (unsigned)i);
     if (mix < 0) mix = 0;
@@ -342,8 +316,7 @@ static uint8_t mix_channel(unsigned frame, sb_voice_t voices[4], unsigned seed)
     return (uint8_t)mix;
 }
 
-static unsigned sb_fill_sound(void)
-{
+static unsigned sb_fill_sound(void) {
     unsigned frames = sb_sound_frames();
     unsigned seed_base = ++sb_noise_nonce;
     for (unsigned frame = 0; frame < frames; frame++) {
@@ -353,17 +326,16 @@ static unsigned sb_fill_sound(void)
     return frames;
 }
 
-static void sb_start_stereo_dma(unsigned bytes)
-{
+static void sb_start_stereo_dma(unsigned bytes) {
     sb_program_dma((uintptr_t)sb_dma_buffer, bytes);
 
-    (void)dsp_write_byte(0x41);                 /* output sample rate */
+    (void)dsp_write_byte(0x41); /* output sample rate */
     (void)dsp_write_byte((uint8_t)(SB_RATE_HZ >> 8));
     (void)dsp_write_byte((uint8_t)(SB_RATE_HZ & 0xFF));
 
     sb_speaker_on();
-    (void)dsp_write_byte(0xC6);                 /* 8-bit auto-init DMA output */
-    (void)dsp_write_byte(0x20);                 /* unsigned stereo */
+    (void)dsp_write_byte(0xC6); /* 8-bit auto-init DMA output */
+    (void)dsp_write_byte(0x20); /* unsigned stereo */
     unsigned last = bytes - 1u;
     (void)dsp_write_byte((uint8_t)(last & 0xFF));
     (void)dsp_write_byte((uint8_t)((last >> 8) & 0xFF));
@@ -372,16 +344,14 @@ static void sb_start_stereo_dma(unsigned bytes)
     sb_paused = 0;
 }
 
-void hal_audio_init(void)
-{
+void hal_audio_init(void) {
     sb_config_from_options();
     (void)sb_probe();
     sb_playing = 0;
     sb_paused = 0;
 }
 
-void hal_audio_tone(double left_hz, double right_hz, int has_duration, int64_t duration_ms)
-{
+void hal_audio_tone(double left_hz, double right_hz, int has_duration, int64_t duration_ms) {
     sb_config_from_options();
     if (!sb_probe()) error("Sound Blaster 16 not detected");
 
@@ -403,8 +373,7 @@ void hal_audio_tone(double left_hz, double right_hz, int has_duration, int64_t d
     }
 }
 
-void hal_audio_sound(int slot, const char *ch, const char *type, double freq_hz, int volume)
-{
+void hal_audio_sound(int slot, const char * ch, const char * type, double freq_hz, int volume) {
     sb_config_from_options();
     if (!sb_probe()) error("Sound Blaster 16 not detected");
 
@@ -432,14 +401,12 @@ void hal_audio_sound(int slot, const char *ch, const char *type, double freq_hz,
     sb_start_stereo_dma(frames * 2u);
 }
 
-void hal_audio_stop(void)
-{
+void hal_audio_stop(void) {
     sb_stop_dma();
     sb_clear_sounds();
 }
 
-void hal_audio_volume(int left_pct, int right_pct)
-{
+void hal_audio_volume(int left_pct, int right_pct) {
     if (!sb_probe()) return;
     if (left_pct < 0) left_pct = 0;
     if (left_pct > 100) left_pct = 100;
@@ -451,22 +418,19 @@ void hal_audio_volume(int left_pct, int right_pct)
     outb(SB_MIXER_DATA, (uint8_t)((l << 4) | r));
 }
 
-void hal_audio_pause(void)
-{
+void hal_audio_pause(void) {
     if (!sb_probe() || !sb_playing || sb_paused) return;
     (void)dsp_write_byte(0xD0);
     sb_paused = 1;
 }
 
-void hal_audio_resume(void)
-{
+void hal_audio_resume(void) {
     if (!sb_probe() || !sb_playing || !sb_paused) return;
     (void)dsp_write_byte(0xD4);
     sb_paused = 0;
 }
 
-void cmd_sb16(void)
-{
+void cmd_sb16(void) {
     sb_config_from_options();
     if (cmdline == NULL || *cmdline == 0) {
         if (!sb_probe_attempted) (void)sb_probe();
@@ -482,7 +446,7 @@ void cmd_sb16(void)
         return;
     }
 
-    unsigned char *p = cmdline;
+    unsigned char * p = cmdline;
     getargs(&p, 7, (unsigned char *)",");
     if (!(argc == 1 || argc == 3 || argc == 5 || argc == 7)) error("Argument count");
 
@@ -513,18 +477,38 @@ void cmd_sb16(void)
 /* Streamed-sample sink: file-stream PCM is not routed to this backend
  * yet; report "always room, never queued" so a decode runs to completion
  * without stalling. */
-int  hal_audio_sample_begin(int sample_rate_hz) { (void)sample_rate_hz; return 0; }
+int hal_audio_sample_begin(int sample_rate_hz) {
+    (void)sample_rate_hz;
+    return 0;
+}
 void hal_audio_sample_end(void) {}
 void hal_audio_sample_eof(void) {}
-int  hal_audio_sample_space(void) { return 4096; }
-int  hal_audio_sample_queued(void) { return 0; }
-int  hal_audio_sample_push(const int16_t *frames, int n) { (void)frames; return n; }
-int  hal_audio_sample_acquire(int16_t **frames, int *frame_capacity) {
-    (void)frames; (void)frame_capacity; return 0;
+int hal_audio_sample_space(void) {
+    return 4096;
 }
-void hal_audio_sample_commit(int frame_count) { (void)frame_count; }
+int hal_audio_sample_queued(void) {
+    return 0;
+}
+int hal_audio_sample_push(const int16_t * frames, int n) {
+    (void)frames;
+    return n;
+}
+int hal_audio_sample_acquire(int16_t ** frames, int * frame_capacity) {
+    (void)frames;
+    (void)frame_capacity;
+    return 0;
+}
+void hal_audio_sample_commit(int frame_count) {
+    (void)frame_count;
+}
 
 #include <stdlib.h>
-void *hal_audio_workmem_alloc(unsigned long bytes) { return malloc((size_t)bytes); }
-void *hal_audio_workmem_realloc(void *p, unsigned long bytes) { return realloc(p, (size_t)bytes); }
-void  hal_audio_workmem_free(void *p) { free(p); }
+void * hal_audio_workmem_alloc(unsigned long bytes) {
+    return malloc((size_t)bytes);
+}
+void * hal_audio_workmem_realloc(void * p, unsigned long bytes) {
+    return realloc(p, (size_t)bytes);
+}
+void hal_audio_workmem_free(void * p) {
+    free(p);
+}

@@ -23,9 +23,8 @@ extern int KeyboardlightSlice, KeyboardlightChannel;
 extern void disable_lcdspi(void);
 extern void disable_systemspi(void);
 
-int MIPS16 port_misc_option_setter(unsigned char *cmdline)
-{
-    unsigned char *tp;
+int MIPS16 port_misc_option_setter(unsigned char * cmdline) {
+    unsigned char * tp;
 
 #ifdef rp2350
     if (port_setter_hdmi_pins(cmdline)) return 1;
@@ -69,23 +68,20 @@ int MIPS16 port_misc_option_setter(unsigned char *cmdline)
 /* OPTION PICO ON/OFF — exposes/hides CYW43-shadow pins (41/42/44).
  * Disabled on WEB (CYW43 actually owns those pins). RP2350B not
  * supported (no shadow needed). */
-int MIPS16 port_pico_pins_option_setter(unsigned char *cmdline)
-{
+int MIPS16 port_pico_pins_option_setter(unsigned char * cmdline) {
     return port_setter_pico_pins(cmdline);
 }
 
 /* OPTION HEARTBEAT — WEB only allows ON/OFF (no pin reassignment);
  * other ports allow pin selection. */
-int MIPS16 port_heartbeat_option_setter(unsigned char *cmdline)
-{
+int MIPS16 port_heartbeat_option_setter(unsigned char * cmdline) {
     return port_setter_heartbeat(cmdline);
 }
 
 /* OPTION SYSTEM SPI / OPTION LCD SPI — non-VGA only. PICOMITE+rp2350
  * also gets a separate LCD SPI bus that defaults to mirroring the
  * system bus on first config. */
-int MIPS16 port_system_lcd_spi_option_setter(unsigned char *cmdline)
-{
+int MIPS16 port_system_lcd_spi_option_setter(unsigned char * cmdline) {
     return port_setter_system_lcd_spi(cmdline);
 }
 
@@ -101,8 +97,7 @@ extern int checkslice(int pin1, int pin2, int ignore);
 extern uint64_t piomap[];
 #endif
 
-int MIPS16 port_audio_i2s_pio_slice(int pin1, int pin2)
-{
+int MIPS16 port_audio_i2s_pio_slice(int pin1, int pin2) {
 #ifdef rp2350
     int pio = HAL_PORT_AUDIO_I2S_PIO_NUM;
     uint64_t map = piomap[pio];
@@ -121,8 +116,7 @@ int MIPS16 port_audio_i2s_pio_slice(int pin1, int pin2)
  * (which is rp2350-class only — rp2040's rp2350a is fixed-true but
  * PWM_SLICE_COUNT is 8, so the runtime guard skips). Everyone else
  * uses checkslice(pin) to find a free slice. */
-int MIPS16 port_audio_default_pwm_slice(int pin)
-{
+int MIPS16 port_audio_default_pwm_slice(int pin) {
 #ifdef rp2350
     if (rp2350a) return 11;
 #endif
@@ -131,8 +125,7 @@ int MIPS16 port_audio_default_pwm_slice(int pin)
 
 /* DEVICE$ chip-variant suffix. rp2350-class ports append " RP2350A"
  * or " RP2350B" depending on rp2350a; rp2040 ports append nothing. */
-void MIPS16 port_chip_variant_suffix(char *sret)
-{
+void MIPS16 port_chip_variant_suffix(char * sret) {
 #ifdef rp2350
     strcat(sret, rp2350a ? " RP2350A" : " RP2350B");
 #else
@@ -143,16 +136,21 @@ void MIPS16 port_chip_variant_suffix(char *sret)
 /* MM.INFO(BOOT) reset-reason decoder for the chip-family-specific
  * watchdog/reset bits. rp2040 uses exact-value matches; rp2350 uses
  * bit-mask matches against PowerMan reset registers. */
-const char *MIPS16 port_boot_reason_label(uint32_t restart_reason)
-{
+const char * MIPS16 port_boot_reason_label(uint32_t restart_reason) {
 #ifdef rp2350
-    if      (restart_reason & 0x30000)  return "Power On";
-    else if (restart_reason & 0x40000)  return "Reset Switch";
-    else if (restart_reason & 0x280000) return "Debug";
+    if (restart_reason & 0x30000)
+        return "Power On";
+    else if (restart_reason & 0x40000)
+        return "Reset Switch";
+    else if (restart_reason & 0x280000)
+        return "Debug";
 #else
-    if      (restart_reason == 0x100)    return "Power On";
-    else if (restart_reason == 0x10000)  return "Reset Switch";
-    else if (restart_reason == 0x100000) return "Debug";
+    if (restart_reason == 0x100)
+        return "Power On";
+    else if (restart_reason == 0x10000)
+        return "Reset Switch";
+    else if (restart_reason == 0x100000)
+        return "Debug";
 #endif
     return NULL;
 }
@@ -161,21 +159,19 @@ const char *MIPS16 port_boot_reason_label(uint32_t restart_reason)
  * register at PPB+M0PLUS_NVIC_ISER_OFFSET; Cortex-M33 (RP2350) uses
  * different offsets (and the SDK header doesn't define the M0+
  * symbol on rp2350), so we just don't expose this on rp2350. */
-int MIPS16 port_mminfo_interrupts(int64_t *out_iret)
-{
+int MIPS16 port_mminfo_interrupts(int64_t * out_iret) {
 #ifdef rp2350
     (void)out_iret;
     return 0;
 #else
-    *out_iret = (int64_t)(uint32_t)*((io_rw_32 *) (PPB_BASE + M0PLUS_NVIC_ISER_OFFSET));
+    *out_iret = (int64_t)(uint32_t)*((io_rw_32 *)(PPB_BASE + M0PLUS_NVIC_ISER_OFFSET));
     return 1;
 #endif
 }
 
 /* MM.INFO TOUCH — VGA Option struct lacks TOUCH_XZERO/TOUCH_CS so
  * the field is unavailable. Other ports return the calibration state. */
-int MIPS16 port_mminfo_touch_status(unsigned char *out_sret)
-{
+int MIPS16 port_mminfo_touch_status(unsigned char * out_sret) {
     return port_setter_touch_status(out_sret);
 }
 
@@ -183,28 +179,24 @@ int MIPS16 port_mminfo_touch_status(unsigned char *out_sret)
  * (PICOMITE + rp2350 only; ScreenBuffer macro = FRAMEBUFFER on rp2350).
  * ScrollStart's volatile qualifier comes from SSD1963.h, included via
  * Hardware_Includes.h. */
-int MIPS16 port_mminfo_scroll_start(int64_t *out_iret)
-{
+int MIPS16 port_mminfo_scroll_start(int64_t * out_iret) {
     return port_setter_scroll_start(out_iret);
 }
-int MIPS16 port_mminfo_screenbuff(int64_t *out_iret)
-{
+int MIPS16 port_mminfo_screenbuff(int64_t * out_iret) {
     return port_setter_screenbuff(out_iret);
 }
 
 /* POKE DISPLAY <args> raw command/data byte sequence. Dispatches by
  * panel class (SSD1963 parallel / SPI-LCD / I2C) — none of those
  * drivers exist on PICOMITEVGA. */
-int MIPS16 port_poke_display_panel(unsigned char *p)
-{
+int MIPS16 port_poke_display_panel(unsigned char * p) {
     return port_setter_poke_display(p);
 }
 
 /* PIO instance lookup for the interrupt poll loop. RP2040 has 2 PIOs
  * with the legacy index-0=pio1 ordering; RP2350 has 3 in natural
  * order. PIOMAX (= HAL_PORT_PIO_COUNT) bounds the caller's loop. */
-PIO port_pio_for_index(int pio_idx)
-{
+PIO port_pio_for_index(int pio_idx) {
 #ifdef rp2350
     return (pio_idx == 0 ? pio0 : (pio_idx == 1 ? pio1 : pio2));
 #else

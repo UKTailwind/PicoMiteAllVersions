@@ -10,15 +10,15 @@
 #include "host_keyrepeat.h"
 #include "host_time.h"
 
-static int      host_kr_enabled      = 0;
-static int      host_kr_start_ms     = 600;
-static int      host_kr_rate_ms      = 200;
-static int      host_kr_last_byte    = -1;
-static uint64_t host_kr_first_us     = 0;
+static int host_kr_enabled = 0;
+static int host_kr_start_ms = 600;
+static int host_kr_rate_ms = 200;
+static int host_kr_last_byte = -1;
+static uint64_t host_kr_first_us = 0;
 static uint64_t host_kr_last_seen_us = 0;
 static uint64_t host_kr_last_pass_us = 0;
-static int      host_kr_seen_count   = 0;
-static int      host_kr_held         = 0;
+static int host_kr_seen_count = 0;
+static int host_kr_held = 0;
 
 /* A terminal only gives us bytes, not key-down/key-up events. Preserve
  * fast double-typing by allowing the first repeated byte through, then
@@ -30,38 +30,38 @@ void host_keyrepeat_configure(int start_ms, int rate_ms) {
         host_kr_enabled = 0;
         return;
     }
-    host_kr_start_ms  = start_ms;
-    host_kr_rate_ms   = rate_ms;
-    host_kr_enabled   = 1;
+    host_kr_start_ms = start_ms;
+    host_kr_rate_ms = rate_ms;
+    host_kr_enabled = 1;
     host_kr_last_byte = -1;
-    host_kr_first_us  = 0;
+    host_kr_first_us = 0;
     host_kr_last_seen_us = 0;
     host_kr_last_pass_us = 0;
     host_kr_seen_count = 0;
-    host_kr_held      = 0;
+    host_kr_held = 0;
 }
 
 int host_keyrepeat_filter(int byte) {
     if (!host_kr_enabled || byte < 0) return byte;
     uint64_t now = host_time_us_64();
     if (byte != host_kr_last_byte) {
-        host_kr_last_byte    = byte;
-        host_kr_first_us     = now;
+        host_kr_last_byte = byte;
+        host_kr_first_us = now;
         host_kr_last_seen_us = now;
         host_kr_last_pass_us = now;
-        host_kr_seen_count   = 1;
-        host_kr_held         = 0;
+        host_kr_seen_count = 1;
+        host_kr_held = 0;
         return byte;
     }
 
     uint64_t since_first_us = now - host_kr_first_us;
-    uint64_t since_seen_us  = now - host_kr_last_seen_us;
-    uint64_t since_pass_us  = now - host_kr_last_pass_us;
+    uint64_t since_seen_us = now - host_kr_last_seen_us;
+    uint64_t since_pass_us = now - host_kr_last_pass_us;
     host_kr_last_seen_us = now;
 
     if (host_kr_held) {
         uint64_t start_us = (uint64_t)host_kr_start_ms * 1000ULL;
-        uint64_t rate_us  = (uint64_t)host_kr_rate_ms * 1000ULL;
+        uint64_t rate_us = (uint64_t)host_kr_rate_ms * 1000ULL;
         if (since_first_us >= start_us && since_pass_us >= rate_us) {
             host_kr_last_pass_us = now;
             return byte;
@@ -71,7 +71,7 @@ int host_keyrepeat_filter(int byte) {
 
     if (since_first_us >= (uint64_t)host_kr_start_ms * 1000ULL) {
         host_kr_last_pass_us = now;
-        host_kr_held         = 1;
+        host_kr_held = 1;
         return byte;
     }
 

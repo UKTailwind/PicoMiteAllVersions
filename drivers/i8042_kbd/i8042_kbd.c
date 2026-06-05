@@ -8,9 +8,9 @@
 #include "../i8259_pic/i8259_pic.h"
 #include "../../ports/pc386/idt.h"
 
-#define KBD_DATA_PORT  0x60
-#define KBD_STAT_PORT  0x64
-#define KBD_ACK        0xFA
+#define KBD_DATA_PORT 0x60
+#define KBD_STAT_PORT 0x64
+#define KBD_ACK 0xFA
 #define KBD_CMD_TYPEMATIC 0xF3
 
 static inline uint8_t inb(uint16_t port) {
@@ -24,9 +24,9 @@ static inline void outb(uint16_t port, uint8_t v) {
 }
 
 #define RING_SIZE 128
-static volatile uint8_t  ring[RING_SIZE];
-static volatile uint16_t ring_head;     /* next write index (filled by ISR) */
-static volatile uint16_t ring_tail;     /* next read index  (consumed by mainline) */
+static volatile uint8_t ring[RING_SIZE];
+static volatile uint16_t ring_head; /* next write index (filled by ISR) */
+static volatile uint16_t ring_tail; /* next read index  (consumed by mainline) */
 
 static bool wait_input_empty(void) {
     for (uint32_t i = 0; i < 1000000u; i++) {
@@ -57,11 +57,11 @@ bool kbd_set_typematic(uint8_t value) {
     return ok;
 }
 
-static void kbd_irq_handler(idt_regs_t *r) {
+static void kbd_irq_handler(idt_regs_t * r) {
     (void)r;
     uint8_t sc = inb(KBD_DATA_PORT);
     uint16_t next = (ring_head + 1) % RING_SIZE;
-    if (next != ring_tail) {     /* drop on overflow rather than overwrite */
+    if (next != ring_tail) { /* drop on overflow rather than overwrite */
         ring[ring_head] = sc;
         ring_head = next;
     }

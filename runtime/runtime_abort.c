@@ -15,15 +15,13 @@
 #endif
 
 void MMB_HOT_FUNC(mmbasic_runtime_poll_service)(
-    mmbasic_runtime_service_fn service)
-{
+    mmbasic_runtime_service_fn service) {
     if (service) service();
 }
 
 void MMB_HOT_FUNC(mmbasic_runtime_poll_service_once)(
-    int *active,
-    mmbasic_runtime_service_fn service)
-{
+    int * active,
+    mmbasic_runtime_service_fn service) {
     if (!service) return;
     if (active && *active) return;
     if (active) *active = 1;
@@ -32,26 +30,22 @@ void MMB_HOT_FUNC(mmbasic_runtime_poll_service_once)(
 }
 
 void MMB_HOT_FUNC(mmbasic_runtime_checkabort_poll)(
-    mmbasic_runtime_service_fn service)
-{
+    mmbasic_runtime_service_fn service) {
     mmbasic_runtime_poll_service(service);
 }
 
 void MMB_HOT_FUNC(mmbasic_runtime_routinechecks_poll)(
-    mmbasic_runtime_service_fn service)
-{
+    mmbasic_runtime_service_fn service) {
     mmbasic_runtime_poll_service(service);
 }
 
 bool MMB_HOT_FUNC(mmbasic_runtime_abort_requested)(
-    volatile int *abort_flag)
-{
+    volatile int * abort_flag) {
     return abort_flag && *abort_flag;
 }
 
 static void MMB_HOT_FUNC(runtime_abort_common)(
-    const mmbasic_runtime_abort_adapter *adapter)
-{
+    const mmbasic_runtime_abort_adapter * adapter) {
     if (!adapter) return;
     mmbasic_runtime_poll_service(adapter->service);
 
@@ -68,13 +62,11 @@ static void MMB_HOT_FUNC(runtime_abort_common)(
 }
 
 void MMB_HOT_FUNC(mmbasic_runtime_checkabort)(
-    const mmbasic_runtime_abort_adapter *adapter)
-{
+    const mmbasic_runtime_abort_adapter * adapter) {
     runtime_abort_common(adapter);
 }
 
 void MMB_HOT_FUNC(mmbasic_runtime_routinechecks)(
-    const mmbasic_runtime_abort_adapter *adapter)
-{
+    const mmbasic_runtime_abort_adapter * adapter) {
     runtime_abort_common(adapter);
 }

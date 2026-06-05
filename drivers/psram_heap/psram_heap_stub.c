@@ -19,16 +19,17 @@
 unsigned int psmap[1] = {0};
 const unsigned int psmap_size_bytes = sizeof(psmap);
 
-unsigned int SBitsGet(unsigned char *addr) {
+unsigned int SBitsGet(unsigned char * addr) {
     (void)addr;
     return 0;
 }
 
-void SBitsSet(unsigned char *addr, int bits) {
-    (void)addr; (void)bits;
+void SBitsSet(unsigned char * addr, int bits) {
+    (void)addr;
+    (void)bits;
 }
 
-void *GetPSMemory(int size) {
+void * GetPSMemory(int size) {
     (void)size;
     return NULL;
 }
@@ -38,7 +39,9 @@ void *GetPSMemory(int size) {
  * rp2350 WEB/VGA-WIFI ports' Option.PSRAM_CS_PIN stays 0 because the
  * QSPI pins are owned by CYW43, so the runtime guard at the call site
  * keeps these stubs unreached). */
-void psram_setup(void) { }
+void psram_setup(void) {}
 
 #include <stddef.h>
-size_t psram_size(void) { return 0; }
+size_t psram_size(void) {
+    return 0;
+}

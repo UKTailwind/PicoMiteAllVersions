@@ -30,7 +30,7 @@
 #define MQTT_HAL_PORT 19185
 #define TCP_SERVER_CONN_PORT 19186
 
-static void fail(const char *msg) {
+static void fail(const char * msg) {
     fprintf(stderr, "host net HAL conformance failed: %s\n", msg);
     exit(1);
 }
@@ -85,7 +85,7 @@ static int raw_tcp_listen(uint16_t port) {
     return fd;
 }
 
-static void *tcp_client_peer(void *arg) {
+static void * tcp_client_peer(void * arg) {
     int listen_fd = *(int *)arg;
     int fd = accept(listen_fd, NULL, NULL);
     if (fd < 0) fail("tcp client peer accept");
@@ -287,8 +287,8 @@ struct http_capture {
     int calls;
 };
 
-static int http_capture_send(void *ctx, const void *buf, size_t len) {
-    struct http_capture *cap = (struct http_capture *)ctx;
+static int http_capture_send(void * ctx, const void * buf, size_t len) {
+    struct http_capture * cap = (struct http_capture *)ctx;
     if (cap->len + len >= sizeof(cap->buf)) return 0;
     memcpy(cap->buf + cap->len, buf, len);
     cap->len += len;
@@ -331,7 +331,7 @@ static const char fake_file_name[] = "host_file.txt";
 static const char fake_file_body[] = "Host file body\r\n";
 static size_t fake_file_pos;
 
-int hal_fs_stat(const char *path, struct hal_stat *out) {
+int hal_fs_stat(const char * path, struct hal_stat * out) {
     if (!path || strcmp(path, fake_file_name) != 0 || !out) return -1;
     memset(out, 0, sizeof(*out));
     out->size = (off_t)(sizeof(fake_file_body) - 1);
@@ -339,7 +339,7 @@ int hal_fs_stat(const char *path, struct hal_stat *out) {
     return 0;
 }
 
-int hal_fs_open(const char *path, int flags, hal_fs_fd_t *out) {
+int hal_fs_open(const char * path, int flags, hal_fs_fd_t * out) {
     if (!path || strcmp(path, fake_file_name) != 0 ||
         flags != HAL_FS_O_RDONLY || !out)
         return -1;
@@ -348,7 +348,7 @@ int hal_fs_open(const char *path, int flags, hal_fs_fd_t *out) {
     return 0;
 }
 
-ssize_t hal_fs_read(hal_fs_fd_t fd, void *buf, size_t n) {
+ssize_t hal_fs_read(hal_fs_fd_t fd, void * buf, size_t n) {
     if (fd != 1 || !buf) return -1;
     size_t remaining = (sizeof(fake_file_body) - 1) - fake_file_pos;
     if (remaining == 0) return 0;
@@ -389,9 +389,9 @@ struct tftp_capture {
     int sent_count;
 };
 
-static int tftp_capture_open(void *ctx, const char *filename, int write,
-                             void **handle) {
-    struct tftp_capture *cap = (struct tftp_capture *)ctx;
+static int tftp_capture_open(void * ctx, const char * filename, int write,
+                             void ** handle) {
+    struct tftp_capture * cap = (struct tftp_capture *)ctx;
     if (strcmp(filename, "core.txt") != 0) return -1;
     cap->pos = 0;
     if (write) cap->len = 0;
@@ -399,10 +399,10 @@ static int tftp_capture_open(void *ctx, const char *filename, int write,
     return 0;
 }
 
-static ssize_t tftp_capture_read(void *ctx, void *handle, void *buf,
+static ssize_t tftp_capture_read(void * ctx, void * handle, void * buf,
                                  size_t len) {
     (void)ctx;
-    struct tftp_capture *cap = (struct tftp_capture *)handle;
+    struct tftp_capture * cap = (struct tftp_capture *)handle;
     size_t remaining = cap->len - cap->pos;
     if (len > remaining) len = remaining;
     memcpy(buf, cap->file + cap->pos, len);
@@ -410,24 +410,24 @@ static ssize_t tftp_capture_read(void *ctx, void *handle, void *buf,
     return (ssize_t)len;
 }
 
-static ssize_t tftp_capture_write(void *ctx, void *handle, const void *buf,
+static ssize_t tftp_capture_write(void * ctx, void * handle, const void * buf,
                                   size_t len) {
     (void)ctx;
-    struct tftp_capture *cap = (struct tftp_capture *)handle;
+    struct tftp_capture * cap = (struct tftp_capture *)handle;
     if (cap->len + len > sizeof(cap->file)) return -1;
     memcpy(cap->file + cap->len, buf, len);
     cap->len += len;
     return (ssize_t)len;
 }
 
-static void tftp_capture_close(void *ctx, void *handle) {
+static void tftp_capture_close(void * ctx, void * handle) {
     (void)ctx;
     (void)handle;
 }
 
-static int tftp_capture_send(void *ctx, const mm_net_tftp_peer_t *peer,
-                             const void *buf, size_t len) {
-    struct tftp_capture *cap = (struct tftp_capture *)ctx;
+static int tftp_capture_send(void * ctx, const mm_net_tftp_peer_t * peer,
+                             const void * buf, size_t len) {
+    struct tftp_capture * cap = (struct tftp_capture *)ctx;
     if (peer->family != 4 || peer->port != 12345 ||
         cap->sent_count >= (int)(sizeof(cap->sent_len) / sizeof(cap->sent_len[0])) ||
         len > sizeof(cap->sent[0]))
@@ -460,16 +460,14 @@ static void test_shared_tftp(void) {
 
     const uint8_t wrq[] = {
         0, 2, 'c', 'o', 'r', 'e', '.', 't', 'x', 't', 0,
-        'o', 'c', 't', 'e', 't', 0
-    };
+        'o', 'c', 't', 'e', 't', 0};
     mm_net_tftp_handle_packet(&session, &peer, wrq, sizeof(wrq));
     if (cap.sent_count != 1 || cap.sent_len[0] != 4 ||
         memcmp(cap.sent[0], "\x00\x04\x00\x00", 4) != 0)
         fail("shared tftp wrq ack");
 
     const uint8_t data[] = {
-        0, 3, 0, 1, 'S', 'H', 'A', 'R', 'E', 'D', '_', 'T', 'F', 'T', 'P'
-    };
+        0, 3, 0, 1, 'S', 'H', 'A', 'R', 'E', 'D', '_', 'T', 'F', 'T', 'P'};
     mm_net_tftp_handle_packet(&session, &peer, data, sizeof(data));
     if (cap.sent_count != 2 || cap.sent_len[1] != 4 ||
         memcmp(cap.sent[1], "\x00\x04\x00\x01", 4) != 0 ||
@@ -479,14 +477,13 @@ static void test_shared_tftp(void) {
 
     const uint8_t rrq[] = {
         0, 1, 'c', 'o', 'r', 'e', '.', 't', 'x', 't', 0,
-        'o', 'c', 't', 'e', 't', 0
-    };
+        'o', 'c', 't', 'e', 't', 0};
     mm_net_tftp_handle_packet(&session, &peer, rrq, sizeof(rrq));
     if (cap.sent_count != 3 || cap.sent_len[2] != sizeof(data) ||
         memcmp(cap.sent[2], data, sizeof(data)) != 0)
         fail("shared tftp rrq data");
 
-    const uint8_t ack[] = { 0, 4, 0, 1 };
+    const uint8_t ack[] = {0, 4, 0, 1};
     mm_net_tftp_handle_packet(&session, &peer, ack, sizeof(ack));
     if (session.active) fail("shared tftp final ack closes");
 
@@ -496,26 +493,27 @@ static void test_shared_tftp(void) {
         0, 2, 'c', 'o', 'r', 'e', '.', 't', 'x', 't', 0,
         'o', 'c', 't', 'e', 't', 0,
         'b', 'l', 'k', 's', 'i', 'z', 'e', 0,
-        '5', '0', '8', 0
-    };
+        '5', '0', '8', 0};
     mm_net_tftp_handle_packet(&session, &peer, wrq_blksize,
                               sizeof(wrq_blksize));
     const uint8_t expected_oack[] = {
-        0, 6, 'b', 'l', 'k', 's', 'i', 'z', 'e', 0, '5', '0', '8', 0
-    };
+        0, 6, 'b', 'l', 'k', 's', 'i', 'z', 'e', 0, '5', '0', '8', 0};
     if (cap.sent_count != 1 || cap.sent_len[0] != sizeof(expected_oack) ||
         memcmp(cap.sent[0], expected_oack, sizeof(expected_oack)) != 0)
         fail("shared tftp wrq blksize oack");
 
     uint8_t data1[4 + 508];
-    data1[0] = 0; data1[1] = 3; data1[2] = 0; data1[3] = 1;
+    data1[0] = 0;
+    data1[1] = 3;
+    data1[2] = 0;
+    data1[3] = 1;
     memset(data1 + 4, 'A', 508);
     mm_net_tftp_handle_packet(&session, &peer, data1, sizeof(data1));
     if (cap.sent_count != 2 || memcmp(cap.sent[1], "\x00\x04\x00\x01", 4) != 0 ||
         !session.active || cap.len != 508)
         fail("shared tftp full negotiated block stays active");
 
-    const uint8_t data2[] = { 0, 3, 0, 2, 'Z' };
+    const uint8_t data2[] = {0, 3, 0, 2, 'Z'};
     mm_net_tftp_handle_packet(&session, &peer, data2, sizeof(data2));
     if (cap.sent_count != 3 || memcmp(cap.sent[2], "\x00\x04\x00\x02", 4) != 0 ||
         cap.len != 509 || cap.file[508] != 'Z' || session.active)
@@ -549,7 +547,7 @@ static void test_shared_ntp(void) {
         fail("shared ntp rejects unsynchronised server");
 }
 
-static void *ntp_hal_peer(void *arg) {
+static void * ntp_hal_peer(void * arg) {
     (void)arg;
     int fd = raw_udp_bound(NTP_HAL_PORT);
     uint8_t request[MM_NET_NTP_PACKET_LEN];
@@ -598,11 +596,11 @@ static void test_shared_mqtt_wire(void) {
         fail("shared mqtt remaining length");
 
     uint8_t body[64];
-    uint8_t *p = mm_net_mqtt_write_utf8(body, "topic");
+    uint8_t * p = mm_net_mqtt_write_utf8(body, "topic");
     memcpy(p, "payload", 7);
     p += 7;
     char topic[16];
-    const uint8_t *payload = NULL;
+    const uint8_t * payload = NULL;
     size_t payload_len = 0;
     if (!mm_net_mqtt_decode_publish(0x30, body, (size_t)(p - body), topic,
                                     sizeof(topic), &payload, &payload_len) ||
@@ -611,7 +609,7 @@ static void test_shared_mqtt_wire(void) {
         fail("shared mqtt publish decode");
 }
 
-static size_t mqtt_test_encode_remaining_length(uint8_t *out, size_t value) {
+static size_t mqtt_test_encode_remaining_length(uint8_t * out, size_t value) {
     size_t n = 0;
     do {
         uint8_t encoded = (uint8_t)(value % 128);
@@ -622,7 +620,7 @@ static size_t mqtt_test_encode_remaining_length(uint8_t *out, size_t value) {
     return n;
 }
 
-static void mqtt_test_send_packet(int fd, uint8_t header, const void *body,
+static void mqtt_test_send_packet(int fd, uint8_t header, const void * body,
                                   size_t body_len) {
     uint8_t fixed[5];
     fixed[0] = header;
@@ -633,8 +631,8 @@ static void mqtt_test_send_packet(int fd, uint8_t header, const void *body,
         fail("mqtt test send body");
 }
 
-static int mqtt_test_recv_exact(int fd, void *buf, size_t len) {
-    uint8_t *p = (uint8_t *)buf;
+static int mqtt_test_recv_exact(int fd, void * buf, size_t len) {
+    uint8_t * p = (uint8_t *)buf;
     size_t got = 0;
     while (got < len) {
         ssize_t n = recv(fd, p + got, len - got, 0);
@@ -644,8 +642,8 @@ static int mqtt_test_recv_exact(int fd, void *buf, size_t len) {
     return 1;
 }
 
-static int mqtt_test_read_packet(int fd, uint8_t *header, uint8_t *body,
-                                 size_t cap, size_t *body_len) {
+static int mqtt_test_read_packet(int fd, uint8_t * header, uint8_t * body,
+                                 size_t cap, size_t * body_len) {
     if (!mqtt_test_recv_exact(fd, header, 1)) return 0;
     size_t multiplier = 1;
     size_t remaining = 0;
@@ -662,8 +660,8 @@ static int mqtt_test_read_packet(int fd, uint8_t *header, uint8_t *body,
     return 1;
 }
 
-static const uint8_t *mqtt_test_utf8(const uint8_t *body, size_t body_len,
-                                     size_t pos, char *out, size_t out_len) {
+static const uint8_t * mqtt_test_utf8(const uint8_t * body, size_t body_len,
+                                      size_t pos, char * out, size_t out_len) {
     if (pos + 2 > body_len) fail("mqtt test truncated string");
     size_t len = ((size_t)body[pos] << 8) | body[pos + 1];
     pos += 2;
@@ -674,7 +672,7 @@ static const uint8_t *mqtt_test_utf8(const uint8_t *body, size_t body_len,
     return body + pos + len;
 }
 
-static void *mqtt_hal_peer(void *arg) {
+static void * mqtt_hal_peer(void * arg) {
     (void)arg;
     int listen_fd = raw_tcp_listen(MQTT_HAL_PORT);
     int fd = accept(listen_fd, NULL, NULL);
@@ -698,7 +696,7 @@ static void *mqtt_hal_peer(void *arg) {
     if (body_len < 5) fail("mqtt peer subscribe short");
     mqtt_test_utf8(body, body_len, 2, topic, sizeof(topic));
     if (strcmp(topic, "host/hal/in") != 0) fail("mqtt peer subscribe topic");
-    uint8_t suback[3] = { body[0], body[1], 0 };
+    uint8_t suback[3] = {body[0], body[1], 0};
     mqtt_test_send_packet(fd, 0x90, suback, sizeof(suback));
     const char payload[] = "HAL_MQTT_IN";
     uint8_t publish[128];
@@ -712,8 +710,8 @@ static void *mqtt_hal_peer(void *arg) {
     if (!mqtt_test_read_packet(fd, &header, body, sizeof(body), &body_len) ||
         (header >> 4) != 3)
         fail("mqtt peer publish");
-    const uint8_t *payload_ptr = mqtt_test_utf8(body, body_len, 0, topic,
-                                                sizeof(topic));
+    const uint8_t * payload_ptr = mqtt_test_utf8(body, body_len, 0, topic,
+                                                 sizeof(topic));
     if (strcmp(topic, "host/hal/out") != 0 ||
         body + body_len < payload_ptr ||
         (size_t)(body + body_len - payload_ptr) != 12 ||
@@ -725,7 +723,7 @@ static void *mqtt_hal_peer(void *arg) {
         fail("mqtt peer unsubscribe");
     mqtt_test_utf8(body, body_len, 2, topic, sizeof(topic));
     if (strcmp(topic, "host/hal/in") != 0) fail("mqtt peer unsubscribe topic");
-    uint8_t unsuback[2] = { body[0], body[1] };
+    uint8_t unsuback[2] = {body[0], body[1]};
     mqtt_test_send_packet(fd, 0xB0, unsuback, sizeof(unsuback));
 
     if (!mqtt_test_read_packet(fd, &header, body, sizeof(body), &body_len) ||
@@ -787,7 +785,7 @@ int main(void) {
         fail("host wifi connect unsupported");
     if (hal_net_wifi_status() != HAL_NET_UNSUPPORTED)
         fail("host wifi status unsupported");
-    char scan_buf[8] = { 'x' };
+    char scan_buf[8] = {'x'};
     size_t scan_written = 1;
     if (hal_net_wifi_scan(scan_buf, sizeof(scan_buf), &scan_written, 0) !=
             HAL_NET_UNSUPPORTED ||

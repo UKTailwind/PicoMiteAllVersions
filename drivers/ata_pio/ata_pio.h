@@ -24,25 +24,25 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#define ATA_DRIVE_COUNT          4
-#define ATA_PRIMARY_MASTER       0
-#define ATA_PRIMARY_SLAVE        1
-#define ATA_SECONDARY_MASTER     2
-#define ATA_SECONDARY_SLAVE      3
+#define ATA_DRIVE_COUNT 4
+#define ATA_PRIMARY_MASTER 0
+#define ATA_PRIMARY_SLAVE 1
+#define ATA_SECONDARY_MASTER 2
+#define ATA_SECONDARY_SLAVE 3
 
-#define ATA_SECTOR_SIZE          512
+#define ATA_SECTOR_SIZE 512
 
 typedef struct {
-    bool        present;
-    uint32_t    sector_count;          /* LBA28 max — capped at 0x0FFFFFFF */
-    char        model[41];             /* 40 chars + NUL */
+    bool present;
+    uint32_t sector_count; /* LBA28 max — capped at 0x0FFFFFFF */
+    char model[41];        /* 40 chars + NUL */
 } ata_drive_info_t;
 
 void ata_init(void);
-const ata_drive_info_t *ata_drive(unsigned drive);
+const ata_drive_info_t * ata_drive(unsigned drive);
 
 /* Returns 0 on success, non-zero on failure. count is in sectors. */
-int  ata_read_sectors (unsigned drive, uint32_t lba, uint8_t count, void *buf);
-int  ata_write_sectors(unsigned drive, uint32_t lba, uint8_t count, const void *buf);
+int ata_read_sectors(unsigned drive, uint32_t lba, uint8_t count, void * buf);
+int ata_write_sectors(unsigned drive, uint32_t lba, uint8_t count, const void * buf);
 
 #endif

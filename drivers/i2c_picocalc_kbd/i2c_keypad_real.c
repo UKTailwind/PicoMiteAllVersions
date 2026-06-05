@@ -15,41 +15,103 @@
 /* PicoCalc scan-word translator. Returns the cooked character to
  * enqueue, or -1 if the byte was a modifier / state change / unknown
  * sentinel that should NOT be enqueued. */
-int hal_i2c_keypad_translate(uint16_t buff, int *ctrlheld_inout) {
-    if (buff == 0xA503) { *ctrlheld_inout = 0; return -1; }
-    if (buff == 0xA502) { *ctrlheld_inout = 1; return -1; }
-    if ((buff & 0xff) != 1) return -1;          /* not a press */
+int hal_i2c_keypad_translate(uint16_t buff, int * ctrlheld_inout) {
+    if (buff == 0xA503) {
+        *ctrlheld_inout = 0;
+        return -1;
+    }
+    if (buff == 0xA502) {
+        *ctrlheld_inout = 1;
+        return -1;
+    }
+    if ((buff & 0xff) != 1) return -1; /* not a press */
 
     int c = buff >> 8;
     int realc;
     switch (c) {
-        case 0xd4: realc = DEL; break;
-        case 0xb5: realc = UP; break;
-        case 0xb6: realc = DOWN; break;
-        case 0xb4: realc = LEFT; break;
-        case 0xb7: realc = RIGHT; break;
-        case 0xd1: realc = INSERT; break;
-        case 0xd2: realc = HOME; break;
-        case 0xd5: realc = END; break;
-        case 0xd6: realc = PUP; break;
-        case 0xd7: realc = PDOWN; break;
-        case 0xa1: realc = ALT; break;
-        case 0x81: realc = F1; break;
-        case 0x82: realc = F2; break;
-        case 0x83: realc = F3; break;
-        case 0x84: realc = F4; break;
-        case 0x85: realc = F5; break;
-        case 0x86: realc = F6; break;
-        case 0x87: realc = F7; break;
-        case 0x88: realc = F8; break;
-        case 0x89: realc = F9; break;
-        case 0x90: realc = F10; break;
-        case 0xd0: realc = BreakKey; break;
-        case 0xb1: realc = ESC; break;
-        case 0x0a: realc = ENTER; break;
-        case 0x91: realc = 0x66; break;        /* USB HID keypad keyboard-power */
-        case 0xa2: case 0xa3: case 0xa5: case 0xc1: return -1;  /* modifiers */
-        default:   realc = c; break;
+    case 0xd4:
+        realc = DEL;
+        break;
+    case 0xb5:
+        realc = UP;
+        break;
+    case 0xb6:
+        realc = DOWN;
+        break;
+    case 0xb4:
+        realc = LEFT;
+        break;
+    case 0xb7:
+        realc = RIGHT;
+        break;
+    case 0xd1:
+        realc = INSERT;
+        break;
+    case 0xd2:
+        realc = HOME;
+        break;
+    case 0xd5:
+        realc = END;
+        break;
+    case 0xd6:
+        realc = PUP;
+        break;
+    case 0xd7:
+        realc = PDOWN;
+        break;
+    case 0xa1:
+        realc = ALT;
+        break;
+    case 0x81:
+        realc = F1;
+        break;
+    case 0x82:
+        realc = F2;
+        break;
+    case 0x83:
+        realc = F3;
+        break;
+    case 0x84:
+        realc = F4;
+        break;
+    case 0x85:
+        realc = F5;
+        break;
+    case 0x86:
+        realc = F6;
+        break;
+    case 0x87:
+        realc = F7;
+        break;
+    case 0x88:
+        realc = F8;
+        break;
+    case 0x89:
+        realc = F9;
+        break;
+    case 0x90:
+        realc = F10;
+        break;
+    case 0xd0:
+        realc = BreakKey;
+        break;
+    case 0xb1:
+        realc = ESC;
+        break;
+    case 0x0a:
+        realc = ENTER;
+        break;
+    case 0x91:
+        realc = 0x66;
+        break; /* USB HID keypad keyboard-power */
+    case 0xa2:
+    case 0xa3:
+    case 0xa5:
+    case 0xc1:
+        return -1; /* modifiers */
+    default:
+        realc = c;
+        break;
     }
     return realc;
 }
@@ -63,9 +125,11 @@ void hal_i2c_keypad_boot_init(void) {
     uSec(300000);
 }
 
-int hal_i2c_keypad_owns_i2c_bus(void) { return 1; }
+int hal_i2c_keypad_owns_i2c_bus(void) {
+    return 1;
+}
 
-extern void PO2Int(char *s1, int n);
+extern void PO2Int(char * s1, int n);
 
 void hal_i2c_keypad_print_options(void) {
     if (Option.KEYBOARDBL) PO2Int("BACKLIGHT KB", Option.KEYBOARDBL);
@@ -99,4 +163,4 @@ int hal_i2c_keypad_set_backlight(int level) {
 }
 
 /* PicoCalc accepts any DISPLAY_TYPE — keypad MCU drives backlight. */
-void hal_i2c_keypad_validate_backlight_supported(void) { }
+void hal_i2c_keypad_validate_backlight_supported(void) {}

@@ -37,18 +37,16 @@ static int pc386_options_sparse_ini;
 
 /* Read-only handles consumed by Memory.c's scan loops + LoadOptions's
  * memcpy-from-flash path. */
-const uint8_t *flash_option_contents = pc386_flash_option_buf;
-const uint8_t *flash_target_contents = pc386_flash_prog_buf;
+const uint8_t * flash_option_contents = pc386_flash_option_buf;
+const uint8_t * flash_target_contents = pc386_flash_prog_buf;
 
 /* flash_progmemory is the runtime ProgMemory base; bc_alloc reads from
  * it. Initialised here so kmain doesn't have to. */
-extern const uint8_t *flash_progmemory;
+extern const uint8_t * flash_progmemory;
 extern void port_apply_load_overrides(void);
 extern void pc386_apply_runtime_option_defaults(void);
 
-
-static int pc386_is_legacy_runtime_field(const char *name, void *ctx)
-{
+static int pc386_is_legacy_runtime_field(const char * name, void * ctx) {
     (void)ctx;
     return strcasecmp(name, "DefaultFont") == 0 ||
            strcasecmp(name, "Height") == 0 ||
@@ -57,8 +55,7 @@ static int pc386_is_legacy_runtime_field(const char *name, void *ctx)
            strcasecmp(name, "DISPLAY_CONSOLE") == 0;
 }
 
-static int pc386_is_runtime_derived_field(const char *name, void *ctx)
-{
+static int pc386_is_runtime_derived_field(const char * name, void * ctx) {
     (void)ctx;
     return strcasecmp(name, "Height") == 0 ||
            strcasecmp(name, "Width") == 0 ||
@@ -66,8 +63,7 @@ static int pc386_is_runtime_derived_field(const char *name, void *ctx)
            strcasecmp(name, "DISPLAY_CONSOLE") == 0;
 }
 
-static void pc386_options_load_ini(void)
-{
+static void pc386_options_load_ini(void) {
     FIL fp;
     if (f_open(&fp, "C:/OPTIONS.INI", FA_READ) != FR_OK) return;
     static char buf[16384];
@@ -81,16 +77,14 @@ static void pc386_options_load_ini(void)
     f_close(&fp);
 }
 
-static int pc386_write_ini_line(void *ctx, const char *line)
-{
-    FIL *fp = (FIL *)ctx;
+static int pc386_write_ini_line(void * ctx, const char * line) {
+    FIL * fp = (FIL *)ctx;
     UINT wrote = 0;
     FRESULT fr = f_write(fp, line, (UINT)strlen(line), &wrote);
     return (fr == FR_OK && wrote == strlen(line)) ? 0 : -1;
 }
 
-static void pc386_options_capture_defaults(void)
-{
+static void pc386_options_capture_defaults(void) {
     struct option_s saved;
     memcpy(&saved, &Option, sizeof(saved));
     memset(&Option, 0, sizeof(Option));
@@ -100,8 +94,7 @@ static void pc386_options_capture_defaults(void)
     memcpy(&Option, &saved, sizeof(Option));
 }
 
-static void pc386_options_write_ini(void)
-{
+static void pc386_options_write_ini(void) {
     struct option_s zero;
     memset(&zero, 0, sizeof(zero));
     if (memcmp(pc386_default_option_buf, &zero, sizeof(zero)) == 0) {
@@ -129,7 +122,7 @@ void pc386_flash_init(void) {
     /* Program area starts erased (0xFF). Option block reads as zero on
      * first boot — matches the freshness contract in hal_flash.h, which
      * is *different* from raw flash 0xFF state. */
-    memset(pc386_flash_prog_buf,   0xFF, sizeof(pc386_flash_prog_buf));
+    memset(pc386_flash_prog_buf, 0xFF, sizeof(pc386_flash_prog_buf));
     memset(pc386_flash_option_buf, 0x00, sizeof(pc386_flash_option_buf));
     memset(pc386_default_option_buf, 0x00, sizeof(pc386_default_option_buf));
     pc386_options_capturing_defaults = 0;
@@ -138,8 +131,7 @@ void pc386_flash_init(void) {
     pc386_options_load_ini();
 }
 
-void pc386_options_defaults_ready(void)
-{
+void pc386_options_defaults_ready(void) {
     pc386_options_capture_defaults();
 }
 
@@ -164,7 +156,7 @@ void flash_range_erase(uint32_t off, uint32_t count) {
     /* Out-of-range write — silently ignored (matches host posture). */
 }
 
-void flash_range_program(uint32_t off, const uint8_t *data, uint32_t count) {
+void flash_range_program(uint32_t off, const uint8_t * data, uint32_t count) {
     if (off + count <= sizeof(pc386_flash_prog_buf)) {
         memcpy(pc386_flash_prog_buf + off, data, count);
         return;

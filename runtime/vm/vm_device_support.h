@@ -16,23 +16,23 @@
 #endif
 
 #ifndef RADCONV
-#define RADCONV   (MMFLOAT)57.2957795130823229
+#define RADCONV (MMFLOAT)57.2957795130823229
 #endif
 #ifndef Rad
-#define Rad(a)  (((MMFLOAT)(a)) / RADCONV)
+#define Rad(a) (((MMFLOAT)(a)) / RADCONV)
 #endif
 
 extern jmp_buf mark;
 
-void error(char *msg, ...);
-void Mstrcpy(unsigned char *dest, unsigned char *src);
-int Mstrcmp(unsigned char *s1, unsigned char *s2);
+void error(char * msg, ...);
+void Mstrcpy(unsigned char * dest, unsigned char * src);
+int Mstrcmp(unsigned char * s1, unsigned char * s2);
 int64_t FloatToInt64(MMFLOAT x);
-void IntToStr(char *strr, int64_t nbr, unsigned int base);
-void FloatToStr(char *p, MMFLOAT f, int m, int n, unsigned char ch);
+void IntToStr(char * strr, int64_t nbr, unsigned int base);
+void FloatToStr(char * p, MMFLOAT f, int m, int n, unsigned char ch);
 void ClearVars(int level, bool all);
 
-extern unsigned char *CurrentLinePtr;
+extern unsigned char * CurrentLinePtr;
 extern int g_OptionBase;
 extern int last_fcolour;
 extern int last_bcolour;

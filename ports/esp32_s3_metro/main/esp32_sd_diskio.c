@@ -21,32 +21,30 @@
 #include "ff.h"
 #include "diskio.h"
 
-#define METRO_SD_PIN_CLK   GPIO_NUM_39
-#define METRO_SD_PIN_MOSI  GPIO_NUM_42
-#define METRO_SD_PIN_MISO  GPIO_NUM_21
-#define METRO_SD_PIN_CS    GPIO_NUM_45
+#define METRO_SD_PIN_CLK GPIO_NUM_39
+#define METRO_SD_PIN_MOSI GPIO_NUM_42
+#define METRO_SD_PIN_MISO GPIO_NUM_21
+#define METRO_SD_PIN_CS GPIO_NUM_45
 
 #define METRO_SD_SPI_FREQ_KHZ 10000
-#define METRO_SD_SECTOR_SIZE  512
+#define METRO_SD_SECTOR_SIZE 512
 
-static const char *TAG = "sdcard";
+static const char * TAG = "sdcard";
 
 extern volatile BYTE SDCardStat;
 
 static sdmmc_card_t s_card;
-static sdmmc_card_t *s_cardp;
+static sdmmc_card_t * s_cardp;
 static sdmmc_host_t s_host;
 static sdspi_dev_handle_t s_sdspi_handle = -1;
 static int s_host_inited;
 
-static DSTATUS sd_not_ready(void)
-{
+static DSTATUS sd_not_ready(void) {
     SDCardStat |= STA_NOINIT | STA_NODISK;
     return SDCardStat;
 }
 
-static esp_err_t init_sdspi_card(void)
-{
+static esp_err_t init_sdspi_card(void) {
     sdmmc_host_t host = SDSPI_HOST_DEFAULT();
     host.max_freq_khz = METRO_SD_SPI_FREQ_KHZ;
 
@@ -100,34 +98,31 @@ static esp_err_t init_sdspi_card(void)
     s_sdspi_handle = handle;
     s_host_inited = 1;
     s_cardp = &s_card;
-    SDCardStat &= (BYTE)~(STA_NOINIT | STA_NODISK | STA_PROTECT);
+    SDCardStat &= (BYTE) ~(STA_NOINIT | STA_NODISK | STA_PROTECT);
 
     ESP_LOGI(TAG, "microSD ready: %llu MB",
              ((uint64_t)s_card.csd.capacity * s_card.csd.sector_size) /
-             (1024ULL * 1024ULL));
+                 (1024ULL * 1024ULL));
     return ESP_OK;
 }
 
-DSTATUS disk_initialize(BYTE pdrv)
-{
+DSTATUS disk_initialize(BYTE pdrv) {
     if (pdrv != 0) return STA_NOINIT;
     if (s_cardp) return SDCardStat;
     return init_sdspi_card() == ESP_OK ? SDCardStat : sd_not_ready();
 }
 
-DSTATUS disk_status(BYTE pdrv)
-{
+DSTATUS disk_status(BYTE pdrv) {
     if (pdrv != 0 || !s_cardp) return STA_NOINIT;
     return SDCardStat;
 }
 
-static DRESULT with_sector_scratch(BYTE *scratch,
-                                   BYTE *dst,
-                                   const BYTE *src,
+static DRESULT with_sector_scratch(BYTE * scratch,
+                                   BYTE * dst,
+                                   const BYTE * src,
                                    LBA_t sector,
                                    UINT count,
-                                   int write)
-{
+                                   int write) {
     for (UINT i = 0; i < count; i++) {
         esp_err_t err;
         if (write) {
@@ -152,31 +147,28 @@ static DRESULT with_sector_scratch(BYTE *scratch,
     return RES_OK;
 }
 
-DRESULT disk_read(BYTE pdrv, BYTE *buff, LBA_t sector, UINT count)
-{
+DRESULT disk_read(BYTE pdrv, BYTE * buff, LBA_t sector, UINT count) {
     if (pdrv != 0 || !s_cardp) return RES_NOTRDY;
     if (!buff || count == 0) return RES_PARERR;
-    BYTE *scratch = (BYTE *)heap_caps_malloc(METRO_SD_SECTOR_SIZE, MALLOC_CAP_DMA | MALLOC_CAP_8BIT);
+    BYTE * scratch = (BYTE *)heap_caps_malloc(METRO_SD_SECTOR_SIZE, MALLOC_CAP_DMA | MALLOC_CAP_8BIT);
     if (!scratch) return RES_ERROR;
     DRESULT r = with_sector_scratch(scratch, buff, NULL, sector, count, 0);
     heap_caps_free(scratch);
     return r;
 }
 
-DRESULT disk_write(BYTE pdrv, const BYTE *buff, LBA_t sector, UINT count)
-{
+DRESULT disk_write(BYTE pdrv, const BYTE * buff, LBA_t sector, UINT count) {
     if (pdrv != 0 || !s_cardp) return RES_NOTRDY;
     if (!buff || count == 0) return RES_PARERR;
     if (SDCardStat & STA_PROTECT) return RES_WRPRT;
-    BYTE *scratch = (BYTE *)heap_caps_malloc(METRO_SD_SECTOR_SIZE, MALLOC_CAP_DMA | MALLOC_CAP_8BIT);
+    BYTE * scratch = (BYTE *)heap_caps_malloc(METRO_SD_SECTOR_SIZE, MALLOC_CAP_DMA | MALLOC_CAP_8BIT);
     if (!scratch) return RES_ERROR;
     DRESULT r = with_sector_scratch(scratch, NULL, buff, sector, count, 1);
     heap_caps_free(scratch);
     return r;
 }
 
-DRESULT disk_ioctl(BYTE pdrv, BYTE cmd, void *buff)
-{
+DRESULT disk_ioctl(BYTE pdrv, BYTE cmd, void * buff) {
     if (pdrv != 0 || !s_cardp) return RES_NOTRDY;
 
     switch (cmd) {
@@ -203,8 +195,7 @@ DRESULT disk_ioctl(BYTE pdrv, BYTE cmd, void *buff)
     }
 }
 
-DWORD get_fattime(void)
-{
+DWORD get_fattime(void) {
     time_t now = time(NULL);
     struct tm tmv;
     if (now <= 0 || localtime_r(&now, &tmv) == NULL || tmv.tm_year + 1900 < 1980) {
@@ -218,8 +209,7 @@ DWORD get_fattime(void)
            ((DWORD)(tmv.tm_sec / 2));
 }
 
-void esp32_sd_diskio_reset(void)
-{
+void esp32_sd_diskio_reset(void) {
     if (s_host_inited && s_sdspi_handle >= 0) {
         (void)s_host.deinit_p(s_host.slot);
     }

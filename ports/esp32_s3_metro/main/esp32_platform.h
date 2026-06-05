@@ -15,8 +15,8 @@
 #ifndef MMBASIC_ESP32_PLATFORM_H
 #define MMBASIC_ESP32_PLATFORM_H
 
-#define PICOMITE        1
-#define MMBASIC_ESP32   1
+#define PICOMITE 1
+#define MMBASIC_ESP32 1
 
 /* Pico SDK section attributes — no-ops on Xtensa. */
 #define __not_in_flash_func(x) x

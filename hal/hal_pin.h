@@ -29,14 +29,14 @@ extern "C" {
  * ---------------------------------------------------------------------- */
 
 typedef enum {
-    HAL_PIN_MODE_DISABLED = 0,  /* no pulls, no drive */
-    HAL_PIN_MODE_INPUT,         /* digital input, no pull */
+    HAL_PIN_MODE_DISABLED = 0, /* no pulls, no drive */
+    HAL_PIN_MODE_INPUT,        /* digital input, no pull */
     HAL_PIN_MODE_INPUT_PULLUP,
     HAL_PIN_MODE_INPUT_PULLDOWN,
-    HAL_PIN_MODE_OUTPUT,        /* push-pull driver */
+    HAL_PIN_MODE_OUTPUT, /* push-pull driver */
     HAL_PIN_MODE_OPEN_DRAIN,
-    HAL_PIN_MODE_ANALOG,        /* ADC channel */
-    HAL_PIN_MODE_PWM,           /* PWM output — use hal_pin_pwm_* to configure */
+    HAL_PIN_MODE_ANALOG, /* ADC channel */
+    HAL_PIN_MODE_PWM,    /* PWM output — use hal_pin_pwm_* to configure */
 } hal_pin_mode_t;
 
 void hal_pin_set_mode(uint32_t gpio, hal_pin_mode_t mode);
@@ -115,8 +115,8 @@ void hal_pin_adc_select(uint32_t adc_channel);
  *   read            — single 12-bit conversion on the currently-selected
  *                     channel; returns raw 0..4095.
  * DMA/round-robin/FIFO is a separate (later) hal_adc surface. */
-void     hal_pin_adc_init(void);
-void     hal_pin_adc_set_temp_sensor(bool enabled);
+void hal_pin_adc_init(void);
+void hal_pin_adc_set_temp_sensor(bool enabled);
 uint16_t hal_pin_adc_read(void);
 
 /* -----------------------------------------------------------------------
@@ -163,15 +163,15 @@ void hal_pin_irq_set_edge(uint32_t gpio, uint32_t edge_mask, bool enabled);
  * ---------------------------------------------------------------------- */
 
 typedef enum {
-    HAL_PIN_FUNC_NONE = 0,  /* GPIO_FUNC_NULL — disconnect pad */
-    HAL_PIN_FUNC_SIO,       /* plain digital */
+    HAL_PIN_FUNC_NONE = 0, /* GPIO_FUNC_NULL — disconnect pad */
+    HAL_PIN_FUNC_SIO,      /* plain digital */
     HAL_PIN_FUNC_UART,
     HAL_PIN_FUNC_I2C,
     HAL_PIN_FUNC_SPI,
     HAL_PIN_FUNC_PWM,
     HAL_PIN_FUNC_PIO0,
     HAL_PIN_FUNC_PIO1,
-    HAL_PIN_FUNC_PIO2,      /* rp2350 only */
+    HAL_PIN_FUNC_PIO2, /* rp2350 only */
 } hal_pin_func_t;
 
 void hal_pin_init_digital(uint32_t gpio);
@@ -190,9 +190,9 @@ void hal_pin_set_function(uint32_t gpio, hal_pin_func_t func);
 
 uint64_t hal_pin_bank_read_all(void);
 uint64_t hal_pin_bank_read_out_latch(void);
-void     hal_pin_bank_set_mask(uint64_t mask);
-void     hal_pin_bank_clr_mask(uint64_t mask);
-void     hal_pin_bank_xor_mask(uint64_t mask);
+void hal_pin_bank_set_mask(uint64_t mask);
+void hal_pin_bank_clr_mask(uint64_t mask);
+void hal_pin_bank_xor_mask(uint64_t mask);
 
 #ifdef __cplusplus
 }
@@ -208,4 +208,4 @@ void     hal_pin_bank_xor_mask(uint64_t mask);
  * ---------------------------------------------------------------------- */
 #include "hal_pin_inlines.h"
 
-#endif  /* HAL_PIN_H */
+#endif /* HAL_PIN_H */

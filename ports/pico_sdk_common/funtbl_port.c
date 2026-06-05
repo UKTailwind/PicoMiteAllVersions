@@ -27,11 +27,10 @@
 /* Relocated from MMBasic.c — funtbl is only used on rp2350. */
 struct s_funtbl funtbl[MAXSUBFUN];
 
-
-static void hashlabels(unsigned char *p, int ErrAbort) {
+static void hashlabels(unsigned char * p, int ErrAbort) {
     int j, u, namelen;
     uint32_t originalhash, hash = FNV_offset_basis;
-    char *lastp = (char *)p + 1;
+    char * lastp = (char *)p + 1;
     (void)ErrAbort;
     while (1) {
         if (p[0] == 0 && p[1] == 0) break;
@@ -40,7 +39,10 @@ static void hashlabels(unsigned char *p, int ErrAbort) {
             p++;
             continue;
         }
-        if (p[0] == T_LINENBR) { p += 3; continue; }
+        if (p[0] == T_LINENBR) {
+            p += 3;
+            continue;
+        }
         if (p[0] == T_LABEL) {
             p++;
             hash = FNV_offset_basis;
@@ -113,12 +115,12 @@ void port_prepare_program_finalize_subfun(int ErrAbort) {
     hashlabels(ProgMemory, ErrAbort);
 }
 
-int port_try_check_var_subfun_collision(const unsigned char *name, int namelen) {
+int port_try_check_var_subfun_collision(const unsigned char * name, int namelen) {
     uint32_t hash = FNV_offset_basis;
     uint32_t funhash;
     int j;
-    const char *ip;
-    char *tp;
+    const char * ip;
+    char * tp;
 
     for (int i = 0; i < namelen; i++) {
         hash ^= name[i];
@@ -131,7 +133,11 @@ int port_try_check_var_subfun_collision(const unsigned char *name, int namelen) 
         tp = funtbl[funhash].name;
         if (*ip++ == *tp++) {
             j = namelen - 1;
-            while (j > 0 && *ip == *tp) { j--; ip++; tp++; }
+            while (j > 0 && *ip == *tp) {
+                j--;
+                ip++;
+                tp++;
+            }
             if (j == 0 && (*(char *)tp == 0 || namelen == MAXVARLEN)) {
                 if (funtbl[funhash].index < MAXSUBFUN)
                     error("A sub/fun has the same name: $", (char *)name);
@@ -143,18 +149,21 @@ int port_try_check_var_subfun_collision(const unsigned char *name, int namelen) 
     return 1;
 }
 
-int port_try_find_label_hash(unsigned char *labelptr, unsigned char **out_ptr) {
+int port_try_find_label_hash(unsigned char * labelptr, unsigned char ** out_ptr) {
     unsigned char *tp, *ip;
     int i;
     uint32_t hash = FNV_offset_basis;
     char label[MAXVARLEN + 1];
 
-    if (labelptr == NULL) { *out_ptr = NULL; return 1; }
+    if (labelptr == NULL) {
+        *out_ptr = NULL;
+        return 1;
+    }
 
     label[1] = mytoupper(*labelptr++);
     hash ^= label[1];
     hash *= FNV_prime;
-    for (i = 2; ; i++) {
+    for (i = 2;; i++) {
         if (!isnamechar(*labelptr)) break;
         if (i > MAXVARLEN) error("Label too long");
         label[i] = mytoupper(*labelptr++);
@@ -169,7 +178,11 @@ int port_try_find_label_hash(unsigned char *labelptr, unsigned char **out_ptr) {
         ip = (unsigned char *)&label[1];
         if (*ip++ == *tp++) {
             i = label[0] - 1;
-            while (i > 0 && *ip == *tp) { i--; ip++; tp++; }
+            while (i > 0 && *ip == *tp) {
+                i--;
+                ip++;
+                tp++;
+            }
             if (i == 0 && (*(char *)tp == 0)) {
                 *out_ptr = (unsigned char *)funtbl[hash].index;
                 return 1;
@@ -183,14 +196,15 @@ int port_try_find_label_hash(unsigned char *labelptr, unsigned char **out_ptr) {
     return 1;
 }
 
-int __not_in_flash_func(port_try_find_subfun_hash)(unsigned char *p, int *out_index) {
-    unsigned char *s;
+int __not_in_flash_func(port_try_find_subfun_hash)(unsigned char * p, int * out_index) {
+    unsigned char * s;
     unsigned char name[MAXVARLEN + 1];
     int j, u, namelen;
     unsigned int hash = FNV_offset_basis;
     unsigned char *tp, *ip;
 
-    s = name; namelen = 0;
+    s = name;
+    namelen = 0;
     do {
         u = mytoupper(*p);
         hash ^= u;
@@ -207,7 +221,11 @@ int __not_in_flash_func(port_try_find_subfun_hash)(unsigned char *p, int *out_in
         tp = (unsigned char *)funtbl[hash].name;
         if (*ip++ == *tp++) {
             j = namelen - 1;
-            while (j > 0 && *ip == *tp) { j--; ip++; tp++; }
+            while (j > 0 && *ip == *tp) {
+                j--;
+                ip++;
+                tp++;
+            }
             if (j == 0 && (*(char *)tp == 0 || namelen == MAXVARLEN) && funtbl[hash].index < MAXSUBFUN) {
                 *out_index = funtbl[hash].index;
                 return 1;
@@ -222,7 +240,7 @@ int __not_in_flash_func(port_try_find_subfun_hash)(unsigned char *p, int *out_in
 
 #else
 
-int port_try_find_subfun_hash(unsigned char *p, int *out_index) {
+int port_try_find_subfun_hash(unsigned char * p, int * out_index) {
     (void)p;
     (void)out_index;
     return 0;
@@ -232,13 +250,13 @@ void port_prepare_program_finalize_subfun(int ErrAbort) {
     (void)ErrAbort;
 }
 
-int port_try_find_label_hash(unsigned char *labelptr, unsigned char **out_ptr) {
+int port_try_find_label_hash(unsigned char * labelptr, unsigned char ** out_ptr) {
     (void)labelptr;
     (void)out_ptr;
     return 0;
 }
 
-int port_try_check_var_subfun_collision(const unsigned char *name, int namelen) {
+int port_try_check_var_subfun_collision(const unsigned char * name, int namelen) {
     (void)name;
     (void)namelen;
     return 0;

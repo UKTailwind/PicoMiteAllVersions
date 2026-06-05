@@ -44,10 +44,13 @@
  * the in-memory FAT disk. NULL for the test harness — commands that
  * require filesystem access error rather than scribble on the user's
  * real files. */
-const char *host_sd_root = NULL;
+const char * host_sd_root = NULL;
 
-static void host_resolve_sd_path(const char *fname, char *out, size_t out_cap) {
-    if (!host_sd_root) { error("No SD root configured"); return; }
+static void host_resolve_sd_path(const char * fname, char * out, size_t out_cap) {
+    if (!host_sd_root) {
+        error("No SD root configured");
+        return;
+    }
     /* Absolute paths pass through unchanged. Relative paths get joined to
      * host_sd_root with a single '/'. */
     if (fname[0] == '/') {
@@ -81,15 +84,15 @@ static void host_resolve_sd_path(const char *fname, char *out, size_t out_cap) {
  * ftime = hr<<11 | min<<5 | sec/2). Zero-filled when mtime decode fails;
  * cmd_files prints "00:00 00-00-1980" but doesn't crash.
  * ======================================================================= */
-static host_fs_walker_t *host_find_walker = NULL;
+static host_fs_walker_t * host_find_walker = NULL;
 
-FRESULT host_f_findfirst(DIR *dp, FILINFO *fi, const TCHAR *path, const TCHAR *pattern);
-FRESULT host_f_findnext(DIR *dp, FILINFO *fi);
-FRESULT host_f_closedir(DIR *dp);
-static void host_strip_fatfs_drive(const char *in, char *out, int out_cap);
-void host_join_sd_root(const char *relpath, char *out, int out_cap);
+FRESULT host_f_findfirst(DIR * dp, FILINFO * fi, const TCHAR * path, const TCHAR * pattern);
+FRESULT host_f_findnext(DIR * dp, FILINFO * fi);
+FRESULT host_f_closedir(DIR * dp);
+static void host_strip_fatfs_drive(const char * in, char * out, int out_cap);
+void host_join_sd_root(const char * relpath, char * out, int out_cap);
 
-static void host_fill_finfo_from_posix(FILINFO *fi, const char *name,
+static void host_fill_finfo_from_posix(FILINFO * fi, const char * name,
                                        int is_dir, unsigned long long size,
                                        int64_t mtime_epoch) {
     memset(fi, 0, sizeof(*fi));
@@ -106,14 +109,14 @@ static void host_fill_finfo_from_posix(FILINFO *fi, const char *name,
     }
 }
 
-static void host_strip_fatfs_drive_keep_root(const char *in, char *out, int out_cap) {
+static void host_strip_fatfs_drive_keep_root(const char * in, char * out, int out_cap) {
     if (out_cap <= 0) return;
     if (in[0] && in[1] == ':') in += 2;
     snprintf(out, out_cap, "%s", *in ? in : "/");
 }
 
-FRESULT host_f_findfirst(DIR *dp, FILINFO *fi, const TCHAR *path,
-                         const TCHAR *pattern) {
+FRESULT host_f_findfirst(DIR * dp, FILINFO * fi, const TCHAR * path,
+                         const TCHAR * pattern) {
     if (!host_sd_root) {
         char stripped[HOST_PATH_MAX];
         host_strip_fatfs_drive_keep_root(path, stripped, sizeof(stripped));
@@ -127,14 +130,20 @@ FRESULT host_f_findfirst(DIR *dp, FILINFO *fi, const TCHAR *path,
     host_join_sd_root(path, target, sizeof(target));
     if (host_find_walker) host_fs_walk_close(host_find_walker);
     host_find_walker = host_fs_walk_open(target, pattern);
-    if (!host_find_walker) { memset(fi, 0, sizeof(*fi)); return FR_NO_PATH; }
+    if (!host_find_walker) {
+        memset(fi, 0, sizeof(*fi));
+        return FR_NO_PATH;
+    }
     return host_f_findnext(dp, fi);
 }
 
-FRESULT host_f_findnext(DIR *dp, FILINFO *fi) {
+FRESULT host_f_findnext(DIR * dp, FILINFO * fi) {
     if (!host_sd_root) return f_findnext(dp, fi);
     (void)dp;
-    if (!host_find_walker) { memset(fi, 0, sizeof(*fi)); return FR_NO_FILE; }
+    if (!host_find_walker) {
+        memset(fi, 0, sizeof(*fi));
+        return FR_NO_FILE;
+    }
     char name[FF_MAX_LFN + 1];
     int is_dir = 0;
     unsigned long long size = 0;
@@ -143,13 +152,13 @@ FRESULT host_f_findnext(DIR *dp, FILINFO *fi) {
                            &is_dir, &size, &mtime)) {
         memset(fi, 0, sizeof(*fi));
         fi->fname[0] = 0;
-        return FR_OK;   /* FatFS signals end-of-dir by empty fname, FR_OK */
+        return FR_OK; /* FatFS signals end-of-dir by empty fname, FR_OK */
     }
     host_fill_finfo_from_posix(fi, name, is_dir, size, mtime);
     return FR_OK;
 }
 
-FRESULT host_f_closedir(DIR *dp) {
+FRESULT host_f_closedir(DIR * dp) {
     if (!host_sd_root) return f_closedir(dp);
     (void)dp;
     if (host_find_walker) {
@@ -167,7 +176,7 @@ FRESULT host_f_closedir(DIR *dp) {
  * The path argument FileIO.c hands us has a FatFS drive prefix (e.g.
  * "0:/foo.bas" from getfullfilename). We strip that so POSIX paths
  * work cleanly under host_sd_root. */
-static void host_strip_fatfs_drive(const char *in, char *out, int out_cap) {
+static void host_strip_fatfs_drive(const char * in, char * out, int out_cap) {
     if (out_cap <= 0) return;
     /* Skip "N:" drive prefix if present. */
     if (in[0] && in[1] == ':') in += 2;
@@ -176,20 +185,20 @@ static void host_strip_fatfs_drive(const char *in, char *out, int out_cap) {
     snprintf(out, out_cap, "%s", in);
 }
 
-void host_join_sd_root(const char *relpath, char *out, int out_cap) {
+void host_join_sd_root(const char * relpath, char * out, int out_cap) {
     char stripped[HOST_PATH_MAX];
     host_strip_fatfs_drive(relpath, stripped, sizeof(stripped));
     host_resolve_sd_path(stripped, out, (size_t)out_cap);
 }
 
-FRESULT host_f_unlink(const TCHAR *path) {
+FRESULT host_f_unlink(const TCHAR * path) {
     if (!host_sd_root) return f_unlink(path);
     char p[HOST_PATH_MAX];
     host_join_sd_root(path, p, sizeof(p));
     return host_fs_unlink(p) == 0 ? FR_OK : FR_NO_FILE;
 }
 
-FRESULT host_f_rename(const TCHAR *from, const TCHAR *to) {
+FRESULT host_f_rename(const TCHAR * from, const TCHAR * to) {
     if (!host_sd_root) return f_rename(from, to);
     char a[HOST_PATH_MAX], b[HOST_PATH_MAX];
     host_join_sd_root(from, a, sizeof(a));
@@ -197,21 +206,21 @@ FRESULT host_f_rename(const TCHAR *from, const TCHAR *to) {
     return host_fs_rename(a, b) == 0 ? FR_OK : FR_NO_FILE;
 }
 
-FRESULT host_f_mkdir(const TCHAR *path) {
+FRESULT host_f_mkdir(const TCHAR * path) {
     if (!host_sd_root) return f_mkdir(path);
     char p[HOST_PATH_MAX];
     host_join_sd_root(path, p, sizeof(p));
     return host_fs_mkdir(p) == 0 ? FR_OK : FR_EXIST;
 }
 
-FRESULT host_f_chdir(const TCHAR *path) {
+FRESULT host_f_chdir(const TCHAR * path) {
     if (!host_sd_root) return f_chdir(path);
     char p[HOST_PATH_MAX];
     host_join_sd_root(path, p, sizeof(p));
     return host_fs_chdir(p) == 0 ? FR_OK : FR_NO_PATH;
 }
 
-FRESULT host_f_getcwd(TCHAR *buff, UINT len) {
+FRESULT host_f_getcwd(TCHAR * buff, UINT len) {
     if (!host_sd_root) return f_getcwd(buff, len);
     char tmp[HOST_PATH_MAX];
     if (host_fs_getcwd(tmp, (int)sizeof(tmp)) != 0) return FR_INT_ERR;
@@ -224,13 +233,25 @@ FRESULT host_f_getcwd(TCHAR *buff, UINT len) {
  * wrappers above so vm_host_fat / POSIX dispatch via host_sd_root keeps
  * working without core seeing a #ifdef MMBASIC_HOST. */
 #include "hal/hal_fatfs_dispatch.h"
-FRESULT hal_ff_findfirst(DIR *dp, FILINFO *fi, const TCHAR *path,
-                         const TCHAR *pattern) { return host_f_findfirst(dp, fi, path, pattern); }
-FRESULT hal_ff_findnext (DIR *dp, FILINFO *fi)                  { return host_f_findnext(dp, fi); }
-FRESULT hal_ff_closedir (DIR *dp)                                { return host_f_closedir(dp); }
-FRESULT hal_ff_unlink   (const TCHAR *path)                      { return host_f_unlink(path); }
-FRESULT hal_ff_chdir    (const TCHAR *path)                      { return host_f_chdir(path); }
-FRESULT hal_ff_getcwd   (TCHAR *buf, UINT len)                   { return host_f_getcwd(buf, len); }
+FRESULT hal_ff_findfirst(DIR * dp, FILINFO * fi, const TCHAR * path,
+                         const TCHAR * pattern) {
+    return host_f_findfirst(dp, fi, path, pattern);
+}
+FRESULT hal_ff_findnext(DIR * dp, FILINFO * fi) {
+    return host_f_findnext(dp, fi);
+}
+FRESULT hal_ff_closedir(DIR * dp) {
+    return host_f_closedir(dp);
+}
+FRESULT hal_ff_unlink(const TCHAR * path) {
+    return host_f_unlink(path);
+}
+FRESULT hal_ff_chdir(const TCHAR * path) {
+    return host_f_chdir(path);
+}
+FRESULT hal_ff_getcwd(TCHAR * buf, UINT len) {
+    return host_f_getcwd(buf, len);
+}
 
 /* POSIX-backed existence check. The Editor's file-load path (EDIT "foo.bas")
  * needs this to return truthful answers — otherwise `edit` leaves its p
@@ -238,7 +259,7 @@ FRESULT hal_ff_getcwd   (TCHAR *buf, UINT len)                   { return host_f
  * cmd_run "file", AUTOSAVE recovery, etc. When no --sd-root is configured
  * (host_sd_root == NULL) we fall back to the CWD so the tree-of-.bas files
  * in the repo root just work for direct-run invocations. */
-int ExistsFile(char *fname) {
+int ExistsFile(char * fname) {
     if (!fname || !*fname) return 0;
     char path[STRINGSIZE];
     if (host_sd_root) {
@@ -260,8 +281,10 @@ int ExistsFile(char *fname) {
     return stat(path, &st) == 0 ? 1 : 0;
 }
 
-int ExistsDir(char *p, char *q, int *filesystem) {
-    (void)p; (void)q; (void)filesystem;
+int ExistsDir(char * p, char * q, int * filesystem) {
+    (void)p;
+    (void)q;
+    (void)filesystem;
     return 0;
 }
 
@@ -292,14 +315,14 @@ int ExistsDir(char *p, char *q, int *filesystem) {
  * (matching erased flash) via the constructor below.
  * ======================================================================= */
 extern uint8_t flash_prog_buf[];
-#define HOST_FLASH_SIZE        (2 * MAX_PROG_SIZE)
-#define HOST_FLASH_PROG_SIZE   (HOST_FLASH_SIZE / 2)
+#define HOST_FLASH_SIZE (2 * MAX_PROG_SIZE)
+#define HOST_FLASH_PROG_SIZE (HOST_FLASH_SIZE / 2)
 
 /* Device address range of the user flash slot region. MAX_PROG_SIZE is
  * the per-slot stride and matches HEAP_MEMORY_SIZE for the variant
  * (PicoCalc rp2040 PICOMITE = 128 KB → 384 KB slot mirror). */
-#define HOST_SLOT_REGION_BASE  ((uint32_t)(FLASH_TARGET_OFFSET + FLASH_ERASE_SIZE + SAVEDVARS_FLASH_SIZE))
-#define HOST_SLOT_REGION_SIZE  ((uint32_t)(MAXFLASHSLOTS * MAX_PROG_SIZE))
+#define HOST_SLOT_REGION_BASE ((uint32_t)(FLASH_TARGET_OFFSET + FLASH_ERASE_SIZE + SAVEDVARS_FLASH_SIZE))
+#define HOST_SLOT_REGION_SIZE ((uint32_t)(MAXFLASHSLOTS * MAX_PROG_SIZE))
 
 /* Forward declaration so flash_range_* can find the slot mirror. */
 extern uint8_t host_flash_target_buf[HOST_SLOT_REGION_SIZE];
@@ -322,7 +345,7 @@ static inline bool host_off_in_slot_region(uint32_t off, uint32_t count) {
  * Returns true and sets *prog_off to the flash_prog_buf-relative offset
  * if `off + count` falls entirely within either form. */
 static inline bool host_off_in_program_region(uint32_t off, uint32_t count,
-                                              uint32_t *prog_off) {
+                                              uint32_t * prog_off) {
     if (off + count <= (uint32_t)MAX_PROG_SIZE) {
         *prog_off = off;
         return true;
@@ -358,7 +381,7 @@ void flash_range_erase(uint32_t off, uint32_t count) {
     memset(flash_prog_buf + off, 0xFF, count);
 }
 
-void flash_range_program(uint32_t off, const uint8_t *data, uint32_t count) {
+void flash_range_program(uint32_t off, const uint8_t * data, uint32_t count) {
     if (host_off_in_slot_region(off, count)) {
         memcpy(host_flash_target_buf + (off - HOST_SLOT_REGION_BASE), data, count);
         return;
@@ -382,7 +405,7 @@ void flash_range_program(uint32_t off, const uint8_t *data, uint32_t count) {
  * Do NOT call ClearRuntime here: EdBuff is allocated via GetTempMemory
  * inside edit(), and ClearRuntime frees temp memory — freeing the very
  * buffer we're about to tokenise. */
-void SaveProgramToFlash(unsigned char *pm, int msg) {
+void SaveProgramToFlash(unsigned char * pm, int msg) {
     (void)msg;
     if (!pm) return;
     mmbasic_save_loaded_source((const char *)pm, MMBASIC_SOURCE_FLAGS_HOST_LOAD);
@@ -391,11 +414,11 @@ void SaveProgramToFlash(unsigned char *pm, int msg) {
 /* LFS stubs. Most host file I/O routes through FatFS/POSIX, but CHAIN uses
  * SaveContext/RestoreContext's `.vars` scratch file. Keep just that file in
  * host memory so the shared interpreter path can run unchanged. */
-static unsigned char *host_lfs_vars;
+static unsigned char * host_lfs_vars;
 static lfs_size_t host_lfs_vars_size;
 static lfs_size_t host_lfs_vars_cap;
 
-static int host_lfs_is_vars_path(const char *path) {
+static int host_lfs_is_vars_path(const char * path) {
     return path && (strcmp(path, ".vars") == 0 || strcmp(path, "/.vars") == 0);
 }
 
@@ -403,15 +426,19 @@ static int host_lfs_vars_grow(lfs_size_t need) {
     if (need <= host_lfs_vars_cap) return 0;
     lfs_size_t cap = host_lfs_vars_cap ? host_lfs_vars_cap : 4096;
     while (cap < need) cap *= 2;
-    unsigned char *p = (unsigned char *)realloc(host_lfs_vars, cap);
+    unsigned char * p = (unsigned char *)realloc(host_lfs_vars, cap);
     if (!p) return LFS_ERR_NOMEM;
     host_lfs_vars = p;
     host_lfs_vars_cap = cap;
     return 0;
 }
 
-int lfs_file_close(lfs_t *l, lfs_file_t *file) { (void)l; (void)file; return 0; }
-int lfs_file_open(lfs_t *l, lfs_file_t *file, const char *path, int flags) {
+int lfs_file_close(lfs_t * l, lfs_file_t * file) {
+    (void)l;
+    (void)file;
+    return 0;
+}
+int lfs_file_open(lfs_t * l, lfs_file_t * file, const char * path, int flags) {
     (void)l;
     if (!host_lfs_is_vars_path(path)) return LFS_ERR_NOENT;
     if (!host_lfs_vars && !(flags & LFS_O_CREAT)) return LFS_ERR_NOENT;
@@ -424,7 +451,7 @@ int lfs_file_open(lfs_t *l, lfs_file_t *file, const char *path, int flags) {
     file->pos = (flags & LFS_O_APPEND) ? host_lfs_vars_size : 0;
     return 0;
 }
-lfs_ssize_t lfs_file_read(lfs_t *l, lfs_file_t *file, void *buf, lfs_size_t size) {
+lfs_ssize_t lfs_file_read(lfs_t * l, lfs_file_t * file, void * buf, lfs_size_t size) {
     (void)l;
     if (!file || file->type != LFS_TYPE_REG || !buf || !host_lfs_vars) return 0;
     if (file->pos >= host_lfs_vars_size) return 0;
@@ -434,18 +461,20 @@ lfs_ssize_t lfs_file_read(lfs_t *l, lfs_file_t *file, void *buf, lfs_size_t size
     file->pos += size;
     return (lfs_ssize_t)size;
 }
-lfs_soff_t lfs_file_seek(lfs_t *l, lfs_file_t *file, lfs_soff_t off, int whence) {
+lfs_soff_t lfs_file_seek(lfs_t * l, lfs_file_t * file, lfs_soff_t off, int whence) {
     (void)l;
     if (!file || file->type != LFS_TYPE_REG) return LFS_ERR_BADF;
     lfs_soff_t base = 0;
-    if (whence == LFS_SEEK_CUR) base = (lfs_soff_t)file->pos;
-    else if (whence == LFS_SEEK_END) base = (lfs_soff_t)host_lfs_vars_size;
+    if (whence == LFS_SEEK_CUR)
+        base = (lfs_soff_t)file->pos;
+    else if (whence == LFS_SEEK_END)
+        base = (lfs_soff_t)host_lfs_vars_size;
     lfs_soff_t next = base + off;
     if (next < 0) return LFS_ERR_INVAL;
     file->pos = (lfs_off_t)next;
     return next;
 }
-lfs_ssize_t lfs_file_write(lfs_t *l, lfs_file_t *file, const void *buf, lfs_size_t size) {
+lfs_ssize_t lfs_file_write(lfs_t * l, lfs_file_t * file, const void * buf, lfs_size_t size) {
     (void)l;
     if (!file || file->type != LFS_TYPE_REG || !buf) return 0;
     lfs_size_t end = file->pos + size;
@@ -457,8 +486,11 @@ lfs_ssize_t lfs_file_write(lfs_t *l, lfs_file_t *file, const void *buf, lfs_size
     if (host_lfs_vars_size < end) host_lfs_vars_size = end;
     return (lfs_ssize_t)size;
 }
-lfs_ssize_t lfs_fs_size(lfs_t *l) { (void)l; return 0; }
-int lfs_remove(lfs_t *l, const char *path) {
+lfs_ssize_t lfs_fs_size(lfs_t * l) {
+    (void)l;
+    return 0;
+}
+int lfs_remove(lfs_t * l, const char * path) {
     (void)l;
     if (host_lfs_is_vars_path(path)) {
         free(host_lfs_vars);
@@ -468,7 +500,7 @@ int lfs_remove(lfs_t *l, const char *path) {
     }
     return 0;
 }
-int lfs_stat(lfs_t *l, const char *path, struct lfs_info *info) {
+int lfs_stat(lfs_t * l, const char * path, struct lfs_info * info) {
     (void)l;
     if (!host_lfs_is_vars_path(path) || !host_lfs_vars) return LFS_ERR_NOENT;
     if (info) {
@@ -479,25 +511,87 @@ int lfs_stat(lfs_t *l, const char *path, struct lfs_info *info) {
     }
     return 0;
 }
-int lfs_dir_open(lfs_t *l, lfs_dir_t *dir, const char *path) { (void)l; (void)dir; (void)path; return -1; }
-int lfs_dir_close(lfs_t *l, lfs_dir_t *dir) { (void)l; (void)dir; return 0; }
-int lfs_dir_read(lfs_t *l, lfs_dir_t *dir, struct lfs_info *info) { (void)l; (void)dir; (void)info; return 0; }
-int lfs_file_rewind(lfs_t *l, lfs_file_t *file) { return (int)lfs_file_seek(l, file, 0, LFS_SEEK_SET); }
-int lfs_file_sync(lfs_t *l, lfs_file_t *file) { (void)l; (void)file; return 0; }
-lfs_soff_t lfs_file_tell(lfs_t *l, lfs_file_t *file) { (void)l; return file ? (lfs_soff_t)file->pos : LFS_ERR_BADF; }
-int lfs_format(lfs_t *l, const struct lfs_config *cfg) { (void)l; (void)cfg; return 0; }
-int lfs_mount(lfs_t *l, const struct lfs_config *cfg) { (void)l; (void)cfg; return 0; }
-int lfs_unmount(lfs_t *l) { (void)l; return 0; }
-lfs_ssize_t lfs_getattr(lfs_t *l, const char *path, uint8_t type, void *buf, lfs_size_t size) { (void)l; (void)path; (void)type; (void)buf; (void)size; return -1; }
-int lfs_setattr(lfs_t *l, const char *path, uint8_t type, const void *buf, lfs_size_t size) { (void)l; (void)path; (void)type; (void)buf; (void)size; return 0; }
-int lfs_removeattr(lfs_t *l, const char *path, uint8_t type) { (void)l; (void)path; (void)type; return 0; }
-int lfs_mkdir(lfs_t *l, const char *path) { (void)l; (void)path; return 0; }
-int lfs_rename(lfs_t *l, const char *oldpath, const char *newpath) { (void)l; (void)oldpath; (void)newpath; return 0; }
+int lfs_dir_open(lfs_t * l, lfs_dir_t * dir, const char * path) {
+    (void)l;
+    (void)dir;
+    (void)path;
+    return -1;
+}
+int lfs_dir_close(lfs_t * l, lfs_dir_t * dir) {
+    (void)l;
+    (void)dir;
+    return 0;
+}
+int lfs_dir_read(lfs_t * l, lfs_dir_t * dir, struct lfs_info * info) {
+    (void)l;
+    (void)dir;
+    (void)info;
+    return 0;
+}
+int lfs_file_rewind(lfs_t * l, lfs_file_t * file) {
+    return (int)lfs_file_seek(l, file, 0, LFS_SEEK_SET);
+}
+int lfs_file_sync(lfs_t * l, lfs_file_t * file) {
+    (void)l;
+    (void)file;
+    return 0;
+}
+lfs_soff_t lfs_file_tell(lfs_t * l, lfs_file_t * file) {
+    (void)l;
+    return file ? (lfs_soff_t)file->pos : LFS_ERR_BADF;
+}
+int lfs_format(lfs_t * l, const struct lfs_config * cfg) {
+    (void)l;
+    (void)cfg;
+    return 0;
+}
+int lfs_mount(lfs_t * l, const struct lfs_config * cfg) {
+    (void)l;
+    (void)cfg;
+    return 0;
+}
+int lfs_unmount(lfs_t * l) {
+    (void)l;
+    return 0;
+}
+lfs_ssize_t lfs_getattr(lfs_t * l, const char * path, uint8_t type, void * buf, lfs_size_t size) {
+    (void)l;
+    (void)path;
+    (void)type;
+    (void)buf;
+    (void)size;
+    return -1;
+}
+int lfs_setattr(lfs_t * l, const char * path, uint8_t type, const void * buf, lfs_size_t size) {
+    (void)l;
+    (void)path;
+    (void)type;
+    (void)buf;
+    (void)size;
+    return 0;
+}
+int lfs_removeattr(lfs_t * l, const char * path, uint8_t type) {
+    (void)l;
+    (void)path;
+    (void)type;
+    return 0;
+}
+int lfs_mkdir(lfs_t * l, const char * path) {
+    (void)l;
+    (void)path;
+    return 0;
+}
+int lfs_rename(lfs_t * l, const char * oldpath, const char * newpath) {
+    (void)l;
+    (void)oldpath;
+    (void)newpath;
+    return 0;
+}
 
 /* lfs_file_size is only reached from the FLASHFILE branch in Editor.c, which
  * is unreachable on host (filesource[] is always FATFSFILE), and from the
  * `.vars` context shim above. */
-lfs_soff_t lfs_file_size(lfs_t *lfs, lfs_file_t *fp) {
+lfs_soff_t lfs_file_size(lfs_t * lfs, lfs_file_t * fp) {
     (void)lfs;
     return (fp && fp->type == LFS_TYPE_REG) ? (lfs_soff_t)host_lfs_vars_size : 0;
 }
@@ -536,18 +630,16 @@ static char host_options_ini_path[HOST_PATH_MAX];
  * Non-static because flash_range_* in this same translation unit forward-
  * declares it; defining it here keeps initialization in one place. */
 uint8_t host_flash_target_buf[HOST_SLOT_REGION_SIZE];
-const uint8_t *flash_option_contents = host_flash_option_buf;
-const uint8_t *flash_target_contents = host_flash_target_buf;
-__attribute__((constructor))
-static void host_flash_contents_init(void) {
+const uint8_t * flash_option_contents = host_flash_option_buf;
+const uint8_t * flash_target_contents = host_flash_target_buf;
+__attribute__((constructor)) static void host_flash_contents_init(void) {
     memset(host_flash_option_buf, 0x00, sizeof(host_flash_option_buf));
     memset(host_default_option_buf, 0x00, sizeof(host_default_option_buf));
     memset(host_flash_target_buf, 0xFF, sizeof(host_flash_target_buf));
     host_options_ini_path[0] = 0;
 }
 
-static int host_is_runtime_derived_option(const char *name, void *ctx)
-{
+static int host_is_runtime_derived_option(const char * name, void * ctx) {
     (void)ctx;
     return strcasecmp(name, "Height") == 0 ||
            strcasecmp(name, "Width") == 0 ||
@@ -555,8 +647,7 @@ static int host_is_runtime_derived_option(const char *name, void *ctx)
            strcasecmp(name, "DISPLAY_CONSOLE") == 0;
 }
 
-static void host_options_populate_defaults(void)
-{
+static void host_options_populate_defaults(void) {
     memset(&Option, 0, sizeof(Option));
     Option.Magic = MagicKey;
     Option.Height = SCREENHEIGHT;
@@ -586,8 +677,7 @@ static void host_options_populate_defaults(void)
     Option.heartbeatpin = 43;
 }
 
-static void host_options_capture_defaults(void)
-{
+static void host_options_capture_defaults(void) {
     if (host_options_capturing_defaults) return;
     struct option_s saved;
     memcpy(&saved, &Option, sizeof(saved));
@@ -598,13 +688,12 @@ static void host_options_capture_defaults(void)
     host_options_capturing_defaults = 0;
 }
 
-static void host_options_load_ini(void)
-{
+static void host_options_load_ini(void) {
     host_options_capture_defaults();
     memcpy(host_flash_option_buf, host_default_option_buf, sizeof(host_flash_option_buf));
     if (!host_options_ini_enabled || !host_options_ini_path[0]) return;
 
-    FILE *fp = fopen(host_options_ini_path, "rb");
+    FILE * fp = fopen(host_options_ini_path, "rb");
     if (!fp) return;
     static char buf[65536];
     size_t got = fread(buf, 1, sizeof(buf) - 1, fp);
@@ -618,14 +707,12 @@ static void host_options_load_ini(void)
                          NULL, NULL);
 }
 
-static int host_write_ini_line(void *ctx, const char *line)
-{
-    FILE *fp = (FILE *)ctx;
+static int host_write_ini_line(void * ctx, const char * line) {
+    FILE * fp = (FILE *)ctx;
     return fwrite(line, 1, strlen(line), fp) == strlen(line) ? 0 : -1;
 }
 
-static void host_options_write_ini(void)
-{
+static void host_options_write_ini(void) {
     if (!host_options_ini_enabled || !host_options_ini_path[0]) return;
     host_options_capture_defaults();
 
@@ -635,7 +722,7 @@ static void host_options_write_ini(void)
         return;
     }
 
-    FILE *fp = fopen(host_options_ini_path, "wb");
+    FILE * fp = fopen(host_options_ini_path, "wb");
     if (!fp) return;
     host_write_ini_line(fp, "# MMBasic host options\r\n");
     host_write_ini_line(fp, "# Only values that differ from host defaults are written.\r\n");
@@ -646,14 +733,15 @@ static void host_options_write_ini(void)
     fclose(fp);
 }
 
-void host_options_set_executable_path(const char *argv0)
-{
-    const char *slash = NULL;
+void host_options_set_executable_path(const char * argv0) {
+    const char * slash = NULL;
     if (argv0) {
-        const char *s1 = strrchr(argv0, '/');
-        const char *s2 = strrchr(argv0, '\\');
-        if (s1 && s2) slash = (s1 > s2) ? s1 : s2;
-        else slash = s1 ? s1 : s2;
+        const char * s1 = strrchr(argv0, '/');
+        const char * s2 = strrchr(argv0, '\\');
+        if (s1 && s2)
+            slash = (s1 > s2) ? s1 : s2;
+        else
+            slash = s1 ? s1 : s2;
     }
     if (slash) {
         size_t dir_len = (size_t)(slash - argv0) + 1;
