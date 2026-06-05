@@ -1,5 +1,5 @@
 /*
- * shared/audio/synth_pcm.h — portable PicoMite tone/sound synthesizer.
+ * shared/audio/synth_pcm.h — portable MMBasic tone/sound synthesizer.
  *
  * The wavetables, per-slot SOUND state, master TONE state, and the
  * per-frame mixing kernel that turns that state into 16-bit-scale PCM

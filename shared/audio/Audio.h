@@ -63,6 +63,8 @@ extern volatile uint32_t bcount[3];
 extern volatile int wav_filesize;                                    // head and tail of the ring buffer for com1
 extern uint8_t trackplaying, trackstoplay;
 extern void checkWAVinput(void);
+extern void audio_runtime_service(void);
+extern int audio_interrupt_pending(unsigned char **target);
 extern volatile uint64_t SoundPlay;
 extern void (*AudioOutput)(uint16_t left, uint16_t right);
 #define WAV_BUFFER_SIZE 8192

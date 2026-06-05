@@ -1770,6 +1770,17 @@ void checkWAVinput(void){
 		}
     }
 }
+
+void audio_runtime_service(void){
+	checkWAVinput();
+}
+
+int audio_interrupt_pending(unsigned char **target){
+	if(WAVInterrupt == NULL || !WAVcomplete) return 0;
+	if(target) *target = (unsigned char *)WAVInterrupt;
+	WAVcomplete = false;
+	return 1;
+}
 void audio_checks(void){
     if(playreadcomplete == 1) {
     	if(!(bcount[1] || bcount[2]) ){

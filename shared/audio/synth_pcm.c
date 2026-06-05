@@ -1,5 +1,5 @@
 /*
- * shared/audio/synth_pcm.c — portable PicoMite tone/sound synthesizer.
+ * shared/audio/synth_pcm.c — portable MMBasic tone/sound synthesizer.
  *
  * Wavetables, SOUND/TONE voice state, and the per-frame mixing kernel,
  * shared by every audio backend. The synthesis math is transplanted
