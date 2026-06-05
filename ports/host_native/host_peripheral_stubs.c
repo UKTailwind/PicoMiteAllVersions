@@ -334,6 +334,13 @@ void fun_info(void) {
         targ = T_INT;
         return;
     }
+    if (checkstring(ep, (unsigned char *)"PLAYING") ||
+        checkstring(ep, (unsigned char *)"SOUND")) {
+        strcpy((char *)sret, PlayingStr[CurrentlyPlaying]);
+        CtoM(sret);
+        targ = T_STR;
+        return;
+    }
     if ((tp = checkstring(ep, (unsigned char *)"FLASH ADDRESS"))) {
         /* uintptr_t round-trip — `(unsigned int)` would truncate the
          * pointer on 64-bit hosts and silently zero the upper bits. */

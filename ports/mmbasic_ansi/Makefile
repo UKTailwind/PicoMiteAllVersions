@@ -76,6 +76,9 @@ endif
 
 endif
 
+AUDIO_SHARED_CORE_SRCS = shared/audio/Audio.c shared/audio/audio_runtime.c shared/audio/audio_stream.c
+AUDIO_BACKEND_SRCS = hal_audio_host.c
+
 # Core MMBasic (same list as host_native — keeps core/mmbasic/Editor.c + REPL + Prompt
 # so the interactive REPL and EDIT both work).
 CORE_SRCS = core/mmbasic/MMBasic.c core/mmbasic/Commands.c core/mmbasic/Functions.c core/mmbasic/Operators.c core/mmbasic/MATHS.c core/mmbasic/Memory.c core/mmbasic/Editor.c core/mmbasic/MMBasic_Prompt.c core/mmbasic/MMBasic_Print.c core/mmbasic/MMBasic_REPL.c
@@ -87,7 +90,7 @@ CORE_SRCS += mm_net_http.c
 CORE_SRCS += mm_net_ntp.c
 CORE_SRCS += mm_net_telnet_rx.c
 CORE_SRCS += mm_net_state.c
-CORE_SRCS += core/mmbasic/Draw.c shared/gfx/RGB121.c shared/gfx/Tilemap.c core/mmbasic/FileIO.c shared/audio/Audio.c shared/audio/audio_stream.c drivers/bmp_decoder/BmpDecoder.c third_party/regex/re.c third_party/picojpeg/picojpeg.c
+CORE_SRCS += core/mmbasic/Draw.c shared/gfx/RGB121.c shared/gfx/Tilemap.c core/mmbasic/FileIO.c $(AUDIO_SHARED_CORE_SRCS) drivers/bmp_decoder/BmpDecoder.c third_party/regex/re.c third_party/picojpeg/picojpeg.c
 CORE_SRCS += audio_mp3_real.c third_party/hxcmod/hxcmod.c spi_lcd_mem332_stub.c display_merge_stub.c vga_ops_stub.c
 CORE_SRCS += gfx_3d.c upng_sprite_stub.c gui_touch_stub.c gui_controls_stub.c psram_heap_stub.c hal_psram_stub.c i2c_keypad_stub.c heartbeat_stub.c
 CORE_SRCS += editor_console_stub.c
@@ -105,7 +108,7 @@ NATIVE_SRCS = host_runtime.c host_fastgfx.c host_fastgfx_resync.c host_fs_shims.
               host_fb.c host_keys.c host_bc_runtime_noop.c \
               host_web_stubs.c \
               hal_flash_host.c hal_time_host.c hal_random_host.c hal_pin_host.c hal_storage_host.c \
-              hal_filesystem_host.c hal_keyboard_host.c hal_audio_host.c hal_vm_framebuffer_host.c
+              hal_filesystem_host.c hal_keyboard_host.c $(AUDIO_BACKEND_SRCS) hal_vm_framebuffer_host.c
 
 PORT_SRCS = ansi_main.c ansi_terminal.c ansi_display.c ansi_mode.c $(ANSI_RESIZE_SRC)
 RUNTIME_SRCS = runtime_boot.c runtime_program.c runtime_console.c runtime_console_putchar.c runtime_console_printstring.c runtime_console_adapter.c runtime_console_input_noop.c runtime_console_escdecode.c runtime_getline.c runtime_abort.c runtime_interrupt.c runtime_filesystem_defaults.c runtime_cmd_load_post_cleanup.c calendar_bare.c

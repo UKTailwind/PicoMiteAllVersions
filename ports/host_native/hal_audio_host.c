@@ -13,7 +13,8 @@
  */
 
 #include "host_sim_audio.h"
-#include "hal/hal_audio.h"
+#include "hal/hal_audio_control.h"
+#include "hal/hal_audio_stream.h"
 
 void hal_audio_init(void) {
     /* host backends initialise lazily on first call; nothing to do here. */

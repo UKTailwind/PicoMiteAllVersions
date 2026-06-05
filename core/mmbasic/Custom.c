@@ -127,12 +127,6 @@ int piointerrupt = 0;
 uint8_t nextline[4] = {0};
 static int pioinuse = 99;
 extern bool PIO2, PIO1, PIO0;
-extern void on_pwm_wrap(void);
-PIO pioi2s;
-uint8_t i2ssm;
-//#if defined( PICOMITEVGA) && !defined(HDMI)
-#include "PicoMiteI2S.pio.h"
-//#endif
 static inline uint32_t pio_sm_calc_wrap(uint wrap_target, uint wrap) {
     uint32_t calc = 0;
     //    valid_params_if(PIO, wrap < PIO_INSTRUCTION_COUNT);
@@ -253,76 +247,8 @@ int checkblock(char * p) {
     }
     return data;
 }
-extern uint I2SOff;
 extern void start_vga_i2s(void);
 extern void start_i2s(int pio, int sm);
-
-void start_i2s(int pior, int sm) {
-    if (!Option.audio_i2s_bclk) return;
-    i2ssm = sm;
-#ifdef rp2350
-    pioi2s = (pior == 0 ? pio0 : (pior == 1 ? pio1 : pio2));
-#else
-    pioi2s = (pior == 0 ? pio0 : pio1);
-#endif
-    port_audio_i2s_pio_add_program(pioi2s);
-    gpio_set_input_enabled(PinDef[Option.audio_i2s_data].GPno, true);
-    gpio_set_input_enabled(PinDef[Option.audio_i2s_bclk].GPno, true);
-    gpio_set_input_enabled(PinDef[Option.audio_i2s_bclk].GPno + 1, true);
-#ifdef rp2350
-    gpio_set_function(PinDef[Option.audio_i2s_bclk].GPno, pior == 0 ? GPIO_FUNC_PIO0 : (pior == 1 ? GPIO_FUNC_PIO1 : GPIO_FUNC_PIO2));
-    gpio_set_function(PinDef[Option.audio_i2s_data].GPno, pior == 0 ? GPIO_FUNC_PIO0 : (pior == 1 ? GPIO_FUNC_PIO1 : GPIO_FUNC_PIO2));
-    gpio_set_function(PinDef[Option.audio_i2s_bclk].GPno + 1, pior == 0 ? GPIO_FUNC_PIO0 : (pior == 1 ? GPIO_FUNC_PIO1 : GPIO_FUNC_PIO2));
-#else
-    gpio_set_function(PinDef[Option.audio_i2s_bclk].GPno, pior == 0 ? GPIO_FUNC_PIO0 : GPIO_FUNC_PIO1);
-    gpio_set_function(PinDef[Option.audio_i2s_data].GPno, pior == 0 ? GPIO_FUNC_PIO0 : GPIO_FUNC_PIO1);
-    gpio_set_function(PinDef[Option.audio_i2s_bclk].GPno + 1, pior == 0 ? GPIO_FUNC_PIO0 : GPIO_FUNC_PIO1);
-#endif
-    ExtCfg(Option.audio_i2s_bclk, EXT_BOOT_RESERVED, 0);
-    ExtCfg(Option.audio_i2s_data, EXT_BOOT_RESERVED, 0);
-    ExtCfg(PINMAP[PinDef[Option.audio_i2s_bclk].GPno + 1], EXT_BOOT_RESERVED, 0);
-
-    // prepare default PIO program config
-    pio_sm_config cfg = i2s_program_get_default_config(I2SOff);
-
-    // map state machine's OUT and MOV pins
-    sm_config_set_out_pins(&cfg, PinDef[Option.audio_i2s_data].GPno, 1);
-
-    // set sideset pins (BCLK and LCLK)
-    sm_config_set_sideset_pins(&cfg, PinDef[Option.audio_i2s_bclk].GPno);
-    sm_config_set_sideset(&cfg, 2, false, false);
-
-    // join FIFO to send only
-    sm_config_set_fifo_join(&cfg, PIO_FIFO_JOIN_TX);
-
-    // PIO clock divider
-    float clockdiv = (Option.CPU_Speed * 1000.0f) / (float)(44100 * 128);
-    //        pio_sm_set_clkdiv(pioi2s,i2ssm,clockdiv);
-    sm_config_set_clkdiv(&cfg, clockdiv);
-    sm_config_set_out_shift(&cfg, false, false, false);
-    sm_config_set_in_shift(&cfg, false, false, false);
-
-    // initialize state machine
-    pio_sm_init(pioi2s, sm, I2SOff, &cfg);
-    pio_sm_set_consecutive_pindirs(pioi2s, sm, PinDef[Option.audio_i2s_data].GPno, 1, true);
-    pio_sm_set_consecutive_pindirs(pioi2s, sm, PinDef[Option.audio_i2s_bclk].GPno, 2, true);
-    pio_sm_set_enabled(pioi2s, sm, true);
-
-    AUDIO_SLICE = Option.AUDIO_SLICE;
-    AUDIO_WRAP = (Option.CPU_Speed * 10) / 441 - 1;
-    pwm_set_wrap(AUDIO_SLICE, AUDIO_WRAP);
-    pwm_clear_irq(AUDIO_SLICE);
-    irq_set_exclusive_handler(PWM_IRQ_WRAP, on_pwm_wrap);
-    irq_set_enabled(PWM_IRQ_WRAP, true);
-    irq_set_priority(PWM_IRQ_WRAP, 255);
-    pwm_set_enabled(AUDIO_SLICE, true);
-    if (pior == 2)
-        PIO2 = false;
-    else if (pior == 1)
-        PIO1 = false;
-    else
-        PIO0 = false;
-}
 int getGPpin(unsigned char * pinarg, int pio, int base) {
     char code;
     int pin;

@@ -19,7 +19,7 @@
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 #include "port_config.h"
-#include "hal/hal_audio.h"
+#include "hal/hal_audio_stream.h"
 #include "audio_stream.h"
 
 #define DRWAV_COPY_MEMORY(dst, src, sz) memcpy((dst), (src), (sz))

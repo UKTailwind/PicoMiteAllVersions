@@ -2389,7 +2389,8 @@ void MIPS16 fun_info(void) {
             iret = (int64_t)(uint32_t)getFreeHeap();
             targ = T_INT;
             return;
-        } else if (checkstring(ep, (unsigned char *)"SOUND")) {
+        } else if (checkstring(ep, (unsigned char *)"PLAYING") ||
+                   checkstring(ep, (unsigned char *)"SOUND")) {
             strcpy((char *)sret, PlayingStr[CurrentlyPlaying]);
             CtoM(sret);
             targ = T_STR;

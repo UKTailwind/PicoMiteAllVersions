@@ -128,6 +128,8 @@ PORT_AUDIO_SRC := hal_audio_pc386_sb16.c
 else
 $(error PC386_AUDIO must be one of: pcspk opl3 sb16)
 endif
+AUDIO_SHARED_CORE_SRCS = shared/audio/Audio.c shared/audio/audio_runtime.c shared/audio/audio_stream.c
+AUDIO_BACKEND_SRCS = $(PORT_AUDIO_SRC)
 
 ifeq ($(PC386_NO_FPU),1)
 PC386_SOFTFLOAT_SRCS := compiler_rt/adddf3.c \
@@ -171,7 +173,7 @@ PORT_SRCS = kmain.c kprint.c mmap.c heap_region.c kstring.c \
             pc386_state.c pc386_runtime.c pc386_peripheral_stubs.c \
             pc386_cpu.c pc386_rtc.c pc386_memio.c pc386_lpt.c pc386_interp.c \
             pc386_flash.c vm_sys_pin_pc386.c idt.c \
-            $(PORT_AUDIO_SRC) hal_filesystem_pc386.c hal_flash_pc386.c \
+            $(AUDIO_BACKEND_SRCS) hal_filesystem_pc386.c hal_flash_pc386.c \
             hal_keyboard_pc386.c hal_pin_pc386.c hal_random_pc386.c \
             hal_storage_pc386.c hal_time_pc386.c \
             hal_vm_framebuffer_pc386.c \
@@ -185,7 +187,7 @@ CORE_SRCS += core/mmbasic/MMBasic_Print.c core/mmbasic/MMBasic_REPL.c core/mmbas
 CORE_SRCS += shared/gfx/gfx_box_shared.c shared/gfx/gfx_circle_shared.c shared/gfx/gfx_line_shared.c shared/gfx/gfx_pixel_shared.c
 CORE_SRCS += shared/gfx/gfx_cls_shared.c shared/gfx/gfx_text_shared.c shared/gfx/gfx_console_shared.c
 CORE_SRCS += shared/mmbasic/mm_misc_shared.c shared/mmbasic/options_ini.c core/mmbasic/OptionCommands.c
-CORE_SRCS += core/mmbasic/Draw.c shared/gfx/RGB121.c shared/gfx/Tilemap.c core/mmbasic/FileIO.c shared/audio/Audio.c shared/audio/audio_stream.c drivers/bmp_decoder/BmpDecoder.c third_party/regex/re.c third_party/picojpeg/picojpeg.c
+CORE_SRCS += core/mmbasic/Draw.c shared/gfx/RGB121.c shared/gfx/Tilemap.c core/mmbasic/FileIO.c $(AUDIO_SHARED_CORE_SRCS) drivers/bmp_decoder/BmpDecoder.c third_party/regex/re.c third_party/picojpeg/picojpeg.c
 CORE_SRCS += core/mmbasic/XModem.c
 
 CORE_STATE_SRCS = display_state.c pin_state.c option_state.c audio_state.c

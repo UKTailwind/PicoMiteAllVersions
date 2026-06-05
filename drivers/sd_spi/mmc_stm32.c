@@ -37,7 +37,6 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 /-------------------------------------------------------------------------*/
 
 #include "Hardware_Includes.h"
-#include "synth_pcm.h"
 #include "hal/hal_main_init.h"
 #include <stddef.h>
 #include "diskio.h"
@@ -63,11 +62,6 @@ extern int TOUCH_CS_PIN;
 #ifndef nop
 #define nop asm("NOP")
 #endif
-#include "drivers/vs1053/VS1053.h"
-#include "pico/multicore.h"
-#include "hardware/sync.h"
-#include "hardware/pio.h"
-#include "hardware/pio_instructions.h"
 //#include "integer.h"
 int SPISpeed = 0xFF;
 //#define SD_CS_PIN Option.SD_CS
@@ -80,8 +74,6 @@ uint16_t SPI_CLK_PIN, SPI_MOSI_PIN, SPI_MISO_PIN;
  * unconditionally so spi_lcd.c's references always link. */
 uint16_t LCD_CLK_PIN, LCD_MOSI_PIN, LCD_MISO_PIN;
 uint16_t SD_CLK_PIN, SD_MOSI_PIN, SD_MISO_PIN, SD_CS_PIN;
-uint16_t AUDIO_CLK_PIN, AUDIO_MOSI_PIN, AUDIO_MISO_PIN, AUDIO_CS_PIN, AUDIO_RESET_PIN, AUDIO_DREQ_PIN, AUDIO_DCS_PIN, AUDIO_LDAC_PIN;
-uint16_t AUDIO_L_PIN, AUDIO_R_PIN, AUDIO_SLICE;
 #define CD MDD_SDSPI_CardDetectState()   /* Card detected   (yes:true, no:false, default:true) */
 #define WP MDD_SDSPI_WriteProtectState() /* Write protected (yes:true, no:false, default:false) */
 /* SPI bit rate controls */
@@ -90,12 +82,10 @@ int SD_SPI_SPEED = SD_SLOW_SPI_SPEED;
 //#define	FCLK_FAST()		{SD_SPI_SPEED=SD_FAST_SPI_SPEED;}/* Set fast clock (depends on the CSD) */
 extern volatile BYTE SDCardStat;
 volatile int diskcheckrate = 0;
-uint16_t left = 0, right = 0;
 const uint8_t high[512] = {[0 ... 511] = 0xFF};
 int CurrentSPISpeed = NONE_SPI_SPEED;
 #define slow_clock 200000
 #define SPI_FAST 18000000
-uint16_t AUDIO_WRAP = 0;
 BYTE (*xchg_byte)(BYTE data_out) = NULL;
 void (*xmit_byte_multi)(const BYTE * buff, int cnt) = NULL;
 void (*rcvr_byte_multi)(BYTE * buff, int cnt) = NULL;
@@ -120,22 +110,6 @@ int BacklightChannel = -1;
  * hardware these stay at -1 and the paths that read them short-circuit. */
 int KeyboardlightSlice = -1;
 int KeyboardlightChannel = -1;
-extern const unsigned short whitenoise[2];
-uint16_t AUDIO_SPI;
-volatile uint16_t VSbuffer = 0;
-void __not_in_flash_func(DefaultAudio)(uint16_t left, uint16_t right) {
-    pwm_set_both_levels(AUDIO_SLICE, (left * AUDIO_WRAP) >> 12, (right * AUDIO_WRAP) >> 12);
-}
-void __not_in_flash_func(SPIAudio)(uint16_t left, uint16_t right) {
-    uint16_t l = 0x7000 | left, r = 0xF000 | right;
-    gpio_put(AUDIO_CS_PIN, GPIO_PIN_RESET);
-    spi_write16_blocking((AUDIO_SPI == 1 ? spi0 : spi1), &r, 1);
-    gpio_put(AUDIO_CS_PIN, GPIO_PIN_SET);
-    gpio_put(AUDIO_CS_PIN, GPIO_PIN_RESET);
-    spi_write16_blocking((AUDIO_SPI == 1 ? spi0 : spi1), &l, 1);
-    gpio_put(AUDIO_CS_PIN, GPIO_PIN_SET);
-}
-void (*AudioOutput)(uint16_t left, uint16_t right) = (void (*)(uint16_t, uint16_t))DefaultAudio;
 
 /*--------------------------------------------------------------------------
 
@@ -181,298 +155,6 @@ BYTE MDD_SDSPI_CardDetectState(void) {
 }
 BYTE MDD_SDSPI_WriteProtectState(void) {
     return 0;
-}
-/* getsound() now lives in shared/audio/synth_pcm.c */
-#define sdi_send_buffer_local(a, b) sdi_send_buffer(a, b)
-#define sendcount 64
-#define sendstream 32
-extern PIO pioi2s;
-extern uint8_t i2ssm;
-void MIPS16 __not_in_flash_func(on_pwm_wrap)(void) {
-    static int noisedwellleft[MAXSOUNDS] = {0}, noisedwellright[MAXSOUNDS] = {0};
-    static uint32_t noiseleft[MAXSOUNDS] = {0}, noiseright[MAXSOUNDS] = {0};
-    static int repeatcount = 1;
-    // play a tone
-    __dsb();
-    pwm_clear_irq(AUDIO_SLICE);
-    if (Option.audio_i2s_bclk) {
-        if ((pioi2s->flevel & (0xf << (i2ssm * 8))) > (0x6 << (i2ssm * 8))) return;
-        static int32_t left = 0, right = 0;
-        if (CurrentlyPlaying == P_TONE) {
-            if (!SoundPlay) {
-                StopAudio();
-                WAVcomplete = true;
-            } else {
-                while ((pioi2s->flevel & (0xf << (i2ssm * 8))) < (0x6 << (i2ssm * 8))) {
-                    SoundPlay--;
-                    synth_pcm_tone_frame(&left, &right);
-                    pio_sm_put_blocking(pioi2s, i2ssm, left);
-                    pio_sm_put_blocking(pioi2s, i2ssm, right);
-                }
-            }
-            return;
-        } else if (CurrentlyPlaying == P_WAV || CurrentlyPlaying == P_FLAC || CurrentlyPlaying == P_MOD || CurrentlyPlaying == P_MP3 || CurrentlyPlaying == P_ARRAY) {
-            while ((pioi2s->flevel & (0xf << (i2ssm * 8))) < (0x6 << (i2ssm * 8))) {
-                if (bcount[1] == 0 && bcount[2] == 0 && playreadcomplete == 1) {
-                    pwm_set_irq_enabled(AUDIO_SLICE, false);
-                    left = right = 0;
-                    return;
-                }
-                if (!swingbuf || bcount[swingbuf] == 0) {
-                    left = right = 0;
-                    pio_sm_put(pioi2s, i2ssm, (uint32_t)left);
-                    pio_sm_put(pioi2s, i2ssm, (uint32_t)right);
-                    continue;
-                }
-                if (--repeatcount) {
-                    pio_sm_put(pioi2s, i2ssm, left);
-                    pio_sm_put(pioi2s, i2ssm, right);
-                } else {
-                    repeatcount = audiorepeat;
-                    if (swingbuf) { //buffer is primed
-                        if (swingbuf == 1)
-                            uplaybuff = g_buff1;
-                        else
-                            uplaybuff = g_buff2;
-                        if ((CurrentlyPlaying == P_WAV || CurrentlyPlaying == P_FLAC || CurrentlyPlaying == P_MP3) && mono) {
-                            left = right = (uplaybuff[ppos] << 16);
-                            ppos++;
-                        } else {
-                            if (ppos < bcount[swingbuf]) {
-                                left = uplaybuff[ppos] << 16;
-                                right = uplaybuff[ppos + 1] << 16;
-                                ppos += 2;
-                            }
-                        }
-                        pio_sm_put(pioi2s, i2ssm, (uint32_t)(left));
-                        pio_sm_put(pioi2s, i2ssm, (uint32_t)(right));
-                        if (ppos == bcount[swingbuf]) {
-                            int psave = ppos;
-                            bcount[swingbuf] = 0;
-                            ppos = 0;
-                            if (swingbuf == 1)
-                                swingbuf = 2;
-                            else
-                                swingbuf = 1;
-                            if (bcount[swingbuf] == 0 && !playreadcomplete) { //nothing ready yet so flip back
-                                if (swingbuf == 1) {
-                                    swingbuf = 2;
-                                    nextbuf = 1;
-                                } else {
-                                    swingbuf = 1;
-                                    nextbuf = 2;
-                                }
-                                bcount[swingbuf] = psave;
-                                ppos = 0;
-                            }
-                        }
-                    }
-                }
-            }
-            return;
-        } else if (CurrentlyPlaying == P_SOUND) {
-            while ((pioi2s->flevel & (0xf << (i2ssm * 8))) < (0x6 << (i2ssm * 8))) {
-                int32_t leftv, rightv;
-                synth_pcm_sound_frame(&leftv, &rightv);
-                pio_sm_put_blocking(pioi2s, i2ssm, leftv);
-                pio_sm_put_blocking(pioi2s, i2ssm, rightv);
-            }
-            return;
-        } else if (CurrentlyPlaying == P_STOP) {
-            while ((pioi2s->flevel & (0xf << (i2ssm * 8))) < (0x6 << (i2ssm * 8))) {
-                pio_sm_put(pioi2s, i2ssm, left);
-                pio_sm_put(pioi2s, i2ssm, right);
-            }
-            return;
-        } else {
-            while ((pioi2s->flevel & (0xf << (i2ssm * 8))) < (0x6 << (i2ssm * 8))) {
-                pio_sm_put(pioi2s, i2ssm, left);
-                pio_sm_put(pioi2s, i2ssm, right);
-            }
-            return;
-        }
-    }
-    if (Option.AUDIO_MISO_PIN) {
-        int32_t left = 0, right = 0;
-        if (!(gpio_get(PinDef[Option.AUDIO_DREQ_PIN].GPno))) return;
-        if (!(CurrentlyPlaying == P_TONE || CurrentlyPlaying == P_SOUND)) {
-            VSbuffer = VS1053free();
-            if (VSbuffer > 1023 - (CurrentlyPlaying == P_STREAM ? sendstream : sendcount)) return;
-        }
-        if (CurrentlyPlaying == P_FLAC || CurrentlyPlaying == P_WAV || CurrentlyPlaying == P_MP3 || CurrentlyPlaying == P_MIDI || CurrentlyPlaying == P_ARRAY || CurrentlyPlaying == P_MOD) {
-            if (bcount[1] == 0 && bcount[2] == 0 && playreadcomplete == 1) {
-                //				pwm_set_irq_enabled(AUDIO_SLICE, false);
-                return;
-            }
-            if (swingbuf) { //buffer is primed
-                int sendlen = ((bcount[swingbuf] - ppos) >= sendcount ? sendcount : bcount[swingbuf] - ppos);
-                if (swingbuf == 1)
-                    sdi_send_buffer_local((uint8_t *)&sbuff1[ppos], sendlen);
-                else
-                    sdi_send_buffer_local((uint8_t *)&sbuff2[ppos], sendlen);
-                ppos += sendlen;
-                if (ppos == bcount[swingbuf]) {
-                    bcount[swingbuf] = 0;
-                    ppos = 0;
-                    if (swingbuf == 1)
-                        swingbuf = 2;
-                    else
-                        swingbuf = 1;
-                }
-            }
-        } else if (CurrentlyPlaying == P_STREAM) {
-            int rp = *streamreadpointer, wp = *streamwritepointer;
-            if (rp == wp) return;
-            int i = wp - rp;
-            if (i < 0) i += streamsize;
-            if (i > sendstream) {
-                if (streamsize - rp > sendcount) {
-                    sdi_send_buffer((uint8_t *)&streambuffer[rp], sendstream);
-                    rp += sendstream;
-                } else {
-                    char buff[sendstream];
-                    int j = 0;
-                    while (j < sendstream) {
-                        buff[j++] = streambuffer[rp];
-                        rp = (rp + 1) % streamsize;
-                    }
-                    sdi_send_buffer((uint8_t *)buff, sendstream);
-                }
-            }
-            *streamreadpointer = rp;
-        } else if (CurrentlyPlaying == P_SOUND) {
-            int i, j;
-            int leftv = 0, rightv = 0, Lcount = 0, Rcount = 0;
-            for (i = 0; i < MAXSOUNDS; i++) { //first update the 8 sound pointers
-                                              //					if(sound_mode_left[i]!=nulltable){
-                Lcount++;
-                if (sound_mode_left[i] != whitenoise) {
-                    sound_PhaseAC_left[i] = sound_PhaseAC_left[i] + sound_PhaseM_left[i];
-                    if (sound_PhaseAC_left[i] >= 4096.0) sound_PhaseAC_left[i] -= 4096.0;
-                    leftv += getsound(i, 2);
-                } else {
-                    if (noisedwellleft[i] <= 0) {
-                        noisedwellleft[i] = sound_PhaseM_left[i];
-                        noiseleft[i] = rand() % 3800 + 100;
-                    }
-                    if (noisedwellleft[i]) noisedwellleft[i]--;
-                    j = (int)noiseleft[i];
-                    leftv += j;
-                }
-                //					}
-                //					if(sound_mode_right[i]!=nulltable){
-                Rcount++;
-                if (sound_mode_right[i] != whitenoise) {
-                    sound_PhaseAC_right[i] = sound_PhaseAC_right[i] + sound_PhaseM_right[i];
-                    if (sound_PhaseAC_right[i] >= 4096.0) sound_PhaseAC_right[i] -= 4096.0;
-                    rightv += getsound(i, 3);
-                } else {
-                    if (noisedwellright[i] <= 0) {
-                        noisedwellright[i] = sound_PhaseM_right[i];
-                        noiseright[i] = rand() % 3800 + 100;
-                    }
-                    if (noisedwellright[i]) noisedwellright[i]--;
-                    j = (int)noiseright[i];
-                    rightv += j;
-                }
-            }
-            //			}
-            left = ((leftv / Lcount) - 2000) * 16;
-            right = ((rightv / Rcount) - 2000) * 16;
-            sdi_send_buffer((uint8_t *)&left, 2);
-            sdi_send_buffer((uint8_t *)&right, 2);
-        } else if (CurrentlyPlaying == P_TONE) {
-            if (!SoundPlay) {
-                StopAudio();
-                WAVcomplete = true;
-            } else {
-                SoundPlay--;
-                if (mono) {
-                    left = ((((int)SineTable[(int)PhaseAC_left]) - 2000) * 16);
-                    PhaseAC_left = PhaseAC_left + PhaseM_left;
-                    if (PhaseAC_left >= 4096.0) PhaseAC_left -= 4096.0;
-                    right = left;
-                } else {
-                    left = (((SineTable[(int)PhaseAC_left]) - 2000) * 16);
-                    right = (((SineTable[(int)PhaseAC_right]) - 2000) * 16);
-                    PhaseAC_left = PhaseAC_left + PhaseM_left;
-                    PhaseAC_right = PhaseAC_right + PhaseM_right;
-                    if (PhaseAC_left >= 4096.0) PhaseAC_left -= 4096.0;
-                    if (PhaseAC_right >= 4096.0) PhaseAC_right -= 4096.0;
-                }
-                sdi_send_buffer((uint8_t *)&left, 2);
-                sdi_send_buffer((uint8_t *)&right, 2);
-            }
-        }
-    } else {
-        if (CurrentlyPlaying == P_TONE) {
-            if (!SoundPlay) {
-                StopAudio();
-                WAVcomplete = true;
-                return;
-            } else {
-                int32_t left_frame, right_frame;
-                SoundPlay--;
-                synth_pcm_tone_frame(&left_frame, &right_frame);
-                left = (uint16_t)((left_frame / (2000 * 512)) + 2000);
-                right = (uint16_t)((right_frame / (2000 * 512)) + 2000);
-            }
-        } else if (CurrentlyPlaying == P_WAV || CurrentlyPlaying == P_FLAC || CurrentlyPlaying == P_MOD || CurrentlyPlaying == P_ARRAY || CurrentlyPlaying == P_MP3) {
-            if (--repeatcount) return;
-            repeatcount = audiorepeat;
-            if (bcount[1] == 0 && bcount[2] == 0 && playreadcomplete == 1) {
-                pwm_set_irq_enabled(AUDIO_SLICE, false);
-                return;
-            }
-            if (swingbuf) { //buffer is primed
-                if (swingbuf == 1)
-                    playbuff = (uint16_t *)sbuff1;
-                else
-                    playbuff = (uint16_t *)sbuff2;
-                if ((CurrentlyPlaying == P_WAV || CurrentlyPlaying == P_FLAC || CurrentlyPlaying == P_MP3) && mono) {
-                    left = right = playbuff[ppos];
-                    ppos++;
-                } else {
-                    if (ppos < bcount[swingbuf]) {
-                        left = playbuff[ppos];
-                        right = playbuff[ppos + 1];
-                        ppos += 2;
-                    }
-                }
-                if (ppos == bcount[swingbuf]) {
-                    int psave = ppos;
-                    bcount[swingbuf] = 0;
-                    ppos = 0;
-                    if (swingbuf == 1)
-                        swingbuf = 2;
-                    else
-                        swingbuf = 1;
-                    if (bcount[swingbuf] == 0 && !playreadcomplete) { //nothing ready yet so flip back
-                        if (swingbuf == 1) {
-                            swingbuf = 2;
-                            nextbuf = 1;
-                        } else {
-                            swingbuf = 1;
-                            nextbuf = 2;
-                        }
-                        bcount[swingbuf] = psave;
-                        ppos = 0;
-                    }
-                }
-            }
-        } else if (CurrentlyPlaying == P_SOUND) {
-            int leftv, rightv;
-            synth_pcm_sound_sample(&leftv, &rightv);
-            left = leftv + 2000;
-            right = rightv + 2000;
-        } else if (CurrentlyPlaying <= P_STOP) {
-            return;
-        } else {
-            if (Option.AUDIO_MISO_PIN) return;
-            left = right = 2000;
-        }
-        AudioOutput(left, right);
-    }
 }
 
 void BitBangSendSPI(const BYTE * buff, int cnt) {
@@ -1476,108 +1158,7 @@ void InitReservedIO(void) {
             SD_MISO_PIN = SPI_MISO_PIN;
         }
     }
-    if (Option.AUDIO_L || Option.AUDIO_CLK_PIN) { //enable the audio system
-        if (Option.AUDIO_L) {                     // Normal PWM audio
-            ExtCfg(Option.AUDIO_L, EXT_BOOT_RESERVED, 0);
-            ExtCfg(Option.AUDIO_R, EXT_BOOT_RESERVED, 0);
-            AUDIO_L_PIN = PinDef[Option.AUDIO_L].GPno;
-            AUDIO_R_PIN = PinDef[Option.AUDIO_R].GPno;
-            gpio_set_function(AUDIO_L_PIN, GPIO_FUNC_PWM);
-            gpio_set_function(AUDIO_R_PIN, GPIO_FUNC_PWM);
-            gpio_set_slew_rate(AUDIO_L_PIN, GPIO_SLEW_RATE_SLOW);
-            gpio_set_slew_rate(AUDIO_R_PIN, GPIO_SLEW_RATE_SLOW);
-        } else { //SPI Audio (DAC or VS1053)
-            ExtCfg(Option.AUDIO_CS_PIN, EXT_BOOT_RESERVED, 0);
-            AUDIO_CS_PIN = PinDef[Option.AUDIO_CS_PIN].GPno;
-            //
-            gpio_init(AUDIO_CS_PIN);
-            gpio_set_drive_strength(AUDIO_CS_PIN, GPIO_DRIVE_STRENGTH_8MA);
-            gpio_put(AUDIO_CS_PIN, GPIO_PIN_SET);
-            gpio_set_dir(AUDIO_CS_PIN, GPIO_OUT);
-            gpio_set_slew_rate(AUDIO_CS_PIN, GPIO_SLEW_RATE_SLOW);
-            //
-            AUDIO_CLK_PIN = PinDef[Option.AUDIO_CLK_PIN].GPno;
-            ExtCfg(Option.AUDIO_CLK_PIN, EXT_BOOT_RESERVED, 0);
-            AUDIO_MOSI_PIN = PinDef[Option.AUDIO_MOSI_PIN].GPno;
-            ExtCfg(Option.AUDIO_MOSI_PIN, EXT_BOOT_RESERVED, 0);
-            if (PinDef[Option.AUDIO_CLK_PIN].mode & SPI0SCK && PinDef[Option.AUDIO_MOSI_PIN].mode & SPI0TX) {
-                SPI0locked = 1;
-                AUDIO_SPI = 1;
-            } else if (PinDef[Option.AUDIO_CLK_PIN].mode & SPI1SCK && PinDef[Option.AUDIO_MOSI_PIN].mode & SPI1TX) {
-                SPI1locked = 1;
-                AUDIO_SPI = 2;
-            }
-            gpio_init(AUDIO_CLK_PIN);
-            gpio_set_drive_strength(AUDIO_CLK_PIN, GPIO_DRIVE_STRENGTH_8MA);
-            gpio_put(AUDIO_CLK_PIN, GPIO_PIN_RESET);
-            gpio_set_dir(AUDIO_CLK_PIN, GPIO_OUT);
-            gpio_set_slew_rate(AUDIO_CLK_PIN, GPIO_SLEW_RATE_FAST);
-            gpio_set_function(AUDIO_CLK_PIN, GPIO_FUNC_SPI);
-            gpio_set_drive_strength(AUDIO_MOSI_PIN, GPIO_DRIVE_STRENGTH_8MA);
-            gpio_put(AUDIO_MOSI_PIN, GPIO_PIN_RESET);
-            gpio_set_dir(AUDIO_MOSI_PIN, GPIO_OUT);
-            gpio_set_slew_rate(AUDIO_MOSI_PIN, GPIO_SLEW_RATE_FAST);
-            gpio_set_function(AUDIO_MOSI_PIN, GPIO_FUNC_SPI);
-            if (Option.AUDIO_MISO_PIN) { //VS1053 audio needs the MISO pin
-                AUDIO_MISO_PIN = PinDef[Option.AUDIO_MISO_PIN].GPno;
-                ExtCfg(Option.AUDIO_MISO_PIN, EXT_BOOT_RESERVED, 0);
-                gpio_set_function(AUDIO_MISO_PIN, GPIO_FUNC_SPI);
-                gpio_set_input_hysteresis_enabled(AUDIO_MISO_PIN, true);
-                spi_init((AUDIO_SPI == 1 ? spi0 : spi1), 200000);
-                spi_set_format((AUDIO_SPI == 1 ? spi0 : spi1), 8, false, false, SPI_MSB_FIRST);
-            } else { //DAC audio
-                spi_init((AUDIO_SPI == 1 ? spi0 : spi1), 16000000);
-                spi_set_format((AUDIO_SPI == 1 ? spi0 : spi1), 16, true, true, SPI_MSB_FIRST);
-            }
-        }
-        if (!Option.AUDIO_DCS_PIN) { //PWM or DAC audio
-            AUDIO_SLICE = Option.AUDIO_SLICE;
-            AUDIO_WRAP = (Option.CPU_Speed * 10) / 441 - 1;
-            pwm_set_wrap(AUDIO_SLICE, AUDIO_WRAP);
-            if (Option.AUDIO_L) {
-                pwm_set_chan_level(AUDIO_SLICE, PWM_CHAN_A, AUDIO_WRAP >> 1);
-                pwm_set_chan_level(AUDIO_SLICE, PWM_CHAN_B, AUDIO_WRAP >> 1);
-                AudioOutput = DefaultAudio;
-            } else {
-                AudioOutput = SPIAudio;
-            }
-            AudioOutput(2000, 2000);
-            pwm_clear_irq(AUDIO_SLICE);
-            irq_set_exclusive_handler(PWM_IRQ_WRAP, on_pwm_wrap);
-            irq_set_enabled(PWM_IRQ_WRAP, true);
-            irq_set_priority(PWM_IRQ_WRAP, 255);
-            pwm_set_enabled(AUDIO_SLICE, true);
-        } else { //VS1053 audio
-            AUDIO_DREQ_PIN = PinDef[Option.AUDIO_DREQ_PIN].GPno;
-            ExtCfg(Option.AUDIO_DREQ_PIN, EXT_BOOT_RESERVED, 0);
-            gpio_init(AUDIO_DREQ_PIN);
-            gpio_set_dir(AUDIO_DREQ_PIN, GPIO_IN);
-            gpio_set_input_hysteresis_enabled(AUDIO_DREQ_PIN, true);
-
-            AUDIO_DCS_PIN = PinDef[Option.AUDIO_DCS_PIN].GPno;
-            ExtCfg(Option.AUDIO_DCS_PIN, EXT_BOOT_RESERVED, 0);
-            gpio_init(AUDIO_DCS_PIN);
-            gpio_set_drive_strength(AUDIO_DCS_PIN, GPIO_DRIVE_STRENGTH_8MA);
-            gpio_put(AUDIO_DCS_PIN, GPIO_PIN_SET);
-            gpio_set_dir(AUDIO_DCS_PIN, GPIO_OUT);
-            gpio_set_slew_rate(AUDIO_DCS_PIN, GPIO_SLEW_RATE_SLOW);
-
-            AUDIO_RESET_PIN = PinDef[Option.AUDIO_RESET_PIN].GPno;
-            ExtCfg(Option.AUDIO_RESET_PIN, EXT_BOOT_RESERVED, 0);
-            gpio_init(AUDIO_RESET_PIN);
-            gpio_set_drive_strength(AUDIO_RESET_PIN, GPIO_DRIVE_STRENGTH_8MA);
-            gpio_put(AUDIO_RESET_PIN, GPIO_PIN_RESET);
-            gpio_set_dir(AUDIO_RESET_PIN, GPIO_OUT);
-            gpio_set_slew_rate(AUDIO_RESET_PIN, GPIO_SLEW_RATE_SLOW);
-            AUDIO_SLICE = Option.AUDIO_SLICE;
-            AUDIO_WRAP = (Option.CPU_Speed * 10) / 441 - 1;
-            pwm_set_wrap(AUDIO_SLICE, AUDIO_WRAP);
-            pwm_clear_irq(AUDIO_SLICE);
-            irq_set_exclusive_handler(PWM_IRQ_WRAP, on_pwm_wrap);
-            irq_set_enabled(PWM_IRQ_WRAP, true);
-            irq_set_priority(PWM_IRQ_WRAP, 255);
-        }
-    }
+    port_audio_init_from_options();
 
     /* PWM-mode shadow on GPIO 23. Non-WiFi ports drive GPIO 23
      * to mirror the global PWM enable; WiFi ports leave GPIO 23 to

@@ -49,6 +49,9 @@ else
   LDFLAGS = -lm -flto -Wl,--gc-sections
 endif
 
+AUDIO_SHARED_CORE_SRCS = shared/audio/Audio.c shared/audio/audio_runtime.c shared/audio/audio_stream.c
+AUDIO_BACKEND_SRCS = hal_audio_host.c
+
 # Core MMBasic — same list as host_native minus core/mmbasic/Editor.c,
 # core/mmbasic/MMBasic_REPL.c, MMBasic_Prompt.c.  Keep shared gfx / state so core/mmbasic/Draw.c
 # etc. link, but the display goes through hal_display stubs.
@@ -61,7 +64,7 @@ CORE_SRCS += mm_net_http.c
 CORE_SRCS += mm_net_ntp.c
 CORE_SRCS += mm_net_telnet_rx.c
 CORE_SRCS += mm_net_state.c
-CORE_SRCS += core/mmbasic/Draw.c shared/gfx/RGB121.c shared/gfx/Tilemap.c core/mmbasic/FileIO.c shared/audio/Audio.c shared/audio/audio_stream.c drivers/bmp_decoder/BmpDecoder.c third_party/regex/re.c third_party/picojpeg/picojpeg.c
+CORE_SRCS += core/mmbasic/Draw.c shared/gfx/RGB121.c shared/gfx/Tilemap.c core/mmbasic/FileIO.c $(AUDIO_SHARED_CORE_SRCS) drivers/bmp_decoder/BmpDecoder.c third_party/regex/re.c third_party/picojpeg/picojpeg.c
 # Stubs inherited from host_native (dr_mp3, SPI-LCD, VGA, GUI, 3D, uPNG).
 CORE_SRCS += audio_mp3_real.c third_party/hxcmod/hxcmod.c spi_lcd_mem332_stub.c display_merge_stub.c vga_ops_stub.c
 CORE_SRCS += gfx_3d.c upng_sprite_stub.c gui_touch_stub.c gui_controls_stub.c psram_heap_stub.c hal_psram_stub.c i2c_keypad_stub.c heartbeat_stub.c
@@ -81,7 +84,7 @@ NATIVE_SRCS = host_runtime.c host_fs_shims.c host_peripheral_stubs.c host_fs.c \
               host_sim_audio.c host_sim_slowdown.c host_sim_emit_stub.c host_time.c host_keys.c \
               host_bc_runtime_noop.c host_web_stubs.c \
               hal_flash_host.c hal_time_host.c hal_random_host.c hal_pin_host.c hal_storage_host.c \
-              hal_filesystem_host.c hal_keyboard_host.c hal_audio_host.c hal_vm_framebuffer_host.c
+              hal_filesystem_host.c hal_keyboard_host.c $(AUDIO_BACKEND_SRCS) hal_vm_framebuffer_host.c
 
 PORT_SRCS = main.c stdio_runtime.c
 

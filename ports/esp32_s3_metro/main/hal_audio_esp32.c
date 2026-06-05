@@ -31,7 +31,8 @@
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 #include "port_config.h"
-#include "hal/hal_audio.h"
+#include "hal/hal_audio_control.h"
+#include "hal/hal_audio_stream.h"
 #include "synth_pcm.h"
 #include "audio_play_common.h"
 

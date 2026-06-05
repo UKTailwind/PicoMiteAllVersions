@@ -528,6 +528,13 @@ void fun_info(void) {
         targ = T_INT;
         return;
     }
+    if (checkstring(ep, (unsigned char *)"PLAYING") ||
+        checkstring(ep, (unsigned char *)"SOUND")) {
+        strcpy((char *)sret, PlayingStr[CurrentlyPlaying]);
+        CtoM(sret);
+        targ = T_STR;
+        return;
+    }
     if (checkstring(ep, (unsigned char *)"BOOT COUNT")) {
         iret = 0;
         targ = T_INT;
