@@ -39,6 +39,7 @@
 #define MAIN_THREAD_ASYNC_EM_ASM EM_ASM
 #endif
 
+// clang-format off
 void host_sim_audio_tone(double left_hz, double right_hz,
                          int has_duration, int64_t duration_ms) {
     MAIN_THREAD_ASYNC_EM_ASM({
@@ -46,15 +47,16 @@ void host_sim_audio_tone(double left_hz, double right_hz,
             window.picomiteAudio.tone($0, $1, $2 ? $3 : -1);
         } else if (typeof postMessage === 'function') {
             postMessage({ type: 'audio', op: 'tone', args: [$0, $1, $2 ? $3 : -1] });
-        } }, left_hz, right_hz, has_duration, (double)duration_ms);
+        }
+    }, left_hz, right_hz, has_duration, (double)duration_ms);
 }
 
 void host_sim_audio_stop(void) {
     MAIN_THREAD_ASYNC_EM_ASM({
-        if (typeof window != = 'undefined' && window.picomiteAudio) {
+        if (typeof window !== 'undefined' && window.picomiteAudio) {
             window.picomiteAudio.stop();
-        } else if (typeof postMessage == = 'function') {
-            postMessage({type : 'audio', op : 'stop', args : []});
+        } else if (typeof postMessage === 'function') {
+            postMessage({ type: 'audio', op: 'stop', args: [] });
         }
     });
 }
@@ -68,7 +70,8 @@ void host_sim_audio_sound(int slot, const char * ch, const char * type,
             window.picomiteAudio.sound($0, chStr, tyStr, $3, $4);
         } else if (typeof postMessage === 'function') {
             postMessage({ type: 'audio', op: 'sound', args: [$0, chStr, tyStr, $3, $4] });
-        } }, slot, ch ? ch : "B", type ? type : "O", freq_hz, volume);
+        }
+    }, slot, ch ? ch : "B", type ? type : "O", freq_hz, volume);
 }
 
 void host_sim_audio_volume(int left, int right) {
@@ -77,28 +80,30 @@ void host_sim_audio_volume(int left, int right) {
             window.picomiteAudio.volume($0, $1);
         } else if (typeof postMessage === 'function') {
             postMessage({ type: 'audio', op: 'volume', args: [$0, $1] });
-        } }, left, right);
+        }
+    }, left, right);
 }
 
 void host_sim_audio_pause(void) {
     MAIN_THREAD_ASYNC_EM_ASM({
-        if (typeof window != = 'undefined' && window.picomiteAudio) {
+        if (typeof window !== 'undefined' && window.picomiteAudio) {
             window.picomiteAudio.pause();
-        } else if (typeof postMessage == = 'function') {
-            postMessage({type : 'audio', op : 'pause', args : []});
+        } else if (typeof postMessage === 'function') {
+            postMessage({ type: 'audio', op: 'pause', args: [] });
         }
     });
 }
 
 void host_sim_audio_resume(void) {
     MAIN_THREAD_ASYNC_EM_ASM({
-        if (typeof window != = 'undefined' && window.picomiteAudio) {
+        if (typeof window !== 'undefined' && window.picomiteAudio) {
             window.picomiteAudio.resume();
-        } else if (typeof postMessage == = 'function') {
-            postMessage({type : 'audio', op : 'resume', args : []});
+        } else if (typeof postMessage === 'function') {
+            postMessage({ type: 'audio', op: 'resume', args: [] });
         }
     });
 }
+// clang-format on
 
 size_t host_sim_audio_drain(char *** out_msgs, int * out_count) {
     if (out_msgs) *out_msgs = NULL;
