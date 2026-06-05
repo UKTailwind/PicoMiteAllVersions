@@ -123,6 +123,12 @@ void app_main(void) {
     ClearRuntime(true);
     if (esp32_web_console_display_init()) SaveOptions();
 
+    /* Bring up VGA (RGB332 over LCD_CAM) if OPTION VGA configured its
+     * pins. Binds the graphics draw pointers + framebuffer globals; the
+     * REPL stays on the serial console. No-op when unconfigured. */
+    extern void esp32_vga_display_init(void);
+    esp32_vga_display_init();
+
     /* Mirror the Pico pattern: always call WebConnect at boot. The
      * lifecycle no-ops cleanly when Option.SSID is empty, and on success
      * it opens whichever network services are enabled (telnet, web

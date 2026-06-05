@@ -261,11 +261,13 @@ void cmd_onewire(void) {}
 
 void cmd_option(void) {
     extern int esp32_wifi_option_setter(unsigned char * cmdline);
+    extern int esp32_vga_option_setter(unsigned char * cmdline);
     if (checkstring(cmdline, (unsigned char *)"LIST")) {
         printoptions();
         return;
     }
     if (esp32_audio_option_setter(cmdline)) return;
+    if (esp32_vga_option_setter(cmdline)) return;
     if (option_command_handle_common(cmdline, false)) return;
     if (esp32_wifi_option_setter(cmdline)) return;
     error("Option not supported on this port");

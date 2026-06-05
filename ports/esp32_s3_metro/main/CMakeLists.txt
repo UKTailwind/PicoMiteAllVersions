@@ -157,6 +157,9 @@ set(PORT_LOCAL_SRCS
     esp32_audio_options.c                   # OPTION AUDIO / MM.INFO$(AUDIO) surface
     ${AUDIO_BACKEND_SRCS}
     hal_vm_framebuffer_esp32_stub.c
+    esp32_vga.c                             # OPTION VGA parser + LCD_CAM display bring-up
+    ${REPO_ROOT}/drivers/vga_lcdcam_s3/vga_lcdcam_s3.c  # ESP32-S3 LCD_CAM VGA scanout (RGB332)
+    ${REPO_ROOT}/drivers/draw_rgb332/draw_rgb332.c      # shared RGB332 draw primitives
     hal_time_esp32.c
     hal_random_esp32.c
     hal_net_esp32.c                         # ESP-IDF socket transport HAL
@@ -230,6 +233,7 @@ idf_component_register(
         ${REPO_ROOT}/drivers/spi_bus
         ${REPO_ROOT}/drivers/spi_lcd
         ${REPO_ROOT}/drivers/ssd1963
+        ${REPO_ROOT}/drivers/vga_lcdcam_s3
         ${REPO_ROOT}
         ${REPO_ROOT}/third_party/aes
         ${REPO_ROOT}/third_party/cjson
@@ -243,6 +247,7 @@ idf_component_register(
         ${REPO_ROOT}/ports/pico_sdk_compat # legacy hardware/* Pico SDK header shims
     REQUIRES
         driver
+        esp_lcd
         esp_adc
         esp_driver_i2s
         esp_driver_rmt
