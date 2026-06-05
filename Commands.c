@@ -62,7 +62,7 @@ char *KeyInterrupt = NULL;
 unsigned char *SaveNextDataLine = NULL;
 #ifdef MMBASIC_FM
 int fm_program_launched_from_fm = 0;
-char fm_relaunch_status[STRINGSIZE * 2] = {0};
+char fm_relaunch_status[STRINGSIZE] = {0}; // short FM status/error line; all writers are bound by sizeof()
 int fm_relaunch_status_valid = 0;
 int fm_suppress_error_output = 0;
 char fm_last_launched_bas[FF_MAX_LFN] = {0};

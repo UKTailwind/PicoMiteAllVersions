@@ -64,7 +64,17 @@
 /* ==============================================================================================================
  * TOUCH STATE MACRO
  * ============================================================================================================== */
+/* Resistive / FT6X36 panels hold their INT pin at the active level while
+ * a finger is down, so pen-down is a cheap pin read. The GT911 only
+ * pulses its INT pin, so its pen-down state has to be polled over I2C
+ * (GT911TouchDown). That path is only compiled where Touch.c is built
+ * (everything except the PICOMITEVGA / HDMI targets, which carry no
+ * capacitive panel and supply their own touch stubs in GUI.c). */
+#ifdef PICOMITEVGA
 #define TOUCH_DOWN (Option.TOUCH_IRQ ? (!(PinRead(Option.TOUCH_IRQ))) : 0)
+#else
+#define TOUCH_DOWN (Option.TOUCH_IRQ ? (Option.TOUCH_CAP == 2 ? GT911TouchDown() : !(PinRead(Option.TOUCH_IRQ))) : 0)
+#endif
 
 /* ==============================================================================================================
  * FT6X36 CAPACITIVE TOUCH CONTROLLER (FT6206, FT6236, FT6336)
@@ -364,8 +374,11 @@ extern void InitTouch(void);
 extern void GetCalibration(int x, int y, int *xval, int *yval);
 extern int GetTouchValue(int cmd);
 extern int GetTouch(int x);
+extern int GetTouchN(int point, int axis);
+extern int GetTouchCount(void);
 extern int GetTouchAxis(int axis);
 extern int GetTouchAxisCap(int axis);
+extern int GT911TouchDown(void);
 
 #endif // !defined(INCLUDE_COMMAND_TABLE) && !defined(INCLUDE_TOKEN_TABLE)
        /* @endcond */

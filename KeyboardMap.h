@@ -64,6 +64,34 @@ void USR_KEYBRD_ProcessData(uint8_t data);
    BLE build passes 0 (LED writes are gated by #ifdef USBKEYBOARD). */
 void process_kbd_report(hid_keyboard_report_t const *report, uint8_t n);
 
+/* ---- Consumer-control (media key) pseudo-ASCII codes --------------- *
+ * Many Bluetooth/USB keyboards carry dedicated media keys (volume,
+ * play/pause, track skip). These arrive as a separate HID
+ * Consumer-Control report rather than in the boot-keyboard report, so
+ * they have no HID keyboard scancode. We extend the special-key code
+ * range used by the arrow / function keys with the codes below; a BASIC
+ * program reads them through INKEY$ (e.g. IF INKEY$ = CHR$(&H8A) ...).
+ *
+ * The values sit in the 0x8A-0x90 gap left between the navigation keys
+ * (0x80-0x89) and the function keys (0x91-0x9C) in the keymap tables,
+ * so they don't collide with any US/UK special key. */
+#define MM_KEY_VOLUME_UP   0x8A
+#define MM_KEY_VOLUME_DOWN 0x8B
+#define MM_KEY_MUTE        0x8C
+#define MM_KEY_PLAY_PAUSE  0x8D
+#define MM_KEY_STOP        0x8E
+#define MM_KEY_PREV_TRACK  0x8F
+#define MM_KEY_NEXT_TRACK  0x90
+
+/* Decode a HID Consumer-Control report — a 16-bit little-endian
+   consumer Usage ID (HID Usage Page 0x0C) — and queue the matching
+   media-key pseudo-ASCII code (above) into the console RX ring via
+   USR_KEYBRD_ProcessData. Returns true if the report was consumed:
+   a recognised media key, or the all-zero key-release that follows
+   every press. Returns false for any other report so the caller can
+   fall back to its raw-notification logging. */
+bool process_consumer_report(const uint8_t *report, uint16_t len);
+
 /* Shared mouse post-decode: takes already-extracted x/y/wheel/button
    values and updates the nunstruct[n] / nunfoundc[n] arrays that the
    DEVICE(MOUSE n, "...") BASIC function reads. Called from both

@@ -55,6 +55,19 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * ============================================================================ */
 #if !defined(INCLUDE_COMMAND_TABLE) && !defined(INCLUDE_TOKEN_TABLE)
 
+/* ----------------------------------------------------------------------------
+ * Touch software gestures — TOUCH(SWIPE/SWL/.../TAP/HOLD/DTAP/PINCH/EXPAND/
+ * CONTRACT/ROTATE/CW/CCW/TTAP). The gesture state machine (Draw.c) and its
+ * per-gesture latches cost static RAM, so they are compiled out on the most
+ * memory-constrained builds: PICOMITEMIN and the RP2040 WebMite (PICOMITEWEB
+ * without GUICONTROLS — the RP2350 WebMite carries GUICONTROLS and has the
+ * RAM headroom). Basic TOUCH(X/Y/DOWN/UP/X2/Y2) is unaffected everywhere.
+ * Gate all gesture code with #ifdef TOUCH_GESTURES.
+ * -------------------------------------------------------------------------- */
+#if !defined(PICOMITEMIN) && !(defined(PICOMITEWEB) && !defined(GUICONTROLS))
+#define TOUCH_GESTURES
+#endif
+
 /* Standard library includes */
 #include <stdio.h>
 #include <stddef.h>
@@ -300,6 +313,22 @@ typedef struct
 	   one button (= tip) + absolute X/Y — for a single finger. Captured so
 	   single touches still register when the multitouch report never comes.
 	   Devices with no such collection leave has_pointer_fallback=false. */
+	/* Windows/HID "Device Configuration" → "Device Mode" (Input Mode, usage
+	   0x52) Feature report. When present, a panel that defaults to mouse /
+	   non-reporting mode is switched to multi-touch by writing 0x02 to this
+	   feature (the standard hid-multitouch mechanism). Captured report ID. */
+	bool has_input_mode;
+	uint8_t input_mode_report_id;
+
+	/* Windows touch "bring-up" Feature reports. Some panels (ILITEK ILI2132)
+	   that declare no Input Mode only enter digitizer mode after the host
+	   performs these GET_FEATURE reads, the way Windows does. Report IDs are
+	   captured from the descriptor by usage (0x55 Contact Count Maximum,
+	   0xC5 Microsoft certification blob) rather than hardcoded, so the
+	   handshake works on any panel that carries them. 0 = not present. */
+	uint8_t contact_count_max_report_id;
+	uint8_t cert_blob_report_id;
+
 	bool has_pointer_fallback;
 	uint8_t pointer_report_id;
 	uint16_t pointer_button_bit_offset; /* button 1 = tip, relative to payload */
@@ -342,6 +371,17 @@ typedef struct s_HID
 	bool active;
 	bool report_requested;
 	bool notfirsttime;
+	/* Touch digitizer-init handshake state (dual-mode panels only). Some
+	   controllers — e.g. ILITEK ILI2132 — power up emitting the mouse-compat
+	   report and only switch to the multi-touch digitizer report once the
+	   host performs the Windows touch GET_FEATURE bring-up reads. Driven by
+	   hid_app_task() + tuh_hid_get_report_complete_cb(). 0 = idle/done. */
+	uint8_t touch_init_step;
+	/* Wall-clock (us) the touch init handshake was last (re)started. Some
+	   controllers (ILI2132) only stay in digitizer mode for a few seconds
+	   after the bring-up reads, then revert — so the handshake is re-asserted
+	   periodically as a keep-alive. */
+	uint64_t touch_init_us;
 	uint8_t motorleft;
 	uint8_t motorright;
 	uint8_t r, g, b;
@@ -519,6 +559,9 @@ extern volatile uint64_t usb_touch_last_us;
 extern volatile bool usb_touch_active2;
 extern volatile int16_t usb_touch_x2;
 extern volatile int16_t usb_touch_y2;
+extern volatile uint8_t usb_touch_count;
+extern volatile int16_t usb_touch_xn[MAX_TOUCH_CONTACTS];
+extern volatile int16_t usb_touch_yn[MAX_TOUCH_CONTACTS];
 #endif
 
 #ifdef USBKEYBOARD

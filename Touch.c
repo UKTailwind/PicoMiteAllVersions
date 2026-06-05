@@ -63,6 +63,137 @@ int TOUCH_GETIRQTRIS = 0;
 static int gt911_addr = GT911_ADDR;
 
 // ========================================
+// GT911 polled touch state
+// ========================================
+// The GT911 has no "pen down" output line that can be polled as a level
+// (unlike the FT6X36, whose INT pin is held low for the duration of a
+// touch in polling mode). Instead the host reads the status register
+// (0x814E): bit 7 signals a fresh coordinate report is ready, the low
+// nibble carries the number of active contacts. After reading the
+// coordinates the host must clear the register or the controller stops
+// updating. We cache the last reported state so that, between reports,
+// TOUCH(X)/TOUCH(Y)/TOUCH(DOWN) all see a stable value rather than a
+// momentary "no data ready".
+static int gt911_x[GT911_MAX_NB_TOUCH];       // raw X for each tracked contact
+static int gt911_y[GT911_MAX_NB_TOUCH];       // raw Y for each tracked contact
+static int gt911_points = 0; // active contacts at the last fresh report
+static bool gt911_down = false;   // debounced pen-down state
+static uint64_t gt911_up_us = 0;  // when the current "no contact" streak began (0 = none)
+
+// A held finger occasionally produces a single spurious "0 contacts"
+// report (a capacitive controller dropping a light/still touch for one
+// frame). Treating that as a release makes the pen flicker up/down, which
+// e.g. skips calibration targets and double-fires GUI buttons. Require the
+// no-contact condition to persist for this long before reporting release.
+#define GT911_RELEASE_DEBOUNCE_US 60000ULL // 60 ms
+
+/**
+ * Refresh the cached GT911 touch state from the controller.
+ * Only the status bit 7 ("report ready") path reads coordinates; between
+ * reports the last values are retained, which keeps the pen-down level
+ * steady while a finger is held. The pen-up edge is debounced (see above)
+ * so a one-frame contact dropout does not register as a release.
+ */
+static void GT911Poll(void)
+{
+    uint8_t status = read8Register16(gt911_addr, GT911_TD_STAT_REG);
+
+    if (status & GT911_TD_STATUS_BIT_BUFFER_STAT)
+    {
+        int n = status & GT911_TD_STATUS_BITS_NBTOUCHPTS;
+        if (n > GT911_MAX_NB_TOUCH)
+            n = 0; // garbage count — treat as no touch
+
+        if (n > 0)
+        {
+            // Read coordinates for every contact we can expose. TOUCH(X/Y)
+            // and TOUCH(X2/Y2) use contacts 0 and 1; TOUCH(XN/YN n) reaches
+            // the rest, up to the GT911's GT911_MAX_NB_TOUCH (5) limit. The
+            // per-contact coordinate blocks are 8 bytes apart and laid out
+            // P1=0x8150, P2=0x8158, ... so the address steps by 8.
+            int rd = (n > GT911_MAX_NB_TOUCH) ? GT911_MAX_NB_TOUCH : n;
+            for (int pt = 0; pt < rd; pt++)
+            {
+                uint8_t buf[4];
+                readNRegister16(gt911_addr, GT911_P1_XL_REG + pt * 8, buf, 4);
+                gt911_x[pt] = buf[0] | (buf[1] << 8);
+                gt911_y[pt] = buf[2] | (buf[3] << 8);
+            }
+            gt911_points = n;
+            gt911_down = true;
+            gt911_up_us = 0; // any contact cancels a pending release
+        }
+        else if (gt911_up_us == 0)
+        {
+            gt911_up_us = time_us_64(); // start of a possible release
+        }
+
+        // Clearing the status register is mandatory — the GT911 will not
+        // produce a new report until the host acknowledges this one.
+        Write8Register16(gt911_addr, GT911_TD_STAT_REG, 0);
+    }
+
+    // Confirm a release once the no-contact streak has lasted long enough.
+    // Done outside the "report ready" gate so it still fires if the
+    // controller goes quiet after a single lift-off report.
+    if (gt911_up_us && (time_us_64() - gt911_up_us >= GT911_RELEASE_DEBOUNCE_US))
+    {
+        gt911_down = false;
+        gt911_points = 0;
+        gt911_up_us = 0;
+    }
+}
+
+/**
+ * Pen-down test for the GT911, used by the TOUCH_DOWN macro in place of
+ * the IRQ-pin read used for resistive / FT6X36 panels.
+ */
+int GT911TouchDown(void)
+{
+    if (Option.TOUCH_CAP != 2)
+        return 0;
+    GT911Poll();
+    return gt911_down;
+}
+
+/**
+ * Run the GT911 power-on reset sequence and probe for the controller.
+ * The GT911 latches its I2C slave address from the INT pin level as RESET
+ * is released: INT high selects 0x14 (GT911_ADDR), INT low selects 0x5D
+ * (GT911_ADDR2). Returns true if the "911" product id is read back at
+ * @addr after the reset.
+ *   Option.TOUCH_IRQ -> INT pin, Option.TOUCH_CS -> RESET pin.
+ */
+static int GT911ResetProbe(int int_level, int addr)
+{
+    gpio_init(TOUCH_CS_PIN);
+    gpio_set_dir(TOUCH_CS_PIN, GPIO_OUT);
+    gpio_init(TOUCH_IRQ_PIN);
+    gpio_set_dir(TOUCH_IRQ_PIN, GPIO_OUT);
+
+    gpio_put(TOUCH_CS_PIN, 0);            // assert RESET (active low)
+    gpio_put(TOUCH_IRQ_PIN, 0);
+    uSec(200);
+    gpio_put(TOUCH_IRQ_PIN, int_level);   // select slave address
+    uSec(200);
+    gpio_put(TOUCH_CS_PIN, 1);            // release RESET, address is latched
+    uSec(6000);
+    gpio_put(TOUCH_IRQ_PIN, 0);
+    uSec(50000);                          // controller boot time
+
+    // Return the INT pin to a high-impedance input (matches how
+    // InitReservedIO leaves it for the resistive / FT6X36 path).
+    gpio_set_dir(TOUCH_IRQ_PIN, GPIO_IN);
+    gpio_pull_up(TOUCH_IRQ_PIN);
+
+    // Verify the product id ("911" in ASCII at 0x8140).
+    uint8_t pid[4];
+    readNRegister16(addr, GT911_CHIP_ID_REG, pid, 4);
+    uint32_t id = pid[0] | (pid[1] << 8) | (pid[2] << 16) | (pid[3] << 24);
+    return (id & 0x00FFFFFFU) == (GT911_ID & 0x00FFFFFFU);
+}
+
+// ========================================
 // GT911 Device Mode Functions
 // ========================================
 
@@ -108,21 +239,28 @@ void MIPS16 ConfigTouch(unsigned char *p)
     int threshold = 50;
     unsigned char *tp = NULL;
 
-    // Check for FT6336 touch controller
+    // Check for a capacitive touch controller (I2C based). Both the
+    // FT6X36 family and the GT911 are wired the same way at the OPTION
+    // TOUCH level: INT pin, RESET pin[, Click pin][, threshold].
     tp = checkstring(p, (unsigned char *)"FT6336");
     if (tp)
     {
-        TOUCH_CAP = 1;
+        TOUCH_CAP = 1; // FT6206 / FT6236 / FT6336
         p = tp;
+    }
+    else
+    {
+        tp = checkstring(p, (unsigned char *)"GT911");
+        if (tp)
+        {
+            TOUCH_CAP = 2; // Goodix GT911
+            p = tp;
+        }
+    }
 
-        if (!Option.SYSTEM_I2C_SDA)
-        {
-            error("System I2C not set");
-        }
-        if (!TOUCH_CAP)
-        {
-            TOUCH_CAP = 2;
-        }
+    if (TOUCH_CAP && !Option.SYSTEM_I2C_SDA)
+    {
+        error("System I2C not set");
     }
 
     getcsargs(&p, 7);
@@ -228,6 +366,38 @@ void MIPS16 InitTouch(void)
         WriteRegister8(FT6X36_ADDR, FT6X36_REG_CTRL, 0x00);
         WriteRegister8(FT6X36_ADDR, FT6X36_REG_THRESHHOLD, Option.THRESHOLD_CAP);
         WriteRegister8(FT6X36_ADDR, FT6X36_REG_TOUCHRATE_ACTIVE, 0x01);
+
+        TOUCH_GETIRQTRIS = 1;
+    }
+    else if (Option.TOUCH_CAP == 2)
+    {
+        // GT911 (Goodix) capacitive controller.
+        // Option.TOUCH_IRQ -> INT pin, Option.TOUCH_CS -> RESET pin.
+        if (!Option.TOUCH_IRQ || !Option.TOUCH_CS || !Option.SYSTEM_I2C_SCL)
+        {
+            return;
+        }
+
+        // The slave address is fixed by the INT level during reset, so each
+        // candidate address needs its own reset. Try 0x14 (INT high) first,
+        // then fall back to 0x5D (INT low) for panels strapped that way.
+        if (GT911ResetProbe(1, GT911_ADDR))
+        {
+            gt911_addr = GT911_ADDR;
+        }
+        else if (GT911ResetProbe(0, GT911_ADDR2))
+        {
+            gt911_addr = GT911_ADDR2;
+        }
+        else
+        {
+            gt911_addr = GT911_ADDR;
+            MMPrintString("GT911 touch panel not found\r\n");
+        }
+
+        // Discard any pending report so the first poll starts clean.
+        Write8Register16(gt911_addr, GT911_TD_STAT_REG, 0);
+        gt911_points = 0;
 
         TOUCH_GETIRQTRIS = 1;
     }
@@ -362,6 +532,39 @@ int __not_in_flash_func(GetTouch)(int y)
     if (!Option.TOUCH_XZERO && !Option.TOUCH_YZERO)
         return TOUCH_ERROR;
 
+    if (Option.TOUCH_CAP == 2)
+    {
+        // GT911 — pen-down state and coordinates come from the polled
+        // status register, not the INT pin (which only pulses).
+        int point = 0;
+        if (y >= 0x10)
+        {
+            point = 1; // second contact: TOUCH(X2) / TOUCH(Y2)
+            y -= 0x10; // strip the contact-2 flag (bit 4), keep X/Y selector
+        }
+
+        GT911Poll();
+        if (!gt911_down || point >= gt911_points)
+        {
+            TOUCH_GETIRQTRIS = 1;
+            return TOUCH_ERROR;
+        }
+
+        // Pick the raw axis, honouring the calibration's swap setting.
+        int raw = (Option.TOUCH_SWAPXY ? !y : y) ? gt911_y[point] : gt911_x[point];
+
+        if (y)
+            i = (MMFLOAT)(raw - Option.TOUCH_YZERO) * Option.TOUCH_YSCALE;
+        else
+            i = (MMFLOAT)(raw - Option.TOUCH_XZERO) * Option.TOUCH_XSCALE;
+
+        if (i < 0 || i >= (y ? VRes : HRes))
+            i = TOUCH_ERROR;
+
+        TOUCH_GETIRQTRIS = 1;
+        return i;
+    }
+
     // Check if pen is down
     if (PinRead(Option.TOUCH_IRQ))
     {
@@ -374,16 +577,21 @@ int __not_in_flash_func(GetTouch)(int y)
         // Capacitive touch reading
         uint32_t in;
 
-        // Handle second touch point
-        if (y >= 10)
+        // Handle second touch point. TOUCH(X2)/TOUCH(Y2) arrive as
+        // GET_X_AXIS2 (0x10) / GET_Y_AXIS2 (0x11): bit 4 flags "contact 2",
+        // the low bit still selects X(0)/Y(1). Strip the flag with 0x10 —
+        // NOT decimal 10, which would leave 6/7 and read X2 as the Y axis.
+        if (y >= 0x10)
         {
-            if (readRegister8(FT6X36_ADDR, FT6X36_REG_NUM_TOUCHES) != 2)
+            // TD_STATUS low nibble = active contact count (upper bits
+            // reserved); need both contacts present for X2/Y2.
+            if ((readRegister8(FT6X36_ADDR, FT6X36_REG_NUM_TOUCHES) & 0x0F) != 2)
             {
                 TOUCH_GETIRQTRIS = 1;
                 return TOUCH_ERROR;
             }
             in = readRegister32(FT6X36_ADDR, FT6X36_REG_P2_XH);
-            y -= 10;
+            y -= 0x10;
         }
         else
         {
@@ -451,6 +659,178 @@ int __not_in_flash_func(GetTouch)(int y)
 
     TOUCH_GETIRQTRIS = 1;
     return i;
+}
+
+/**
+ * Generalised multi-touch reader behind TOUCH(XN n) / TOUCH(YN n).
+ * @param point  zero-based contact index (BASIC's 1..10 maps to 0..9)
+ * @param axis   GET_X_AXIS or GET_Y_AXIS
+ * Returns the screen-scaled coordinate of that contact, or TOUCH_ERROR if
+ * the contact is not currently touching (or the panel can't track it).
+ *
+ * Contact 0 returns exactly what TOUCH(X)/TOUCH(Y) return and contact 1
+ * matches TOUCH(X2)/TOUCH(Y2); the existing accessors are left untouched.
+ * Hardware limits: resistive panels are single-touch (point 0 only), the
+ * FT6X36 family tracks 2 contacts, the GT911 up to GT911_MAX_NB_TOUCH (5).
+ * A caller walking the list should stop at the first TOUCH_ERROR — there is
+ * no point reading contact n+1 once contact n is inactive.
+ */
+int __not_in_flash_func(GetTouchN)(int point, int axis)
+{
+    int i = TOUCH_ERROR;
+    int y = (axis == GET_Y_AXIS);
+    TOUCH_GETIRQTRIS = 0;
+
+    // Mirror GetTouch's "no panel / not calibrated -> no touch" guards.
+    if (Option.TOUCH_CS == 0 && Option.TOUCH_IRQ == 0)
+        return TOUCH_ERROR;
+    if (!Option.TOUCH_XZERO && !Option.TOUCH_YZERO)
+        return TOUCH_ERROR;
+    if (point < 0)
+        return TOUCH_ERROR;
+
+    if (Option.TOUCH_CAP == 2)
+    {
+        // GT911 — all live contacts are cached by the status-register poll.
+        GT911Poll();
+        if (!gt911_down || point >= gt911_points || point >= GT911_MAX_NB_TOUCH)
+        {
+            TOUCH_GETIRQTRIS = 1;
+            return TOUCH_ERROR;
+        }
+
+        int raw = (Option.TOUCH_SWAPXY ? !y : y) ? gt911_y[point] : gt911_x[point];
+
+        if (y)
+            i = (MMFLOAT)(raw - Option.TOUCH_YZERO) * Option.TOUCH_YSCALE;
+        else
+            i = (MMFLOAT)(raw - Option.TOUCH_XZERO) * Option.TOUCH_XSCALE;
+
+        if (i < 0 || i >= (y ? VRes : HRes))
+            i = TOUCH_ERROR;
+
+        TOUCH_GETIRQTRIS = 1;
+        return i;
+    }
+
+    // Resistive / FT6X36: pen-down is the INT pin level.
+    if (PinRead(Option.TOUCH_IRQ))
+    {
+        TOUCH_GETIRQTRIS = 1;
+        return TOUCH_ERROR;
+    }
+
+    if (Option.TOUCH_CAP == 1)
+    {
+        // FT6X36 family tracks at most two contacts.
+        if (point >= 2)
+        {
+            TOUCH_GETIRQTRIS = 1;
+            return TOUCH_ERROR;
+        }
+        // TD_STATUS low nibble = active contact count; need this contact present.
+        if ((readRegister8(FT6X36_ADDR, FT6X36_REG_NUM_TOUCHES) & 0x0F) <= point)
+        {
+            TOUCH_GETIRQTRIS = 1;
+            return TOUCH_ERROR;
+        }
+
+        uint32_t in = readRegister32(FT6X36_ADDR, point ? FT6X36_REG_P2_XH : FT6X36_REG_P1_XH);
+
+        if (Option.TOUCH_SWAPXY)
+            y = !y;
+        if (y)
+        {
+            i = (in & 0xF0000) >> 8;
+            i |= (in >> 24);
+        }
+        else
+        {
+            i = (in & 0xF) << 8;
+            i |= ((in >> 8) & 0xFF);
+        }
+        if (Option.TOUCH_SWAPXY)
+            y = !y;
+
+        if (y)
+            i = (MMFLOAT)(i - Option.TOUCH_YZERO) * Option.TOUCH_YSCALE;
+        else
+            i = (MMFLOAT)(i - Option.TOUCH_XZERO) * Option.TOUCH_XSCALE;
+
+        if (i < 0 || i >= (y ? VRes : HRes))
+            i = TOUCH_ERROR;
+    }
+    else
+    {
+        // Resistive panels report a single contact — nothing beyond point 0.
+        if (point != 0)
+        {
+            TOUCH_GETIRQTRIS = 1;
+            return TOUCH_ERROR;
+        }
+        if (y)
+            i = ((MMFLOAT)(GetTouchAxis(Option.TOUCH_SWAPXY ? CMD_MEASURE_X : CMD_MEASURE_Y) - Option.TOUCH_YZERO) * Option.TOUCH_YSCALE);
+        else
+            i = ((MMFLOAT)(GetTouchAxis(Option.TOUCH_SWAPXY ? CMD_MEASURE_Y : CMD_MEASURE_X) - Option.TOUCH_XZERO) * Option.TOUCH_XSCALE);
+
+        if (i < 0 || i >= (y ? VRes : HRes))
+            i = TOUCH_ERROR;
+    }
+
+    TOUCH_GETIRQTRIS = 1;
+    return i;
+}
+
+/**
+ * Number of contacts currently touching the panel, behind TOUCH(XN 0) /
+ * TOUCH(YN 0). Lets a program read the count once and then read exactly
+ * that many contacts, instead of probing TOUCH(XN n) upward until -1.
+ * Returns 0 when nothing is touching. Caps at the panel's tracking limit
+ * (resistive 1, FT6X36 2, GT911 GT911_MAX_NB_TOUCH).
+ */
+int __not_in_flash_func(GetTouchCount)(void)
+{
+    int n = 0;
+    TOUCH_GETIRQTRIS = 0;
+
+    if (Option.TOUCH_CS == 0 && Option.TOUCH_IRQ == 0)
+        return 0;
+    if (!Option.TOUCH_XZERO && !Option.TOUCH_YZERO)
+        return 0;
+
+    if (Option.TOUCH_CAP == 2)
+    {
+        GT911Poll();
+        if (gt911_down)
+        {
+            n = gt911_points;
+            if (n > GT911_MAX_NB_TOUCH)
+                n = GT911_MAX_NB_TOUCH;
+        }
+        TOUCH_GETIRQTRIS = 1;
+        return n;
+    }
+
+    // Resistive / FT6X36: pen-down is the INT pin level.
+    if (PinRead(Option.TOUCH_IRQ))
+    {
+        TOUCH_GETIRQTRIS = 1;
+        return 0;
+    }
+
+    if (Option.TOUCH_CAP == 1)
+    {
+        n = readRegister8(FT6X36_ADDR, FT6X36_REG_NUM_TOUCHES) & 0x0F;
+        if (n > 2)
+            n = 2; // FT6X36 family tracks at most two contacts
+    }
+    else
+    {
+        n = 1; // resistive panels are single-touch
+    }
+
+    TOUCH_GETIRQTRIS = 1;
+    return n;
 }
 
 /**
@@ -554,6 +934,16 @@ int __not_in_flash_func(GetTouchAxisCap)(int y)
     uint32_t i, in;
 
     TOUCH_GETIRQTRIS = 0;
+
+    if (Option.TOUCH_CAP == 2)
+    {
+        // GT911 raw contact-0 coordinate (used during calibration).
+        GT911Poll();
+        i = y ? gt911_y[0] : gt911_x[0];
+        TOUCH_GETIRQTRIS = 1;
+        return i;
+    }
+
     in = readRegister32(FT6X36_ADDR, FT6X36_REG_P1_XH);
 
     if (y)
@@ -649,8 +1039,10 @@ void __not_in_flash_func(TDelay)(void)
    On builds WITHOUT GUICONTROLS, none of that state exists — this
    file's simpler touch-panel-only implementation is the right one. */
 #ifndef GUICONTROLS
+
 void fun_touch(void)
 {
+    unsigned char *tp;
     if (checkstring(ep, (unsigned char *)"X"))
         iret = GetTouch(GET_X_AXIS);
     else if (checkstring(ep, (unsigned char *)"Y"))
@@ -663,6 +1055,110 @@ void fun_touch(void)
         iret = GetTouch(GET_X_AXIS2);
     else if (Option.TOUCH_CAP && checkstring(ep, (unsigned char *)"Y2"))
         iret = GetTouch(GET_Y_AXIS2);
+    /* TOUCH(XN n) / TOUCH(YN n): nth contact (n = 1..MAX_TOUCH_CONTACTS).
+       n=1 matches TOUCH(X/Y), n=2 matches TOUCH(X2/Y2); higher contacts are
+       available on a GT911 (up to 5). Any inactive / unsupported contact
+       returns -1, so a program can walk n upward until it sees -1.
+       n=0 returns the number of contacts currently touching, so a program
+       can size its loop instead of probing for the -1. */
+    else if ((tp = checkstring(ep, (unsigned char *)"XN")))
+    {
+        int n = getint(tp, 0, MAX_TOUCH_CONTACTS);
+        iret = n ? GetTouchN(n - 1, GET_X_AXIS) : GetTouchCount();
+    }
+    else if ((tp = checkstring(ep, (unsigned char *)"YN")))
+    {
+        int n = getint(tp, 0, MAX_TOUCH_CONTACTS);
+        iret = n ? GetTouchN(n - 1, GET_Y_AXIS) : GetTouchCount();
+    }
+#ifdef TOUCH_GESTURES
+    /* Gesture accessors — same keywords and clear-on-read semantics as the
+       GUICONTROLS fun_touch() in Draw.c. Two-finger results stay 0 on a
+       resistive panel. */
+    else if (checkstring(ep, (unsigned char *)"SWL"))
+    {
+        iret = (touch_swipe_dir == 1);
+        if (iret)
+            touch_swipe_dir = 0;
+    }
+    else if (checkstring(ep, (unsigned char *)"SWR"))
+    {
+        iret = (touch_swipe_dir == 2);
+        if (iret)
+            touch_swipe_dir = 0;
+    }
+    else if (checkstring(ep, (unsigned char *)"SWU"))
+    {
+        iret = (touch_swipe_dir == 3);
+        if (iret)
+            touch_swipe_dir = 0;
+    }
+    else if (checkstring(ep, (unsigned char *)"SWD"))
+    {
+        iret = (touch_swipe_dir == 4);
+        if (iret)
+            touch_swipe_dir = 0;
+    }
+    else if (checkstring(ep, (unsigned char *)"SWIPE"))
+    {
+        iret = touch_swipe_dir;
+        touch_swipe_dir = 0;
+    }
+    else if (checkstring(ep, (unsigned char *)"TAP"))
+    {
+        iret = touch_tap;
+        touch_tap = 0;
+    }
+    else if (checkstring(ep, (unsigned char *)"HOLD"))
+    {
+        iret = touch_longpress;
+        touch_longpress = 0;
+    }
+    else if (checkstring(ep, (unsigned char *)"DTAP"))
+    {
+        iret = touch_doubletap;
+        touch_doubletap = 0;
+    }
+    else if (checkstring(ep, (unsigned char *)"EXPAND"))
+    {
+        iret = (touch_pinch_dir == 1);
+        if (iret)
+            touch_pinch_dir = 0;
+    }
+    else if (checkstring(ep, (unsigned char *)"CONTRACT"))
+    {
+        iret = (touch_pinch_dir == 2);
+        if (iret)
+            touch_pinch_dir = 0;
+    }
+    else if (checkstring(ep, (unsigned char *)"PINCH"))
+    {
+        iret = touch_pinch_dir;
+        touch_pinch_dir = 0;
+    }
+    else if (checkstring(ep, (unsigned char *)"CW"))
+    {
+        iret = (touch_rotate_dir == 1);
+        if (iret)
+            touch_rotate_dir = 0;
+    }
+    else if (checkstring(ep, (unsigned char *)"CCW"))
+    {
+        iret = (touch_rotate_dir == 2);
+        if (iret)
+            touch_rotate_dir = 0;
+    }
+    else if (checkstring(ep, (unsigned char *)"ROTATE"))
+    {
+        iret = touch_rotate_dir;
+        touch_rotate_dir = 0;
+    }
+    else if (checkstring(ep, (unsigned char *)"TTAP"))
+    {
+        iret = touch_twotap;
+        touch_twotap = 0;
+    }
+#endif /* TOUCH_GESTURES */
     else
         SyntaxError();
     targ = T_INT;

@@ -6712,24 +6712,29 @@ void ResetOptions(bool startup)
        BLE-side layout is selected via Option.USBKeyboard, same field
        the USB-host build uses — defaulting to US matches the existing
        USB-host defaults. RepeatStart/RepeatRate were already set at
-       the top of ResetOptions, so we don't re-set them here. Also:
-       GP25 is the wireless CS pin so the regular heartbeat GPIO can't
-       be used; bt_keyboard_poll() blinks the CYW43 on-module LED
-       instead. Same 200 MHz CPU floor as PICOMITEBT (matches MIN_CPU). */
+       the top of ResetOptions, so we don't re-set them here. Heartbeat:
+       GP25 (pseudo-pin 43) is the wireless CS line and is marked UNUSED
+       in PinDef, so CheckPin() skips both the regular GPIO heartbeat
+       (External.c) and its IRQ toggle (PicoMite.c) regardless of the
+       NoHeartbeat flag. That leaves NoHeartbeat free to gate ONLY the
+       CYW43 on-module LED that bt_keyboard_poll() blinks — so default it
+       ON (NoHeartbeat=0, like WEB) and let OPTION HEARTBEAT OFF darken
+       it. Same 200 MHz CPU floor as PICOMITEBT (matches MIN_CPU). */
     Option.USBKeyboard = CONFIG_US;
     Option.capslock = 0;
     Option.numlock = 1;
-    Option.NoHeartbeat = 1;
+    Option.NoHeartbeat = 0;
     Option.CPU_Speed = 200000;
 #endif
 #ifdef PICOMITEHDMIBTH
-    /* HDMIBTH: same BTKeyboard heartbeat path as PICOMITEBTH — GP25
-       is the CYW43 CS line so the regular GPIO heartbeat is unusable;
-       bt_keyboard_poll() blinks the on-module LED instead. The HDMI
-       USBKEYBOARD branch above already set Option.USBKeyboard etc.,
-       so only NoHeartbeat needs override here. CPU_Speed default
+    /* HDMIBTH: same BTKeyboard heartbeat path as PICOMITEBTH — GP25 is
+       the CYW43 CS line, marked UNUSED in PinDef, so the regular GPIO
+       heartbeat is skipped by CheckPin() irrespective of NoHeartbeat.
+       NoHeartbeat therefore only gates the CYW43 on-module LED that
+       bt_keyboard_poll() blinks; default it ON so the LED works out of
+       the box (OPTION HEARTBEAT OFF still darkens it). CPU_Speed default
        (FreqX = 250 MHz) is set elsewhere in the HDMIBTH branch. */
-    Option.NoHeartbeat = 1;
+    Option.NoHeartbeat = 0;
 #endif
 #if defined(PICOMITEBT) || defined(PICOMITEBTH) || defined(PICOMITEHDMIBTH)
     /* btstack TLV uses flash-erase-state semantics (0xFF = empty).
@@ -6763,14 +6768,15 @@ void ResetOptions(bool startup)
 #ifdef rp2350
     if (!rp2350a)
     {
-#if !defined(PICOMITEWEB)
+#if !defined(PICOMITEWEB) && !defined(PICOMITEBTH) && !defined(PICOMITEHDMIBTH)
         /* RP2350-B (QFN-80) is the PGA2350 / Pico Plus 2 package which
            has no on-board GPIO LED, so the regular gpio heartbeat is
            suppressed. PICOMITEWEB drives the LED via cyw43_arch and
-           keeps NoHeartbeat=0 so its ProcessWeb-based poll runs. For
-           PICOMITEBTH / PICOMITEHDMIBTH the NoHeartbeat=1 default is
-           set explicitly above and the bt_keyboard_poll() path drives
-           the CYW43 LED unconditionally (ignores NoHeartbeat). */
+           keeps NoHeartbeat=0 so its ProcessWeb-based poll runs. The BT
+           hosts (PICOMITEBTH / PICOMITEHDMIBTH) are likewise excluded:
+           they keep NoHeartbeat at its 0 default so bt_keyboard_poll()
+           blinks the CYW43 on-module LED (the GPIO heartbeat is already
+           suppressed by GP25 being UNUSED in PinDef, not by this flag). */
         Option.NoHeartbeat = 1;
 #endif
         Option.AllPins = 1;

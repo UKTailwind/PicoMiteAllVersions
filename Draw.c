@@ -992,6 +992,18 @@ void fun_click(void)
     targ = T_INT;
 }
 
+#endif /* GUICONTROLS — paused for the shared gesture machine */
+#endif /* PICOMITEVGA || GUICONTROLS — also paused: the gesture machine is
+          broader than the cursor block (it serves every touch build that
+          enables TOUCH_GESTURES), so it must sit OUTSIDE this guard. */
+
+/* The gesture state machine is shared by every build that enables
+   TOUCH_GESTURES (excludes PICOMITEMIN and the RP2040 WebMite — see
+   Hardware_Includes.h), so it sits in its own guard rather than the
+   cursor / GUICONTROLS fun_click/fun_touch blocks (which use GUI-only
+   symbols like CurrentRef / GetTouch). Those resume after
+   touch_gesture_pinch_end. */
+#ifdef TOUCH_GESTURES
 /* ====================================================================
  *  Touch gesture state machine.
  *  Modelled on the mouse double-click state machine in KeyboardMap.c:
@@ -1083,6 +1095,13 @@ void touch_gesture_on_up(int16_t end_x, int16_t end_y)
     uint64_t dt = time_us_64() - touch_swipe_start_us;
     int dx = end_x - touch_swipe_start_x;
     int dy = end_y - touch_swipe_start_y;
+    /* Close the gesture window. Past this point only touch_swipe_start_x/y
+       (the down position) are used, so zeroing start_us here makes every
+       classification path below leave the machine idle — and stops a
+       sampler that runs touch_gesture_tick() before the next
+       touch_gesture_on_down() from seeing a stale start and mis-firing a
+       long-press between gestures. */
+    touch_swipe_start_us = 0;
     int adx = (dx < 0) ? -dx : dx;
     int ady = (dy < 0) ? -dy : dy;
     /* Swipe threshold ~15% of the shorter screen dimension, with a
@@ -1252,7 +1271,10 @@ void touch_gesture_pinch_end(int16_t x1, int16_t y1, int16_t x2, int16_t y2)
         }
     }
 }
+#endif /* TOUCH_GESTURES — end of shared gesture state machine */
 
+#if defined(PICOMITEVGA) || defined(GUICONTROLS) /* resume the cursor block */
+#ifdef GUICONTROLS /* resume the GUICONTROLS-only fun_click/fun_touch block */
 /* ====================================================================
  *  TOUCH() function — historically touch-panel-only, now extended to
  *  the same input-source coverage as CLICK() so a single BASIC program
@@ -1272,6 +1294,7 @@ void touch_gesture_pinch_end(int16_t x1, int16_t y1, int16_t x2, int16_t y2)
  * ==================================================================== */
 void fun_touch(void)
 {
+    unsigned char *tp;
     int btn = (nunstruct[2].L || gui_click_synthetic_down || click_pin_pressed()) ? 1 : 0;
     if (TOUCH_GETIRQTRIS && TOUCH_DOWN)
         btn = 1;
@@ -1352,6 +1375,70 @@ void fun_touch(void)
             y2 = usb_touch_y2;
 #endif
         iret = y2;
+    }
+    /* nth contact — TOUCH(XN n) / TOUCH(YN n), n = 1..MAX_TOUCH_CONTACTS.
+       Same two-source merge as X2/Y2 (hardware panel first, then USB
+       multi-touch), but generalised to every contact: n=1 matches X/Y,
+       n=2 matches X2/Y2, and a GT911 or USB panel can carry more. Returns
+       TOUCH_ERROR for any contact that isn't currently touching, so a BASIC
+       loop can count fingers by walking n until it sees -1. */
+    else if ((tp = checkstring(ep, (unsigned char *)"XN")))
+    {
+        int n = getint(tp, 0, MAX_TOUCH_CONTACTS);
+        if (n == 0)
+        {
+            /* Contact count — hardware panel first, USB as fallback, the
+               same source precedence used per-contact below. */
+            int cnt = 0;
+#ifndef PICOMITEVGA
+            cnt = GetTouchCount();
+#endif
+#ifdef USBKEYBOARD
+            if (cnt == 0)
+                cnt = usb_touch_count;
+#endif
+            iret = cnt;
+        }
+        else
+        {
+            int xn = TOUCH_ERROR;
+#ifndef PICOMITEVGA
+            xn = GetTouchN(n - 1, GET_X_AXIS);
+#endif
+#ifdef USBKEYBOARD
+            if (xn == TOUCH_ERROR && (n - 1) < usb_touch_count)
+                xn = usb_touch_xn[n - 1];
+#endif
+            iret = xn;
+        }
+    }
+    else if ((tp = checkstring(ep, (unsigned char *)"YN")))
+    {
+        int n = getint(tp, 0, MAX_TOUCH_CONTACTS);
+        if (n == 0)
+        {
+            int cnt = 0;
+#ifndef PICOMITEVGA
+            cnt = GetTouchCount();
+#endif
+#ifdef USBKEYBOARD
+            if (cnt == 0)
+                cnt = usb_touch_count;
+#endif
+            iret = cnt;
+        }
+        else
+        {
+            int yn = TOUCH_ERROR;
+#ifndef PICOMITEVGA
+            yn = GetTouchN(n - 1, GET_Y_AXIS);
+#endif
+#ifdef USBKEYBOARD
+            if (yn == TOUCH_ERROR && (n - 1) < usb_touch_count)
+                yn = usb_touch_yn[n - 1];
+#endif
+            iret = yn;
+        }
     }
     /* Single-finger swipe gestures. Latched at the touch-up edge by
        touch_gesture_on_up() (see gesture section above). Each one-shot
@@ -1921,6 +2008,7 @@ bool click_handle_gui_subcommand(unsigned char *cmdline_in)
 
 void fun_touch(void)
 {
+    unsigned char *tp;
     /* Primary "is something touching" — USB touch contact 0 OR the
        (USB) mouse left button. */
     int btn = (usb_touch_active || nunstruct[2].L) ? 1 : 0;
@@ -1938,6 +2026,26 @@ void fun_touch(void)
         iret = usb_touch_active2 ? usb_touch_x2 : VGAUSB_TOUCH_ERROR;
     else if (checkstring(ep, (unsigned char *)"Y2"))
         iret = usb_touch_active2 ? usb_touch_y2 : VGAUSB_TOUCH_ERROR;
+    /* TOUCH(XN n) / TOUCH(YN n): nth USB multi-touch contact (n = 1..
+       MAX_TOUCH_CONTACTS). n=1/2 match X/Y and X2/Y2; -1 when that contact
+       isn't touching. n=0 returns the contact count. No hardware panel
+       exists on this build, so the source is the USB digitizer only. */
+    else if ((tp = checkstring(ep, (unsigned char *)"XN")))
+    {
+        int n = getint(tp, 0, MAX_TOUCH_CONTACTS);
+        if (n == 0)
+            iret = usb_touch_count;
+        else
+            iret = ((n - 1) < usb_touch_count) ? usb_touch_xn[n - 1] : VGAUSB_TOUCH_ERROR;
+    }
+    else if ((tp = checkstring(ep, (unsigned char *)"YN")))
+    {
+        int n = getint(tp, 0, MAX_TOUCH_CONTACTS);
+        if (n == 0)
+            iret = usb_touch_count;
+        else
+            iret = ((n - 1) < usb_touch_count) ? usb_touch_yn[n - 1] : VGAUSB_TOUCH_ERROR;
+    }
     else
         SyntaxError();
     targ = T_INT;

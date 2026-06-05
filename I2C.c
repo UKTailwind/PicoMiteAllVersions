@@ -1840,6 +1840,22 @@ uint8_t read8Register16(unsigned int addr, uint16_t reg)
   GeneralReceive(addr, 1, (char *)&buff, 1);
   return buff;
 }
+void readNRegister16(unsigned int addr, uint16_t reg, uint8_t *buff, int nbr)
+{
+  uint8_t rbuff[2];
+  rbuff[0] = reg >> 8;
+  rbuff[1] = reg & 0xFF;
+  if (I2C0locked)
+    I2C_Status = I2C_Status_BusHold;
+  else
+    I2C2_Status = I2C_Status_BusHold;
+  GeneralSend(addr, 2, (char *)rbuff, 1);
+  if (I2C0locked)
+    I2C_Status = 0;
+  else
+    I2C2_Status = 0;
+  GeneralReceive(addr, nbr, (char *)buff, 1);
+}
 
 void nunproc(void)
 {

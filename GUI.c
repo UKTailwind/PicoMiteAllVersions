@@ -3618,9 +3618,17 @@ void ProcessTouch(void)
             TouchX = GetTouch(GET_X_AXIS);
             TouchY = GetTouch(GET_Y_AXIS);
         }
-        /* Record swipe-start at the down-edge. Same source we use for
-           hit-testing, so the swipe origin matches what the user sees. */
-        touch_gesture_on_down(TouchX, TouchY);
+        /* Record swipe-start at the down-edge for the mouse / USB-touch
+           sources. A wired panel's gestures are driven separately by
+           PanelGestureService() in routinechecks(), so they work even
+           with no GUI controls allocated (ProcessTouch only runs when
+           Ctrl != NULL) — don't double-drive the machine here. */
+        if (gui_click_from_mouse
+#ifdef USBKEYBOARD
+            || usb_touch_present
+#endif
+        )
+            touch_gesture_on_down(TouchX, TouchY);
         LastRef = CurrentRef = 0;
         TouchUp = TouchDown = false;
         if (!gui_click_from_mouse && TouchX == TOUCH_ERROR)
@@ -3769,12 +3777,14 @@ void ProcessTouch(void)
         TouchUp = TouchDown = false;
         LastX = TouchX;
         LastY = TouchY;
-        /* Classify any swipe. End position priority:
+        /* Classify any swipe for the mouse / USB-touch sources. End
+           position priority:
              USB touch:   usb_touch_x/y still hold the last reported
                           position before release (set false-before-x/y
                           in process_touch_report)
              mouse-driven: nunstruct[2].ax/ay (cursor location at lift)
-             fallback:    TouchX/TouchY (down position — no swipe possible) */
+           A wired panel's gestures are driven by PanelGestureService()
+           in routinechecks(), not here. */
         {
             int16_t end_x = TouchX, end_y = TouchY;
 #ifdef USBKEYBOARD
@@ -3790,7 +3800,12 @@ void ProcessTouch(void)
                 end_x = nunstruct[2].ax;
                 end_y = nunstruct[2].ay;
             }
-            touch_gesture_on_up(end_x, end_y);
+            if (gui_click_from_mouse
+#ifdef USBKEYBOARD
+                || usb_touch_present
+#endif
+            )
+                touch_gesture_on_up(end_x, end_y);
         }
         if (InvokingCtrl)
         { // the keyboard/keypad takes complete control when activated

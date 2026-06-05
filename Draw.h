@@ -374,13 +374,25 @@ void CursorRefresh(void);
 void CursorOnHeapWipe(void);   /* called by ClearRuntime before InitHeap(true) */
 bool cursor_handle_gui_subcommand(unsigned char *cmdline_in);
 extern volatile bool CursorSuspend;
+#ifdef GUICONTROLS
+bool click_handle_gui_subcommand(unsigned char *cmdline_in);
+extern volatile bool gui_click_synthetic_down;
+bool click_pin_pressed(void);
+extern int  click_pin;       /* 0 when no click pin assigned */
+extern bool click_pin_inv;
+extern volatile bool gui_click_emulated;
+extern int  cursor_x, cursor_y;
+#endif
+#endif
 
-/* Touch gesture state machines — see comments in Draw.c. ProcessTouch
-   in GUI.c calls touch_gesture_on_down / _on_up at the single-finger
-   edges; process_touch_report (USB) calls touch_gesture_tick on every
-   report so long-press can fire WHILE the finger is still down.
-   Two-finger pinch / rotate / two-finger-tap are driven from
-   process_touch_report on contact-1 edges. */
+/* Touch gesture state machine — see comments in Draw.c. The single-
+   finger edges are driven by ProcessTouch (GUI.c, wired panels + mouse),
+   process_touch_report (USB), and the panel sampler in Touch.c (non-GUI
+   builds). Two-finger pinch / rotate / two-finger-tap come from the same
+   samplers on contact-1 edges; touch_gesture_tick fires long-press while
+   the finger is still down. Compiled only where TOUCH_GESTURES is enabled
+   (see Hardware_Includes.h) — excludes PICOMITEMIN and the RP2040 WebMite. */
+#ifdef TOUCH_GESTURES
 void touch_gesture_on_down(int16_t x, int16_t y);
 void touch_gesture_on_up(int16_t end_x, int16_t end_y);
 void touch_gesture_tick(int16_t cur_x, int16_t cur_y, bool is_down);
@@ -395,15 +407,6 @@ extern int touch_doubletap;     /* 0 / 1 */
 extern int touch_pinch_dir;     /* 0=none, 1=expand, 2=contract */
 extern int touch_rotate_dir;    /* 0=none, 1=CW, 2=CCW */
 extern int touch_twotap;        /* 0 / 1 */
-#ifdef GUICONTROLS
-bool click_handle_gui_subcommand(unsigned char *cmdline_in);
-extern volatile bool gui_click_synthetic_down;
-bool click_pin_pressed(void);
-extern int  click_pin;       /* 0 when no click pin assigned */
-extern bool click_pin_inv;
-extern volatile bool gui_click_emulated;
-extern int  cursor_x, cursor_y;
-#endif
 #endif
 
 /* ============================================================================

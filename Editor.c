@@ -1364,7 +1364,13 @@ static int fm_load_context(fm_panel_t *panels, int *active)
 static void fm_save_context(const fm_panel_t *panels, int active)
 {
     lfs_file_t file;
-    static char prev_data[FF_MAX_LFN * 2 + 256] = {0};
+    /* Dedup cache: skip the flash write when the context is unchanged.
+       We keep only the length + CRC of the last write (8 bytes) instead of a
+       full ~382-byte copy. prev_len starts at -1 so the first call always
+       writes; comparing length as well as CRC means a (1-in-2^32) CRC
+       collision can never match a different-length context. */
+    static int prev_len = -1;
+    static uint32_t prev_crc = 0;
     char data[FF_MAX_LFN * 2 + 256] = {0};
     int n;
 
@@ -1393,9 +1399,11 @@ static void fm_save_context(const fm_panel_t *panels, int active)
 
     if (n <= 0 || n >= (int)sizeof(data))
         return;
-    if (memcmp(data, prev_data, n) == 0)
-        return;
-    memcpy(prev_data, data, n);
+    uint32_t crc = lfs_crc(0xffffffff, data, n);
+    if (n == prev_len && crc == prev_crc)
+        return; // unchanged -> skip the flash write
+    prev_len = n;
+    prev_crc = crc;
 
     memset(&file, 0, sizeof(file));
     if (lfs_file_open(&lfs, &file, FM_CONTEXT_FILE, LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC) < 0)
@@ -6078,6 +6086,15 @@ static void editBeautify(int edit_buff_size, int keep_blanks)
 }
 #endif /* !PICOMITEMIN */
 
+/* Shared scratch buffer for the editor's import / export filename handling
+   (FullScreenEditor + MarkMode). The import and the two export paths are
+   separate one-shot user commands that never run concurrently, so they
+   share one buffer rather than each carrying its own static
+   char[STRINGSIZE+8] (saves ~528 bytes of BSS). Kept at unconditional file
+   scope — the import/export commands are part of the editor on every build,
+   including PICOMITEMIN. */
+static char editor_io_filename[STRINGSIZE + 8];
+
 void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdfile)
 {
     edit_is_bas = (fname == NULL || fstrstr(fname, ".bas") != NULL);
@@ -7119,8 +7136,8 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
                 if (*inpbuf == 0 || *inpbuf == ESC)
                     break;
 
-                // Copy filename to local buffer
-                static char importfile[STRINGSIZE + 8];
+                // Copy filename to the shared editor I/O buffer
+                char *importfile = editor_io_filename;
                 strcpy(importfile, (char *)inpbuf);
 
                 // Add .bas extension if no extension and file not found
@@ -7217,8 +7234,8 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
                 if (*inpbuf == 0 || *inpbuf == ESC)
                     break;
 
-                // Copy filename to local buffer
-                static char exportfile[STRINGSIZE + 8];
+                // Copy filename to the shared editor I/O buffer
+                char *exportfile = editor_io_filename;
                 strcpy(exportfile, (char *)inpbuf);
 
                 // Add .bas extension if no extension specified
@@ -7813,8 +7830,8 @@ void MarkMode(unsigned char *cb, unsigned char *buf)
                     GetInputString((unsigned char *)"Export to file: ");
                     if (*inpbuf != 0 && *inpbuf != ESC)
                     {
-                        // Copy filename to local buffer
-                        static char exportfile[STRINGSIZE + 8];
+                        // Copy filename to the shared editor I/O buffer
+                        char *exportfile = editor_io_filename;
                         strcpy(exportfile, (char *)inpbuf);
 
                         // Add .bas extension if no extension specified

@@ -78,6 +78,25 @@
    away or behind a wall. */
 #define BTH_SCAN_RSSI_MIN (-70)
 
+/* Master switch for the verbose [BT] diagnostic log — the HCI / scan /
+   SM / connection trace produced by bth_log(), plus the raw-notification
+   hex dump. Off by default: with it undefined the only Bluetooth console
+   output is the "Bluetooth Keyboard Connected/Disconnected" messages.
+   Define it to trace pairing / connection problems. */
+// #define BTH_DEBUG_LOG
+
+/* Verbose scan diagnostics. When defined, every distinct advertiser
+   seen while scanning is logged once — address, address-type, RSSI,
+   advertising event-type, whether it carries the HID UUID (0x1812),
+   and the local name. Logged BEFORE the RSSI gate so even weak/distant
+   devices show, and deduped per scan session so the console stays
+   readable. Use it to confirm a new keyboard is actually broadcasting
+   and to read the address / address-type you need for
+   BTH_TARGET_ADDR_STRING / BTH_TARGET_ADDR_TYPE. Comment out for normal
+   operation. (Its log lines go through bth_log, so BTH_DEBUG_LOG must
+   also be defined for them to appear.) */
+// #define BTH_SCAN_DEBUG
+
 /* hid_descriptor_storage size — same as the SDK hid_host_demo. Large
    enough for typical keyboard HID descriptors (~150 bytes); 300 leaves
    slack for combination kbd+mouse devices. */
@@ -664,13 +683,18 @@ static void pair_kickoff_timeout(btstack_timer_source_t *ts)
 static void bth_log(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 static void bth_log(const char *fmt, ...)
 {
-    //    va_list ap;
-    //    fputs("[BT] ", stdout);
-    //    va_start(ap, fmt);
-    //    vprintf(fmt, ap);
-    //    va_end(ap);
-    //    fputc('\n', stdout);
-    //    fflush(stdout);
+#ifdef BTH_DEBUG_LOG
+    va_list ap;
+    fputs("[BT] ", stdout);
+    va_start(ap, fmt);
+    vprintf(fmt, ap);
+    va_end(ap);
+    fputc('\r', stdout);
+    fputc('\n', stdout);
+    fflush(stdout);
+#else
+    (void)fmt; /* diagnostics off — see BTH_DEBUG_LOG */
+#endif
 }
 
 /* ============================================================================
@@ -728,6 +752,26 @@ static bool ad_has_uuid16(const uint8_t *data, uint16_t len, uint16_t uuid)
     return false;
 }
 
+#ifdef BTH_SCAN_DEBUG
+/* Addresses already logged this scan session, so the verbose scan log
+   shows each advertiser once rather than flooding. Reset by start_scan().
+   Note: peripherals using a rotating Resolvable Private Address will
+   re-log when their address changes — that is expected. */
+#define BTH_SCAN_SEEN_MAX 32
+static bd_addr_t bth_scan_seen[BTH_SCAN_SEEN_MAX];
+static uint8_t bth_scan_seen_count;
+
+static bool bth_scan_log_once(const uint8_t *addr)
+{
+    for (uint8_t i = 0; i < bth_scan_seen_count; i++)
+        if (memcmp(bth_scan_seen[i], addr, sizeof(bd_addr_t)) == 0)
+            return false;
+    if (bth_scan_seen_count < BTH_SCAN_SEEN_MAX)
+        memcpy(bth_scan_seen[bth_scan_seen_count++], addr, sizeof(bd_addr_t));
+    return true; /* first sighting (or table full — log anyway) */
+}
+#endif
+
 /* ============================================================================
  * Connection lifecycle
  * ============================================================================
@@ -735,6 +779,9 @@ static bool ad_has_uuid16(const uint8_t *data, uint16_t len, uint16_t uuid)
 static void start_scan(void)
 {
     state = BTK_SCANNING;
+#ifdef BTH_SCAN_DEBUG
+    bth_scan_seen_count = 0;
+#endif
     /* Active scan, 30 ms interval / 30 ms window — aggressive, but
        keyboards advertise at 30-100 ms during pairing so this catches
        them quickly. */
@@ -1278,12 +1325,25 @@ static void bth_raw_notification_handler(uint8_t packet_type,
     if (bth_try_handle_gamepad_report(val, vlen))
         return;
 
+    /* Consumer-control report? Media keys (volume, play/pause, track
+       skip) arrive as a 2-byte little-endian consumer Usage ID on a
+       separate characteristic. Recognised usages are queued into the
+       console RX ring as media-key pseudo-ASCII codes; the trailing
+       all-zero release is swallowed. Unknown 2-byte reports fall
+       through to the raw log below. */
+    if (process_consumer_report(val, vlen))
+        return;
+
+#ifdef BTH_DEBUG_LOG
     printf("[BT] raw notify handle=0x%04x len=%u:", (unsigned)vh, (unsigned)vlen);
     for (uint16_t i = 0; i < vlen; i++)
         printf(" %02X", val[i]);
     fputc('\r', stdout);
     fputc('\n', stdout);
     fflush(stdout);
+#else
+    (void)vh; /* unrecognised report — silently dropped (BTH_DEBUG_LOG off) */
+#endif
 }
 
 /* ============================================================================
@@ -1385,6 +1445,9 @@ static void hids_client_handler(uint8_t packet_type,
             bth_raw_listener_installed = true;
         }
 
+        if (!CurrentLinePtr)
+            MMPrintString("Bluetooth Keyboard Connected\r\n> ");
+
         state = BTK_READY;
         break;
     }
@@ -1446,10 +1509,6 @@ static void packet_handler(uint8_t packet_type,
         bd_addr_type_t addr_type = gap_event_advertising_report_get_address_type(packet);
         int8_t rssi = (int8_t)gap_event_advertising_report_get_rssi(packet);
 
-        /* Filter out distant advertisers — see BTH_SCAN_RSSI_MIN. */
-        if (rssi < BTH_SCAN_RSSI_MIN)
-            break;
-
         uint8_t data_len = gap_event_advertising_report_get_data_length(packet);
         const uint8_t *data = gap_event_advertising_report_get_data(packet);
 
@@ -1457,13 +1516,26 @@ static void packet_handler(uint8_t packet_type,
         ad_extract_name(data, data_len, name, sizeof(name));
 
         /* HID Service UUID = 0x1812. Devices that advertise it are
-           proper BLE-HID (HOG) peripherals — eligible for hosting. */
+           proper BLE-HID (HOG) peripherals — eligible for hosting.
+           Note: some keyboards only put 0x1812 in their SCAN RESPONSE,
+           which arrives as a separate report (event type 4) — watch the
+           scan log for a second line from the same address. */
         bool has_hid = ad_has_uuid16(data, data_len, 0x1812);
 
-        // printf("[BT] adv %s type=%u rssi=%d%s \"%s\"\n",
-        //        bd_addr_to_str(addr), addr_type, (int)rssi,
-        //       has_hid ? " HID" : "", name);
-        // fflush(stdout);
+#ifdef BTH_SCAN_DEBUG
+        /* Log each distinct advertiser once, before the RSSI gate so even
+           weak/distant devices show. evt: 0=ADV_IND 1=ADV_DIRECT_IND
+           2=ADV_SCAN_IND 3=ADV_NONCONN_IND 4=SCAN_RSP. */
+        if (bth_scan_log_once(addr))
+            bth_log("adv %s type=%u evt=%u rssi=%d%s name=\"%s\"",
+                    bd_addr_to_str(addr), addr_type,
+                    gap_event_advertising_report_get_advertising_event_type(packet),
+                    (int)rssi, has_hid ? " HID" : "", name);
+#endif
+
+        /* Filter out distant advertisers — see BTH_SCAN_RSSI_MIN. */
+        if (rssi < BTH_SCAN_RSSI_MIN)
+            break;
 
         bool mac_match = (memcmp(addr, target_addr, sizeof(bd_addr_t)) == 0);
 #ifdef BTH_MATCH_HID_UUID
@@ -1510,19 +1582,36 @@ static void packet_handler(uint8_t packet_type,
             }
             conn_handle = hci_subevent_le_connection_complete_get_connection_handle(packet);
             state = BTK_CONNECTED_UNENCRYPTED;
-            bth_log("LE connected, handle=0x%04x; waiting for SM",
-                    (unsigned)conn_handle);
-            /* Don't initiate pairing or GATT here. Two reasons:
-               (a) iOS-style peers send a Security Request right after
-                   connect — if we send our own Pairing Request first,
-                   btstack ignores the late Sec Req and the peer
-                   disconnects with auth failure.
-               (b) iOS-style peers also lock down every ATT handle in
-                   the HID service until the link is encrypted. Doing
-                   GATT discovery before pairing makes them disconnect
-                   mid-flow.
-               The fallback timer below covers peers that don't send a
-               Security Request and expect us to initiate. */
+
+            /* On a *bonded* reconnect (the common case after the keyboard
+               sleeps and re-advertises on a key press) we don't need to
+               wait for the peer: the central is expected to re-establish
+               encryption, and for a device with stored keys
+               sm_request_pairing() starts *reencryption* with the saved
+               LTK rather than a fresh pairing. Kicking it off immediately
+               removes the up-to-2 s idle wait for a Security Request that
+               many keyboards never send on reconnect — that wait was the
+               bulk of the wake-from-sleep reconnect delay. The fallback
+               timer is still armed as a safety net.
+
+               This is gated on a bond already existing. For a first-time
+               pairing we keep the passive wait, because initiating our own
+               Pairing Request before an iOS-style peer's Security Request
+               makes btstack drop the late request and the peer disconnects
+               with auth failure — and such peers also lock down the HID
+               ATT handles until encrypted, so early GATT must be avoided.
+
+               Single-target assumption: this host pairs one keyboard, so a
+               non-empty LE device DB means "this peer is bonded". If you
+               bond a second, different keyboard its very first connect may
+               initiate early; clear bonds when switching keyboards. */
+            bool bonded = (le_device_db_count() > 0);
+            bth_log("LE connected, handle=0x%04x; %s", (unsigned)conn_handle,
+                    bonded ? "bonded — requesting reencryption"
+                           : "waiting for SM");
+            if (bonded)
+                sm_request_pairing(conn_handle);
+
             btstack_run_loop_set_timer(&pair_kickoff_timer, 2000);
             btstack_run_loop_set_timer_handler(&pair_kickoff_timer,
                                                &pair_kickoff_timeout);
@@ -1538,6 +1627,11 @@ static void packet_handler(uint8_t packet_type,
     {
         uint8_t reason = hci_event_disconnection_complete_get_reason(packet);
         bth_log("disconnected reason=0x%02x; restarting scan", reason);
+        /* Only report to the console if the keyboard had actually
+           reached the ready (HID-connected) state — avoids spurious
+           "Disconnected" lines for failed pairings / dropped scans. */
+        if (state == BTK_READY && !CurrentLinePtr)
+            MMPrintString("Bluetooth Keyboard Disconnected\r\n> ");
         btstack_run_loop_remove_timer(&pair_kickoff_timer);
         if (bth_raw_listener_installed)
         {
@@ -1764,17 +1858,10 @@ void bt_keyboard_poll(void)
             return;
         }
 
-        /* LED cadence telegraphs HCI / link state at a glance:
-             500 ms — HCI still booting
-             250 ms — HCI up, no keyboard link
-             100 ms — keyboard connected + HID notifications enabled */
-        uint32_t interval;
-        if (state < BTK_SCANNING)
-            interval = 500000u;
-        else if (state == BTK_READY)
-            interval = 100000u;
-        else
-            interval = 250000u;
+        /* LED cadence telegraphs link state at a glance:
+             1000 ms — not yet connected (HCI booting / scanning / pairing)
+              500 ms — keyboard connected + HID notifications enabled */
+        uint32_t interval = (state == BTK_READY) ? 500000u : 1000000u;
 
         if (now - last_heart_us >= interval)
         {
@@ -2416,9 +2503,10 @@ static void bth_gamepad_publish(const hid_gamepad_descriptor_t *desc,
 {
     /* Axis values land in ax/ay/Z/C/L/R, zero-filled if the device
        doesn't report that axis. */
-    int32_t a[6] = { 0, 0, 0, 0, 0, 0 };
+    int32_t a[6] = {0, 0, 0, 0, 0, 0};
     uint8_t cnt = desc->axis_count;
-    if (cnt > 6) cnt = 6;
+    if (cnt > 6)
+        cnt = 6;
     for (uint8_t i = 0; i < cnt; i++)
         a[i] = report->axes[i];
 
@@ -2430,9 +2518,11 @@ static void bth_gamepad_publish(const hid_gamepad_descriptor_t *desc,
        0xFF as the canonical "no direction" so the in-range values 0..7
        stay as standard hat codes. */
     unsigned short hat = 0xFF;
-    if (desc->has_hat) {
+    if (desc->has_hat)
+    {
         int32_t h = report->hat;
-        if (h >= desc->hat_logical_min && h <= desc->hat_logical_max) {
+        if (h >= desc->hat_logical_min && h <= desc->hat_logical_max)
+        {
             hat = (unsigned short)(h & 0x07);
         }
     }
@@ -2440,11 +2530,11 @@ static void bth_gamepad_publish(const hid_gamepad_descriptor_t *desc,
     /* Edge-detect for the interrupt path. */
     if (nunstruct[n].ax != a[0] ||
         nunstruct[n].ay != a[1] ||
-        nunstruct[n].Z  != a[2] ||
-        nunstruct[n].C  != a[3] ||
-        nunstruct[n].L  != a[4] ||
-        nunstruct[n].R  != a[5] ||
-        nunstruct[n].x0 != btn  ||
+        nunstruct[n].Z != a[2] ||
+        nunstruct[n].C != a[3] ||
+        nunstruct[n].L != a[4] ||
+        nunstruct[n].R != a[5] ||
+        nunstruct[n].x0 != btn ||
         nunstruct[n].y0 != hat)
     {
         nunfoundc[n] = 1;
@@ -2452,10 +2542,10 @@ static void bth_gamepad_publish(const hid_gamepad_descriptor_t *desc,
 
     nunstruct[n].ax = a[0];
     nunstruct[n].ay = a[1];
-    nunstruct[n].Z  = a[2];
-    nunstruct[n].C  = a[3];
-    nunstruct[n].L  = a[4];
-    nunstruct[n].R  = a[5];
+    nunstruct[n].Z = a[2];
+    nunstruct[n].C = a[3];
+    nunstruct[n].L = a[4];
+    nunstruct[n].R = a[5];
     nunstruct[n].x0 = btn;
     nunstruct[n].y0 = hat;
     nunstruct[n].type = 0x4254u; /* 'BT' magic */

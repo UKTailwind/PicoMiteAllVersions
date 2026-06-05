@@ -181,6 +181,7 @@ extern void WriteRegister8(unsigned int addr, uint8_t reg, uint8_t data);
 extern uint32_t readRegister32(unsigned int addr, uint8_t reg);
 extern void Write8Register16(unsigned int addr, uint16_t reg, uint8_t data);
 extern uint8_t read8Register16(unsigned int addr, uint16_t reg);
+extern void readNRegister16(unsigned int addr, uint16_t reg, uint8_t *buff, int nbr);
 extern int i2c_bus_recovery(int i2c_num, int baudrate);
 
 /* ==============================================================================================================

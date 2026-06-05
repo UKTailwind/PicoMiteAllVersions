@@ -608,6 +608,110 @@ uint8_t PSRAMpin;
         else
             return ConsoleRxBufTail - ConsoleRxBufHead;
     }
+#ifdef GUICONTROLS
+    /* Wired-panel pen-down, polled in the MAIN THREAD by routinechecks()
+       and read by the 1ms timer ISR's touch edge detector. The GT911's
+       TOUCH_DOWN is an I2C transaction, which must never run from interrupt
+       context — so the ISR consumes this cached flag instead of evaluating
+       TOUCH_DOWN itself. Resistive / FT6336 (cheap pin reads) ride along
+       for uniformity. */
+    volatile bool TouchPanelDown = false;
+#endif
+
+#if defined(TOUCH_GESTURES) && !defined(PICOMITEVGA)
+    /* ================================================================
+     *  Wired-panel software-gesture driver (XPT2046 / FT6336 / GT911).
+     *
+     *  Driven from routinechecks() so gestures work in every context the
+     *  interpreter polls from — program execution, PAUSE, the prompt —
+     *  and crucially WITHOUT requiring GUI controls (ProcessTouch only
+     *  runs when Ctrl != NULL) or even a GUICONTROLS build. The shared
+     *  gesture state machine lives in Draw.c; this just feeds it the
+     *  panel's down / move / up stream. Mouse and USB-touch gestures are
+     *  fed from ProcessTouch / process_touch_report instead.
+     *
+     *  @param down  pre-polled pen-down state (routinechecks polls the
+     *               panel once, in the main thread, and shares the result).
+     *  Overhead: down/up edges are acted on immediately; the heavier
+     *  coordinate reads while held are throttled to PANEL_GESTURE_SAMPLE_US.
+     *  Two-finger pinch/rotate is sampled on capacitive panels only
+     *  (resistive has no contact 2).
+     * ================================================================ */
+#define PANEL_GESTURE_SAMPLE_US 15000ULL
+    static void PanelGestureService(bool down)
+    {
+#ifdef USBKEYBOARD
+        if (usb_touch_present)
+            return; /* a USB touch screen owns the gesture machine */
+#endif
+        static uint64_t svc_us = 0;
+        static bool svc_down_prev = false;
+        static int16_t sx = 0, sy = 0, sx2 = 0, sy2 = 0;
+        static bool s_two = false;
+
+        if (down && !svc_down_prev)
+        {
+            /* Down edge — capture the swipe start position. */
+            int x = GetTouch(GET_X_AXIS), y = GetTouch(GET_Y_AXIS);
+            if (x != TOUCH_ERROR && y != TOUCH_ERROR)
+            {
+                sx = (int16_t)x;
+                sy = (int16_t)y;
+            }
+            touch_gesture_on_down(sx, sy);
+            s_two = false;
+            svc_us = time_us_64();
+        }
+        else if (down)
+        {
+            /* Held — track the live position + long-press + pinch, but
+               throttle the (comparatively expensive) coordinate reads. */
+            uint64_t now = time_us_64();
+            if (now - svc_us >= PANEL_GESTURE_SAMPLE_US)
+            {
+                svc_us = now;
+                int x = GetTouch(GET_X_AXIS), y = GetTouch(GET_Y_AXIS);
+                if (x != TOUCH_ERROR && y != TOUCH_ERROR)
+                {
+                    sx = (int16_t)x;
+                    sy = (int16_t)y;
+                }
+                if (Option.TOUCH_CAP) /* two-finger: capacitive panels only */
+                {
+                    int x2 = GetTouch(GET_X_AXIS2), y2 = GetTouch(GET_Y_AXIS2);
+                    if (x2 != TOUCH_ERROR && y2 != TOUCH_ERROR)
+                    {
+                        sx2 = (int16_t)x2;
+                        sy2 = (int16_t)y2;
+                        if (!s_two)
+                        {
+                            touch_gesture_pinch_start(sx, sy, sx2, sy2);
+                            s_two = true;
+                        }
+                    }
+                    else if (s_two)
+                    {
+                        touch_gesture_pinch_end(sx, sy, sx2, sy2);
+                        s_two = false;
+                    }
+                }
+                touch_gesture_tick(sx, sy, !s_two);
+            }
+        }
+        else if (svc_down_prev)
+        {
+            /* Up edge — last sampled position is the swipe end point. */
+            if (s_two)
+            {
+                touch_gesture_pinch_end(sx, sy, sx2, sy2);
+                s_two = false;
+            }
+            touch_gesture_on_up(sx, sy);
+        }
+        svc_down_prev = down;
+    }
+#endif /* TOUCH_GESTURES && !PICOMITEVGA */
+
     // should be run not more than once a millisecond
     void MIPS32 __not_in_flash_func(routinechecks)(void)
     {
@@ -633,6 +737,26 @@ uint8_t PSRAMpin;
         {
             cursor_lastrun = timenow;
             CursorRefresh();
+        }
+#endif
+#if defined(TOUCH_GESTURES) && !defined(PICOMITEVGA)
+        /* Poll the wired panel's pen-down here, in the main thread, never
+           from the 1ms timer ISR (the GT911's TOUCH_DOWN is an I2C
+           transaction). Throttled — the GT911 only reports at ~10-20ms, so
+           faster polling gains nothing. The cached flag feeds both the ISR
+           touch edge detector (TouchPanelDown) and the gesture service. */
+        {
+            static uint64_t pd_us = 0;
+            static bool pd_state = false;
+            if (timenow - pd_us >= 5000)
+            {
+                pd_us = timenow;
+                pd_state = (Option.TOUCH_CS || Option.TOUCH_IRQ) && TOUCH_DOWN;
+#ifdef GUICONTROLS
+                TouchPanelDown = pd_state;
+#endif
+            }
+            PanelGestureService(pd_state);
         }
 #endif
 #ifndef USBKEYBOARD
@@ -694,7 +818,7 @@ uint8_t PSRAMpin;
            packet handler (process_kbd_report path), so no extra
            drain logic is needed here. Also drives the CYW43 LED
            heartbeat — see bt_keyboard_poll() in BTKeyboard.c. */
-//        bt_keyboard_poll();
+        bt_keyboard_poll();
 #endif
 #ifdef PICOMITEBT
         /* Pump btstack/cyw43 and drain inbound RFCOMM bytes into the
@@ -897,7 +1021,7 @@ uint8_t PSRAMpin;
            wrapper like PICOMITEBT — HID reports route directly into
            the console RX ring via process_kbd_report() from inside
            the packet handler. */
-//        bt_keyboard_poll();
+        bt_keyboard_poll();
 #endif
 #ifdef PICOMITEBT
         /* Service cyw43/btstack work from the main thread at full
@@ -2142,12 +2266,16 @@ int __not_in_flash_func(MMInkey)(void)
             CheckGuiTimeouts();
 
         /* Touch panel edge detector. Fires for either a wired
-           resistive/capacitive panel (TOUCH_GETIRQTRIS && TOUCH_DOWN)
+           resistive/capacitive panel (TOUCH_GETIRQTRIS && TouchPanelDown)
            or a USB touch screen (usb_touch_active). Records ownership
            so the mouse/click detector below doesn't see a touch press
            as "mouse should release". GetTouch() (or its stub in GUI.c)
            returns whichever source is currently active when
-           ProcessTouch reads coords. */
+           ProcessTouch reads coords.
+           NB: TouchPanelDown is a flag polled in the main thread by
+           routinechecks() — we must NOT evaluate TOUCH_DOWN here, as the
+           GT911's pen-down read is an I2C transaction and this runs in the
+           1ms timer ISR. */
         {
             bool panel_armed = TOUCH_GETIRQTRIS;
 #ifdef USBKEYBOARD
@@ -2169,7 +2297,7 @@ int __not_in_flash_func(MMInkey)(void)
 #endif
             if (panel_armed || usb_armed)
             {
-                bool pen_down = (panel_armed && TOUCH_DOWN)
+                bool pen_down = (panel_armed && TouchPanelDown)
 #ifdef USBKEYBOARD
                                 || usb_touch_active
 #endif
@@ -6225,7 +6353,7 @@ uint32_t testPSRAM(void)
             bt_console_init();
         }
 #endif
-#if defined(PICOMITEBTH) || defined(PICOMITEHDMIBTHx)
+#if defined(PICOMITEBTH) || defined(PICOMITEHDMIBTH)
 #ifdef PICOMITEHDMIBTH
         /* HDMICore hardcodes DMACH_PING=0 / DMACH_PONG=1 (see the HDMI
            scanout block above). CYW43's bus_pio_spi grabs two unused
@@ -6239,7 +6367,7 @@ uint32_t testPSRAM(void)
 #endif
         /* Same PIO clock divider scaling as PICOMITEBT / WEB. */
         {
-            uint32_t cyw43_div = (Option.CPU_Speed + 79999) / 80000;
+            uint32_t cyw43_div = (Option.CPU_Speed + 99999) / 100000;
             if (cyw43_div < 2)
                 cyw43_div = 2;
             cyw43_set_pio_clkdiv_int_frac8(cyw43_div, 0);
@@ -6459,8 +6587,8 @@ uint32_t testPSRAM(void)
         // Enumeration is deferred to tuh_task() in the main loop, which runs
         // after the reset, so re-enumeration starts from a clean bus.
         tuh_init(BOARD_TUH_RHPORT);
-        USB_bus_reset();  // force any attached hub back to Default state
-        uSec(50000);      // recovery: let the hub re-detect its downstream ports
+        USB_bus_reset(); // force any attached hub back to Default state
+        uSec(50000);     // recovery: let the hub re-detect its downstream ports
         USBenabled = true;
 #else
     initMouse0(0);

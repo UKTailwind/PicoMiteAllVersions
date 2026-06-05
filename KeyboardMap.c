@@ -1259,6 +1259,67 @@ void process_kbd_report(hid_keyboard_report_t const *report, uint8_t n)
 
 
 /* ============================================================================
+ * Shared consumer-control (media key) decoder.
+ *
+ * A HID Consumer-Control report is a single 16-bit little-endian
+ * consumer Usage ID (HID Usage Page 0x0C): the usage of the key being
+ * pressed, or 0x0000 when all media keys are released. These keys have
+ * no boot-keyboard scancode, so the boot-report decoder above never
+ * sees them — both the BLE-HID-host (BTKeyboard.c) and USB-HID-host
+ * builds route their 2-byte consumer reports here instead.
+ *
+ * We translate the common transport-control usages to the media-key
+ * pseudo-ASCII codes declared in KeyboardMap.h and push them into the
+ * console RX ring, so a BASIC program reads them through INKEY$ just
+ * like the arrow / function keys. Only the press edge emits a code;
+ * the trailing 0x0000 release is swallowed silently (we report it as
+ * handled so the caller doesn't log it as an unknown report).
+ * ============================================================================
+ */
+bool process_consumer_report(const uint8_t *report, uint16_t len)
+{
+	if (len != 2)
+		return false; /* not a single-usage consumer report */
+
+	uint16_t usage = (uint16_t)report[0] | ((uint16_t)report[1] << 8);
+	uint8_t code;
+	switch (usage)
+	{
+	case 0x0000:           /* all media keys released — nothing to emit */
+		return true;
+	case 0x00E9:           /* Volume Increment */
+		code = MM_KEY_VOLUME_UP;
+		break;
+	case 0x00EA:           /* Volume Decrement */
+		code = MM_KEY_VOLUME_DOWN;
+		break;
+	case 0x00E2:           /* Mute */
+		code = MM_KEY_MUTE;
+		break;
+	case 0x00CD:           /* Play/Pause */
+	case 0x00B0:           /* Play */
+	case 0x00B1:           /* Pause */
+		code = MM_KEY_PLAY_PAUSE;
+		break;
+	case 0x00B7:           /* Stop */
+		code = MM_KEY_STOP;
+		break;
+	case 0x00B5:           /* Scan Next Track */
+	case 0x00B3:           /* Fast Forward */
+		code = MM_KEY_NEXT_TRACK;
+		break;
+	case 0x00B6:           /* Scan Previous Track */
+	case 0x00B4:           /* Rewind */
+		code = MM_KEY_PREV_TRACK;
+		break;
+	default:
+		return false;      /* unrecognised — let the caller log it raw */
+	}
+	USR_KEYBRD_ProcessData(code);
+	return true;
+}
+
+/* ============================================================================
  * Shared mouse post-decode helper.
  *
  * Both the USB-HID-host mouse path (USBKeyboard.c::process_mouse_report)

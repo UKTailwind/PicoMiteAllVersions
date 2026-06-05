@@ -56,7 +56,7 @@ extern int g_forindex;
 extern unsigned char cmdlinebuff[STRINGSIZE];
 #ifdef MMBASIC_FM
 extern int fm_program_launched_from_fm;
-extern char fm_relaunch_status[STRINGSIZE * 2];
+extern char fm_relaunch_status[STRINGSIZE];
 extern int fm_relaunch_status_valid;
 extern int fm_suppress_error_output;
 extern char fm_last_launched_bas[FF_MAX_LFN];

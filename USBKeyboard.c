@@ -197,6 +197,14 @@ volatile uint64_t usb_touch_last_us = 0;
 volatile bool usb_touch_active2 = false;
 volatile int16_t usb_touch_x2 = 0;
 volatile int16_t usb_touch_y2 = 0;
+
+/* All live contacts (tip=1), compacted to the front, exposed via
+   TOUCH(XN n) / TOUCH(YN n) for n = 1..usb_touch_count. Contacts 0 and 1
+   duplicate usb_touch_x/y and usb_touch_x2/y2 so the legacy accessors are
+   unaffected. Refreshed wholesale on every decoded report by touch_publish. */
+volatile uint8_t usb_touch_count = 0;
+volatile int16_t usb_touch_xn[MAX_TOUCH_CONTACTS] = {0};
+volatile int16_t usb_touch_yn[MAX_TOUCH_CONTACTS] = {0};
 typedef struct TU_ATTR_PACKED
 {
 	uint8_t x, y, z, rz; // joystick
@@ -656,6 +664,11 @@ bool analyze_touch_descriptor(const uint8_t *desc_report, uint16_t desc_len, tou
 	uint16_t ptr_uq[8];
 	uint8_t ptr_uq_n = 0;
 
+	/* Device Configuration collection (usage 0x0E) — hosts the Input Mode
+	   (Device Mode 0x52) Feature used to switch the panel to multi-touch. */
+	bool in_device_config = false;
+	int device_config_depth = -1;
+
 	for (uint16_t i = 0; i < desc_len;)
 	{
 		uint8_t prefix = desc_report[i++];
@@ -723,6 +736,13 @@ bool analyze_touch_descriptor(const uint8_t *desc_report, uint16_t desc_len, tou
 					in_pointer = true;
 					pointer_start_depth = collection_depth;
 				}
+				/* Device Configuration collection — carries the Input Mode
+				   (Device Mode) Feature whose Report ID we need to write. */
+				if (usage_page == 0x0D && last_usage == 0x0E && !in_device_config)
+				{
+					in_device_config = true;
+					device_config_depth = collection_depth;
+				}
 				/* Finger collection — capture start bit, then descend
 				   so per-contact fields populate relative offsets.
 				   Lock finger_report_id to the Report ID that hosts
@@ -758,6 +778,8 @@ bool analyze_touch_descriptor(const uint8_t *desc_report, uint16_t desc_len, tou
 				}
 				if (in_pointer && collection_depth == pointer_start_depth)
 					in_pointer = false;
+				if (in_device_config && collection_depth == device_config_depth)
+					in_device_config = false;
 				collection_depth--;
 			}
 			else if (bTag == 8) /* Input */
@@ -869,6 +891,23 @@ bool analyze_touch_descriptor(const uint8_t *desc_report, uint16_t desc_len, tou
 			}
 			else if (bTag == 11) /* Feature */
 			{
+				/* The Feature inside the Device Configuration collection is
+				   the Input Mode (Device Mode) selector. Capture its Report
+				   ID so we can write it to enable multi-touch. */
+				if (in_device_config && !info->has_input_mode)
+				{
+					info->has_input_mode = true;
+					info->input_mode_report_id = (uint8_t)current_report_id;
+				}
+				/* Windows bring-up Feature reports, captured by usage so the
+				   GET_FEATURE handshake isn't tied to one panel's report IDs:
+				   Contact Count Maximum (0x55, digitizer page) and the
+				   Microsoft certification blob (0xC5, distinctive enough to
+				   match on usage alone since the vendor page is truncated). */
+				if (usage_page == 0x0D && last_usage == 0x55 && !info->contact_count_max_report_id)
+					info->contact_count_max_report_id = (uint8_t)current_report_id;
+				if (last_usage == 0xC5 && !info->cert_blob_report_id)
+					info->cert_blob_report_id = (uint8_t)current_report_id;
 				last_usage = 0;
 			}
 			/* Every Main item consumes the pending Local usages. */
@@ -967,6 +1006,22 @@ static void touch_publish(touch_report_t *out)
 	else
 	{
 		usb_touch_active2 = false;
+	}
+
+	/* Publish every live contact for TOUCH(XN n)/TOUCH(YN n). out->count is
+	   the tip=1 contacts compacted to the front, so xn[0..count-1] are valid.
+	   Set the count last so a BASIC reader never sees coords from a contact
+	   that the count says is absent. */
+	{
+		uint8_t nc = out->count;
+		if (nc > MAX_TOUCH_CONTACTS)
+			nc = MAX_TOUCH_CONTACTS;
+		for (uint8_t k = 0; k < nc; k++)
+		{
+			usb_touch_xn[k] = out->contacts[k].x;
+			usb_touch_yn[k] = out->contacts[k].y;
+		}
+		usb_touch_count = nc;
 	}
 
 #ifdef GUICONTROLS
@@ -1083,20 +1138,30 @@ bool process_touch_report(const uint8_t *report, uint16_t len,
 		return false;
 	}
 
-	uint8_t raw_count = touch_read_bits(bytes,
-										info->contact_count_bit_offset,
-										info->contact_count_bits);
-	if (raw_count > info->max_contacts)
-		raw_count = info->max_contacts;
-	if (raw_count > MAX_TOUCH_CONTACTS)
-		raw_count = MAX_TOUCH_CONTACTS;
-	out->count = raw_count;
+	/* The Contact Count field tells us how many contact slots the report
+	   carries — but on many panels it counts contacts still being TRACKED,
+	   including fingers that have lifted (reported with tip=0) and aren't
+	   released yet. So it doesn't fall as fingers lift. We therefore use it
+	   only to bound the slot scan (so a fixed footer past the live slots
+	   isn't misread as a contact) and report out->count as the number of
+	   slots actually TOUCHING (tip=1), compacted to the front so contact 0/1
+	   are the live fingers regardless of which hardware slot they occupy. */
+	uint8_t scan = touch_read_bits(bytes,
+								   info->contact_count_bit_offset,
+								   info->contact_count_bits);
+	if (scan > info->max_contacts)
+		scan = info->max_contacts;
+	if (scan > MAX_TOUCH_CONTACTS)
+		scan = MAX_TOUCH_CONTACTS;
 
-	for (uint8_t c = 0; c < raw_count; c++)
+	uint8_t live = 0;
+	for (uint8_t c = 0; c < scan; c++)
 	{
 		uint16_t base = info->first_contact_bit_offset + (uint16_t)c * info->contact_stride_bits;
-		touch_contact_t *tc = &out->contacts[c];
-		tc->tip = touch_read_bits(bytes, base + info->tip_switch_bit_offset, 1) != 0;
+		if (touch_read_bits(bytes, base + info->tip_switch_bit_offset, 1) == 0)
+			continue; /* lifted / hovering contact — not a live touch */
+		touch_contact_t *tc = &out->contacts[live++];
+		tc->tip = true;
 		tc->in_range = touch_read_bits(bytes, base + info->in_range_bit_offset, 1) != 0;
 		tc->id = (uint8_t)touch_read_bits(bytes, base + info->contact_id_bit_offset,
 										  info->contact_id_bits);
@@ -1139,6 +1204,7 @@ bool process_touch_report(const uint8_t *report, uint16_t len,
 			tc->y = (int16_t)raw_y;
 		}
 	}
+	out->count = live; /* number of contacts actually touching (tip=1) */
 
 	touch_publish(out);
 	return true;
@@ -1267,6 +1333,18 @@ void dump_touch_descriptor(const uint8_t *desc, uint16_t len, const touch_info_t
 	MMPrintString(" logical_max=");
 	PInt(info->y_logical_max);
 	PRet();
+	MMPrintString("  input_mode=");
+	PInt(info->has_input_mode);
+	if (info->has_input_mode)
+	{
+		MMPrintString(" report_id=");
+		PInt(info->input_mode_report_id);
+	}
+	MMPrintString(" bringup: cc_max_id=");
+	PInt(info->contact_count_max_report_id);
+	MMPrintString(" cert_id=");
+	PInt(info->cert_blob_report_id);
+	PRet();
 	MMPrintString("  pointer_fallback=");
 	PInt(info->has_pointer_fallback);
 	if (info->has_pointer_fallback)
@@ -1302,37 +1380,49 @@ void dump_touch_descriptor(const uint8_t *desc, uint16_t len, const touch_info_t
  *          up one packet per transfer — software reassembly is then needed.
  *   count / tip / x / y / active → whether the decode actually produced a
  *          live contact (count>0, tip=1, active=1) or silently dropped it.
- * Limited to TOUCH_RAW_DUMP_LIMIT reports; resets each connection.
+ * Runs for the life of the connection but PRINTS at most ~6 lines/sec
+ * (time-throttled) so a held finger doesn't flood the console — the goal
+ * here is to see WHEN a stream stops, not every report. Each printed line is
+ * stamped with `T+<ms>` since connect and `#<seq>` (count of ALL reports
+ * received, not just printed), so a stall shows as the seq freezing and the
+ * lines ceasing at a known time. resets each connection.
  */
-#define TOUCH_RAW_DUMP_LIMIT 16
+#define TOUCH_RAW_DUMP_LIMIT 100000 /* safety cap (~minutes); throttle is the real limiter */
 static int touch_raw_dump_count = 0;
-void reset_touch_raw_dump(void) { touch_raw_dump_count = 0; }
+static uint64_t touch_dump_last_us = 0;
+static uint64_t touch_dump_t0_us = 0;
+void reset_touch_raw_dump(void)
+{
+	touch_raw_dump_count = 0;
+	touch_dump_last_us = 0;
+	touch_dump_t0_us = 0;
+}
 void dump_touch_report(const touch_info_t *info, const uint8_t *report,
 					   uint16_t len, const touch_report_t *out)
 {
-	char s[16];
+	char s[32];
+	(void)info;
 	if (CurrentLinePtr || touch_raw_dump_count >= TOUCH_RAW_DUMP_LIMIT)
 		return;
-	touch_raw_dump_count++;
-	MMPrintString("Touch report [");
+	uint64_t now = time_us_64();
+	if (touch_dump_t0_us == 0)
+		touch_dump_t0_us = now;
+	touch_raw_dump_count++; /* count every report */
+	/* Throttle printing — but never stop, so the stall point is visible. */
+	if (touch_dump_last_us != 0 && (now - touch_dump_last_us) < 150000ULL)
+		return;
+	touch_dump_last_us = now;
+	sprintf(s, "T+%lums #%d [", (unsigned long)((now - touch_dump_t0_us) / 1000),
+			touch_raw_dump_count);
+	MMPrintString(s);
 	PInt(len);
 	MMPrintString("] ");
-	for (uint16_t i = 0; i < len && i < 96; i++)
+	for (uint16_t i = 0; i < len && i < 64; i++)
 	{
 		sprintf(s, "%02X ", report[i]);
 		MMPrintString(s);
 	}
-	PRet();
-	MMPrintString("  -> expect ");
-	PInt(info->report_length_bytes);
-	MMPrintString("B id=");
-	PInt(info->report_id);
-	if (info->has_pointer_fallback)
-	{
-		MMPrintString(" ptr_id=");
-		PInt(info->pointer_report_id);
-	}
-	MMPrintString(" count=");
+	MMPrintString("-> count=");
 	PInt(out->count);
 	if (out->count > 0)
 	{
@@ -1373,61 +1463,104 @@ static uint16_t touch_expected_len(const touch_info_t *info, uint8_t rid)
 }
 
 /**
- * Reassemble a touch Input report that the host controller delivers split
- * across several interrupt-IN callbacks. The RP2350 USB host hands up one
- * USB packet (≤ wMaxPacketSize, 64 bytes here) per transfer completion
- * regardless of CFG_TUH_HID_EPIN_BUFSIZE, so a report longer than the
- * packet size (e.g. a 10-contact Windows touch report at 84 bytes) arrives
- * as 64 + tail. Without this, process_touch_report() saw only the first
- * fragment — which lacks the contact-count byte — and decoded 0 contacts.
+ * Frame touch Input reports out of the raw interrupt-IN byte stream and
+ * decode each complete one. Needed because the RP2350 USB host doesn't hand
+ * us one tidy report per callback:
  *
- * The first fragment carries the report-ID byte, which tells us the full
- * length; we buffer fragments until we have that many bytes, then decode
- * the assembled report. Reports that fit one packet pass straight through
- * on the first call. A single static buffer serves the (normally single)
- * active touch panel; if a fragment from a different device interleaves
- * mid-assembly the buffer restarts on it. Always-on (not a debug aid).
+ *   - Long reports are SPLIT: it completes the transfer one USB packet
+ *     (≤ wMaxPacketSize, 64 bytes) at a time regardless of
+ *     CFG_TUH_HID_EPIN_BUFSIZE, so a 10-contact 84-byte report arrives as
+ *     64 + 20. A leading fragment lacks the contact-count byte → decoded 0.
+ *   - Fast panels COALESCE: several short reports land in one callback
+ *     (e.g. the ILI2132 delivering two 6-byte pointer reports as one 12-byte
+ *     chunk), sometimes with a couple of stray bytes between them so the
+ *     reports don't sit on clean boundaries. Decoding only the first lost
+ *     samples and left usb_touch_active stale (a rejected fragment returns
+ *     before touch_publish() runs).
+ *
+ * Both are handled by accumulating bytes in a stream buffer and repeatedly
+ * pulling reports off the front: the leading byte is a report ID whose total
+ * length touch_expected_len() knows. With enough bytes we decode and advance;
+ * a known ID with too few bytes waits for the next callback (the split case);
+ * an unrecognised leading byte means we're mis-aligned, so skip one byte to
+ * resync (the stray-byte case). A single static buffer serves the normally
+ * single active touch panel; a different device resets it. Always-on.
  */
 static void touch_reassemble(uint8_t dev_addr, uint8_t instance,
 							 const uint8_t *report, uint16_t len,
 							 const touch_info_t *info, touch_report_t *out)
 {
-	static uint8_t asm_buf[256];
-	static uint16_t asm_fill = 0;
-	static uint16_t asm_exp = 0;
-	static uint8_t asm_addr = 0xFF, asm_inst = 0xFF;
+	static uint8_t buf[256];
+	static uint16_t fill = 0;
+	static uint8_t owner_addr = 0xFF, owner_inst = 0xFF;
 
-	/* Start a fresh report when the buffer is empty or a different device
-	   barges in. The leading byte of the first fragment is the report ID,
-	   from which we derive the expected total length. */
-	if (asm_fill == 0 || asm_addr != dev_addr || asm_inst != instance)
+	/* A different device (or first ever call) restarts the stream. */
+	if (owner_addr != dev_addr || owner_inst != instance)
 	{
-		asm_fill = 0;
-		asm_addr = dev_addr;
-		asm_inst = instance;
-		uint8_t rid = (len > 0) ? report[0] : 0;
-		asm_exp = touch_expected_len(info, rid);
-		if (asm_exp == 0 || asm_exp > sizeof(asm_buf))
-			asm_exp = len; /* unknown / oversize → treat as a single chunk */
+		owner_addr = dev_addr;
+		owner_inst = instance;
+		fill = 0;
 	}
 
-	uint16_t copy = len;
-	if ((uint32_t)asm_fill + copy > sizeof(asm_buf))
-		copy = (uint16_t)(sizeof(asm_buf) - asm_fill);
-	memcpy(asm_buf + asm_fill, report, copy);
-	asm_fill += copy;
+	/* Append. If the buffer would overflow we've stalled on undecodable
+	   data — drop it and resync on the fresh chunk rather than wedge. */
+	if ((uint32_t)fill + len > sizeof(buf))
+		fill = 0;
+	uint16_t copy = (len > sizeof(buf)) ? (uint16_t)sizeof(buf) : len;
+	memcpy(buf + fill, report, copy);
+	fill += copy;
 
-	if (asm_fill >= asm_exp)
+	/* Pull complete reports off the front. */
+	uint16_t pos = 0;
+	while (pos < fill)
 	{
-		process_touch_report(asm_buf, asm_fill, info, out);
-		dump_touch_report(info, asm_buf, asm_fill, out);
-		asm_fill = 0;
+		uint16_t exp = touch_expected_len(info, buf[pos]);
+		if (exp == 0)
+		{
+			pos++; /* not a known report ID → mis-aligned, resync */
+			continue;
+		}
+		if (fill - pos < exp)
+			break; /* known report, not all here yet → await next callback */
+		process_touch_report(buf + pos, exp, info, out);
+		pos += exp;
+	}
+
+	/* Keep the unconsumed tail for next time. */
+	if (pos > 0)
+	{
+		if (pos < fill)
+			memmove(buf, buf + pos, fill - pos);
+		fill -= pos;
+	}
+
+	/* A report that fits one USB packet (<= wMaxPacketSize, 64) always
+	   arrives whole in a single callback — so any leftover after extracting
+	   the whole reports is padding or stray bytes and MUST be dropped. If we
+	   carried it, a payload byte that happens to equal a report ID (these
+	   62-byte reports contain 0x04 in their footer) could anchor the parser
+	   one report out of phase and, because that byte is a "valid" report ID,
+	   it would never resync — every report then decodes as garbage/count=0.
+	   Only a genuinely fragmented report (length > 64, still awaiting later
+	   packets) is legitimately carried across callbacks. */
+	if (fill > 0)
+	{
+		uint16_t exp0 = touch_expected_len(info, buf[0]);
+		if (!(exp0 > 64 && fill < exp0))
+			fill = 0;
 	}
 }
 
 /* TOUCH Device_type — same numbering scheme as PS4/PS3/SNES/XBOX/UNKNOWN. */
 #ifndef TOUCH
 #define TOUCH 133
+#endif
+/* TOUCHMOUSE: a standalone absolute-pointer interface (e.g. a composite
+   touch monitor's "mouse" interface that reports touch as absolute X/Y).
+   Processed exactly like TOUCH (report routed through process_pointer_report)
+   but kept a distinct type so its connect/disconnect messages are its own. */
+#ifndef TOUCHMOUSE
+#define TOUCHMOUSE 134
 #endif
 
 /* process_kbd_report is declared in KeyboardMap.h. */
@@ -1837,6 +1970,88 @@ void process_sony_ds4(uint8_t const *report, uint16_t len, uint8_t n)
 		nunstruct[n].x0 = b;
 	}
 }
+/* Scratch buffer for the touch digitizer-init GET_FEATURE reads. Sized for
+   the largest one (the 256-byte certification blob, report ID 6). The data
+   is only needed so the device sees the read happen — we don't parse it. */
+static uint8_t touch_feature_buf[256];
+
+/* Completion of a GET_FEATURE control transfer. Used to sequence the touch
+   digitizer-init handshake (see hid_app_task): advance to the next read, or
+   mark it done. Independent of report polling. */
+void tuh_hid_get_report_complete_cb(uint8_t dev_addr, uint8_t instance,
+									uint8_t report_id, uint8_t report_type, uint16_t len)
+{
+	for (int i = 0; i < 4; i++)
+	{
+		if (HID[i].Device_address == dev_addr && HID[i].Device_instance == instance &&
+			HID[i].Device_type == TOUCH)
+		{
+#ifdef TOUCH_DEBUG
+			/* Dump the raw read value BEFORE we modify it. */
+			if (!CurrentLinePtr)
+			{
+				MMPrintString("Touch GET_FEATURE id=");
+				PInt(report_id);
+				MMPrintString(" len=");
+				PInt(len);
+				if (len >= 2)
+				{
+					MMPrintString(" data=");
+					PIntH(touch_feature_buf[0]);
+					MMPrintString(",");
+					PIntH(touch_feature_buf[1]);
+				}
+				PRet();
+			}
+#endif
+			if (HID[i].touch_init_step == 2)
+				HID[i].touch_init_step = 3; /* got blob → read contact-count-max */
+			else if (HID[i].touch_init_step == 4)
+				HID[i].touch_init_step = 0; /* handshake complete */
+			else if (HID[i].touch_init_step == 12)
+			{
+				/* Read-modify-write Input Mode: we just read the current
+				   [Device Mode, Device Identifier]; force Device Mode to 0x02
+				   (touchscreen) but keep the identifier the panel returned,
+				   then write it back (step 13). */
+				touch_feature_buf[0] = 0x02;
+				HID[i].touch_init_step = 13;
+			}
+			break;
+		}
+	}
+}
+
+/* Completion of a SET_FEATURE control transfer — used to clear the touch
+   Input Mode write's in-flight state. */
+void tuh_hid_set_report_complete_cb(uint8_t dev_addr, uint8_t instance,
+									uint8_t report_id, uint8_t report_type, uint16_t len)
+{
+	for (int i = 0; i < 4; i++)
+	{
+		if (HID[i].Device_address == dev_addr && HID[i].Device_instance == instance &&
+			HID[i].Device_type == TOUCH && HID[i].touch_init_step == 11)
+		{
+			HID[i].touch_init_step = 0; /* Input Mode write done */
+#ifdef TOUCH_DEBUG
+			if (!CurrentLinePtr)
+			{
+				MMPrintString("Touch SET_FEATURE InputMode id=");
+				PInt(report_id);
+				MMPrintString(" len=");
+				PInt(len);
+				PRet();
+			}
+#endif
+			break;
+		}
+	}
+}
+
+/* Periodic touch handshake re-assertion. 0 = disabled (A/B test whether the
+   panels actually revert after the one-shot bring-up). 1 = re-assert every 2 s. */
+#define TOUCH_KEEPALIVE 0
+
 void hid_app_task(void)
 {
 	static uint64_t timer;
@@ -1856,7 +2071,74 @@ void hid_app_task(void)
 	}
 	for (int i = 0; i < 4; i++)
 	{
-		if (HID[i].active == false || HID[i].report_requested)
+		if (HID[i].active == false)
+			continue;
+		/* Keep-alive: some panels (ILI2132) were seen to stay in digitizer
+		   mode only a few seconds after the bring-up handshake, then revert.
+		   Re-asserting the handshake every 2 s prevents that. Currently
+		   DISABLED for an A/B test — set TOUCH_KEEPALIVE to 1 (defined above
+		   hid_app_task) to re-enable. If the panel turns out to revert, the
+		   preferred fix is a reactive version (re-assert only on a stall). */
+#if TOUCH_KEEPALIVE
+		if (HID[i].Device_type == TOUCH && HID[i].touch_init_step == 0 &&
+			(HID[i].touch_info.has_input_mode || HID[i].touch_info.has_pointer_fallback) &&
+			(timenow - HID[i].touch_init_us) > 2000000ULL)
+		{
+			HID[i].touch_init_us = timenow;
+			HID[i].touch_init_step = HID[i].touch_info.has_input_mode ? 10 : 1;
+		}
+#endif
+		/* Touch digitizer-init handshake. Two mechanisms, by step value:
+			 steps 10/13 -> STANDARD: read-modify-write Input Mode (Device
+			   Mode) to 0x02 to switch a Windows-compliant panel into
+			   multi-touch. Read (10) the current [mode, identifier], force
+			   mode=0x02 keeping the identifier, write back (13). The read
+			   first matches Linux hid-multitouch's FORCE_GET_FEATURE: some
+			   panels reject a blind write that zeroes the identifier.
+			 steps 1/3 -> GET_FEATURE the Windows bring-up reports (cert
+			   blob, then contact-count-max) at report IDs captured from the
+			   descriptor, for dual-mode panels that lack Input Mode (ILI2132).
+		   All use EP0 — if it can't be issued this cycle (control pipe busy)
+		   we retry next time; in-flight steps (2/4/11/12) are cleared only by
+		   the completion callbacks. A panel that STALLs the request simply
+		   stops here without affecting report polling below. */
+		if (HID[i].Device_type == TOUCH && HID[i].touch_init_step == 10)
+		{
+			/* Read the current Input Mode feature ([Device Mode, Device
+			   Identifier]) into the buffer; the GET completion forces
+			   mode=0x02 and advances to the write (step 13). */
+			if (tuh_hid_get_report(HID[i].Device_address, HID[i].Device_instance,
+								   HID[i].touch_info.input_mode_report_id,
+								   HID_REPORT_TYPE_FEATURE, touch_feature_buf, 2))
+				HID[i].touch_init_step = 12; /* GET in-flight */
+		}
+		else if (HID[i].Device_type == TOUCH && HID[i].touch_init_step == 13)
+		{
+			/* Write the modified Input Mode (Device Mode = 0x02, identifier
+			   preserved by the GET completion). */
+			if (tuh_hid_set_report(HID[i].Device_address, HID[i].Device_instance,
+								   HID[i].touch_info.input_mode_report_id,
+								   HID_REPORT_TYPE_FEATURE, touch_feature_buf, 2))
+				HID[i].touch_init_step = 11; /* SET in-flight */
+		}
+		else if (HID[i].Device_type == TOUCH &&
+				 (HID[i].touch_init_step == 1 || HID[i].touch_init_step == 3))
+		{
+			/* step 1 -> cert blob, step 3 -> contact-count-max; report IDs
+			   come from the descriptor. A report absent on this panel is
+			   skipped (advance the step) rather than read at a guessed ID. */
+			uint8_t rid = (HID[i].touch_init_step == 1)
+							  ? HID[i].touch_info.cert_blob_report_id
+							  : HID[i].touch_info.contact_count_max_report_id;
+			if (rid == 0)
+				/* absent → jump past the in-flight state: 1->3, 3->0(done) */
+				HID[i].touch_init_step = (HID[i].touch_init_step == 1) ? 3 : 0;
+			else if (tuh_hid_get_report(HID[i].Device_address, HID[i].Device_instance,
+										rid, HID_REPORT_TYPE_FEATURE, touch_feature_buf,
+										sizeof(touch_feature_buf)))
+				HID[i].touch_init_step++; /* -> in-flight (2 or 4) */
+		}
+		if (HID[i].report_requested)
 			continue;
 		if (HID[i].report_timer >= HID[i].report_rate)
 		{
@@ -1932,7 +2214,9 @@ void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const *desc_re
 	tuh_vid_pid_get(dev_addr, &vid, &pid);
 	int slot = FindFreeSlot(itf_protocol);
 	if (slot == -1)
-		error("USB device limit reached");
+		return; /* all slots in use by devices we service — skip this
+				   interface quietly (composite panels expose extra vendor
+				   interfaces we don't use; don't error from a USB callback) */
 	HID[slot].vid = vid;
 	HID[slot].pid = pid;
 	//  char buff[STRINGSIZE];
@@ -1952,7 +2236,7 @@ void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const *desc_re
 	else if (Option.USBKeyboard == CONFIG_BE)
 		keylayout = BEkeyValue;
 	if (Current_USB_devices == 4)
-		error("USB device limit reached");
+		return; /* full — skip quietly rather than error mid-enumeration */
 
 	// Interface protocol (hid_interface_protocol_enum_t)
 	//  const char* protocol_str[] = { "None", "Keyboard", "Mouse" };
@@ -2045,7 +2329,9 @@ void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const *desc_re
 		   FindFreeSlot picked. */
 		{
 			touch_info_t tinfo;
-			if (desc_report && desc_len > 0 && analyze_touch_descriptor(desc_report, desc_len, &tinfo))
+			bool is_digitizer = (desc_report && desc_len > 0 &&
+								 analyze_touch_descriptor(desc_report, desc_len, &tinfo));
+			if (is_digitizer)
 			{
 				int touch_slot = (HID[3].active && slot != 3) ? slot : 3;
 				HID[touch_slot].Device_address = dev_addr;
@@ -2072,6 +2358,16 @@ void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const *desc_re
 				   compatibility report (some touch screens default to
 				   that for BIOS / pre-boot environments). */
 				tuh_hid_set_protocol(dev_addr, instance, HID_PROTOCOL_REPORT);
+				/* Dual-mode panels (mouse + digitizer collections) may sit
+				   in mouse-compat mode until the host performs the Windows
+				   touch bring-up: GET_FEATURE on the digitizer feature
+				   reports. Arm that handshake — hid_app_task() issues the
+				   reads, sequenced via tuh_hid_get_report_complete_cb(). It
+				   runs independently of report polling, so a STALL on an
+				   absent feature can't stop touch working. */
+				HID[touch_slot].touch_init_step =
+					tinfo.has_input_mode ? 10 : (tinfo.has_pointer_fallback ? 1 : 0);
+				HID[touch_slot].touch_init_us = time_us_64();
 				if (!CurrentLinePtr)
 				{
 					MMPrintString("Multi-touch Connected on channel ");
@@ -2082,6 +2378,45 @@ void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const *desc_re
 					PInt(tinfo.x_logical_max);
 					MMPrintString("x");
 					PInt(tinfo.y_logical_max);
+					MMPrintString(")\r\n> ");
+				}
+				PlayMemWav(ezyZip_wav, EZYZIP_WAV_SIZE);
+				Current_USB_devices++;
+				return;
+			}
+			/* Standalone absolute-pointer interface — e.g. a composite touch
+			   monitor's "mouse" interface that reports touch as absolute X/Y.
+			   analyze_touch_descriptor() returned false (no Finger
+			   collections) but still captured the pointer layout. Route it
+			   into the touch pipeline as a single-touch source: report
+			   processing reuses process_pointer_report() via TOUCHMOUSE. */
+			if (desc_report && desc_len > 0 && tinfo.has_pointer_fallback)
+			{
+				tinfo.valid = true; /* pointer-only, but a usable touch source */
+				HID[slot].Device_address = dev_addr;
+				HID[slot].Device_instance = instance;
+				HID[slot].Device_type = TOUCHMOUSE;
+				memcpy((void *)&HID[slot].touch_info, &tinfo, sizeof(touch_info_t));
+				memset((void *)&HID[slot].touch_report, 0, sizeof(touch_report_t));
+				dump_touch_descriptor(desc_report, desc_len, &tinfo);
+				reset_touch_raw_dump();
+				HID[slot].report_rate = 5;
+				HID[slot].report_timer = -(10 + (slot + 2) * 500);
+				HID[slot].active = true;
+				HID[slot].report_requested = false;
+				HID[slot].touch_init_step = 0; /* no digitizer handshake */
+				usb_touch_present = true;
+				usb_touch_active = false;
+				usb_touch_active2 = false;
+				tuh_hid_set_protocol(dev_addr, instance, HID_PROTOCOL_REPORT);
+				if (!CurrentLinePtr)
+				{
+					MMPrintString("USB Touchscreen Connected on channel ");
+					PInt(slot + 1);
+					MMPrintString(" (");
+					PInt(tinfo.pointer_x_logical_max);
+					MMPrintString("x");
+					PInt(tinfo.pointer_y_logical_max);
 					MMPrintString(")\r\n> ");
 				}
 				PlayMemWav(ezyZip_wav, EZYZIP_WAV_SIZE);
@@ -2168,34 +2503,12 @@ void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const *desc_re
 		}
 		else
 		{
-			/*			MMPrintString("Unknown Device Connected on channel ");
-						PInt(slot + 1);
-						MMPrintString(" (pid=&H");
-						PIntH(pid);
-						MMPrintString(", vid=&H");
-						PIntH(vid);
-						MMPrintString(")");
-						MMPrintString("\r\n> ");
-						HID[slot].Device_address = dev_addr;
-						HID[slot].Device_instance = instance;
-						HID[slot].report_timer = -(10 + (slot + 2) * 500);
-						HID[slot].active = false;
-						HID[slot].report_rate = 20; // mSec between reports
-						HID[slot].Device_type = UNKNOWN;
-						HID[slot].active = true;
-						HID[slot].report_requested = false;
-						for (int i = 0; i < desc_len; i += 2)
-						{
-							putConsole('0', 0);
-							putConsole('x', 0);
-							PIntH(desc_report[i]);
-							putConsole(' ', 0);
-							putConsole('0', 0);
-							putConsole('x', 0);
-							PIntH(desc_report[i + 1]);
-							PRet();
-						}
-						return;*/
+			/* Unrecognised interface (e.g. a composite touch monitor's
+			   vendor interface). We never service it, so skip it entirely:
+			   don't claim its slot, don't count it toward the device limit,
+			   don't play the connect sound. This keeps slots free for the
+			   keyboard / mouse / digitizer that follow on the same device. */
+			return;
 		}
 	}
 	PlayMemWav(ezyZip_wav, EZYZIP_WAV_SIZE);
@@ -2255,6 +2568,15 @@ void tuh_hid_umount_cb(uint8_t dev_addr, uint8_t instance)
 				MMPrintString("Multi-touch Disconnected\r\n> ");
 			break;
 		}
+		else if (instance == HID[i].Device_instance && dev_addr == HID[i].Device_address && HID[i].Device_type == TOUCHMOUSE)
+		{
+			usb_touch_present = false;
+			usb_touch_active = false;
+			usb_touch_active2 = false;
+			if (!CurrentLinePtr)
+				MMPrintString("USB Touchscreen Disconnected\r\n> ");
+			break;
+		}
 		else if (instance == HID[i].Device_instance && dev_addr == HID[i].Device_address && HID[i].Device_type == UNKNOWN)
 		{
 			if (!CurrentLinePtr)
@@ -2300,7 +2622,7 @@ void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance, uint8_t cons
 
 	default:
 		//		MMPrintString("HID receive boot gamepad report\r\n");
-		if (HID[n].Device_type == TOUCH)
+		if (HID[n].Device_type == TOUCH || HID[n].Device_type == TOUCHMOUSE)
 		{
 			/* Reassembles fragmented reports, then decodes + dumps the
 			   complete report (the host hands up one 64-byte packet per
@@ -2308,6 +2630,11 @@ void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance, uint8_t cons
 			touch_reassemble(dev_addr, instance, report, len,
 							 (const touch_info_t *)&HID[n].touch_info,
 							 (touch_report_t *)&HID[n].touch_report);
+			/* Dump the RAW callback (actual length + full bytes) so framing
+			   vs content problems are visible; decode result reflects this
+			   report for the normal one-report-per-callback case. */
+			dump_touch_report((const touch_info_t *)&HID[n].touch_info, report, len,
+							  (const touch_report_t *)&HID[n].touch_report);
 		}
 		else if (is_sony_ds4(dev_addr))
 		{

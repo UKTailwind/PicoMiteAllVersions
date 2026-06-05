@@ -534,9 +534,11 @@ void bt_console_poll(void)
             return;
         }
 
+        /* LED cadence: 1000 ms before a console connects, 500 ms once
+           connected — matches the bt_keyboard_poll() host cadence. */
         uint32_t interval =
             bt_console_connected()
-                ? 250000
+                ? 500000
                 : 1000000;
 
         if (now - last_heart_us >= interval)

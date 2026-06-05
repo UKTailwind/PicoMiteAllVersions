@@ -3007,9 +3007,11 @@ void MIPS16 printoptions(void)
         PO("TOUCH");
         if (Option.TOUCH_CAP == 1)
             (MMPrintString("FT6336 "));
-        MMPrintString((char *)PinDef[Option.TOUCH_CAP == 1 ? Option.TOUCH_IRQ : Option.TOUCH_CS].pinname);
+        else if (Option.TOUCH_CAP == 2)
+            (MMPrintString("GT911 "));
+        MMPrintString((char *)PinDef[Option.TOUCH_CAP ? Option.TOUCH_IRQ : Option.TOUCH_CS].pinname);
         MMputchar(',', 1);
-        MMPrintString((char *)PinDef[Option.TOUCH_CAP == 1 ? Option.TOUCH_CS : Option.TOUCH_IRQ].pinname);
+        MMPrintString((char *)PinDef[Option.TOUCH_CAP ? Option.TOUCH_CS : Option.TOUCH_IRQ].pinname);
         if (Option.TOUCH_Click)
         {
             MMputchar(',', 1);
