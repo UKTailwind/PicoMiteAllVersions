@@ -97,6 +97,8 @@ extern long long picomite_mbedtls_time(long long *tp);
 /* TLS 1.2 */
 #define MBEDTLS_SSL_PROTO_TLS1_2
 #define MBEDTLS_KEY_EXCHANGE_ECDHE_ECDSA_ENABLED
+#define MBEDTLS_KEY_EXCHANGE_ECDHE_RSA_ENABLED
+#define MBEDTLS_PKCS1_V15
 #define MBEDTLS_GCM_C
 #define MBEDTLS_ECDH_C
 #define MBEDTLS_ECP_C
