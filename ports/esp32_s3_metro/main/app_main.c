@@ -55,6 +55,8 @@ static void esp32_apply_terminal_option_defaults(void) {
     Option.Invert    = 0;
     Option.Listcase  = 0;
     Option.continuation = 0;
+    Option.audio_i2s_bclk = codemap(HAL_PORT_AUDIO_I2S_BCLK_PIN);
+    Option.audio_i2s_data = codemap(HAL_PORT_AUDIO_I2S_DOUT_PIN);
 }
 
 void app_main(void) {
@@ -110,6 +112,8 @@ void app_main(void) {
     esp32_sd_diskio_reset();
     vm_sys_file_reset();
     vm_sys_pin_reset();
+    extern void esp32_audio_reserve_option_pins(void);
+    esp32_audio_reserve_option_pins();
 
     /* ClearRuntime initialises OptionConsole (= 3 BOTH) and several other
      * runtime globals MMBasic expects to be sane before the first

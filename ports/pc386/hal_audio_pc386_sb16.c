@@ -509,3 +509,22 @@ void cmd_sb16(void)
     sb_probe_attempted = 0;
     if (!sb_probe()) error("Sound Blaster 16 not detected");
 }
+
+/* Streamed-sample sink: file-stream PCM is not routed to this backend
+ * yet; report "always room, never queued" so a decode runs to completion
+ * without stalling. */
+int  hal_audio_sample_begin(int sample_rate_hz) { (void)sample_rate_hz; return 0; }
+void hal_audio_sample_end(void) {}
+void hal_audio_sample_eof(void) {}
+int  hal_audio_sample_space(void) { return 4096; }
+int  hal_audio_sample_queued(void) { return 0; }
+int  hal_audio_sample_push(const int16_t *frames, int n) { (void)frames; return n; }
+int  hal_audio_sample_acquire(int16_t **frames, int *frame_capacity) {
+    (void)frames; (void)frame_capacity; return 0;
+}
+void hal_audio_sample_commit(int frame_count) { (void)frame_count; }
+
+#include <stdlib.h>
+void *hal_audio_workmem_alloc(unsigned long bytes) { return malloc((size_t)bytes); }
+void *hal_audio_workmem_realloc(void *p, unsigned long bytes) { return realloc(p, (size_t)bytes); }
+void  hal_audio_workmem_free(void *p) { free(p); }

@@ -14,8 +14,8 @@
 #define HAL_PORT_CONFIG_INCLUDED 1
 
 /* Chip-level: ESP32-S3.  GPIO 0..48 exist on the chip.  The port does not
- * expose RP2040-style PWM slices or PIO blocks; PWM/servo commands error
- * explicitly until LEDC support is wired. */
+ * expose RP2040-style PWM slices or PIO blocks; general PWM/servo commands
+ * still error explicitly. OPTION AUDIO left,right uses I2S PDM TX. */
 #define HAL_PORT_PWM_SLICE_COUNT         0
 #define HAL_PORT_GPIO_COUNT              49
 #define HAL_PORT_PIO_COUNT               0
@@ -51,6 +51,17 @@
 #define HAL_PORT_AUDIO_FLAC_MAX_BASE_HZ  44100
 #define HAL_PORT_AUDIO_MOD_BUFFER_SIZE   6144
 #define HAL_PORT_HAS_MP3                 0
+
+/* Default generic I2S DAC pins (e.g. MAX98357A, PCM5102, UDA1334). PLAY
+ * TONE / SOUND / NOTE synthesize 16-bit stereo PCM (shared/audio/synth_pcm.c).
+ * OPTION AUDIO can switch the saved configuration to either standard I2S
+ * or I2S PDM TX.
+ * These defaults avoid strapping, USB, and Octal-PSRAM (GPIO 33-37) pins
+ * on the Metro N16R8. */
+#define HAL_PORT_AUDIO_SAMPLE_RATE       44100
+#define HAL_PORT_AUDIO_I2S_BCLK_PIN      5      /* bit clock  (BCLK/SCK) */
+#define HAL_PORT_AUDIO_I2S_WS_PIN        6      /* word select (LRCLK/WS) */
+#define HAL_PORT_AUDIO_I2S_DOUT_PIN      7      /* serial data (DIN/SD)  */
 
 #define PORT_RAM_FUNC(name)          name
 #define MMB_HOT_FUNC(name)    name

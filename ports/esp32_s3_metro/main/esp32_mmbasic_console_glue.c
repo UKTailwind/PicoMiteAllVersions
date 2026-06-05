@@ -23,6 +23,7 @@
 #include "esp32_telnet.h"
 #include "hal/hal_time.h"
 #include "runtime/runtime_console_escdecode.h"
+#include "shared/audio/audio_runtime.h"
 
 /* Provided by esp32_console.c. */
 extern void esp32_console_write_bytes(const char *text, int len);
@@ -143,6 +144,8 @@ int MMInkey(void) {
     if (!in_web_poll) {
         in_web_poll = 1;
         ProcessWeb(0);
+        /* Keep file playback progressing while the prompt polls for input. */
+        audio_runtime_service();
         in_web_poll = 0;
     }
     /* Drain any chars left over from an earlier unrecognised escape
@@ -179,6 +182,8 @@ int MMgetchar(void) {
         ShowCursor(1);
         from_web = 0;
         ProcessWeb(0);
+        /* MMgetchar blocks here, so runtime CheckAbort polling will not run. */
+        audio_runtime_service();
         c = esp32_console_ring_pop();
         if (c < 0) {
             c = esp32_web_console_pop_key();

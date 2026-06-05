@@ -61,9 +61,9 @@ CORE_SRCS += mm_net_http.c
 CORE_SRCS += mm_net_ntp.c
 CORE_SRCS += mm_net_telnet_rx.c
 CORE_SRCS += mm_net_state.c
-CORE_SRCS += core/mmbasic/Draw.c shared/gfx/RGB121.c shared/gfx/Tilemap.c core/mmbasic/FileIO.c shared/audio/Audio.c drivers/bmp_decoder/BmpDecoder.c third_party/regex/re.c third_party/picojpeg/picojpeg.c
+CORE_SRCS += core/mmbasic/Draw.c shared/gfx/RGB121.c shared/gfx/Tilemap.c core/mmbasic/FileIO.c shared/audio/Audio.c shared/audio/audio_stream.c drivers/bmp_decoder/BmpDecoder.c third_party/regex/re.c third_party/picojpeg/picojpeg.c
 # Stubs inherited from host_native (dr_mp3, SPI-LCD, VGA, GUI, 3D, uPNG).
-CORE_SRCS += audio_mp3_stub.c spi_lcd_mem332_stub.c display_merge_stub.c vga_ops_stub.c
+CORE_SRCS += audio_mp3_real.c third_party/hxcmod/hxcmod.c spi_lcd_mem332_stub.c display_merge_stub.c vga_ops_stub.c
 CORE_SRCS += gfx_3d.c upng_sprite_stub.c gui_touch_stub.c gui_controls_stub.c psram_heap_stub.c hal_psram_stub.c i2c_keypad_stub.c heartbeat_stub.c
 CORE_SRCS += editor_console_stub.c
 CORE_SRCS += display_pixel_host.c

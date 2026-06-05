@@ -719,6 +719,7 @@ void MIPS16 do_run(unsigned char *cmdline, bool CMM2mode) {
         error("RUN command line too long");
     }
     unsigned char *pcmd_args = buf + strlen((char *)filename) + 3; // *** THW 16/4/23
+    CloseAudio(1);
 
     if(CMM2mode){
 		/* FileLoadCMM2Program has a failure-returning stub on rp2040

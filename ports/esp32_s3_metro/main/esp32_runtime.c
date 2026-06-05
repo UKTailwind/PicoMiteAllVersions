@@ -27,6 +27,7 @@
 #include "Hardware_Includes.h"
 #include "bc_alloc.h"
 #include "runtime/runtime.h"
+#include "shared/audio/audio_runtime.h"
 
 /* esp32_console.c provides the USB Serial/JTAG byte ring; we drain
  * pending input here so Ctrl-C breaks runaway loops even when MMInkey
@@ -73,6 +74,8 @@ static void esp32_runtime_network_service(void) {
 
 static void esp32_runtime_service(void) {
     esp32_runtime_pump_input();
+    /* Cooperative decode pump for file playback during interpreter polls. */
+    audio_runtime_service();
     mmbasic_runtime_poll_service_once(&s_network_service_active,
                                       esp32_runtime_network_service);
 }

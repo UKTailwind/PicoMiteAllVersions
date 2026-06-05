@@ -1,11 +1,10 @@
 /*
  * hal/hal_audio.h — audio backend HAL.
  *
- * Covers the top-level BASIC PLAY commands: TONE, SOUND slot, STOP,
- * CLOSE, PAUSE, RESUME, VOLUME. File-based playback (WAV / FLAC / MP3 /
- * MOD / MIDI) is NOT part of this initial surface — those codecs stream
- * 16-bit PCM frames into the same backend via a later
- * `hal_audio_sample_push()` addition.
+ * Covers the top-level BASIC PLAY commands: TONE, SOUND slot, NOTE,
+ * STOP, CLOSE, PAUSE, RESUME, VOLUME, plus the sample sink used by
+ * shared WAV / FLAC / MP3 / MOD decoding. MIDI remains outside the
+ * shared audio path.
  *
  * Signatures are designed to match the actual BASIC semantics
  * (independent L/R frequencies for TONE, 1..4 slot numbering with
@@ -45,6 +44,11 @@ void hal_audio_init(void);
 void hal_audio_tone(double left_hz, double right_hz,
                     int has_duration, int64_t duration_ms);
 
+/* Non-zero when the backend publishes WAVcomplete for finite PLAY TONE
+ * completion. Backends without this support must reject tone interrupts
+ * at the shared command layer. */
+int hal_audio_tone_interrupt_supported(void);
+
 /* PLAY SOUND slot, ch, type [, freq [, volume]].
  *   slot:   1..4 (PicoMite has four hardware SOUND slots).
  *   ch:     "L" | "R" | "B" (left / right / both).
@@ -56,6 +60,11 @@ void hal_audio_tone(double left_hz, double right_hz,
  *           is a separate setting — see hal_audio_volume). */
 void hal_audio_sound(int slot, const char *ch, const char *type,
                      double freq_hz, int volume);
+
+/* PLAY NOTE is implemented above the HAL as a small MIDI-note-number to
+ * SOUND-voice adapter. Non-MIDI backends expose four note channels
+ * (0..3), mapped onto the existing four SOUND slots. Full 0..15 MIDI
+ * channel semantics remain specific to hardware MIDI/VS1053 paths. */
 
 /* PLAY STOP / PLAY CLOSE — tear down every voice, reset internal state.
  * Both commands map to this single entry point because neither backend
@@ -74,6 +83,51 @@ void hal_audio_volume(int left_pct, int right_pct);
  * specific but the contract is the same. */
 void hal_audio_pause(void);
 void hal_audio_resume(void);
+
+/* --- File / sample streaming (PLAY WAV/FLAC/MP3/MOD/ARRAY) ---
+ *
+ * The shared decode engine (shared/audio/audio_stream.c) decodes to
+ * 16-bit interleaved-stereo PCM and feeds it to the backend here, so a
+ * single decoder path drives every transport (RP2 PWM/I2S, ESP32 I2S).
+ *
+ * hal_audio_sample_push() is non-blocking: it copies as many of the
+ * `frame_count` stereo frames as the backend's queue can take and
+ * returns that count (0 if full). The decode loop retries the remainder
+ * on the next service tick, which paces decoding to playback. */
+int  hal_audio_sample_push(const int16_t *frames, int frame_count);
+
+/* Optional zero-copy path for backends with discrete writable buffers.
+ * Returns non-zero when a buffer is acquired; `*frames` receives writable
+ * interleaved-stereo storage and `*frame_capacity` receives its capacity in
+ * stereo frames. The caller must finish with hal_audio_sample_commit().
+ * Backends that use rings/DMA queues can return 0 and rely on push(). */
+int  hal_audio_sample_acquire(int16_t **frames, int *frame_capacity);
+void hal_audio_sample_commit(int frame_count);
+
+/* Free space in the backend queue, in stereo frames — the decode loop
+ * uses it to size each read. */
+int  hal_audio_sample_space(void);
+
+/* Queued stereo frames not yet played. End-of-stream is reached when the
+ * decoder is exhausted AND this returns 0. */
+int  hal_audio_sample_queued(void);
+
+/* The decoder has reached EOF and all decoded frames have been queued.
+ * Backends that use "no next buffer yet" underrun recovery should switch
+ * to drain-only mode here. */
+void hal_audio_sample_eof(void);
+
+/* Begin / end a streamed-sample session: configure the output sample
+ * rate and reset the queue. hal_audio_sample_begin returns 0 on success. */
+int  hal_audio_sample_begin(int sample_rate_hz);
+void hal_audio_sample_end(void);
+
+/* Working memory for the file decoders + MOD file buffer. On targets with
+ * a small main heap (ESP32) this comes from PSRAM; elsewhere it is plain
+ * malloc. NULL on failure. */
+void *hal_audio_workmem_alloc(unsigned long bytes);
+void *hal_audio_workmem_realloc(void *p, unsigned long bytes);
+void  hal_audio_workmem_free(void *p);
 
 #ifdef __cplusplus
 }

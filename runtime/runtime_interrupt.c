@@ -13,6 +13,7 @@
 #include "MMBasic_Includes.h"
 #include "MM_Misc.h"
 #include "Memory.h"
+#include "shared/audio/audio_runtime.h"
 #include "shared/net/mm_net_interrupts.h"
 
 #ifndef MMB_HOT_FUNC
@@ -110,6 +111,9 @@ int MMB_HOT_FUNC(mmbasic_runtime_check_interrupt)(
         (adapter->udp_pending && adapter->udp_pending()))) {
         intaddr = (unsigned char *)UDPinterrupt;
         UDPreceive = false;
+    } else if (audio_interrupt_pending(&intaddr)) {
+        /* Audio owns the legacy WAVcomplete/WAVInterrupt state; this just
+         * consumes a completed PLAY-file/TONE callback target. */
     } else {
         return 0;
     }
