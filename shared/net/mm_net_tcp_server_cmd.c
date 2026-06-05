@@ -8,24 +8,24 @@
 #include "MATHS.h"
 #include "shared/net/mm_net_tcp_server_cmd.h"
 
-char *mm_net_tcp_server_parse_interrupt(unsigned char *arg) {
+char * mm_net_tcp_server_parse_interrupt(unsigned char * arg) {
     getargs(&arg, 1, (unsigned char *)",");
     if (argc != 1) error("Syntax");
     return (char *)GetIntAddress(argv[0]);
 }
 
-void mm_net_tcp_server_parse_slot(unsigned char *arg, int max_pcb,
-                                  mm_net_tcp_server_slot_args_t *out) {
+void mm_net_tcp_server_parse_slot(unsigned char * arg, int max_pcb,
+                                  mm_net_tcp_server_slot_args_t * out) {
     memset(out, 0, sizeof(*out));
     getargs(&arg, 1, (unsigned char *)",");
     if (argc != 1) error("Syntax");
     out->pcb = getint(argv[0], 1, max_pcb) - 1;
 }
 
-void mm_net_tcp_server_parse_read(unsigned char *arg, int max_pcb,
-                                  mm_net_tcp_server_read_args_t *out) {
+void mm_net_tcp_server_parse_read(unsigned char * arg, int max_pcb,
+                                  mm_net_tcp_server_read_args_t * out) {
     memset(out, 0, sizeof(*out));
-    void *ptr = NULL;
+    void * ptr = NULL;
     getargs(&arg, 3, (unsigned char *)",");
     if (argc != 3) error("Syntax");
     out->pcb = getint(argv[0], 1, max_pcb) - 1;
@@ -40,14 +40,14 @@ void mm_net_tcp_server_parse_read(unsigned char *arg, int max_pcb,
     out->buffer = (uint8_t *)&out->dest[1];
 }
 
-void mm_net_tcp_server_parse_send(unsigned char *arg, int max_pcb,
-                                  mm_net_tcp_server_send_args_t *out) {
+void mm_net_tcp_server_parse_send(unsigned char * arg, int max_pcb,
+                                  mm_net_tcp_server_send_args_t * out) {
     memset(out, 0, sizeof(*out));
     getargs(&arg, 3, (unsigned char *)",");
     if (argc != 3) error("Argument count");
     out->pcb = getint(argv[0], 1, max_pcb) - 1;
 
-    int64_t *src = NULL;
+    int64_t * src = NULL;
     parseintegerarray(argv[2], &src, 2, 1, NULL, false);
     if (src[0] < 0) error("Syntax");
     out->payload = (const uint8_t *)&src[1];

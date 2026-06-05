@@ -53,7 +53,7 @@ int hal_flash_erase(uint32_t offset, size_t len);
  * 1→0 per bit; programming over previously-programmed bytes yields the
  * bitwise-AND of old and new.
  */
-int hal_flash_program(uint32_t offset, const void *buf, size_t len);
+int hal_flash_program(uint32_t offset, const void * buf, size_t len);
 
 /* Fill `out[0..7]` with the 64-bit device unique ID.
  *
@@ -101,8 +101,8 @@ int hal_flash_write_active(void);
  * (0xFF) — the HAL impl normalises. Violation causes Option.PIN (int)
  * to read as -1 (truthy) and trips the lockdown prompt.
  */
-int hal_flash_read_options(void *buf, size_t len);
-int hal_flash_write_options(const void *buf, size_t len);
+int hal_flash_read_options(void * buf, size_t len);
+int hal_flash_write_options(const void * buf, size_t len);
 
 /* Erase the entire on-flash program-memory area (tokenised BASIC). */
 int hal_flash_erase_program_area(void);
@@ -111,4 +111,4 @@ int hal_flash_erase_program_area(void);
 }
 #endif
 
-#endif  /* HAL_FLASH_H */
+#endif /* HAL_FLASH_H */

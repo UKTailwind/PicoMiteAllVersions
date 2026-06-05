@@ -74,7 +74,8 @@ void hal_console_usb_cdc_boot_init(void) {
 
 int hal_keyboard_keydown_count(void) {
     int count = 0;
-    for (int i = 0; i < 6; i++) if (LocalKeyDown[i]) count++;
+    for (int i = 0; i < 6; i++)
+        if (LocalKeyDown[i]) count++;
     return count;
 }
 
@@ -84,24 +85,24 @@ int hal_keyboard_keydown_slot(int slot) {
 }
 
 uint32_t hal_keyboard_lock_state(void) {
-    return 0u;       /* no lock-key state machine */
+    return 0u; /* no lock-key state machine */
 }
 
 int hal_keyboard_set_layout(int layout) {
     switch (layout) {
-        case HAL_KBD_LAYOUT_US:
-        case HAL_KBD_LAYOUT_FR:
-        case HAL_KBD_LAYOUT_GR:
-        case HAL_KBD_LAYOUT_IT:
-        case HAL_KBD_LAYOUT_BE:
-        case HAL_KBD_LAYOUT_UK:
-        case HAL_KBD_LAYOUT_ES:
-        case HAL_KBD_LAYOUT_BR:
-        case HAL_KBD_LAYOUT_I2C:
-            Option.KeyboardConfig = layout;
-            return 0;
-        default:
-            return -1;
+    case HAL_KBD_LAYOUT_US:
+    case HAL_KBD_LAYOUT_FR:
+    case HAL_KBD_LAYOUT_GR:
+    case HAL_KBD_LAYOUT_IT:
+    case HAL_KBD_LAYOUT_BE:
+    case HAL_KBD_LAYOUT_UK:
+    case HAL_KBD_LAYOUT_ES:
+    case HAL_KBD_LAYOUT_BR:
+    case HAL_KBD_LAYOUT_I2C:
+        Option.KeyboardConfig = layout;
+        return 0;
+    default:
+        return -1;
     }
 }
 
@@ -109,9 +110,11 @@ void hal_keyboard_quiesce_for_reset(void) {
     /* PS/2 has no async hardware to quiesce. */
 }
 
-int hal_keyboard_usb_raw_report(int slot, unsigned char *out, int max_len) {
-    (void)slot; (void)out; (void)max_len;
-    return 0;        /* no USB report to read */
+int hal_keyboard_usb_raw_report(int slot, unsigned char * out, int max_len) {
+    (void)slot;
+    (void)out;
+    (void)max_len;
+    return 0; /* no USB report to read */
 }
 
 void hal_keyboard_on_external_io_clear(void) {

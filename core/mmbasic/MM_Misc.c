@@ -23,7 +23,6 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 
 ************************************************************************************************************************/
 
-
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 #include "runtime/runtime.h"
@@ -49,7 +48,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "hal/hal_gui_controls.h"
 #include "hal/hal_watchdog.h"
 #include "shared/audio/audio_option_common.h"
-#include "hardware/regs/addressmap.h"     /* XIP_BASE */
+#include "hardware/regs/addressmap.h" /* XIP_BASE */
 #include "hardware/spi.h"
 #include "hardware/pio.h"
 #include "hardware/pio_instructions.h"
@@ -62,15 +61,15 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 /* PicoCalc HW hooks — real impls are linked by PicoCalc ports; other
  * ports link stubs. */
 extern void port_picocalc_set_keyboard_backlight(int level);
-extern int  port_picocalc_battery_pct(void);
-extern int  port_picocalc_is_charging(void);
+extern int port_picocalc_battery_pct(void);
+extern int port_picocalc_is_charging(void);
 extern void port_picocalc_factory_reset_options(void);
 extern void port_print_supported_boards(void);
-extern int  port_factory_reset_board(unsigned char *p);
-extern int  port_display_option_setter(unsigned char *cmdline);
+extern int port_factory_reset_board(unsigned char * p);
+extern int port_display_option_setter(unsigned char * cmdline);
 extern void port_print_display_options(void);
 extern void port_print_lcd_spi(void);
-extern int  port_keyboard_option_setter(unsigned char *cmdline);
+extern int port_keyboard_option_setter(unsigned char * cmdline);
 extern void port_print_keyboard_heartbeat(void);
 extern void port_print_usb_kb_repeat(void);
 extern void port_clear_lcd_spi_if_shares_system(void);
@@ -80,89 +79,89 @@ extern void disable_lcdspi(void);
 /* Port-specific pin alias maps for MM.PINNO / MM.PIN. PICOMITEWEB
  * exposes virtual GP23/24/25/29 → 41-44 (CYW43-reserved); HDMI
  * exposes GP12-19 → 16-25 (HDMI-reserved). Other ports return 0/NULL. */
-extern int  port_pinno_alias_for_name(const char *name);
-extern int  port_pin_is_reserved_alias(int pin);
-extern const char *port_pin_reserved_label(int pin);
-extern int  port_lcd320_option_setter(unsigned char *cmdline);
-extern int  port_misc_option_setter(unsigned char *cmdline);
-extern int  port_pico_pins_option_setter(unsigned char *cmdline);
-extern int  port_heartbeat_option_setter(unsigned char *cmdline);
-extern int  port_system_lcd_spi_option_setter(unsigned char *cmdline);
-extern int  port_audio_i2s_pio_slice(int pin1, int pin2);
-extern int  port_audio_default_pwm_slice(int pin);
-extern void port_chip_variant_suffix(char *sret);
-extern const char *port_boot_reason_label(uint32_t restart_reason);
+extern int port_pinno_alias_for_name(const char * name);
+extern int port_pin_is_reserved_alias(int pin);
+extern const char * port_pin_reserved_label(int pin);
+extern int port_lcd320_option_setter(unsigned char * cmdline);
+extern int port_misc_option_setter(unsigned char * cmdline);
+extern int port_pico_pins_option_setter(unsigned char * cmdline);
+extern int port_heartbeat_option_setter(unsigned char * cmdline);
+extern int port_system_lcd_spi_option_setter(unsigned char * cmdline);
+extern int port_audio_i2s_pio_slice(int pin1, int pin2);
+extern int port_audio_default_pwm_slice(int pin);
+extern void port_chip_variant_suffix(char * sret);
+extern const char * port_boot_reason_label(uint32_t restart_reason);
 extern void port_print_system_spi(void);
 extern void port_disable_sd_release_system_spi(void);
-extern int  port_setter_sdcard_combined_cs(unsigned char *tp);
+extern int port_setter_sdcard_combined_cs(unsigned char * tp);
 extern void port_setter_sdcard_argc_check(int argc);
-extern int  port_setter_sdcard_via_system_spi(int pin1, int pin2, int pin3);
-extern int  port_mminfo_lcdpanel(unsigned char *ep, unsigned char *sret, int *out_targ);
-extern int  port_mminfo_lcd320(unsigned char *ep, int64_t *out_iret, int *out_targ);
-extern int  port_mminfo_interrupts(int64_t *out_iret);
-extern int  port_mminfo_touch_status(unsigned char *out_sret);
-extern int  port_mminfo_scroll_start(int64_t *out_iret);
-extern int  port_mminfo_screenbuff(int64_t *out_iret);
-extern PIO  port_pio_for_index(int pio_idx);
-extern int  port_poke_display_panel(unsigned char *p);
+extern int port_setter_sdcard_via_system_spi(int pin1, int pin2, int pin3);
+extern int port_mminfo_lcdpanel(unsigned char * ep, unsigned char * sret, int * out_targ);
+extern int port_mminfo_lcd320(unsigned char * ep, int64_t * out_iret, int * out_targ);
+extern int port_mminfo_interrupts(int64_t * out_iret);
+extern int port_mminfo_touch_status(unsigned char * out_sret);
+extern int port_mminfo_scroll_start(int64_t * out_iret);
+extern int port_mminfo_screenbuff(int64_t * out_iret);
+extern PIO port_pio_for_index(int pio_idx);
+extern int port_poke_display_panel(unsigned char * p);
 extern void port_apply_default_console_colors(int default_fc, int default_bc);
 extern void port_web_print_options(void);
-extern int  port_web_option_setter(unsigned char *cmdline);
-extern int  port_web_mminfo(unsigned char *ep, int64_t *out_iret,
-                            unsigned char *out_sret, int *out_targ);
-extern int  port_web_get_ssid(unsigned char *out_sret, int *out_targ);
+extern int port_web_option_setter(unsigned char * cmdline);
+extern int port_web_mminfo(unsigned char * ep, int64_t * out_iret,
+                           unsigned char * out_sret, int * out_targ);
+extern int port_web_get_ssid(unsigned char * out_sret, int * out_targ);
 /* TimeOffsetToUptime defined in mm_misc_shared.c (also used by vm_sys_time.c) */
 extern int64_t TimeOffsetToUptime;
 extern int last_adc;
 extern char banner[];
-extern char *pinsearch(int pin);
+extern char * pinsearch(int pin);
 extern uint8_t getrnd(void);
 extern uint32_t restart_reason;
 extern unsigned int b64d_size(unsigned int in_size);
 extern unsigned int b64e_size(unsigned int in_size);
-extern unsigned int b64_encode(const unsigned char* in, unsigned int in_len, unsigned char* out);
-extern unsigned int b64_decode(const unsigned char* in, unsigned int in_len, unsigned char* out);
-void parselongAES(uint8_t *p, int ivadd, uint8_t *keyx, uint8_t *ivx, int64_t **inint, int64_t **outint);
+extern unsigned int b64_encode(const unsigned char * in, unsigned int in_len, unsigned char * out);
+extern unsigned int b64_decode(const unsigned char * in, unsigned int in_len, unsigned char * out);
+void parselongAES(uint8_t * p, int ivadd, uint8_t * keyx, uint8_t * ivx, int64_t ** inint, int64_t ** outint);
 /* SSD1963data is defined in SSD1963.c on PICO/PICORP2350/PICOUSB/
  * PICOUSBRP2350/WEB/WEBRP2350; ports/vga{,_rp2350}/port_defaults.c +
  * ports/hdmi_rp2350/port_defaults.c stub it so the OPTION LCDPANEL
  * DISABLE reset path can write 0 unconditionally. */
 extern int SSD1963data;
 uint32_t getTotalHeap(void) {
-   extern char __StackLimit, __bss_end__;
+    extern char __StackLimit, __bss_end__;
 
-   return &__StackLimit  - &__bss_end__;
+    return &__StackLimit - &__bss_end__;
 }
 
 uint32_t getFreeHeap(void) {
-   struct mallinfo m = mallinfo();
+    struct mallinfo m = mallinfo();
 
-   return getTotalHeap() - m.uordblks;
+    return getTotalHeap() - m.uordblks;
 }
 
 uint32_t getProgramSize(void) {
-   extern char __flash_binary_start, __flash_binary_end;
+    extern char __flash_binary_start, __flash_binary_end;
 
-   return &__flash_binary_end - &__flash_binary_start;
+    return &__flash_binary_end - &__flash_binary_start;
 }
 
 uint32_t getFreeProgramSpace() {
-   return PICO_FLASH_SIZE_BYTES - getProgramSize();
+    return PICO_FLASH_SIZE_BYTES - getProgramSize();
 }
-static inline CommandToken commandtbl_decode(const unsigned char *p){
-    return ((CommandToken)(p[0] & 0x7f)) | ((CommandToken)(p[1] & 0x7f)<<7);
+static inline CommandToken commandtbl_decode(const unsigned char * p) {
+    return ((CommandToken)(p[0] & 0x7f)) | ((CommandToken)(p[1] & 0x7f) << 7);
 }
 extern int busfault;
 //#include "pico/stdio_usb/reset_interface.h"
-const char *OrientList[] = {"LANDSCAPE", "PORTRAIT", "RLANDSCAPE", "RPORTRAIT"};
-const char *KBrdList[] = {"", "US", "FR", "GR", "IT", "BE", "UK", "ES" };
+const char * OrientList[] = {"LANDSCAPE", "PORTRAIT", "RLANDSCAPE", "RPORTRAIT"};
+const char * KBrdList[] = {"", "US", "FR", "GR", "IT", "BE", "UK", "ES"};
 extern const void * const CallTable[];
 struct s_inttbl inttbl[NBRINTERRUPTS];
-unsigned char *InterruptReturn;
-extern const char *FErrorMsg[];
-uint8_t *buff320=NULL;
+unsigned char * InterruptReturn;
+extern const char * FErrorMsg[];
+uint8_t * buff320 = NULL;
 /* setwifi lives in MMsetwifi.c on WEB builds. */
-extern void setwifi(unsigned char *tp);
+extern void setwifi(unsigned char * tp);
 /* USB device-info hooks: real impls in drivers/usb_host_kbd/USBKeyboard.c
  * (USB device builds) and stubs in drivers/ps2_matrix/Keyboard.c (non-USB
  * device builds) and host_runtime.c (host). The HID[4] array stays
@@ -175,60 +174,47 @@ extern int port_usb_hid_field(int n, int field);
  * MMweb_stubs.c (linked on non-WEB device) and
  * host_runtime.c (host); real impls in MMsetwifi.c / MMMqtt.c /
  * MMtcpserver.c on WEB. */
-extern const uint8_t *flash_target_contents;
-int TickPeriod[NBRSETTICKS]={0};
-volatile int TickTimer[NBRSETTICKS]={0};
-unsigned char *TickInt[NBRSETTICKS]={NULL};
-volatile unsigned char TickActive[NBRSETTICKS]={0};
-unsigned char *OnKeyGOSUB = NULL;
-unsigned char *OnPS2GOSUB = NULL;
+extern const uint8_t * flash_target_contents;
+int TickPeriod[NBRSETTICKS] = {0};
+volatile int TickTimer[NBRSETTICKS] = {0};
+unsigned char * TickInt[NBRSETTICKS] = {NULL};
+volatile unsigned char TickActive[NBRSETTICKS] = {0};
+unsigned char * OnKeyGOSUB = NULL;
+unsigned char * OnPS2GOSUB = NULL;
 /* daystrings[] defined in mm_misc_shared.c (only fun_day references it) */
-const char *CaseList[] = {"", "LOWER", "UPPER"};
+const char * CaseList[] = {"", "LOWER", "UPPER"};
 int OptionErrorCheck;
 unsigned char EchoOption = true;
-unsigned long long int __attribute__((section(".my_section"))) saved_variable;  //  __attribute__ ((persistent));  // and this is the address
+unsigned long long int __attribute__((section(".my_section"))) saved_variable; //  __attribute__ ((persistent));  // and this is the address
 unsigned int CurrentCpuSpeed;
 unsigned int PeripheralBusSpeed;
-extern char *ADCInterrupt;
+extern char * ADCInterrupt;
 extern volatile int ConsoleTxBufHead;
 extern volatile int ConsoleTxBufTail;
-extern char *LCDList[];
+extern char * LCDList[];
 extern volatile BYTE SDCardStat;
 extern uint64_t TIM12count;
 extern char id_out[12];
 extern void WriteComand(int cmd);
 extern void WriteData(int data);
-char *CSubInterrupt;
-MMFLOAT optionangle=1.0;
-bool useoptionangle=false;
-bool optionfastaudio=false;
-bool optionfulltime=false;
-bool screen320=false;
-bool optionlogging=false;
-volatile bool CSubComplete=false;
+char * CSubInterrupt;
+MMFLOAT optionangle = 1.0;
+bool useoptionangle = false;
+bool optionfastaudio = false;
+bool optionfulltime = false;
+bool screen320 = false;
+bool optionlogging = false;
+volatile bool CSubComplete = false;
 /* timeroffset defined in mm_misc_shared.c (also used by bc_vm.c) */
 extern uint64_t timeroffset;
-int SaveOptionErrorSkip=0;
-char SaveErrorMessage[MAXERRMSG] = { 0 };
+int SaveOptionErrorSkip = 0;
+char SaveErrorMessage[MAXERRMSG] = {0};
 int Saveerrno = 0;
-
 
 // this is invoked as a command (ie, TIMER = 0)
 // search through the line looking for the equals sign and step over it,
 // evaluate the rest of the command and save in the timer
 // this is invoked as a function
-
-
-
-
-
-
-
-
-
-
-
-
 
 /*void update_clock(void){
     RTC_TimeTypeDef sTime;
@@ -253,7 +239,6 @@ int Saveerrno = 0;
     }
 }*/
 
-
 // this is invoked as a command (ie, date$ = "6/7/2010")
 // search through the line looking for the equals sign and step over it,
 // evaluate the rest of the command, split it up and save in the system counters
@@ -266,15 +251,10 @@ int Saveerrno = 0;
 // search through the line looking for the equals sign and step over it,
 // evaluate the rest of the command, split it up and save in the system counters
 
-
-
-
 // this is invoked as a function
 
-
-
-void cmd_ireturn(void){
-    if(InterruptReturn == NULL) error("Not in interrupt");
+void cmd_ireturn(void) {
+    if (InterruptReturn == NULL) error("Not in interrupt");
     checkend(cmdline);
     mmbasic_runtime_interrupt_leave_state(&nextstmt, &InterruptReturn,
                                           &g_LocalIndex, ClearVars,
@@ -288,16 +268,16 @@ void cmd_ireturn(void){
 }
 
 void MIPS16 cmd_library(void) {
-    unsigned char *tp;
+    unsigned char * tp;
     /********************************************************************************************************************
      ******* LIBRARY SAVE **********************************************************************************************/
-    if(checkstring(cmdline, (unsigned char *)"SAVE")) {
-        unsigned char *p=NULL,  *pp , *m, *MemBuff, *TempPtr;
+    if (checkstring(cmdline, (unsigned char *)"SAVE")) {
+        unsigned char *p = NULL, *pp, *m, *MemBuff, *TempPtr;
         unsigned short rem, tkn;
         int i, j, k, InCFun, InQuote, CmdExpected;
-        unsigned int CFunDefAddr[100], *CFunHexAddr[100] ;
-        if(CurrentLinePtr) error("Invalid in a program");
-        if(*ProgMemory != 0x01) return;
+        unsigned int CFunDefAddr[100], *CFunHexAddr[100];
+        if (CurrentLinePtr) error("Invalid in a program");
+        if (*ProgMemory != 0x01) return;
         checkend(p);
         ClearRuntime(true);
         TempPtr = m = MemBuff = GetTempMemory(EDIT_BUFFER_SIZE);
@@ -305,81 +285,83 @@ void MIPS16 cmd_library(void) {
         rem = GetCommandValue((unsigned char *)"Rem");
         InQuote = InCFun = j = 0;
         CmdExpected = true;
-       if(Option.LIBRARY_FLASH_SIZE != MAX_PROG_SIZE){
-           uint32_t *c = (uint32_t *)(flash_progmemory - MAX_PROG_SIZE);
-           if (*c != 0xFFFFFFFF)
-            error("Flash Slot % already in use",MAXFLASHSLOTS);
-        ;
-       }
+        if (Option.LIBRARY_FLASH_SIZE != MAX_PROG_SIZE) {
+            uint32_t * c = (uint32_t *)(flash_progmemory - MAX_PROG_SIZE);
+            if (*c != 0xFFFFFFFF)
+                error("Flash Slot % already in use", MAXFLASHSLOTS);
+            ;
+        }
         // first copy the current program code residing in the Library area to RAM
-        if(Option.LIBRARY_FLASH_SIZE == MAX_PROG_SIZE){
+        if (Option.LIBRARY_FLASH_SIZE == MAX_PROG_SIZE) {
             p = ProgMemory - Option.LIBRARY_FLASH_SIZE;
-            while(!(p[0] == 0 && p[1] == 0)) *m++ = *p++;
-              *m++ = 0;                                               // terminate the last line
+            while (!(p[0] == 0 && p[1] == 0)) *m++ = *p++;
+            *m++ = 0; // terminate the last line
         }
         //dump(m, 256);
         // then copy the current contents of the program memory to RAM
 
-       //MMPrintString("\r\n Size=1 ");PInt(m - MemBuff);
+        //MMPrintString("\r\n Size=1 ");PInt(m - MemBuff);
         p = ProgMemory;
-        while(!(p[0] == 0xff && p[1] == 0xff)){
-//        while(*p != 0xff) {
-            if(p[0] == 0 && p[1] == 0) break;                       // end of the program
-            if(*p == T_NEWLINE) {
+        while (!(p[0] == 0xff && p[1] == 0xff)) {
+            //        while(*p != 0xff) {
+            if (p[0] == 0 && p[1] == 0) break; // end of the program
+            if (*p == T_NEWLINE) {
                 TempPtr = m;
                 CurrentLinePtr = p;
                 *m++ = *p++;
-                CmdExpected = true;                                 // if true we can expect a command next (possibly a CFunction, etc)
-                if(*p == 0) {                                       // if this is an empty line we can skip it
+                CmdExpected = true; // if true we can expect a command next (possibly a CFunction, etc)
+                if (*p == 0) {      // if this is an empty line we can skip it
                     p++;
-                    if(*p == 0) break;                              // end of the program or module
+                    if (*p == 0) break; // end of the program or module
                     m--;
                     continue;
                 }
             }
 
-            if(*p == T_LINENBR) {
-//                TempPtr = m;
-                *m++ = *p++; *m++ = *p++; *m++ = *p++;              // copy the line number
+            if (*p == T_LINENBR) {
+                //                TempPtr = m;
+                *m++ = *p++;
+                *m++ = *p++;
+                *m++ = *p++; // copy the line number
                 skipspace(p);
             }
 
-            if(*p == T_LABEL) {
-                for(i = p[1] + 2; i > 0; i--) *m++ = *p++;          // copy the label
-//                TempPtr = m;
+            if (*p == T_LABEL) {
+                for (i = p[1] + 2; i > 0; i--) *m++ = *p++; // copy the label
+                                                            //                TempPtr = m;
                 skipspace(p);
             }
-            tkn=commandtbl_decode(p);
+            tkn = commandtbl_decode(p);
             //if(CmdExpected && ( *p == GetCommandValue("End CFunction") || *p == GetCommandValue("End CSub") || *p == GetCommandValue("End DefineFont"))) {
-            if(CmdExpected && (  tkn == GetCommandValue((unsigned char *)"End CSub") || tkn == GetCommandValue((unsigned char *)"End DefineFont"))) {
-                InCFun = false;                                     // found an  END CSUB or END DEFINEFONT token
+            if (CmdExpected && (tkn == GetCommandValue((unsigned char *)"End CSub") || tkn == GetCommandValue((unsigned char *)"End DefineFont"))) {
+                InCFun = false; // found an  END CSUB or END DEFINEFONT token
             }
-            if(InCFun) {
-                skipline(p);                                        // skip the body of a CFunction
-                m = TempPtr;                                        // don't copy the new line
+            if (InCFun) {
+                skipline(p); // skip the body of a CFunction
+                m = TempPtr; // don't copy the new line
                 continue;
             }
 
-            tkn=commandtbl_decode(p);
-            if(CmdExpected && ( tkn == cmdCSUB || tkn == GetCommandValue((unsigned char *)"DefineFont"))) {    // found a  CSUB or DEFINEFONT token
-                CFunDefAddr[++j] = (unsigned int)m;                 // save its address so that the binary copy in the library can point to it
-                while(*p) *m++ = *p++;                              // copy the declaration
+            tkn = commandtbl_decode(p);
+            if (CmdExpected && (tkn == cmdCSUB || tkn == GetCommandValue((unsigned char *)"DefineFont"))) { // found a  CSUB or DEFINEFONT token
+                CFunDefAddr[++j] = (unsigned int)m;                                                         // save its address so that the binary copy in the library can point to it
+                while (*p) *m++ = *p++;                                                                     // copy the declaration
                 InCFun = true;
             }
 
-            tkn=commandtbl_decode(p);
-            if(CmdExpected && tkn == rem) {                          // found a REM token
+            tkn = commandtbl_decode(p);
+            if (CmdExpected && tkn == rem) { // found a REM token
                 skipline(p);
-                m = TempPtr;                                        // don't copy the new line tokens
+                m = TempPtr; // don't copy the new line tokens
                 continue;
             }
 
-            if(*p >= C_BASETOKEN || isnamestart(*p))
-                CmdExpected = false;                                // stop looking for a CFunction, etc on this line
+            if (*p >= C_BASETOKEN || isnamestart(*p))
+                CmdExpected = false; // stop looking for a CFunction, etc on this line
 
-            if(*p == '"') InQuote = !InQuote;                       // found the start/end of a string
+            if (*p == '"') InQuote = !InQuote; // found the start/end of a string
 
-            if(*p == '\'' && !InQuote) {                            // found a modern remark char
+            if (*p == '\'' && !InQuote) { // found a modern remark char
                 skipline(p);
                 //PIntHC(*(m-3)); PIntHC(*(m-2)); PIntHC(*(m-1)); PIntHC(*(m));
                 //MMPrintString("\r\n");
@@ -388,36 +370,41 @@ void MIPS16 cmd_library(void) {
                 Spaces have been reduced to a single space so we treat a comment with 1 space before it
                 as a comment line to be omitted.
                 */
-                if((*(m-1) == 0x01) ||  ((*(m-2) == 0x01) && (*(m-1) == 0x20))){
-                    m = TempPtr;                                    // if the comment was the only thing on the line don't copy the line at all
+                if ((*(m - 1) == 0x01) || ((*(m - 2) == 0x01) && (*(m - 1) == 0x20))) {
+                    m = TempPtr; // if the comment was the only thing on the line don't copy the line at all
                     continue;
                 } else
                     p--;
             }
 
-            if(*p == ' ' && !InQuote) {                             // found a space
-                if(*(m-1) == ' ') m--;                              // don't copy the space if the preceeding char was a space
+            if (*p == ' ' && !InQuote) {  // found a space
+                if (*(m - 1) == ' ') m--; // don't copy the space if the preceeding char was a space
             }
 
-            if(p[0] == 0 && p[1] == 0) break;                       // end of the program
+            if (p[0] == 0 && p[1] == 0) break; // end of the program
             *m++ = *p++;
         }
 
-       // MMPrintString("\r\n Size2= ");PInt(m - MemBuff);
-       //The picomite will have any fonts or CSUBs binary starting on a new 256 byte block so there can be many
-       //0x00 bytes at the end of the program. We only need two of them .
+        // MMPrintString("\r\n Size2= ");PInt(m - MemBuff);
+        //The picomite will have any fonts or CSUBs binary starting on a new 256 byte block so there can be many
+        //0x00 bytes at the end of the program. We only need two of them .
         // At the end of the program so get the two 0x00 bytes
         *m++ = *p++;
         *m++ = *p++;
         // Step the program memory up to the first 0xFF of the 4 that mark the beginning of the CSub binaries.
-        while(*p != 0xff) p++;
-        p++;p++; p++;p++;                                           // step over the header of the four 0xff bytes
+        while (*p != 0xff) p++;
+        p++;
+        p++;
+        p++;
+        p++; // step over the header of the four 0xff bytes
 
         //step the memory to the next 4 word boundary
         // while((unsigned int)p & 0b11) p++;
-        while((unsigned int)m & 0b11) *m++ = 0x00;                  // step memory to the next word boundary
-        *m++=0xFF;*m++=0xFF;*m++=0xFF;*m++=0xFF;                    //write 4 byte of the csub binary header
-
+        while ((unsigned int)m & 0b11) *m++ = 0x00; // step memory to the next word boundary
+        *m++ = 0xFF;
+        *m++ = 0xFF;
+        *m++ = 0xFF;
+        *m++ = 0xFF; //write 4 byte of the csub binary header
 
         // now copy the CFunction/CSub/Font data
         // =====================================
@@ -429,32 +416,32 @@ void MIPS16 cmd_library(void) {
         // The next CFunction starts immediately following the last word of the previous CFunction
 
         // first, copy any CFunctions residing in the library area to RAM
-       // MMPrintString("\r\n Copying CSUBS from library");
-        k = 0;                                                      // this is used to index CFunHexLibAddr[] for later adjustment of a CFun's address
-        if(CFunctionLibrary != NULL) {
+        // MMPrintString("\r\n Copying CSUBS from library");
+        k = 0; // this is used to index CFunHexLibAddr[] for later adjustment of a CFun's address
+        if (CFunctionLibrary != NULL) {
             pp = (unsigned char *)CFunctionLibrary;
-            while(*(unsigned int *)pp != 0xffffffff) {
-//                CFunHexLibAddr[++k] = (unsigned int *)m;            // save the address for later adjustment
-                j = (*(unsigned int *)(pp + 4)) + 8;                // calculate the total size of the CFunction
-                while(j--) *m++ = *pp++;                            // copy it into RAM
+            while (*(unsigned int *)pp != 0xffffffff) {
+                //                CFunHexLibAddr[++k] = (unsigned int *)m;            // save the address for later adjustment
+                j = (*(unsigned int *)(pp + 4)) + 8; // calculate the total size of the CFunction
+                while (j--) *m++ = *pp++;            // copy it into RAM
             }
         }
 
         // then, copy any CFunctions in program memory to RAM
 
-        i = 0;                                                      // this is used to index CFunHexAddr[] for later adjustment of a CFun's address
-       // while(*(unsigned int *)p != 0xffffffff && (int)p < Option.PROG_FLASH_SIZE) {
-        while(*(unsigned int *)p != 0xffffffff) {
-            CFunHexAddr[++i] = (unsigned int *)m;                   // save the address for later adjustment
-            j = (*(unsigned int *)(p + 4)) + 8;                     // calculate the total size of the CFunction
-            while(j--) *m++ = *p++;                                 // copy it into RAM
+        i = 0; // this is used to index CFunHexAddr[] for later adjustment of a CFun's address
+               // while(*(unsigned int *)p != 0xffffffff && (int)p < Option.PROG_FLASH_SIZE) {
+        while (*(unsigned int *)p != 0xffffffff) {
+            CFunHexAddr[++i] = (unsigned int *)m; // save the address for later adjustment
+            j = (*(unsigned int *)(p + 4)) + 8;   // calculate the total size of the CFunction
+            while (j--) *m++ = *p++;              // copy it into RAM
         }
         // we have now copied all the CFunctions into RAM
 
         // calculate the size of the library code  to  end on a word boundary
-        j=(((m - MemBuff) + (0x4 - 1)) & (~(0x4 - 1)));
+        j = (((m - MemBuff) + (0x4 - 1)) & (~(0x4 - 1)));
 
-         //We only have reserved MAX_PROG_SIZE of flash for library code .
+        //We only have reserved MAX_PROG_SIZE of flash for library code .
         //Error if we try to use too much
         if (j > MAX_PROG_SIZE) error("Library too big");
 
@@ -465,37 +452,37 @@ void MIPS16 cmd_library(void) {
         // NO ADJUSTMENT REQUIRED FOR PICOMITE as ADDRESS is RELATIVE and LIBRARY is at a fixed location.
         // first, CFunctions that were already in the library
         //for(; k > 0; k--) {
-             //if ((*CFunHexLibAddr[k]>>31)==0)  *CFunHexLibAddr[k] -= ((unsigned int)( MAX_PROG_SIZE);
+        //if ((*CFunHexLibAddr[k]>>31)==0)  *CFunHexLibAddr[k] -= ((unsigned int)( MAX_PROG_SIZE);
         //}
 
         // then, CFunctions that are being added to the library
-        for(; i > 0; i--) {
-          if ((*CFunHexAddr[i]>>31)==0)  *CFunHexAddr[i] = (CFunDefAddr[i] - (unsigned int)MemBuff);
+        for (; i > 0; i--) {
+            if ((*CFunHexAddr[i] >> 31) == 0) *CFunHexAddr[i] = (CFunDefAddr[i] - (unsigned int)MemBuff);
         }
 
-
-  //******************************************************************************
+        //******************************************************************************
         //now write the library from ram to the library flash area
         // initialise for writing to the flash
         FlashWriteInit(LIBRARY_FLASH);
         hal_flash_erase(realflashpointer, MAX_PROG_SIZE);
-        i=MAX_PROG_SIZE/4;
+        i = MAX_PROG_SIZE / 4;
 
-        int *ppp=(int *)(flash_progmemory - MAX_PROG_SIZE);
-        while(i--)if(*ppp++ != 0xFFFFFFFF){
-            fileio_flash_write_end();
-            error("Flash erase problem");
-        }
+        int * ppp = (int *)(flash_progmemory - MAX_PROG_SIZE);
+        while (i--)
+            if (*ppp++ != 0xFFFFFFFF) {
+                fileio_flash_write_end();
+                error("Flash erase problem");
+            }
 
-        i=0;
-        for(k = 0; k < m - MemBuff; k++){        // write to the flash byte by byte
-           FlashWriteByte(MemBuff[k]);
+        i = 0;
+        for (k = 0; k < m - MemBuff; k++) { // write to the flash byte by byte
+            FlashWriteByte(MemBuff[k]);
         }
         FlashWriteClose();
         Option.LIBRARY_FLASH_SIZE = MAX_PROG_SIZE;
         SaveOptions();
 
-        if(MMCharPos > 1) MMPrintString("\r\n");                    // message should be on a new line
+        if (MMCharPos > 1) MMPrintString("\r\n"); // message should be on a new line
         MMPrintString("Library Saved ");
         IntToStr((char *)tknbuf, k, 10);
         MMPrintString((char *)tknbuf);
@@ -503,123 +490,128 @@ void MIPS16 cmd_library(void) {
         fflush(stdout);
         uSec(2000);
 
-
         //Now call the new command that will clear the current program memory then
         //write the library code at Option.ProgFlashSize by copying it from the windbond
         //and return to the command prompt.
-        cmdline = (unsigned char *)""; CurrentLinePtr = NULL;    // keep the NEW command happy
-        cmd_new();                              //  delete the program,add the library code and return to the command prompt
+        cmdline = (unsigned char *)"";
+        CurrentLinePtr = NULL; // keep the NEW command happy
+        cmd_new();             //  delete the program,add the library code and return to the command prompt
     }
-     /********************************************************************************************************************
+    /********************************************************************************************************************
      ******* LIBRARY DELETE **********************************************************************************************/
 
-     if(checkstring(cmdline, (unsigned char *)"DELETE")) {
+    if (checkstring(cmdline, (unsigned char *)"DELETE")) {
         int i;
-        if(CurrentLinePtr) error("Invalid in a program");
-        if(Option.LIBRARY_FLASH_SIZE != MAX_PROG_SIZE) return;
+        if (CurrentLinePtr) error("Invalid in a program");
+        if (Option.LIBRARY_FLASH_SIZE != MAX_PROG_SIZE) return;
 
         FlashWriteInit(LIBRARY_FLASH);
         hal_flash_erase(realflashpointer, MAX_PROG_SIZE);
-        i=MAX_PROG_SIZE/4;
+        i = MAX_PROG_SIZE / 4;
 
-        int *ppp=(int *)(flash_progmemory - MAX_PROG_SIZE);
-        while(i--)if(*ppp++ != 0xFFFFFFFF){
-            fileio_flash_write_end();
-            error("Flash erase problem");
-        }
+        int * ppp = (int *)(flash_progmemory - MAX_PROG_SIZE);
+        while (i--)
+            if (*ppp++ != 0xFFFFFFFF) {
+                fileio_flash_write_end();
+                error("Flash erase problem");
+            }
         fileio_flash_write_end();
 
-        Option.LIBRARY_FLASH_SIZE= 0;
+        Option.LIBRARY_FLASH_SIZE = 0;
         SaveOptions();
         return;
         // Clear Program Memory and also the Library at the end.
-//        cmdline = ""; CurrentLinePtr = NULL;    // keep the NEW command happy
-//        cmd_new();                              //  delete any program,and the library code and return to the command prompt
+        //        cmdline = ""; CurrentLinePtr = NULL;    // keep the NEW command happy
+        //        cmd_new();                              //  delete any program,and the library code and return to the command prompt
+    }
 
-     }
-
-      /********************************************************************************************************************
+    /********************************************************************************************************************
       ******* LIBRARY LIST **********************************************************************************************/
 
-     if(checkstring(cmdline, (unsigned char *)"LIST ALL")) {
-        if(CurrentLinePtr) error("Invalid in a program");
-        if(Option.LIBRARY_FLASH_SIZE != MAX_PROG_SIZE) return;
+    if (checkstring(cmdline, (unsigned char *)"LIST ALL")) {
+        if (CurrentLinePtr) error("Invalid in a program");
+        if (Option.LIBRARY_FLASH_SIZE != MAX_PROG_SIZE) return;
         ListProgram(ProgMemory - Option.LIBRARY_FLASH_SIZE, true);
         return;
-     }
-     if(checkstring(cmdline, (unsigned char *)"LIST")) {
-        if(CurrentLinePtr) error("Invalid in a program");
-        if(Option.LIBRARY_FLASH_SIZE != MAX_PROG_SIZE) return;
+    }
+    if (checkstring(cmdline, (unsigned char *)"LIST")) {
+        if (CurrentLinePtr) error("Invalid in a program");
+        if (Option.LIBRARY_FLASH_SIZE != MAX_PROG_SIZE) return;
         ListProgram(ProgMemory - Option.LIBRARY_FLASH_SIZE, false);
         return;
-     }
-     if((tp=checkstring(cmdline, (unsigned char *)"DISK SAVE"))) {
-        getargs(&tp,1,(unsigned char *)",");
-        if(!(argc==1))error("Syntax");
-        if(CurrentLinePtr) error("Invalid in a program");
+    }
+    if ((tp = checkstring(cmdline, (unsigned char *)"DISK SAVE"))) {
+        getargs(&tp, 1, (unsigned char *)",");
+        if (!(argc == 1)) error("Syntax");
+        if (CurrentLinePtr) error("Invalid in a program");
         int fnbr = FindFreeFileNbr();
-        if (!InitSDCard())  return;
-        if(Option.LIBRARY_FLASH_SIZE != MAX_PROG_SIZE) error("No library to store");
-        char *pp = (char *)getFstring(argv[0]);
+        if (!InitSDCard()) return;
+        if (Option.LIBRARY_FLASH_SIZE != MAX_PROG_SIZE) error("No library to store");
+        char * pp = (char *)getFstring(argv[0]);
         if (strchr((char *)pp, '.') == NULL)
             strcat((char *)pp, ".lib");
         if (!BasicFileOpen((char *)pp, fnbr, FA_WRITE | FA_CREATE_ALWAYS)) return;
         int i = 0;
         // first count the normal program code residing in the Library
-        char *p = (char *)LibMemory;
-        while(!(p[0] == 0 && p[1] == 0)) {
-            p++; i++;
+        char * p = (char *)LibMemory;
+        while (!(p[0] == 0 && p[1] == 0)) {
+            p++;
+            i++;
         }
-        while(*p == 0){ // the end of the program can have multiple zeros -count them
-            p++;i++;
+        while (*p == 0) { // the end of the program can have multiple zeros -count them
+            p++;
+            i++;
         }
-        p++; i++;    //get 0xFF that ends the program and count it
-        while((unsigned int)p & 0b11) { //count to the next word boundary
-        p++;i++;
+        p++;
+        i++;                             //get 0xFF that ends the program and count it
+        while ((unsigned int)p & 0b11) { //count to the next word boundary
+            p++;
+            i++;
         }
 
         //Now add the binary used for CSUB and Fonts
-        if(CFunctionLibrary != NULL) {
-            int j=0;
-            unsigned int *pint = (unsigned int *)CFunctionLibrary;
-            while(*pint != 0xffffffff) {
-                pint++;                                      //step over the address or Font No.
-                j += *pint + 8;                              //Read the size
-                pint += (*pint + 4) / sizeof(unsigned int);  //set pointer to start of next CSUB/Font
+        if (CFunctionLibrary != NULL) {
+            int j = 0;
+            unsigned int * pint = (unsigned int *)CFunctionLibrary;
+            while (*pint != 0xffffffff) {
+                pint++;                                     //step over the address or Font No.
+                j += *pint + 8;                             //Read the size
+                pint += (*pint + 4) / sizeof(unsigned int); //set pointer to start of next CSUB/Font
             }
-            i=i+j;
+            i = i + j;
         }
-        char *s = (char *)LibMemory;
-//        int i=MAX_PROG_SIZE;
-        while(i--){
-            FilePutChar(*s++,fnbr);
+        char * s = (char *)LibMemory;
+        //        int i=MAX_PROG_SIZE;
+        while (i--) {
+            FilePutChar(*s++, fnbr);
         }
         FileClose(fnbr);
         return;
-     }
-     if((tp=checkstring(cmdline, (unsigned char *)"DISK LOAD"))) {
+    }
+    if ((tp = checkstring(cmdline, (unsigned char *)"DISK LOAD"))) {
         int fsize;
-        getargs(&tp,1,(unsigned char *)",");
-        if(!(argc==1))error("Syntax");
-        if(CurrentLinePtr) error("Invalid in a program");
+        getargs(&tp, 1, (unsigned char *)",");
+        if (!(argc == 1)) error("Syntax");
+        if (CurrentLinePtr) error("Invalid in a program");
         int fnbr = FindFreeFileNbr();
-        if (!InitSDCard())  return;
-        char *pp = (char *)getFstring(argv[0]);
+        if (!InitSDCard()) return;
+        char * pp = (char *)getFstring(argv[0]);
         if (strchr((char *)pp, '.') == NULL)
             strcat((char *)pp, ".lib");
         if (!BasicFileOpen((char *)pp, fnbr, FA_READ)) return;
-		fsize = (int)hal_fs_size(hal_fds[fnbr]);
-        if(fsize>MAX_PROG_SIZE)error("File size % should be % or less",fsize,MAX_PROG_SIZE);
+        fsize = (int)hal_fs_size(hal_fds[fnbr]);
+        if (fsize > MAX_PROG_SIZE) error("File size % should be % or less", fsize, MAX_PROG_SIZE);
         FlashWriteInit(LIBRARY_FLASH);
         hal_flash_erase(realflashpointer, MAX_PROG_SIZE);
-        int i=MAX_PROG_SIZE/4;
-        int *ppp=(int *)(flash_progmemory - MAX_PROG_SIZE);
-        while(i--)if(*ppp++ != 0xFFFFFFFF){
-            fileio_flash_write_end();
-            error("Flash erase problem");
-        }
-        for(int k = 0; k < fsize; k++){        // write to the flash byte by byte
-           FlashWriteByte(FileGetChar(fnbr));
+        int i = MAX_PROG_SIZE / 4;
+        int * ppp = (int *)(flash_progmemory - MAX_PROG_SIZE);
+        while (i--)
+            if (*ppp++ != 0xFFFFFFFF) {
+                fileio_flash_write_end();
+                error("Flash erase problem");
+            }
+        for (int k = 0; k < fsize; k++) { // write to the flash byte by byte
+            FlashWriteByte(FileGetChar(fnbr));
         }
         FlashWriteClose();
         Option.LIBRARY_FLASH_SIZE = MAX_PROG_SIZE;
@@ -628,82 +620,110 @@ void MIPS16 cmd_library(void) {
         return;
     }
 
-     error("Invalid syntax");
-    }
-
+    error("Invalid syntax");
+}
 
 // set up the tick interrupt
-void cmd_settick(void){
+void cmd_settick(void) {
     int period;
-    int irq=0;;
-//    int pause=0;
-    char *s=GetTempMemory(STRINGSIZE);
+    int irq = 0;
+    ;
+    //    int pause=0;
+    char * s = GetTempMemory(STRINGSIZE);
     getargs(&cmdline, 5, (unsigned char *)",");
-    strcpy(s,(char *)argv[0]);
-    if(!(argc == 3 || argc == 5)) error("Argument count");
-    if(argc == 5) irq = getint(argv[4], 1, NBRSETTICKS) - 1;
-    if(strcasecmp((char *)argv[0],"PAUSE")==0){
-        TickActive[irq]=0;
+    strcpy(s, (char *)argv[0]);
+    if (!(argc == 3 || argc == 5)) error("Argument count");
+    if (argc == 5) irq = getint(argv[4], 1, NBRSETTICKS) - 1;
+    if (strcasecmp((char *)argv[0], "PAUSE") == 0) {
+        TickActive[irq] = 0;
         return;
-    } else if(strcasecmp((char *)argv[0],"RESUME")==0){
-        TickActive[irq]=1;
+    } else if (strcasecmp((char *)argv[0], "RESUME") == 0) {
+        TickActive[irq] = 1;
         return;
-    } else period = getint(argv[0], -1, INT_MAX);
-    if(period == 0) {
-        TickInt[irq] = NULL;                                        // turn off the interrupt
+    } else
+        period = getint(argv[0], -1, INT_MAX);
+    if (period == 0) {
+        TickInt[irq] = NULL; // turn off the interrupt
         TickPeriod[irq] = 0;
-        TickTimer[irq] = 0;                                         // set the timer running
-        TickActive[irq]=0;
+        TickTimer[irq] = 0; // set the timer running
+        TickActive[irq] = 0;
     } else {
         TickPeriod[irq] = period;
-        TickInt[irq] = GetIntAddress(argv[2]);                      // get a pointer to the interrupt routine
-        TickTimer[irq] = 0;                                         // set the timer running
+        TickInt[irq] = GetIntAddress(argv[2]); // get a pointer to the interrupt routine
+        TickTimer[irq] = 0;                    // set the timer running
         InterruptUsed = true;
-        TickActive[irq]=1;
-
+        TickActive[irq] = 1;
     }
 }
-void PO(char *s) {
-    MMPrintString("OPTION "); MMPrintString(s); MMPrintString(" ");
+void PO(char * s) {
+    MMPrintString("OPTION ");
+    MMPrintString(s);
+    MMPrintString(" ");
 }
 
-void PO2Str(char *s1, const char *s2) {
-    PO(s1); MMPrintString((char *)s2); MMPrintString("\r\n");
+void PO2Str(char * s1, const char * s2) {
+    PO(s1);
+    MMPrintString((char *)s2);
+    MMPrintString("\r\n");
 }
-void PO3Str(char *s1, const char *s2, const char *s3) {
-    PO(s1); MMPrintString((char *)s2); MMPrintString(", ");MMPrintString((char *)s3); MMPrintString("\r\n");
+void PO3Str(char * s1, const char * s2, const char * s3) {
+    PO(s1);
+    MMPrintString((char *)s2);
+    MMPrintString(", ");
+    MMPrintString((char *)s3);
+    MMPrintString("\r\n");
 }
-void PO2StrInt(char *s1, const char *s2, int s3) {
-    PO(s1); MMPrintString((char *)s2); MMPrintString(" @ ");PInt(s3);MMPrintString("KHz\r\n");
-}
-
-
-void PO2Int(char *s1, int n) {
-    PO(s1); PInt(n); MMPrintString("\r\n");
-}
-void PO2IntH(char *s1, int n) {
-    PO(s1); PIntH(n); MMPrintString("\r\n");
-}
-void PO3Int(char *s1, int n1, int n2) {
-    PO(s1); PInt(n1); PIntComma(n2); MMPrintString("\r\n");
-}
-void PO4Int(char *s1, int n1, int n2, int n3) {
-    PO(s1); PInt(n1); PIntComma(n2);  PIntComma(n3);  MMPrintString("\r\n");
-}
-void PO5Int(char *s1, int n1, int n2, int n3, int n4) {
-    PO(s1); PInt(n1); PIntComma(n2);  PIntComma(n3);  PIntComma(n4); MMPrintString("\r\n");
+void PO2StrInt(char * s1, const char * s2, int s3) {
+    PO(s1);
+    MMPrintString((char *)s2);
+    MMPrintString(" @ ");
+    PInt(s3);
+    MMPrintString("KHz\r\n");
 }
 
-void MIPS16 printoptions(void){
-//	LoadOptions();
+void PO2Int(char * s1, int n) {
+    PO(s1);
+    PInt(n);
+    MMPrintString("\r\n");
+}
+void PO2IntH(char * s1, int n) {
+    PO(s1);
+    PIntH(n);
+    MMPrintString("\r\n");
+}
+void PO3Int(char * s1, int n1, int n2) {
+    PO(s1);
+    PInt(n1);
+    PIntComma(n2);
+    MMPrintString("\r\n");
+}
+void PO4Int(char * s1, int n1, int n2, int n3) {
+    PO(s1);
+    PInt(n1);
+    PIntComma(n2);
+    PIntComma(n3);
+    MMPrintString("\r\n");
+}
+void PO5Int(char * s1, int n1, int n2, int n3, int n4) {
+    PO(s1);
+    PInt(n1);
+    PIntComma(n2);
+    PIntComma(n3);
+    PIntComma(n4);
+    MMPrintString("\r\n");
+}
+
+void MIPS16 printoptions(void) {
+    //	LoadOptions();
     MMPrintString(banner);
-    if(Option.SerialConsole){
+    if (Option.SerialConsole) {
         MMPrintString("OPTION SERIAL CONSOLE COM");
-        MMputchar((Option.SerialConsole & 3)+48,1);
-        MMputchar(',',1);
-        MMPrintString((char *)PinDef[Option.SerialTX].pinname);MMputchar(',',1);
+        MMputchar((Option.SerialConsole & 3) + 48, 1);
+        MMputchar(',', 1);
+        MMPrintString((char *)PinDef[Option.SerialTX].pinname);
+        MMputchar(',', 1);
         MMPrintString((char *)PinDef[Option.SerialRX].pinname);
-        if(Option.SerialConsole & 4)MMPrintString((char *)",BOTH");
+        if (Option.SerialConsole & 4) MMPrintString((char *)",BOTH");
         PRet();
     }
     /* SYSTEM SPI + LCD SPI prints — VGA targets share SYSTEM_CLK with
@@ -711,123 +731,178 @@ void MIPS16 printoptions(void){
      * port_print_display_options). Both hooks stub on VGA. */
     port_print_system_spi();
     port_print_lcd_spi();
-    if(Option.SYSTEM_I2C_SDA){
+    if (Option.SYSTEM_I2C_SDA) {
         PO("SYSTEM I2C");
-        MMPrintString((char *)PinDef[Option.SYSTEM_I2C_SDA].pinname);MMputchar(',',1);
+        MMPrintString((char *)PinDef[Option.SYSTEM_I2C_SDA].pinname);
+        MMputchar(',', 1);
         MMPrintString((char *)PinDef[Option.SYSTEM_I2C_SCL].pinname);
-        if(Option.SYSTEM_I2C_SLOW)MMPrintString(", SLOW\r\n");
-        else PRet();
+        if (Option.SYSTEM_I2C_SLOW)
+            MMPrintString(", SLOW\r\n");
+        else
+            PRet();
     }
-    if(Option.Autorun){
+    if (Option.Autorun) {
         PO("AUTORUN ");
-        if(Option.Autorun>0 && Option.Autorun<=MAXFLASHSLOTS)PInt(Option.Autorun);
-        else MMPrintString("ON");
-        if(Option.NoReset){
+        if (Option.Autorun > 0 && Option.Autorun <= MAXFLASHSLOTS)
+            PInt(Option.Autorun);
+        else
+            MMPrintString("ON");
+        if (Option.NoReset) {
             MMPrintString(",NORESET");
         }
         PRet();
     }
-    if(Option.Baudrate != CONSOLE_BAUDRATE) PO2Int("BAUDRATE", Option.Baudrate);
-    if(Option.FlashSize !=2048*1024) PO2Int("FLASH SIZE", Option.FlashSize);
-    if(MAX_PROG_SIZE == Option.LIBRARY_FLASH_SIZE) PO2IntH("LIBRARY_FLASH_SIZE ", Option.LIBRARY_FLASH_SIZE);
-    if(Option.Invert == true) PO2Str("CONSOLE", "INVERT");
-    if(Option.Invert == 2) PO2Str("CONSOLE", "AUTO");
-    if(Option.ColourCode == true) PO2Str("COLOURCODE", "ON");
-    if(Option.continuation) PO2Str("CONTINUATION LINES", "ON");
-    if(Option.PWM == true) PO2Str("POWER PWM", "ON");
-    if(Option.Listcase != CONFIG_TITLE) PO2Str("CASE", CaseList[(int)Option.Listcase]);
-    if(Option.Tab != 2) PO2Int("TAB", Option.Tab);
-    if(Option.DefaultFC !=WHITE ||Option.DefaultBC !=BLACK){
+    if (Option.Baudrate != CONSOLE_BAUDRATE) PO2Int("BAUDRATE", Option.Baudrate);
+    if (Option.FlashSize != 2048 * 1024) PO2Int("FLASH SIZE", Option.FlashSize);
+    if (MAX_PROG_SIZE == Option.LIBRARY_FLASH_SIZE) PO2IntH("LIBRARY_FLASH_SIZE ", Option.LIBRARY_FLASH_SIZE);
+    if (Option.Invert == true) PO2Str("CONSOLE", "INVERT");
+    if (Option.Invert == 2) PO2Str("CONSOLE", "AUTO");
+    if (Option.ColourCode == true) PO2Str("COLOURCODE", "ON");
+    if (Option.continuation) PO2Str("CONTINUATION LINES", "ON");
+    if (Option.PWM == true) PO2Str("POWER PWM", "ON");
+    if (Option.Listcase != CONFIG_TITLE) PO2Str("CASE", CaseList[(int)Option.Listcase]);
+    if (Option.Tab != 2) PO2Int("TAB", Option.Tab);
+    if (Option.DefaultFC != WHITE || Option.DefaultBC != BLACK) {
         PO("DEFAULT COLOURS");
-            if(Option.DefaultFC==WHITE)MMPrintString("WHITE, ");
-            else if(Option.DefaultFC==YELLOW)MMPrintString("YELLOW,");
-            else if(Option.DefaultFC==LILAC)MMPrintString("LILAC,");
-            else if(Option.DefaultFC==BROWN)MMPrintString("BROWN,");
-            else if(Option.DefaultFC==FUCHSIA)MMPrintString("FUCHSIA,");
-            else if(Option.DefaultFC==RUST)MMPrintString("RUST, ");
-            else if(Option.DefaultFC==MAGENTA)MMPrintString("MAGENTA,");
-            else if(Option.DefaultFC==RED)MMPrintString("RED,");
-            else if(Option.DefaultFC==CYAN)MMPrintString("CYAN,");
-            else if(Option.DefaultFC==GREEN)MMPrintString("GREEN,");
-            else if(Option.DefaultFC==CERULEAN)MMPrintString("CERULEAN,");
-            else if(Option.DefaultFC==MIDGREEN)MMPrintString("MIDGREEN,");
-            else if(Option.DefaultFC==COBALT)MMPrintString("COBALT,");
-            else if(Option.DefaultFC==MYRTLE)MMPrintString("MYRTLE,");
-            else if(Option.DefaultFC==BLUE)MMPrintString("BLUE,");
-            else if(Option.DefaultFC==BLACK)MMPrintString("BLACK,");
-            if(Option.DefaultBC==WHITE)MMPrintString(" WHITE");
-            else if(Option.DefaultBC==YELLOW)MMPrintString(" YELLOW");
-            else if(Option.DefaultBC==LILAC)MMPrintString(" LILAC");
-            else if(Option.DefaultBC==BROWN)MMPrintString(" BROWN");
-            else if(Option.DefaultBC==FUCHSIA)MMPrintString(" FUCHSIA");
-            else if(Option.DefaultBC==RUST)MMPrintString(" RUST");
-            else if(Option.DefaultBC==MAGENTA)MMPrintString(" MAGENTA");
-            else if(Option.DefaultBC==RED)MMPrintString(" RED");
-            else if(Option.DefaultBC==CYAN)MMPrintString(" CYAN");
-            else if(Option.DefaultBC==GREEN)MMPrintString(" GREEN");
-            else if(Option.DefaultBC==CERULEAN)MMPrintString(" CERULEAN");
-            else if(Option.DefaultBC==MIDGREEN)MMPrintString(" MIDGREEN");
-            else if(Option.DefaultBC==COBALT)MMPrintString(" COBALT");
-            else if(Option.DefaultBC==MYRTLE)MMPrintString(" MYRTLE");
-            else if(Option.DefaultBC==BLUE)MMPrintString(" BLUE");
-            else if(Option.DefaultBC==BLACK)MMPrintString(" BLACK");
+        if (Option.DefaultFC == WHITE)
+            MMPrintString("WHITE, ");
+        else if (Option.DefaultFC == YELLOW)
+            MMPrintString("YELLOW,");
+        else if (Option.DefaultFC == LILAC)
+            MMPrintString("LILAC,");
+        else if (Option.DefaultFC == BROWN)
+            MMPrintString("BROWN,");
+        else if (Option.DefaultFC == FUCHSIA)
+            MMPrintString("FUCHSIA,");
+        else if (Option.DefaultFC == RUST)
+            MMPrintString("RUST, ");
+        else if (Option.DefaultFC == MAGENTA)
+            MMPrintString("MAGENTA,");
+        else if (Option.DefaultFC == RED)
+            MMPrintString("RED,");
+        else if (Option.DefaultFC == CYAN)
+            MMPrintString("CYAN,");
+        else if (Option.DefaultFC == GREEN)
+            MMPrintString("GREEN,");
+        else if (Option.DefaultFC == CERULEAN)
+            MMPrintString("CERULEAN,");
+        else if (Option.DefaultFC == MIDGREEN)
+            MMPrintString("MIDGREEN,");
+        else if (Option.DefaultFC == COBALT)
+            MMPrintString("COBALT,");
+        else if (Option.DefaultFC == MYRTLE)
+            MMPrintString("MYRTLE,");
+        else if (Option.DefaultFC == BLUE)
+            MMPrintString("BLUE,");
+        else if (Option.DefaultFC == BLACK)
+            MMPrintString("BLACK,");
+        if (Option.DefaultBC == WHITE)
+            MMPrintString(" WHITE");
+        else if (Option.DefaultBC == YELLOW)
+            MMPrintString(" YELLOW");
+        else if (Option.DefaultBC == LILAC)
+            MMPrintString(" LILAC");
+        else if (Option.DefaultBC == BROWN)
+            MMPrintString(" BROWN");
+        else if (Option.DefaultBC == FUCHSIA)
+            MMPrintString(" FUCHSIA");
+        else if (Option.DefaultBC == RUST)
+            MMPrintString(" RUST");
+        else if (Option.DefaultBC == MAGENTA)
+            MMPrintString(" MAGENTA");
+        else if (Option.DefaultBC == RED)
+            MMPrintString(" RED");
+        else if (Option.DefaultBC == CYAN)
+            MMPrintString(" CYAN");
+        else if (Option.DefaultBC == GREEN)
+            MMPrintString(" GREEN");
+        else if (Option.DefaultBC == CERULEAN)
+            MMPrintString(" CERULEAN");
+        else if (Option.DefaultBC == MIDGREEN)
+            MMPrintString(" MIDGREEN");
+        else if (Option.DefaultBC == COBALT)
+            MMPrintString(" COBALT");
+        else if (Option.DefaultBC == MYRTLE)
+            MMPrintString(" MYRTLE");
+        else if (Option.DefaultBC == BLUE)
+            MMPrintString(" BLUE");
+        else if (Option.DefaultBC == BLACK)
+            MMPrintString(" BLACK");
         PRet();
     }
     port_print_keyboard_heartbeat();
-    if(Option.AllPins)PO2Str("PICO", "OFF");
+    if (Option.AllPins) PO2Str("PICO", "OFF");
     port_print_display_options();
-    if(Option.CombinedCS)PO2Str("SDCARD", "COMBINED CS");
+    if (Option.CombinedCS) PO2Str("SDCARD", "COMBINED CS");
     port_print_usb_kb_repeat();
-    if(Option.AUDIO_L || Option.AUDIO_CLK_PIN || Option.audio_i2s_bclk){
+    if (Option.AUDIO_L || Option.AUDIO_CLK_PIN || Option.audio_i2s_bclk) {
         PO("AUDIO");
-        if(Option.AUDIO_L){
-            MMPrintString((char *)PinDef[Option.AUDIO_L].pinname);MMputchar(',',1);
+        if (Option.AUDIO_L) {
+            MMPrintString((char *)PinDef[Option.AUDIO_L].pinname);
+            MMputchar(',', 1);
             MMPrintString((char *)PinDef[Option.AUDIO_R].pinname);
-        } else if(Option.audio_i2s_data){
+        } else if (Option.audio_i2s_data) {
             MMPrintString((char *)"I2S ");
-            MMPrintString((char *)PinDef[Option.audio_i2s_bclk].pinname);MMputchar(',',1);
+            MMPrintString((char *)PinDef[Option.audio_i2s_bclk].pinname);
+            MMputchar(',', 1);
             MMPrintString((char *)PinDef[Option.audio_i2s_data].pinname);
-        } else if(!Option.AUDIO_DCS_PIN){
+        } else if (!Option.AUDIO_DCS_PIN) {
             MMPrintString((char *)"SPI ");
-            MMPrintString((char *)PinDef[Option.AUDIO_CS_PIN].pinname);MMputchar(',',1);
-            MMPrintString((char *)PinDef[Option.AUDIO_CLK_PIN].pinname);MMputchar(',',1);
+            MMPrintString((char *)PinDef[Option.AUDIO_CS_PIN].pinname);
+            MMputchar(',', 1);
+            MMPrintString((char *)PinDef[Option.AUDIO_CLK_PIN].pinname);
+            MMputchar(',', 1);
             MMPrintString((char *)PinDef[Option.AUDIO_MOSI_PIN].pinname);
         } else {
             MMPrintString((char *)"VS1053 ");
-            MMPrintString((char *)PinDef[Option.AUDIO_CLK_PIN].pinname);MMputchar(',',1);
-            MMPrintString((char *)PinDef[Option.AUDIO_MOSI_PIN].pinname);MMputchar(',',1);
-            MMPrintString((char *)PinDef[Option.AUDIO_MISO_PIN].pinname);MMputchar(',',1);
-            MMPrintString((char *)PinDef[Option.AUDIO_CS_PIN].pinname);MMputchar(',',1);
-            MMPrintString((char *)PinDef[Option.AUDIO_DCS_PIN].pinname);MMputchar(',',1);
-            MMPrintString((char *)PinDef[Option.AUDIO_DREQ_PIN].pinname);MMputchar(',',1);
+            MMPrintString((char *)PinDef[Option.AUDIO_CLK_PIN].pinname);
+            MMputchar(',', 1);
+            MMPrintString((char *)PinDef[Option.AUDIO_MOSI_PIN].pinname);
+            MMputchar(',', 1);
+            MMPrintString((char *)PinDef[Option.AUDIO_MISO_PIN].pinname);
+            MMputchar(',', 1);
+            MMPrintString((char *)PinDef[Option.AUDIO_CS_PIN].pinname);
+            MMputchar(',', 1);
+            MMPrintString((char *)PinDef[Option.AUDIO_DCS_PIN].pinname);
+            MMputchar(',', 1);
+            MMPrintString((char *)PinDef[Option.AUDIO_DREQ_PIN].pinname);
+            MMputchar(',', 1);
             MMPrintString((char *)PinDef[Option.AUDIO_RESET_PIN].pinname);
         }
         MMPrintString("', ON PWM CHANNEL ");
         PInt(Option.AUDIO_SLICE);
         MMPrintString("\r\n");
     }
-    if(Option.RTC)PO2Str("RTC AUTO", "ENABLE");
+    if (Option.RTC) PO2Str("RTC AUTO", "ENABLE");
 
-    if(Option.INT1pin!=9 || Option.INT2pin!=10 || Option.INT3pin!=11 || Option.INT4pin!=12){
-        PO("COUNT"); MMPrintString((char *)PinDef[Option.INT1pin].pinname);
-        MMputchar(',',1);;MMPrintString((char *)PinDef[Option.INT2pin].pinname);
-        MMputchar(',',1);;MMPrintString((char *)PinDef[Option.INT3pin].pinname);
-        MMputchar(',',1);;MMPrintString((char *)PinDef[Option.INT4pin].pinname);PRet();
-    }
-
-    if(Option.modbuff){
-        PO("MODBUFF ENABLE ");
-        if(Option.modbuffsize!=128)PInt(Option.modbuffsize);
+    if (Option.INT1pin != 9 || Option.INT2pin != 10 || Option.INT3pin != 11 || Option.INT4pin != 12) {
+        PO("COUNT");
+        MMPrintString((char *)PinDef[Option.INT1pin].pinname);
+        MMputchar(',', 1);
+        ;
+        MMPrintString((char *)PinDef[Option.INT2pin].pinname);
+        MMputchar(',', 1);
+        ;
+        MMPrintString((char *)PinDef[Option.INT3pin].pinname);
+        MMputchar(',', 1);
+        ;
+        MMPrintString((char *)PinDef[Option.INT4pin].pinname);
         PRet();
     }
-    if(*Option.F1key)PO2Str("F1", (const char *)Option.F1key);
-    if(*Option.F5key)PO2Str("F5", (const char *)Option.F5key);
-    if(*Option.F6key)PO2Str("F6", (const char *)Option.F6key);
-    if(*Option.F7key)PO2Str("F7", (const char *)Option.F7key);
-    if(*Option.F8key)PO2Str("F8", (const char *)Option.F8key);
-    if(*Option.F9key)PO2Str("F9", (const char *)Option.F9key);
-    if(*Option.platform && *Option.platform!=0xFF)PO2Str("PLATFORM", (const char *)Option.platform);
-    if(Option.DefaultFont!=1)PO3Int("DEFAULT FONT",(Option.DefaultFont>>4)+1, Option.DefaultFont & 0xF);
+
+    if (Option.modbuff) {
+        PO("MODBUFF ENABLE ");
+        if (Option.modbuffsize != 128) PInt(Option.modbuffsize);
+        PRet();
+    }
+    if (*Option.F1key) PO2Str("F1", (const char *)Option.F1key);
+    if (*Option.F5key) PO2Str("F5", (const char *)Option.F5key);
+    if (*Option.F6key) PO2Str("F6", (const char *)Option.F6key);
+    if (*Option.F7key) PO2Str("F7", (const char *)Option.F7key);
+    if (*Option.F8key) PO2Str("F8", (const char *)Option.F8key);
+    if (*Option.F9key) PO2Str("F9", (const char *)Option.F9key);
+    if (*Option.platform && *Option.platform != 0xFF) PO2Str("PLATFORM", (const char *)Option.platform);
+    if (Option.DefaultFont != 1) PO3Int("DEFAULT FONT", (Option.DefaultFont >> 4) + 1, Option.DefaultFont & 0xF);
     /* PSRAM_CS_PIN is only meaningful on rp2350. On rp2040 the field
      * stays at 0 so the runtime guard suffices. Ports that own PSRAM via
      * an internal allocator (e.g. ESP32-S3, where the slab comes from
@@ -838,7 +913,7 @@ void MIPS16 printoptions(void){
         PO2Str("PSRAM PIN", PinDef[Option.PSRAM_CS_PIN].pinname);
     else if (PSRAMsize != 0) {
         unsigned mb = (unsigned)((uint32_t)PSRAMsize / (1024u * 1024u));
-        if (mb == 0) mb = 1;  /* sub-MB slabs still report 1 MB. */
+        if (mb == 0) mb = 1; /* sub-MB slabs still report 1 MB. */
         PO2Int("PSRAM SIZE", (int)mb);
     }
     /* HEARTBEAT PIN: rp2040 prints when heartbeatpin != default (43).
@@ -846,129 +921,128 @@ void MIPS16 printoptions(void){
      * (RP2350B has different default). Both pieces stay runtime-gated
      * via HAL_PORT_PWM_SLICE_COUNT > 8 (the rp2350 detector). */
     {
-        int print_pin = (Option.heartbeatpin != 43 && !Option.NoHeartbeat)
-            || (HAL_PORT_PWM_SLICE_COUNT > 8 &&
-                Option.heartbeatpin == 43 && !rp2350a && !Option.NoHeartbeat);
+        int print_pin = (Option.heartbeatpin != 43 && !Option.NoHeartbeat) || (HAL_PORT_PWM_SLICE_COUNT > 8 &&
+                                                                               Option.heartbeatpin == 43 && !rp2350a && !Option.NoHeartbeat);
         if (print_pin) PO2Str("HEARTBEAT PIN", PinDef[Option.heartbeatpin].pinname);
     }
 }
 
-int MIPS16 checkslice(int pin1,int pin2, int ignore){
-    if((PinDef[pin1].slice & 0xf) != (PinDef[pin2].slice &0xf)) error("Pins not on same PWM slice");
-    if(!ignore){
-        if(!((PinDef[pin1].slice - PinDef[pin2].slice == 128) || (PinDef[pin2].slice - PinDef[pin1].slice == 128))) error("Pins both same channel");
+int MIPS16 checkslice(int pin1, int pin2, int ignore) {
+    if ((PinDef[pin1].slice & 0xf) != (PinDef[pin2].slice & 0xf)) error("Pins not on same PWM slice");
+    if (!ignore) {
+        if (!((PinDef[pin1].slice - PinDef[pin2].slice == 128) || (PinDef[pin2].slice - PinDef[pin1].slice == 128))) error("Pins both same channel");
     }
     return PinDef[pin1].slice & 0xf;
 }
 
-void MIPS16 setterminal(int height,int width){
-	  char sp[20]={0};
-	  strcpy(sp,"\033[8;");
-	  IntToStr(&sp[strlen(sp)],height,10);
-	  strcat(sp,";");
-	  IntToStr(&sp[strlen(sp)],width+1,10);
-	  strcat(sp,"t");
-	  SSPrintString(sp);						//
+void MIPS16 setterminal(int height, int width) {
+    char sp[20] = {0};
+    strcpy(sp, "\033[8;");
+    IntToStr(&sp[strlen(sp)], height, 10);
+    strcat(sp, ";");
+    IntToStr(&sp[strlen(sp)], width + 1, 10);
+    strcat(sp, "t");
+    SSPrintString(sp); //
 }
 /* fun_keydown lives in vm_sys_input.c — routes through hal_keyboard_*.
  * cmd_update (Update Firmware) is non-USB-only — moved to
  * ports/pico_sdk_common/cmd_files_hooks.c. */
-void MIPS16 disable_systemspi(void){
-    if(!IsInvalidPin(Option.SYSTEM_MOSI))ExtCurrentConfig[Option.SYSTEM_MOSI] = EXT_DIG_IN ;
-    if(!IsInvalidPin(Option.SYSTEM_MISO))ExtCurrentConfig[Option.SYSTEM_MISO] = EXT_DIG_IN ;
-    if(!IsInvalidPin(Option.SYSTEM_CLK))ExtCurrentConfig[Option.SYSTEM_CLK] = EXT_DIG_IN ;
-    if(!IsInvalidPin(Option.SYSTEM_MOSI))ExtCfg(Option.SYSTEM_MOSI, EXT_NOT_CONFIG, 0);
-    if(!IsInvalidPin(Option.SYSTEM_MISO))ExtCfg(Option.SYSTEM_MISO, EXT_NOT_CONFIG, 0);
-    if(!IsInvalidPin(Option.SYSTEM_CLK))ExtCfg(Option.SYSTEM_CLK, EXT_NOT_CONFIG, 0);
+void MIPS16 disable_systemspi(void) {
+    if (!IsInvalidPin(Option.SYSTEM_MOSI)) ExtCurrentConfig[Option.SYSTEM_MOSI] = EXT_DIG_IN;
+    if (!IsInvalidPin(Option.SYSTEM_MISO)) ExtCurrentConfig[Option.SYSTEM_MISO] = EXT_DIG_IN;
+    if (!IsInvalidPin(Option.SYSTEM_CLK)) ExtCurrentConfig[Option.SYSTEM_CLK] = EXT_DIG_IN;
+    if (!IsInvalidPin(Option.SYSTEM_MOSI)) ExtCfg(Option.SYSTEM_MOSI, EXT_NOT_CONFIG, 0);
+    if (!IsInvalidPin(Option.SYSTEM_MISO)) ExtCfg(Option.SYSTEM_MISO, EXT_NOT_CONFIG, 0);
+    if (!IsInvalidPin(Option.SYSTEM_CLK)) ExtCfg(Option.SYSTEM_CLK, EXT_NOT_CONFIG, 0);
     /* PICOMITE+rp2350 has dedicated LCD_CLK/MOSI/MISO Option fields
      * that may share pins with SYSTEM_CLK; clear them too if so.
      * No-op on every other build (host stub). */
     port_clear_lcd_spi_if_shares_system();
-    Option.SYSTEM_MOSI=0;
-    Option.SYSTEM_MISO=0;
-    Option.SYSTEM_CLK=0;
+    Option.SYSTEM_MOSI = 0;
+    Option.SYSTEM_MISO = 0;
+    Option.SYSTEM_CLK = 0;
 }
 /* disable_lcdspi (PICOMITE+rp2350-only) lives in
  * ports/pico_rp2350/port_defaults.c — only that port has LCD_CLK
  * Option fields. */
-void MIPS16 disable_systemi2c(void){
-    if(!IsInvalidPin(Option.SYSTEM_I2C_SCL))ExtCurrentConfig[Option.SYSTEM_I2C_SCL] = EXT_DIG_IN ;
-    if(!IsInvalidPin(Option.SYSTEM_I2C_SDA))ExtCurrentConfig[Option.SYSTEM_I2C_SDA] = EXT_DIG_IN ;
-    if(!IsInvalidPin(Option.SYSTEM_I2C_SCL))ExtCfg(Option.SYSTEM_I2C_SCL, EXT_NOT_CONFIG, 0);
-    if(!IsInvalidPin(Option.SYSTEM_I2C_SDA))ExtCfg(Option.SYSTEM_I2C_SDA, EXT_NOT_CONFIG, 0);
-    Option.SYSTEM_I2C_SCL=0;
-    Option.SYSTEM_I2C_SDA=0;
+void MIPS16 disable_systemi2c(void) {
+    if (!IsInvalidPin(Option.SYSTEM_I2C_SCL)) ExtCurrentConfig[Option.SYSTEM_I2C_SCL] = EXT_DIG_IN;
+    if (!IsInvalidPin(Option.SYSTEM_I2C_SDA)) ExtCurrentConfig[Option.SYSTEM_I2C_SDA] = EXT_DIG_IN;
+    if (!IsInvalidPin(Option.SYSTEM_I2C_SCL)) ExtCfg(Option.SYSTEM_I2C_SCL, EXT_NOT_CONFIG, 0);
+    if (!IsInvalidPin(Option.SYSTEM_I2C_SDA)) ExtCfg(Option.SYSTEM_I2C_SDA, EXT_NOT_CONFIG, 0);
+    Option.SYSTEM_I2C_SCL = 0;
+    Option.SYSTEM_I2C_SDA = 0;
 }
-void MIPS16 disable_sd(void){
-    if(!IsInvalidPin(Option.SD_CS))ExtCurrentConfig[Option.SD_CS] = EXT_DIG_IN ;
-    if(!IsInvalidPin(Option.SD_CS))ExtCfg(Option.SD_CS, EXT_NOT_CONFIG, 0);
-    Option.SD_CS=0;
-    if(!IsInvalidPin(Option.SD_CLK_PIN))ExtCurrentConfig[Option.SD_CLK_PIN] = EXT_DIG_IN ;
-    if(!IsInvalidPin(Option.SD_CLK_PIN))ExtCfg(Option.SD_CLK_PIN, EXT_NOT_CONFIG, 0);
-    Option.SD_CLK_PIN=0;
-    if(!IsInvalidPin(Option.SD_MOSI_PIN))ExtCurrentConfig[Option.SD_MOSI_PIN] = EXT_DIG_IN ;
-    if(!IsInvalidPin(Option.SD_MOSI_PIN))ExtCfg(Option.SD_MOSI_PIN, EXT_NOT_CONFIG, 0);
-    Option.SD_MOSI_PIN=0;
-    if(!IsInvalidPin(Option.SD_MISO_PIN))ExtCurrentConfig[Option.SD_MISO_PIN] = EXT_DIG_IN ;
-    if(!IsInvalidPin(Option.SD_MISO_PIN))ExtCfg(Option.SD_MISO_PIN, EXT_NOT_CONFIG, 0);
-    Option.SD_MISO_PIN=0;
-    Option.CombinedCS=0;
+void MIPS16 disable_sd(void) {
+    if (!IsInvalidPin(Option.SD_CS)) ExtCurrentConfig[Option.SD_CS] = EXT_DIG_IN;
+    if (!IsInvalidPin(Option.SD_CS)) ExtCfg(Option.SD_CS, EXT_NOT_CONFIG, 0);
+    Option.SD_CS = 0;
+    if (!IsInvalidPin(Option.SD_CLK_PIN)) ExtCurrentConfig[Option.SD_CLK_PIN] = EXT_DIG_IN;
+    if (!IsInvalidPin(Option.SD_CLK_PIN)) ExtCfg(Option.SD_CLK_PIN, EXT_NOT_CONFIG, 0);
+    Option.SD_CLK_PIN = 0;
+    if (!IsInvalidPin(Option.SD_MOSI_PIN)) ExtCurrentConfig[Option.SD_MOSI_PIN] = EXT_DIG_IN;
+    if (!IsInvalidPin(Option.SD_MOSI_PIN)) ExtCfg(Option.SD_MOSI_PIN, EXT_NOT_CONFIG, 0);
+    Option.SD_MOSI_PIN = 0;
+    if (!IsInvalidPin(Option.SD_MISO_PIN)) ExtCurrentConfig[Option.SD_MISO_PIN] = EXT_DIG_IN;
+    if (!IsInvalidPin(Option.SD_MISO_PIN)) ExtCfg(Option.SD_MISO_PIN, EXT_NOT_CONFIG, 0);
+    Option.SD_MISO_PIN = 0;
+    Option.CombinedCS = 0;
     /* VGA targets reuse SYSTEM_CLK/MOSI/MISO for SD (non-VGA wires SD
      * to dedicated pins). Hook releases the system SPI bus on VGA; no-op
      * elsewhere. */
     port_disable_sd_release_system_spi();
 }
-void disable_audio(void){
+void disable_audio(void) {
     int audio_i2s_lrck = audio_option_i2s_lrck_pin();
 
-    if(!IsInvalidPin(Option.AUDIO_L))ExtCurrentConfig[Option.AUDIO_L] = EXT_DIG_IN ;
-    if(!IsInvalidPin(Option.AUDIO_L))ExtCfg(Option.AUDIO_L, EXT_NOT_CONFIG, 0);
+    if (!IsInvalidPin(Option.AUDIO_L)) ExtCurrentConfig[Option.AUDIO_L] = EXT_DIG_IN;
+    if (!IsInvalidPin(Option.AUDIO_L)) ExtCfg(Option.AUDIO_L, EXT_NOT_CONFIG, 0);
 
-    if(!IsInvalidPin(Option.AUDIO_R))ExtCurrentConfig[Option.AUDIO_R] = EXT_DIG_IN ;
-    if(!IsInvalidPin(Option.AUDIO_R))ExtCfg(Option.AUDIO_R, EXT_NOT_CONFIG, 0);
+    if (!IsInvalidPin(Option.AUDIO_R)) ExtCurrentConfig[Option.AUDIO_R] = EXT_DIG_IN;
+    if (!IsInvalidPin(Option.AUDIO_R)) ExtCfg(Option.AUDIO_R, EXT_NOT_CONFIG, 0);
 
-    if(!IsInvalidPin(Option.AUDIO_CLK_PIN))ExtCurrentConfig[Option.AUDIO_CLK_PIN] = EXT_DIG_IN ;
-    if(!IsInvalidPin(Option.AUDIO_CLK_PIN))ExtCfg(Option.AUDIO_CLK_PIN, EXT_NOT_CONFIG, 0);
+    if (!IsInvalidPin(Option.AUDIO_CLK_PIN)) ExtCurrentConfig[Option.AUDIO_CLK_PIN] = EXT_DIG_IN;
+    if (!IsInvalidPin(Option.AUDIO_CLK_PIN)) ExtCfg(Option.AUDIO_CLK_PIN, EXT_NOT_CONFIG, 0);
 
-    if(!IsInvalidPin(Option.AUDIO_CS_PIN))ExtCurrentConfig[Option.AUDIO_CS_PIN] = EXT_DIG_IN ;
-    if(!IsInvalidPin(Option.AUDIO_CS_PIN))ExtCfg(Option.AUDIO_CS_PIN, EXT_NOT_CONFIG, 0);
+    if (!IsInvalidPin(Option.AUDIO_CS_PIN)) ExtCurrentConfig[Option.AUDIO_CS_PIN] = EXT_DIG_IN;
+    if (!IsInvalidPin(Option.AUDIO_CS_PIN)) ExtCfg(Option.AUDIO_CS_PIN, EXT_NOT_CONFIG, 0);
 
-    if(!IsInvalidPin(Option.AUDIO_DCS_PIN))ExtCurrentConfig[Option.AUDIO_DCS_PIN] = EXT_DIG_IN ;
-    if(!IsInvalidPin(Option.AUDIO_DCS_PIN))ExtCfg(Option.AUDIO_DCS_PIN, EXT_NOT_CONFIG, 0);
+    if (!IsInvalidPin(Option.AUDIO_DCS_PIN)) ExtCurrentConfig[Option.AUDIO_DCS_PIN] = EXT_DIG_IN;
+    if (!IsInvalidPin(Option.AUDIO_DCS_PIN)) ExtCfg(Option.AUDIO_DCS_PIN, EXT_NOT_CONFIG, 0);
 
-    if(!IsInvalidPin(Option.AUDIO_DREQ_PIN))ExtCurrentConfig[Option.AUDIO_DREQ_PIN] = EXT_DIG_IN ;
-    if(!IsInvalidPin(Option.AUDIO_DREQ_PIN))ExtCfg(Option.AUDIO_DREQ_PIN, EXT_NOT_CONFIG, 0);
+    if (!IsInvalidPin(Option.AUDIO_DREQ_PIN)) ExtCurrentConfig[Option.AUDIO_DREQ_PIN] = EXT_DIG_IN;
+    if (!IsInvalidPin(Option.AUDIO_DREQ_PIN)) ExtCfg(Option.AUDIO_DREQ_PIN, EXT_NOT_CONFIG, 0);
 
-    if(!IsInvalidPin(Option.AUDIO_MOSI_PIN))ExtCurrentConfig[Option.AUDIO_MOSI_PIN] = EXT_DIG_IN ;
-    if(!IsInvalidPin(Option.AUDIO_MOSI_PIN))ExtCfg(Option.AUDIO_MOSI_PIN, EXT_NOT_CONFIG, 0);
+    if (!IsInvalidPin(Option.AUDIO_MOSI_PIN)) ExtCurrentConfig[Option.AUDIO_MOSI_PIN] = EXT_DIG_IN;
+    if (!IsInvalidPin(Option.AUDIO_MOSI_PIN)) ExtCfg(Option.AUDIO_MOSI_PIN, EXT_NOT_CONFIG, 0);
 
-    if(!IsInvalidPin(Option.AUDIO_MISO_PIN))ExtCurrentConfig[Option.AUDIO_MISO_PIN] = EXT_DIG_IN ;
-    if(!IsInvalidPin(Option.AUDIO_MISO_PIN))ExtCfg(Option.AUDIO_MISO_PIN, EXT_NOT_CONFIG, 0);
+    if (!IsInvalidPin(Option.AUDIO_MISO_PIN)) ExtCurrentConfig[Option.AUDIO_MISO_PIN] = EXT_DIG_IN;
+    if (!IsInvalidPin(Option.AUDIO_MISO_PIN)) ExtCfg(Option.AUDIO_MISO_PIN, EXT_NOT_CONFIG, 0);
 
-    if(!IsInvalidPin(Option.AUDIO_RESET_PIN))ExtCurrentConfig[Option.AUDIO_RESET_PIN] = EXT_DIG_IN ;
-    if(!IsInvalidPin(Option.AUDIO_RESET_PIN))ExtCfg(Option.AUDIO_RESET_PIN, EXT_NOT_CONFIG, 0);
+    if (!IsInvalidPin(Option.AUDIO_RESET_PIN)) ExtCurrentConfig[Option.AUDIO_RESET_PIN] = EXT_DIG_IN;
+    if (!IsInvalidPin(Option.AUDIO_RESET_PIN)) ExtCfg(Option.AUDIO_RESET_PIN, EXT_NOT_CONFIG, 0);
 
-    if(!IsInvalidPin(Option.audio_i2s_bclk))ExtCurrentConfig[Option.audio_i2s_bclk] = EXT_DIG_IN ;
-    if(!IsInvalidPin(Option.audio_i2s_bclk))ExtCfg(Option.audio_i2s_bclk, EXT_NOT_CONFIG, 0);
+    if (!IsInvalidPin(Option.audio_i2s_bclk)) ExtCurrentConfig[Option.audio_i2s_bclk] = EXT_DIG_IN;
+    if (!IsInvalidPin(Option.audio_i2s_bclk)) ExtCfg(Option.audio_i2s_bclk, EXT_NOT_CONFIG, 0);
 
-    if(!IsInvalidPin(audio_i2s_lrck))ExtCurrentConfig[audio_i2s_lrck] = EXT_DIG_IN ;
-    if(!IsInvalidPin(audio_i2s_lrck))ExtCfg(audio_i2s_lrck, EXT_NOT_CONFIG, 0);
+    if (!IsInvalidPin(audio_i2s_lrck)) ExtCurrentConfig[audio_i2s_lrck] = EXT_DIG_IN;
+    if (!IsInvalidPin(audio_i2s_lrck)) ExtCfg(audio_i2s_lrck, EXT_NOT_CONFIG, 0);
 
-    if(!IsInvalidPin(Option.audio_i2s_data))ExtCurrentConfig[Option.audio_i2s_data] = EXT_DIG_IN ;
-    if(!IsInvalidPin(Option.audio_i2s_data))ExtCfg(Option.audio_i2s_data, EXT_NOT_CONFIG, 0);
+    if (!IsInvalidPin(Option.audio_i2s_data)) ExtCurrentConfig[Option.audio_i2s_data] = EXT_DIG_IN;
+    if (!IsInvalidPin(Option.audio_i2s_data)) ExtCfg(Option.audio_i2s_data, EXT_NOT_CONFIG, 0);
 
     audio_option_clear_common_fields(AUDIO_OPTION_SLICE_DISABLED);
 }
 /* ConfigDisplayUser + clear320 (SPI-LCD-only) live in
  * ports/pico_sdk_common/spi_lcd_options.c. */
 
-void MIPS16 configure(unsigned char *p){
-    if(!*p){
+void MIPS16 configure(unsigned char * p) {
+    if (!*p) {
         ResetOptions(false);
         _excep_code = RESET_COMMAND;
         SoftReset();
     } else {
-        if(checkstring(p,(unsigned char *) "LIST")){
+        if (checkstring(p, (unsigned char *)"LIST")) {
             port_print_supported_boards();
             return;
         }
@@ -976,11 +1050,11 @@ void MIPS16 configure(unsigned char *p){
         error("Invalid board for this firmware");
     }
 }
-void cmd_configure(void){
+void cmd_configure(void) {
     configure(cmdline);
 }
 void MIPS16 cmd_option(void) {
-    unsigned char *tp;
+    unsigned char * tp;
 
     if (option_command_handle_common(cmdline, true)) return;
 
@@ -989,66 +1063,80 @@ void MIPS16 cmd_option(void) {
     if (port_keyboard_option_setter(cmdline)) return;
 
     tp = checkstring(cmdline, (unsigned char *)"BAUDRATE");
-    if(tp) {
-        if(CurrentLinePtr) error("Invalid in a program");
+    if (tp) {
+        if (CurrentLinePtr) error("Invalid in a program");
         int i;
-        i = getint(tp,Option.CPU_Speed*1000/16/65535,921600);
-        if(i < 100) error("Number out of bounds");
+        i = getint(tp, Option.CPU_Speed * 1000 / 16 / 65535, 921600);
+        if (i < 100) error("Number out of bounds");
         Option.Baudrate = i;
         SaveOptions();
-        if(!Option.SerialConsole)MMPrintString("Value saved but Serial Console not enabled");
-        else MMPrintString("Restart to activate");                // set the console baud rate
+        if (!Option.SerialConsole)
+            MMPrintString("Value saved but Serial Console not enabled");
+        else
+            MMPrintString("Restart to activate"); // set the console baud rate
         return;
     }
 
     tp = checkstring(cmdline, (unsigned char *)"SERIAL CONSOLE");
-    if(tp) {
-   	    if(CurrentLinePtr) error("Invalid in a program");
-//        unsigned char *p=NULL;
-        if(checkstring(tp, (unsigned char *)"DISABLE")) {
-            Option.SerialTX=0;
-            Option.SerialRX=0;
+    if (tp) {
+        if (CurrentLinePtr) error("Invalid in a program");
+        //        unsigned char *p=NULL;
+        if (checkstring(tp, (unsigned char *)"DISABLE")) {
+            Option.SerialTX = 0;
+            Option.SerialRX = 0;
             Option.SerialConsole = 0;
             SaveOptions();
             _excep_code = RESET_COMMAND;
             SoftReset();
             return;
         } else {
-            int pin,pin2;
-            getargs(&tp,5,(unsigned char *)",");
-            if(!(argc==3 || argc==5))error("Syntax");
+            int pin, pin2;
+            getargs(&tp, 5, (unsigned char *)",");
+            if (!(argc == 3 || argc == 5)) error("Syntax");
             char code;
-            if(!(code=codecheck(argv[0])))argv[0]+=2;
+            if (!(code = codecheck(argv[0]))) argv[0] += 2;
             pin = getinteger(argv[0]);
-            if(!code)pin=codemap(pin);
-            if(!(code=codecheck(argv[2])))argv[2]+=2;
+            if (!code) pin = codemap(pin);
+            if (!(code = codecheck(argv[2]))) argv[2] += 2;
             pin2 = getinteger(argv[2]);
-            if(!code)pin2=codemap(pin2);
-            if(ExtCurrentConfig[pin] != EXT_NOT_CONFIG)  error("Pin %/| is in use",pin,pin);
-            if(ExtCurrentConfig[pin2] != EXT_NOT_CONFIG)  error("Pin %/| is in use",pin2,pin2);
-            if(PinDef[pin].mode & UART0TX)Option.SerialTX = pin;
-            else if(PinDef[pin].mode & UART0RX)Option.SerialRX = pin;
-            else goto checkcom2;
-            if(PinDef[pin2].mode & UART0TX)Option.SerialTX = pin2;
-            else if(PinDef[pin2].mode & UART0RX)Option.SerialRX = pin2;
-            else error("Invalid configuration");
-            if(Option.SerialTX==Option.SerialRX)error("Invalid configuration");
+            if (!code) pin2 = codemap(pin2);
+            if (ExtCurrentConfig[pin] != EXT_NOT_CONFIG) error("Pin %/| is in use", pin, pin);
+            if (ExtCurrentConfig[pin2] != EXT_NOT_CONFIG) error("Pin %/| is in use", pin2, pin2);
+            if (PinDef[pin].mode & UART0TX)
+                Option.SerialTX = pin;
+            else if (PinDef[pin].mode & UART0RX)
+                Option.SerialRX = pin;
+            else
+                goto checkcom2;
+            if (PinDef[pin2].mode & UART0TX)
+                Option.SerialTX = pin2;
+            else if (PinDef[pin2].mode & UART0RX)
+                Option.SerialRX = pin2;
+            else
+                error("Invalid configuration");
+            if (Option.SerialTX == Option.SerialRX) error("Invalid configuration");
             Option.SerialConsole = 1;
-            if(argc==5)Option.SerialConsole=(checkstring(argv[4],(unsigned char *)"B") ? 5: 1);
+            if (argc == 5) Option.SerialConsole = (checkstring(argv[4], (unsigned char *)"B") ? 5 : 1);
             SaveOptions();
             _excep_code = RESET_COMMAND;
             SoftReset();
             return;
         checkcom2:
-            if(PinDef[pin].mode & UART1TX)Option.SerialTX = pin;
-            else if(PinDef[pin].mode & UART1RX)Option.SerialRX = pin;
-            else error("Invalid configuration");
-            if(PinDef[pin2].mode & UART1TX)Option.SerialTX = pin2;
-            else if(PinDef[pin2].mode & UART1RX)Option.SerialRX = pin2;
-            else error("Invalid configuration");
-            if(Option.SerialTX==Option.SerialRX)error("Invalid configuration");
+            if (PinDef[pin].mode & UART1TX)
+                Option.SerialTX = pin;
+            else if (PinDef[pin].mode & UART1RX)
+                Option.SerialRX = pin;
+            else
+                error("Invalid configuration");
+            if (PinDef[pin2].mode & UART1TX)
+                Option.SerialTX = pin2;
+            else if (PinDef[pin2].mode & UART1RX)
+                Option.SerialRX = pin2;
+            else
+                error("Invalid configuration");
+            if (Option.SerialTX == Option.SerialRX) error("Invalid configuration");
             Option.SerialConsole = 2;
-            if(argc==5)Option.SerialConsole=(checkstring(argv[4],(unsigned char *)"B") ? 6: 2);
+            if (argc == 5) Option.SerialConsole = (checkstring(argv[4], (unsigned char *)"B") ? 6 : 2);
             SaveOptions();
             _excep_code = RESET_COMMAND;
             SoftReset();
@@ -1058,94 +1146,104 @@ void MIPS16 cmd_option(void) {
     if (port_pico_pins_option_setter(cmdline)) return;
     if (port_heartbeat_option_setter(cmdline)) return;
     tp = checkstring(cmdline, (unsigned char *)"LCDPANEL NOCONSOLE");
-    if(tp){
-   	    if(CurrentLinePtr) error("Invalid in a program");
-        Option.Height = SCREENHEIGHT; Option.Width = SCREENWIDTH;
+    if (tp) {
+        if (CurrentLinePtr) error("Invalid in a program");
+        Option.Height = SCREENHEIGHT;
+        Option.Width = SCREENWIDTH;
         Option.DISPLAY_CONSOLE = 0;
         Option.DefaultFC = WHITE;
         Option.DefaultBC = BLACK;
-        SetFont((Option.DefaultFont = (Option.DISPLAY_TYPE==SCREENMODE2? (6<<4) | 1 : 0x01 )));
+        SetFont((Option.DefaultFont = (Option.DISPLAY_TYPE == SCREENMODE2 ? (6 << 4) | 1 : 0x01)));
         Option.BackLightLevel = 100;
-        Option.NoScroll=0;
+        Option.NoScroll = 0;
         Option.Height = SCREENHEIGHT;
         Option.Width = SCREENWIDTH;
         SaveOptions();
-        setterminal(Option.Height,Option.Width);
+        setterminal(Option.Height, Option.Width);
         ClearScreen(Option.DefaultBC);
         return;
     }
     tp = checkstring(cmdline, (unsigned char *)"LCDPANEL CONSOLE");
-    if(tp) {
-   	    if(CurrentLinePtr) error("Invalid in a program");
+    if (tp) {
+        if (CurrentLinePtr) error("Invalid in a program");
         Option.NoScroll = 0;
-        if(!(Option.DISPLAY_TYPE==ST7789B || Option.DISPLAY_TYPE==ILI9488 || Option.DISPLAY_TYPE == ST7796SP  || Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE == ILI9488P || Option.DISPLAY_TYPE==ILI9341 || Option.DISPLAY_TYPE>=VGADISPLAY))Option.NoScroll=1;
-        if(!(Option.DISPLAY_ORIENTATION == DISPLAY_LANDSCAPE) && Option.DISPLAY_TYPE==SSDTYPE) error("Landscape only");
+        if (!(Option.DISPLAY_TYPE == ST7789B || Option.DISPLAY_TYPE == ILI9488 || Option.DISPLAY_TYPE == ST7796SP || Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE == ILI9488P || Option.DISPLAY_TYPE == ILI9341 || Option.DISPLAY_TYPE >= VGADISPLAY)) Option.NoScroll = 1;
+        if (!(Option.DISPLAY_ORIENTATION == DISPLAY_LANDSCAPE) && Option.DISPLAY_TYPE == SSDTYPE) error("Landscape only");
         skipspace(tp);
         Option.DefaultFC = WHITE;
         Option.DefaultBC = BLACK;
         int font;
         Option.BackLightLevel = 100;
-        if(!(*tp == 0 || *tp == '\'')) {
-            getargs(&tp, 9, (unsigned char *)",");                              // this is a macro and must be the first executable stmt in a block
-            if(argc > 0) {
-                if(*argv[0] == '#') argv[0]++;                  // skip the hash if used
+        if (!(*tp == 0 || *tp == '\'')) {
+            getargs(&tp, 9, (unsigned char *)","); // this is a macro and must be the first executable stmt in a block
+            if (argc > 0) {
+                if (*argv[0] == '#') argv[0]++; // skip the hash if used
                 font = (((getint(argv[0], 1, FONT_BUILTIN_NBR) - 1) << 4) | 1);
-                if(FontTable[font >> 4][0]*29>HRes)error("Font too wide for console mode");
-                Option.DefaultFont=font;
+                if (FontTable[font >> 4][0] * 29 > HRes) error("Font too wide for console mode");
+                Option.DefaultFont = font;
             }
-            if(argc > 2 && *argv[2]) Option.DefaultFC = getint(argv[2], BLACK, WHITE);
-            if(argc > 4 && *argv[4]) Option.DefaultBC = getint(argv[4], BLACK, WHITE);
-            if(Option.DefaultFC == Option.DefaultBC) error("Same colours");
-            if(argc > 6 && *argv[6]) {
-                if(!Option.DISPLAY_BL)error("Backlight not available on this display");
+            if (argc > 2 && *argv[2]) Option.DefaultFC = getint(argv[2], BLACK, WHITE);
+            if (argc > 4 && *argv[4]) Option.DefaultBC = getint(argv[4], BLACK, WHITE);
+            if (Option.DefaultFC == Option.DefaultBC) error("Same colours");
+            if (argc > 6 && *argv[6]) {
+                if (!Option.DISPLAY_BL) error("Backlight not available on this display");
                 Option.BackLightLevel = getint(argv[6], 0, 100);
             }
-            if(argc==9){
-                if(checkstring(argv[8],(unsigned char *)"NOSCROLL")){
-                    if(!FASTSCROLL)Option.NoScroll=1;
-                    else error("Invalid for this display");
-                } else error("Syntax");
+            if (argc == 9) {
+                if (checkstring(argv[8], (unsigned char *)"NOSCROLL")) {
+                    if (!FASTSCROLL)
+                        Option.NoScroll = 1;
+                    else
+                        error("Invalid for this display");
+                } else
+                    error("Syntax");
             }
         }
-        if(Option.DISPLAY_BL){
-			MMFLOAT frequency=1000.0,duty=Option.BackLightLevel;
-            int wrap=(Option.CPU_Speed*1000)/frequency;
-            int high=(int)((MMFLOAT)Option.CPU_Speed/frequency*duty*10.0);
-            int div=1;
-            while(wrap>65535){
-                wrap>>=1;
-                if(duty>=0.0)high>>=1;
-                div<<=1;
+        if (Option.DISPLAY_BL) {
+            MMFLOAT frequency = 1000.0, duty = Option.BackLightLevel;
+            int wrap = (Option.CPU_Speed * 1000) / frequency;
+            int high = (int)((MMFLOAT)Option.CPU_Speed / frequency * duty * 10.0);
+            int div = 1;
+            while (wrap > 65535) {
+                wrap >>= 1;
+                if (duty >= 0.0) high >>= 1;
+                div <<= 1;
             }
             wrap--;
-            if(div!=1)pwm_set_clkdiv(BacklightSlice,(float)div);
+            if (div != 1) pwm_set_clkdiv(BacklightSlice, (float)div);
             pwm_set_wrap(BacklightSlice, wrap);
             pwm_set_chan_level(BacklightSlice, BacklightChannel, high);
         }
         port_apply_default_console_colors(Option.DefaultFC, Option.DefaultBC);
         Option.DISPLAY_CONSOLE = true;
-        if(!CurrentLinePtr) {
+        if (!CurrentLinePtr) {
             ResetDisplay();
             //Only setterminal if console is bigger than 80*24
-            if  (Option.Width > SCREENWIDTH || Option.Height > SCREENHEIGHT){
-               setterminal((Option.Height > SCREENHEIGHT)?Option.Height:SCREENHEIGHT,(Option.Width >= SCREENWIDTH)?Option.Width:SCREENWIDTH);                                                    // or height is > 24
+            if (Option.Width > SCREENWIDTH || Option.Height > SCREENHEIGHT) {
+                setterminal((Option.Height > SCREENHEIGHT) ? Option.Height : SCREENHEIGHT, (Option.Width >= SCREENWIDTH) ? Option.Width : SCREENWIDTH); // or height is > 24
             }
             SaveOptions();
-            if(!(Option.DISPLAY_TYPE==SCREENMODE1 || Option.DISPLAY_TYPE==SCREENMODE2))ClearScreen(Option.DefaultBC);
+            if (!(Option.DISPLAY_TYPE == SCREENMODE1 || Option.DISPLAY_TYPE == SCREENMODE2)) ClearScreen(Option.DefaultBC);
         }
         return;
     }
 
     tp = checkstring(cmdline, (unsigned char *)"LEGACY");
-    if(tp) {
-        if(checkstring(tp, (unsigned char *)"OFF"))      { CMM1=0; return;  }
-        if(checkstring(tp, (unsigned char *)"ON"))      { CMM1=1; return;  }
+    if (tp) {
+        if (checkstring(tp, (unsigned char *)"OFF")) {
+            CMM1 = 0;
+            return;
+        }
+        if (checkstring(tp, (unsigned char *)"ON")) {
+            CMM1 = 1;
+            return;
+        }
         error("Syntax");
     }
     tp = checkstring(cmdline, (unsigned char *)"BACKLIGHT KB");
-    if(tp) {
-        getargs(&tp,1,(unsigned char *)",");
-        int level = getint(argv[0],0,255);
+    if (tp) {
+        getargs(&tp, 1, (unsigned char *)",");
+        int level = getint(argv[0], 0, 255);
         port_picocalc_set_keyboard_backlight(level);
         SaveOptions();
         return;
@@ -1155,17 +1253,17 @@ void MIPS16 cmd_option(void) {
     if (port_display_option_setter(cmdline)) return;
     if (hal_gui_controls_option_set(cmdline)) return;
     tp = checkstring(cmdline, (unsigned char *)"VCC");
-    if(tp) {
+    if (tp) {
         MMFLOAT f;
         f = getnumber(tp);
-        if(f > 3.6) error("VCC too high");
-        if(f < 1.8) error("VCC too low");
-        VCC=f;
+        if (f > 3.6) error("VCC too high");
+        if (f < 1.8) error("VCC too low");
+        VCC = f;
         return;
     }
 
     tp = checkstring(cmdline, (unsigned char *)"PIN");
-    if(tp) {
+    if (tp) {
         int i;
         i = getint(tp, 0, 99999999);
         Option.PIN = i;
@@ -1174,13 +1272,13 @@ void MIPS16 cmd_option(void) {
     }
 
     tp = checkstring(cmdline, (unsigned char *)"POWER");
-    if(tp) {
+    if (tp) {
         /* RP2350B (rp2350a==false) has no PWR_EN power-control pin.
          * On rp2040 rp2350a is fixed-true, so this never fires there. */
         if (!rp2350a) error("Invalid for RP2350B");
-        if(Option.AllPins)error("OPTION PICO set");
-        if(checkstring(tp, (unsigned char *)"PWM"))  Option.PWM = true;
-        if(checkstring(tp, (unsigned char *)"PFM"))  Option.PWM = false;
+        if (Option.AllPins) error("OPTION PICO set");
+        if (checkstring(tp, (unsigned char *)"PWM")) Option.PWM = true;
+        if (checkstring(tp, (unsigned char *)"PFM")) Option.PWM = false;
         SaveOptions();
         hal_pin_set_mode(23, HAL_PIN_MODE_OUTPUT);
         hal_pin_write(23, Option.PWM);
@@ -1188,208 +1286,221 @@ void MIPS16 cmd_option(void) {
     }
 
     tp = checkstring(cmdline, (unsigned char *)"RTC AUTO");
-    if(tp) {
-        if(checkstring(tp, (unsigned char *)"ENABLE"))       { Option.RTC = true; SaveOptions(); RtcGetTime(0); return; }
-        if(checkstring(tp, (unsigned char *)"DISABLE"))      { Option.RTC = false; SaveOptions(); return;  }
+    if (tp) {
+        if (checkstring(tp, (unsigned char *)"ENABLE")) {
+            Option.RTC = true;
+            SaveOptions();
+            RtcGetTime(0);
+            return;
+        }
+        if (checkstring(tp, (unsigned char *)"DISABLE")) {
+            Option.RTC = false;
+            SaveOptions();
+            return;
+        }
     }
     tp = checkstring(cmdline, (unsigned char *)"MODBUFF");
-    if(tp) {
-        unsigned char *p=NULL;
-        int i, size=0;
-    	if(CurrentLinePtr) error("Invalid in a program");
-        if((p=checkstring(tp, (unsigned char *)"ENABLE"))){
-            if(!Option.modbuff)       {
-                getargs(&p,1,(unsigned char *)",");
-                if(argc){
-                    size=getint(argv[0],16,(Option.FlashSize-RoundUpK4(TOP_OF_SYSTEM_FLASH))/1024-132);
-                    if(size & 3)error("Must be a multiple of 4");
+    if (tp) {
+        unsigned char * p = NULL;
+        int i, size = 0;
+        if (CurrentLinePtr) error("Invalid in a program");
+        if ((p = checkstring(tp, (unsigned char *)"ENABLE"))) {
+            if (!Option.modbuff) {
+                getargs(&p, 1, (unsigned char *)",");
+                if (argc) {
+                    size = getint(argv[0], 16, (Option.FlashSize - RoundUpK4(TOP_OF_SYSTEM_FLASH)) / 1024 - 132);
+                    if (size & 3) error("Must be a multiple of 4");
                 }
                 MMPrintString("\r\nThis will erase everything in flash including the A: drive - are you sure (Y/N) ? ");
-                while((i = MMInkey())==-1){};
-                putConsole(i,1);
-                if(toupper(i)!='Y'){
-                    memset(inpbuf,0,STRINGSIZE);
-                    longjmp(mark,1);
+                while ((i = MMInkey()) == -1) {
+                };
+                putConsole(i, 1);
+                if (toupper(i) != 'Y') {
+                    memset(inpbuf, 0, STRINGSIZE);
+                    longjmp(mark, 1);
                 }
-                if(argc)Option.modbuffsize=size;
-                else Option.modbuffsize=128;
+                if (argc)
+                    Option.modbuffsize = size;
+                else
+                    Option.modbuffsize = 128;
                 Option.modbuff = true;
                 SaveOptions();
                 ResetFlashStorage(1);
-                modbuff=(char *)(XIP_BASE + RoundUpK4(TOP_OF_SYSTEM_FLASH));
+                modbuff = (char *)(XIP_BASE + RoundUpK4(TOP_OF_SYSTEM_FLASH));
                 _excep_code = RESET_COMMAND;
                 SoftReset();
-                }
-            else error("Already enabled");
+            } else
+                error("Already enabled");
         }
-        if(checkstring(tp, (unsigned char *)"DISABLE")){
-            if(Option.modbuff)      {
+        if (checkstring(tp, (unsigned char *)"DISABLE")) {
+            if (Option.modbuff) {
                 MMPrintString("\r\nThis will erase everything in flash including the A: drive - are you sure (Y/N) ? ");
-                while((i = MMInkey())==-1){};
-                putConsole(i,1);
-                if(toupper(i)!='Y'){
-                    memset(inpbuf,0,STRINGSIZE);
-                    longjmp(mark,1);
+                while ((i = MMInkey()) == -1) {
+                };
+                putConsole(i, 1);
+                if (toupper(i) != 'Y') {
+                    memset(inpbuf, 0, STRINGSIZE);
+                    longjmp(mark, 1);
                 }
                 Option.modbuff = false;
-                Option.modbuffsize=0;
+                Option.modbuffsize = 0;
                 SaveOptions();
                 ResetFlashStorage(1);
-                modbuff=NULL;
+                modbuff = NULL;
                 _excep_code = RESET_COMMAND;
                 SoftReset();
-            }
-            else error("Not enabled");
+            } else
+                error("Not enabled");
         }
     }
 
-	tp = checkstring(cmdline, (unsigned char *)"LIST");
-    if(tp) {
-    	printoptions();
-    	return;
+    tp = checkstring(cmdline, (unsigned char *)"LIST");
+    if (tp) {
+        printoptions();
+        return;
     }
     tp = checkstring(cmdline, (unsigned char *)"AUDIO");
-    if(tp) {
-        int pin1,pin2, slice;
-        unsigned char *p;
-    	if(CurrentLinePtr) error("Invalid in a program");
-        if(checkstring(tp, (unsigned char *)"DISABLE")){
+    if (tp) {
+        int pin1, pin2, slice;
+        unsigned char * p;
+        if (CurrentLinePtr) error("Invalid in a program");
+        if (checkstring(tp, (unsigned char *)"DISABLE")) {
             disable_audio();
             SaveOptions();
             _excep_code = RESET_COMMAND;
             SoftReset();
-            return;                                // this will restart the processor ? only works when not in debug
+            return; // this will restart the processor ? only works when not in debug
         }
-        if((p=checkstring(tp, (unsigned char *)"VS1053"))){
-            int pin1,pin2,pin3,pin4,pin5,pin6,pin7;
-            getargs(&p,13,(unsigned char *)",");
-            if(argc!=13)error("Syntax");
-//
+        if ((p = checkstring(tp, (unsigned char *)"VS1053"))) {
+            int pin1, pin2, pin3, pin4, pin5, pin6, pin7;
+            getargs(&p, 13, (unsigned char *)",");
+            if (argc != 13) error("Syntax");
+            //
             pin1 = audio_option_parse_mmbasic_pin(&argv[0]);
-            if(IsInvalidPin(pin1)) error("Invalid pin");
+            if (IsInvalidPin(pin1)) error("Invalid pin");
             audio_option_require_pin_available(pin1);
-//
+            //
             pin2 = audio_option_parse_mmbasic_pin(&argv[2]);
-            if(IsInvalidPin(pin2)) error("Invalid pin");
+            if (IsInvalidPin(pin2)) error("Invalid pin");
             audio_option_require_pin_available(pin2);
-//
+            //
             pin3 = audio_option_parse_mmbasic_pin(&argv[4]);
-            if(IsInvalidPin(pin3)) error("Invalid pin");
+            if (IsInvalidPin(pin3)) error("Invalid pin");
             audio_option_require_pin_available(pin3);
-//
+            //
             pin4 = audio_option_parse_mmbasic_pin(&argv[6]);
-            if(IsInvalidPin(pin4)) error("Invalid pin");
+            if (IsInvalidPin(pin4)) error("Invalid pin");
             audio_option_require_pin_available(pin4);
-//
+            //
             pin5 = audio_option_parse_mmbasic_pin(&argv[8]);
-            if(IsInvalidPin(pin5)) error("Invalid pin");
+            if (IsInvalidPin(pin5)) error("Invalid pin");
             audio_option_require_pin_available(pin5);
-//
+            //
             pin6 = audio_option_parse_mmbasic_pin(&argv[10]);
-            if(IsInvalidPin(pin6)) error("Invalid pin");
+            if (IsInvalidPin(pin6)) error("Invalid pin");
             audio_option_require_pin_available(pin6);
-//
+            //
             pin7 = audio_option_parse_mmbasic_pin(&argv[12]);
-            if(IsInvalidPin(pin7)) error("Invalid pin");
+            if (IsInvalidPin(pin7)) error("Invalid pin");
             audio_option_require_pin_available(pin7);
-//
-            if(!(PinDef[pin1].mode & SPI0SCK && PinDef[pin2].mode & SPI0TX && PinDef[pin3].mode & SPI0RX) &&
-            !(PinDef[pin1].mode & SPI1SCK && PinDef[pin2].mode & SPI1TX && PinDef[pin3].mode & SPI1RX))error("Not valid SPI pins");
-            if(PinDef[pin1].mode & SPI0SCK && SPI0locked)error("SPI channel already configured for System SPI");
-            if(PinDef[pin1].mode & SPI1SCK && SPI1locked)error("SPI channel already configured for System SPI");
-            slice=checkslice(pin2,pin2, 1);
-            if((PinDef[Option.DISPLAY_BL].slice & 0x7f) == slice) error("Channel in use for backlight");
+            //
+            if (!(PinDef[pin1].mode & SPI0SCK && PinDef[pin2].mode & SPI0TX && PinDef[pin3].mode & SPI0RX) &&
+                !(PinDef[pin1].mode & SPI1SCK && PinDef[pin2].mode & SPI1TX && PinDef[pin3].mode & SPI1RX)) error("Not valid SPI pins");
+            if (PinDef[pin1].mode & SPI0SCK && SPI0locked) error("SPI channel already configured for System SPI");
+            if (PinDef[pin1].mode & SPI1SCK && SPI1locked) error("SPI channel already configured for System SPI");
+            slice = checkslice(pin2, pin2, 1);
+            if ((PinDef[Option.DISPLAY_BL].slice & 0x7f) == slice) error("Channel in use for backlight");
             disable_audio();
-            Option.AUDIO_SLICE=slice;
-            Option.AUDIO_CLK_PIN=pin1;
-            Option.AUDIO_MOSI_PIN=pin2;
-            Option.AUDIO_MISO_PIN=pin3;
-            Option.AUDIO_CS_PIN=pin4;
-            Option.AUDIO_DCS_PIN=pin5;
-            Option.AUDIO_DREQ_PIN=pin6;
-            Option.AUDIO_RESET_PIN=pin7;
+            Option.AUDIO_SLICE = slice;
+            Option.AUDIO_CLK_PIN = pin1;
+            Option.AUDIO_MOSI_PIN = pin2;
+            Option.AUDIO_MISO_PIN = pin3;
+            Option.AUDIO_CS_PIN = pin4;
+            Option.AUDIO_DCS_PIN = pin5;
+            Option.AUDIO_DREQ_PIN = pin6;
+            Option.AUDIO_RESET_PIN = pin7;
             SaveOptions();
             _excep_code = RESET_COMMAND;
             SoftReset();
             return;
         }
-        if((p=checkstring(tp, (unsigned char *)"SPI"))){
-            int pin1,pin2,pin3;
-            getargs(&p,5,(unsigned char *)",");
-            if(argc!=5)error("Syntax");
-//
+        if ((p = checkstring(tp, (unsigned char *)"SPI"))) {
+            int pin1, pin2, pin3;
+            getargs(&p, 5, (unsigned char *)",");
+            if (argc != 5) error("Syntax");
+            //
             pin1 = audio_option_parse_mmbasic_pin(&argv[0]);
-            if(IsInvalidPin(pin1)) error("Invalid pin");
+            if (IsInvalidPin(pin1)) error("Invalid pin");
             audio_option_require_pin_available(pin1);
-//
+            //
             pin2 = audio_option_parse_mmbasic_pin(&argv[2]);
-            if(IsInvalidPin(pin2)) error("Invalid pin");
+            if (IsInvalidPin(pin2)) error("Invalid pin");
             audio_option_require_pin_available(pin2);
-//
+            //
             pin3 = audio_option_parse_mmbasic_pin(&argv[4]);
-            if(IsInvalidPin(pin3)) error("Invalid pin");
+            if (IsInvalidPin(pin3)) error("Invalid pin");
             audio_option_require_pin_available(pin3);
-//
-            if(!(PinDef[pin2].mode & SPI0SCK && PinDef[pin3].mode & SPI0TX) &&
-            !(PinDef[pin2].mode & SPI1SCK && PinDef[pin3].mode & SPI1TX))error("Not valid SPI pins");
+            //
+            if (!(PinDef[pin2].mode & SPI0SCK && PinDef[pin3].mode & SPI0TX) &&
+                !(PinDef[pin2].mode & SPI1SCK && PinDef[pin3].mode & SPI1TX)) error("Not valid SPI pins");
             /* RP2350A (or RP2040, where rp2350a is fixed-true) reserves
              * slice 11 for audio on rp2350-class hardware; everyone else
              * routes the audio slice through checkslice(). */
             slice = port_audio_default_pwm_slice(pin2);
-            if((PinDef[Option.DISPLAY_BL].slice & 0x7f) == slice) error("Channel in use for backlight");
+            if ((PinDef[Option.DISPLAY_BL].slice & 0x7f) == slice) error("Channel in use for backlight");
             disable_audio();
-            Option.AUDIO_CS_PIN=pin1;
-            Option.AUDIO_CLK_PIN=pin2;
-            Option.AUDIO_MOSI_PIN=pin3;
-            Option.AUDIO_SLICE=slice;
+            Option.AUDIO_CS_PIN = pin1;
+            Option.AUDIO_CLK_PIN = pin2;
+            Option.AUDIO_MOSI_PIN = pin3;
+            Option.AUDIO_SLICE = slice;
             SaveOptions();
             _excep_code = RESET_COMMAND;
             SoftReset();
             return;
         }
-        if((p=checkstring(tp, (unsigned char *)"I2S"))){
-            int pin1,pin2,pin3;
-            getargs(&p,3,(unsigned char *)",");
-            if(argc!=3)error("Syntax");
-//
+        if ((p = checkstring(tp, (unsigned char *)"I2S"))) {
+            int pin1, pin2, pin3;
+            getargs(&p, 3, (unsigned char *)",");
+            if (argc != 3) error("Syntax");
+            //
             pin1 = audio_option_parse_mmbasic_pin(&argv[0]);
-            if(IsInvalidPin(pin1)) error("Invalid pin");
+            if (IsInvalidPin(pin1)) error("Invalid pin");
             audio_option_require_pin_available(pin1);
-//
-            pin3 = PINMAP[PinDef[pin1].GPno+1];
-            if(IsInvalidPin(pin3)) error("Invalid pin");
+            //
+            pin3 = PINMAP[PinDef[pin1].GPno + 1];
+            if (IsInvalidPin(pin3)) error("Invalid pin");
             audio_option_require_pin_available(pin3);
-//
+            //
             pin2 = audio_option_parse_mmbasic_pin(&argv[2]);
-            if(IsInvalidPin(pin2)) error("Invalid pin");
-            if(pin2==pin1 || pin2==pin3) error("Pin %/| is in use",pin2,pin2);
+            if (IsInvalidPin(pin2)) error("Invalid pin");
+            if (pin2 == pin1 || pin2 == pin3) error("Pin %/| is in use", pin2, pin2);
             audio_option_require_pin_available(pin2);
 
             slice = port_audio_i2s_pio_slice(pin1, pin2);
-            if((PinDef[Option.DISPLAY_BL].slice & 0x7f) == slice) error("Channel in use for backlight");
+            if ((PinDef[Option.DISPLAY_BL].slice & 0x7f) == slice) error("Channel in use for backlight");
             disable_audio();
-            Option.audio_i2s_bclk=pin1;
-            Option.audio_i2s_data=pin2;
-            Option.AUDIO_SLICE=slice;
+            Option.audio_i2s_bclk = pin1;
+            Option.audio_i2s_data = pin2;
+            Option.AUDIO_SLICE = slice;
             SaveOptions();
             _excep_code = RESET_COMMAND;
             SoftReset();
             return;
         }
-    	getargs(&tp,3,(unsigned char *)",");
-         if(argc!=3)error("Syntax");
+        getargs(&tp, 3, (unsigned char *)",");
+        if (argc != 3) error("Syntax");
         pin1 = audio_option_parse_mmbasic_pin(&argv[0]);
-        if(IsInvalidPin(pin1)) error("Invalid pin");
+        if (IsInvalidPin(pin1)) error("Invalid pin");
         audio_option_require_pin_available(pin1);
         pin2 = audio_option_parse_mmbasic_pin(&argv[2]);
-        if(IsInvalidPin(pin2)) error("Invalid pin");
+        if (IsInvalidPin(pin2)) error("Invalid pin");
         audio_option_require_pin_available(pin2);
-        slice=checkslice(pin1,pin2, 0);
-        if((PinDef[Option.DISPLAY_BL].slice & 0x7f) == slice) error("Channel in use for backlight");
+        slice = checkslice(pin1, pin2, 0);
+        if ((PinDef[Option.DISPLAY_BL].slice & 0x7f) == slice) error("Channel in use for backlight");
         disable_audio();
-        Option.AUDIO_L=pin1;
-        Option.AUDIO_R=pin2;
-        Option.AUDIO_SLICE=slice;
+        Option.AUDIO_L = pin1;
+        Option.AUDIO_R = pin2;
+        Option.AUDIO_SLICE = slice;
         SaveOptions();
         _excep_code = RESET_COMMAND;
         SoftReset();
@@ -1397,163 +1508,170 @@ void MIPS16 cmd_option(void) {
     }
 
     tp = checkstring(cmdline, (unsigned char *)"SYSTEM I2C");
-    if(tp) {
-        int pin1,pin2,channel=-1;
-        if(checkstring(tp, (unsigned char *)"DISABLE")){
-   	    if(CurrentLinePtr) error("Invalid in a program");
-        /* SSD1306I2C panels don't exist on VGA (the OPTION setter rejects
+    if (tp) {
+        int pin1, pin2, channel = -1;
+        if (checkstring(tp, (unsigned char *)"DISABLE")) {
+            if (CurrentLinePtr) error("Invalid in a program");
+            /* SSD1306I2C panels don't exist on VGA (the OPTION setter rejects
          * the type), so the runtime DISPLAY_TYPE check is sufficient on
          * every port. */
-        if (Option.RTC_Clock || Option.RTC_Data) error("In use");
-        if (Option.DISPLAY_TYPE == SSD1306I2C || Option.DISPLAY_TYPE == SSD1306I2C32)
-            error("In use");
+            if (Option.RTC_Clock || Option.RTC_Data) error("In use");
+            if (Option.DISPLAY_TYPE == SSD1306I2C || Option.DISPLAY_TYPE == SSD1306I2C32)
+                error("In use");
             disable_systemi2c();
             SaveOptions();
             _excep_code = RESET_COMMAND;
             SoftReset();
-            return;                                // this will restart the processor ? only works when not in debug
+            return; // this will restart the processor ? only works when not in debug
         }
-    	getargs(&tp,5,(unsigned char *)",");
-   	    if(CurrentLinePtr) error("Invalid in a program");
-         if(argc<3)error("Syntax");
-        if(Option.SYSTEM_I2C_SCL)error("I2C already configured");
+        getargs(&tp, 5, (unsigned char *)",");
+        if (CurrentLinePtr) error("Invalid in a program");
+        if (argc < 3) error("Syntax");
+        if (Option.SYSTEM_I2C_SCL) error("I2C already configured");
         unsigned char code;
-        if(!(code=codecheck(argv[0])))argv[0]+=2;
+        if (!(code = codecheck(argv[0]))) argv[0] += 2;
         pin1 = getinteger(argv[0]);
-        if(!code)pin1=codemap(pin1);
-        if(IsInvalidPin(pin1)) error("Invalid pin");
-        if(ExtCurrentConfig[pin1] != EXT_NOT_CONFIG)  error("Pin %/| is in use",pin1,pin1);
-        if(!(code=codecheck(argv[2])))argv[2]+=2;
+        if (!code) pin1 = codemap(pin1);
+        if (IsInvalidPin(pin1)) error("Invalid pin");
+        if (ExtCurrentConfig[pin1] != EXT_NOT_CONFIG) error("Pin %/| is in use", pin1, pin1);
+        if (!(code = codecheck(argv[2]))) argv[2] += 2;
         pin2 = getinteger(argv[2]);
-        if(!code)pin2=codemap(pin2);
-        if(IsInvalidPin(pin2)) error("Invalid pin");
-        if(ExtCurrentConfig[pin2] != EXT_NOT_CONFIG)  error("Pin %/| is in use",pin2,pin2);
-        if(PinDef[pin1].mode & I2C0SDA && PinDef[pin2].mode & I2C0SCL)channel=0;
-        if(PinDef[pin1].mode & I2C1SDA && PinDef[pin2].mode & I2C1SCL)channel=1;
-        if(channel==-1)error("Invalid I2C pins");
-        Option.SYSTEM_I2C_SLOW=0;
-        if(argc==5){
-            if(checkstring(argv[4], (unsigned char *)"SLOW"))Option.SYSTEM_I2C_SLOW=1;
-            else if(checkstring(argv[4],(unsigned char *)"FAST"))Option.SYSTEM_I2C_SLOW=0;
-            else error("Syntax");
+        if (!code) pin2 = codemap(pin2);
+        if (IsInvalidPin(pin2)) error("Invalid pin");
+        if (ExtCurrentConfig[pin2] != EXT_NOT_CONFIG) error("Pin %/| is in use", pin2, pin2);
+        if (PinDef[pin1].mode & I2C0SDA && PinDef[pin2].mode & I2C0SCL) channel = 0;
+        if (PinDef[pin1].mode & I2C1SDA && PinDef[pin2].mode & I2C1SCL) channel = 1;
+        if (channel == -1) error("Invalid I2C pins");
+        Option.SYSTEM_I2C_SLOW = 0;
+        if (argc == 5) {
+            if (checkstring(argv[4], (unsigned char *)"SLOW"))
+                Option.SYSTEM_I2C_SLOW = 1;
+            else if (checkstring(argv[4], (unsigned char *)"FAST"))
+                Option.SYSTEM_I2C_SLOW = 0;
+            else
+                error("Syntax");
         }
-        Option.SYSTEM_I2C_SDA=pin1;
-        Option.SYSTEM_I2C_SCL=pin2;
+        Option.SYSTEM_I2C_SDA = pin1;
+        Option.SYSTEM_I2C_SCL = pin2;
         SaveOptions();
         _excep_code = RESET_COMMAND;
         SoftReset();
         return;
     }
     tp = checkstring(cmdline, (unsigned char *)"COUNT");
-    if(tp) {
-        int pin1,pin2,pin3,pin4;
-        if(CallBackEnabled==2) pico_gpio_irq_set_enabled(PinDef[Option.INT1pin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
-        else if(CallBackEnabled & 2){
+    if (tp) {
+        int pin1, pin2, pin3, pin4;
+        if (CallBackEnabled == 2)
+            pico_gpio_irq_set_enabled(PinDef[Option.INT1pin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
+        else if (CallBackEnabled & 2) {
             hal_pin_irq_set_edge(PinDef[Option.INT1pin].GPno, HAL_PIN_EDGE_BOTH, false);
             CallBackEnabled &= (~2);
         }
-        if(CallBackEnabled==4) pico_gpio_irq_set_enabled(PinDef[Option.INT2pin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
-        else if(CallBackEnabled & 4){
+        if (CallBackEnabled == 4)
+            pico_gpio_irq_set_enabled(PinDef[Option.INT2pin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
+        else if (CallBackEnabled & 4) {
             hal_pin_irq_set_edge(PinDef[Option.INT2pin].GPno, HAL_PIN_EDGE_BOTH, false);
             CallBackEnabled &= (~4);
         }
-        if(CallBackEnabled==8) pico_gpio_irq_set_enabled(PinDef[Option.INT3pin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
-        else  if(CallBackEnabled & 8){
+        if (CallBackEnabled == 8)
+            pico_gpio_irq_set_enabled(PinDef[Option.INT3pin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
+        else if (CallBackEnabled & 8) {
             hal_pin_irq_set_edge(PinDef[Option.INT3pin].GPno, HAL_PIN_EDGE_BOTH, false);
             CallBackEnabled &= (~8);
         }
-        if(CallBackEnabled==16) pico_gpio_irq_set_enabled(PinDef[Option.INT4pin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
-        else  if(CallBackEnabled & 16){
+        if (CallBackEnabled == 16)
+            pico_gpio_irq_set_enabled(PinDef[Option.INT4pin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
+        else if (CallBackEnabled & 16) {
             hal_pin_irq_set_edge(PinDef[Option.INT4pin].GPno, HAL_PIN_EDGE_BOTH, false);
             CallBackEnabled &= (~16);
         }
-    	getargs(&tp,7,(unsigned char *)",");
-        if(argc!=7)error("Syntax");
+        getargs(&tp, 7, (unsigned char *)",");
+        if (argc != 7) error("Syntax");
         unsigned char code;
-        if(!(code=codecheck(argv[0])))argv[0]+=2;
+        if (!(code = codecheck(argv[0]))) argv[0] += 2;
         pin1 = getinteger(argv[0]);
-        if(!code)pin1=codemap(pin1);
-        if(IsInvalidPin(pin1)) error("Invalid pin");
-        if(ExtCurrentConfig[pin1] != EXT_NOT_CONFIG)  error("Pin %/| is in use",pin1,pin1);
-        if(!(code=codecheck(argv[2])))argv[2]+=2;
+        if (!code) pin1 = codemap(pin1);
+        if (IsInvalidPin(pin1)) error("Invalid pin");
+        if (ExtCurrentConfig[pin1] != EXT_NOT_CONFIG) error("Pin %/| is in use", pin1, pin1);
+        if (!(code = codecheck(argv[2]))) argv[2] += 2;
         pin2 = getinteger(argv[2]);
-        if(!code)pin2=codemap(pin2);
-        if(IsInvalidPin(pin2)) error("Invalid pin");
-        if(ExtCurrentConfig[pin2] != EXT_NOT_CONFIG)  error("Pin %/| is in use",pin2,pin2);
-        if(!(code=codecheck(argv[4])))argv[4]+=2;
+        if (!code) pin2 = codemap(pin2);
+        if (IsInvalidPin(pin2)) error("Invalid pin");
+        if (ExtCurrentConfig[pin2] != EXT_NOT_CONFIG) error("Pin %/| is in use", pin2, pin2);
+        if (!(code = codecheck(argv[4]))) argv[4] += 2;
         pin3 = getinteger(argv[4]);
-        if(!code)pin3=codemap(pin3);
-        if(IsInvalidPin(pin3)) error("Invalid pin");
-        if(ExtCurrentConfig[pin3] != EXT_NOT_CONFIG)  error("Pin %/| is in use",pin3,pin3);
-        if(!(code=codecheck(argv[6])))argv[6]+=2;
+        if (!code) pin3 = codemap(pin3);
+        if (IsInvalidPin(pin3)) error("Invalid pin");
+        if (ExtCurrentConfig[pin3] != EXT_NOT_CONFIG) error("Pin %/| is in use", pin3, pin3);
+        if (!(code = codecheck(argv[6]))) argv[6] += 2;
         pin4 = getinteger(argv[6]);
-        if(!code)pin4=codemap(pin4);
-        if(IsInvalidPin(pin4)) error("Invalid pin");
-        if(ExtCurrentConfig[pin4] != EXT_NOT_CONFIG)  error("Pin %/| is in use",pin4,pin4);
-        if(pin1==pin2 || pin1==pin3 || pin1==pin4 || pin2==pin3 || pin2==pin4 || pin3==pin4)error("Pins must be unique");
-        Option.INT1pin=pin1;
-        Option.INT2pin=pin2;
-        Option.INT3pin=pin3;
-        Option.INT4pin=pin4;
+        if (!code) pin4 = codemap(pin4);
+        if (IsInvalidPin(pin4)) error("Invalid pin");
+        if (ExtCurrentConfig[pin4] != EXT_NOT_CONFIG) error("Pin %/| is in use", pin4, pin4);
+        if (pin1 == pin2 || pin1 == pin3 || pin1 == pin4 || pin2 == pin3 || pin2 == pin4 || pin3 == pin4) error("Pins must be unique");
+        Option.INT1pin = pin1;
+        Option.INT2pin = pin2;
+        Option.INT3pin = pin3;
+        Option.INT4pin = pin4;
         SaveOptions();
         return;
     }
     if (port_system_lcd_spi_option_setter(cmdline)) return;
-	tp = checkstring(cmdline, (unsigned char *)"SDCARD");
+    tp = checkstring(cmdline, (unsigned char *)"SDCARD");
     int pin1, pin2, pin3, pin4;
-    if(CurrentLinePtr) error("Invalid in a program");
-    if(tp) {
-        if(checkstring(tp, (unsigned char *)"DISABLE")){
-            FatFSFileSystem=0;
+    if (CurrentLinePtr) error("Invalid in a program");
+    if (tp) {
+        if (checkstring(tp, (unsigned char *)"DISABLE")) {
+            FatFSFileSystem = 0;
             disable_sd();
             SaveOptions();
-            return;                                // this will restart the processor ? only works when not in debug
+            return; // this will restart the processor ? only works when not in debug
         }
         /* COMBINED CS: SD shares the touch-controller's CS pin to free
          * up an external pin. Not available on VGA — VGA uses dedicated
          * SD pins from the SDIO lines. Hook returns 1 on VGA to skip
          * the branch entirely. */
         if (port_setter_sdcard_combined_cs(tp)) return;
-    	getargs(&tp,7,(unsigned char *)",");
+        getargs(&tp, 7, (unsigned char *)",");
         /* VGA forces all 7 args (no implicit SYSTEM SPI sharing); other
          * ports allow 1-arg form (CS only) or full 7-arg. */
         port_setter_sdcard_argc_check(argc);
-         if(Option.SD_CS || Option.CombinedCS)error("SDcard already configured");
-        if(argc==1 && !Option.SYSTEM_CLK)error("System SPI not configured");
+        if (Option.SD_CS || Option.CombinedCS) error("SDcard already configured");
+        if (argc == 1 && !Option.SYSTEM_CLK) error("System SPI not configured");
         unsigned char code;
-        if(!(code=codecheck(argv[0])))argv[0]+=2;
+        if (!(code = codecheck(argv[0]))) argv[0] += 2;
         pin4 = getinteger(argv[0]);
-        if(!code)pin4=codemap(pin4);
-        if(IsInvalidPin(pin4)) error("Invalid pin");
-        if(ExtCurrentConfig[pin4] != EXT_NOT_CONFIG)  error("Pin %/| is in use",pin4,pin4);
-        Option.SD_CS=pin4;
-        Option.SDspeed=12;
-        Option.SD_CLK_PIN=0;
-        Option.SD_MOSI_PIN=0;
-        Option.SD_MISO_PIN=0;
-        if(argc>1){
-            if(!(code=codecheck(argv[2])))argv[2]+=2;
+        if (!code) pin4 = codemap(pin4);
+        if (IsInvalidPin(pin4)) error("Invalid pin");
+        if (ExtCurrentConfig[pin4] != EXT_NOT_CONFIG) error("Pin %/| is in use", pin4, pin4);
+        Option.SD_CS = pin4;
+        Option.SDspeed = 12;
+        Option.SD_CLK_PIN = 0;
+        Option.SD_MOSI_PIN = 0;
+        Option.SD_MISO_PIN = 0;
+        if (argc > 1) {
+            if (!(code = codecheck(argv[2]))) argv[2] += 2;
             pin1 = getinteger(argv[2]);
-            if(!code)pin1=codemap(pin1);
-            if(IsInvalidPin(pin1)) error("Invalid pin");
-            if(ExtCurrentConfig[pin1] != EXT_NOT_CONFIG)  error("Pin %/| is in use",pin1,pin1);
-            if(!(code=codecheck(argv[4])))argv[4]+=2;
+            if (!code) pin1 = codemap(pin1);
+            if (IsInvalidPin(pin1)) error("Invalid pin");
+            if (ExtCurrentConfig[pin1] != EXT_NOT_CONFIG) error("Pin %/| is in use", pin1, pin1);
+            if (!(code = codecheck(argv[4]))) argv[4] += 2;
             pin2 = getinteger(argv[4]);
-            if(!code)pin2=codemap(pin2);
-            if(IsInvalidPin(pin2)) error("Invalid pin");
-            if(ExtCurrentConfig[pin2] != EXT_NOT_CONFIG)  error("Pin %/| is in use",pin2,pin2);
-            if(!(code=codecheck(argv[6])))argv[6]+=2;
+            if (!code) pin2 = codemap(pin2);
+            if (IsInvalidPin(pin2)) error("Invalid pin");
+            if (ExtCurrentConfig[pin2] != EXT_NOT_CONFIG) error("Pin %/| is in use", pin2, pin2);
+            if (!(code = codecheck(argv[6]))) argv[6] += 2;
             pin3 = getinteger(argv[6]);
-            if(!code)pin3=codemap(pin3);
-            if(IsInvalidPin(pin3)) error("Invalid pin");
-            if(ExtCurrentConfig[pin3] != EXT_NOT_CONFIG)  error("Pin %/| is in use",pin3,pin3);
+            if (!code) pin3 = codemap(pin3);
+            if (IsInvalidPin(pin3)) error("Invalid pin");
+            if (ExtCurrentConfig[pin3] != EXT_NOT_CONFIG) error("Pin %/| is in use", pin3, pin3);
             /* VGA reuses SPI0/SPI1 hw pins for SD when the chosen pins
              * match an SPI peripheral; non-VGA always uses dedicated
              * SD pins. Hook returns 1 if SYSTEM_* was reassigned. */
             if (!port_setter_sdcard_via_system_spi(pin1, pin2, pin3)) {
-                Option.SD_CLK_PIN=pin1;
-                Option.SD_MOSI_PIN=pin2;
-                Option.SD_MISO_PIN=pin3;
+                Option.SD_CLK_PIN = pin1;
+                Option.SD_MOSI_PIN = pin2;
+                Option.SD_MISO_PIN = pin3;
             }
         }
         SaveOptions();
@@ -1561,44 +1679,44 @@ void MIPS16 cmd_option(void) {
         SoftReset();
         return;
     }
-	tp = checkstring(cmdline, (unsigned char *)"DISK SAVE");
-    if(tp){
-        getargs(&tp,1,(unsigned char *)",");
-        if(!(argc==1))error("Syntax");
-        if(CurrentLinePtr) error("Invalid in a program");
+    tp = checkstring(cmdline, (unsigned char *)"DISK SAVE");
+    if (tp) {
+        getargs(&tp, 1, (unsigned char *)",");
+        if (!(argc == 1)) error("Syntax");
+        if (CurrentLinePtr) error("Invalid in a program");
         int fnbr = FindFreeFileNbr();
-        if (!InitSDCard())  return;
-        char *pp = (char *)getFstring(argv[0]);
+        if (!InitSDCard()) return;
+        char * pp = (char *)getFstring(argv[0]);
         if (strchr((char *)pp, '.') == NULL)
             strcat((char *)pp, ".opt");
         if (!BasicFileOpen((char *)pp, fnbr, FA_WRITE | FA_CREATE_ALWAYS)) return;
         int i = sizeof(Option);
-        char *s = (char *)&Option.Magic;
-        while(i--){
-            FilePutChar(*s++,fnbr);
+        char * s = (char *)&Option.Magic;
+        while (i--) {
+            FilePutChar(*s++, fnbr);
         }
         FileClose(fnbr);
         return;
     }
-	tp = checkstring(cmdline, (unsigned char *)"DISK LOAD");
-    if(tp){
-        getargs(&tp,1,(unsigned char *)",");
-    	if(CurrentLinePtr) error("Invalid in a program");
-        if(!(argc==1))error("Syntax");
+    tp = checkstring(cmdline, (unsigned char *)"DISK LOAD");
+    if (tp) {
+        getargs(&tp, 1, (unsigned char *)",");
+        if (CurrentLinePtr) error("Invalid in a program");
+        if (!(argc == 1)) error("Syntax");
         int fnbr = FindFreeFileNbr();
         int fsize;
-        if (!InitSDCard())  return;
-        char *pp = (char *)getFstring(argv[0]);
+        if (!InitSDCard()) return;
+        char * pp = (char *)getFstring(argv[0]);
         if (strchr((char *)pp, '.') == NULL)
             strcat((char *)pp, ".opt");
         if (!BasicFileOpen((char *)pp, fnbr, FA_READ)) return;
-		fsize = (int)hal_fs_size(hal_fds[fnbr]);
-        if(!(fsize==sizeof(Option) || fsize==sizeof(Option)-128))error("File size incorrect");
-        char *s=(char *)&Option.Magic;
-        for(int k = 0; k < fsize; k++){        // write to the flash byte by byte
-           *s++=FileGetChar(fnbr);
+        fsize = (int)hal_fs_size(hal_fds[fnbr]);
+        if (!(fsize == sizeof(Option) || fsize == sizeof(Option) - 128)) error("File size incorrect");
+        char * s = (char *)&Option.Magic;
+        for (int k = 0; k < fsize; k++) { // write to the flash byte by byte
+            *s++ = FileGetChar(fnbr);
         }
-        Option.Magic=MagicKey; //This isn't ideal but it improves the chances of a older config working in a new build
+        Option.Magic = MagicKey; //This isn't ideal but it improves the chances of a older config working in a new build
         FileClose(fnbr);
         uSec(100000);
         fileio_flash_write_begin();
@@ -1607,15 +1725,15 @@ void MIPS16 cmd_option(void) {
         _excep_code = RESET_COMMAND;
         SoftReset();
     }
-	tp = checkstring(cmdline, (unsigned char *)"RESET");
-    if(tp) {
-   	    if(CurrentLinePtr) error("Invalid in a program");
-        if(Option.LIBRARY_FLASH_SIZE==MAX_PROG_SIZE) {
-          uint32_t j = FLASH_TARGET_OFFSET + FLASH_ERASE_SIZE + SAVEDVARS_FLASH_SIZE + ((MAXFLASHSLOTS - 1) * MAX_PROG_SIZE);
-          uSec(250000);
-          fileio_flash_write_begin();
-          hal_flash_erase(j, MAX_PROG_SIZE);
-          fileio_flash_write_end();
+    tp = checkstring(cmdline, (unsigned char *)"RESET");
+    if (tp) {
+        if (CurrentLinePtr) error("Invalid in a program");
+        if (Option.LIBRARY_FLASH_SIZE == MAX_PROG_SIZE) {
+            uint32_t j = FLASH_TARGET_OFFSET + FLASH_ERASE_SIZE + SAVEDVARS_FLASH_SIZE + ((MAXFLASHSLOTS - 1) * MAX_PROG_SIZE);
+            uSec(250000);
+            fileio_flash_write_begin();
+            hal_flash_erase(j, MAX_PROG_SIZE);
+            fileio_flash_write_end();
         }
         configure(tp);
         return;
@@ -1623,7 +1741,7 @@ void MIPS16 cmd_option(void) {
     error("Invalid Option");
 }
 
-void fun_device(void){
+void fun_device(void) {
     sret = GetTempMemory(STRINGSIZE);
     /* Device name string baked in at compile time per COMPILE variant
      * (CMakeLists.txt + host/port_config.h). RP2350A/B suffix appended at
@@ -1639,256 +1757,274 @@ void fun_device(void){
     targ = T_STR;
 }
 
-uint32_t __get_MSP(void)
-{
-  uint32_t result;
+uint32_t __get_MSP(void) {
+    uint32_t result;
 
-  __asm volatile ("MRS %0, msp" : "=r" (result) );
-  return(result);
+    __asm volatile("MRS %0, msp" : "=r"(result));
+    return (result);
 }
 /* FileSize / ExistsFile / ExistsDir now live in mm_misc_shared.c so the
  * ESP32 port (which doesn't compile MM_Misc.c) can reuse the same
  * drivecheck + lfs_stat / f_stat routing. */
 
-void MIPS16 fun_info(void){
-    unsigned char *tp;
-    sret = GetTempMemory(STRINGSIZE);                                  // this will last for the life of the command
-    if(checkstring(ep, (unsigned char *)"AUTORUN")){
-        if(Option.Autorun == false)strcpy((char *)sret,"Off");
-        else strcpy((char *)sret,"On");
+void MIPS16 fun_info(void) {
+    unsigned char * tp;
+    sret = GetTempMemory(STRINGSIZE); // this will last for the life of the command
+    if (checkstring(ep, (unsigned char *)"AUTORUN")) {
+        if (Option.Autorun == false)
+            strcpy((char *)sret, "Off");
+        else
+            strcpy((char *)sret, "On");
         CtoM(sret);
-        targ=T_STR;
+        targ = T_STR;
         return;
-    } else if((tp=checkstring(ep, (unsigned char *)"TILE HEIGHT"))){
+    } else if ((tp = checkstring(ep, (unsigned char *)"TILE HEIGHT"))) {
         /* ytileheight is defined in Memory.c on every device build (VGA
          * tile renderer height + non-VGA SPI-LCD scroll-block height). */
-        iret=ytileheight;
-        targ=T_INT;
+        iret = ytileheight;
+        targ = T_INT;
         return;
-    } else if((tp=checkstring(ep, (unsigned char *)"ADC DMA"))){
-        targ=T_INT;
-        iret=ADCDualBuffering | dmarunning;
+    } else if ((tp = checkstring(ep, (unsigned char *)"ADC DMA"))) {
+        targ = T_INT;
+        iret = ADCDualBuffering | dmarunning;
         return;
-    } else if((tp=checkstring(ep, (unsigned char *)"ADC"))){
-        targ=T_INT;
-        iret=((adcint==adcint1 && adcint) ? 1 : ((adcint==adcint2 && adcint) ? 2 : 0));
+    } else if ((tp = checkstring(ep, (unsigned char *)"ADC"))) {
+        targ = T_INT;
+        iret = ((adcint == adcint1 && adcint) ? 1 : ((adcint == adcint2 && adcint) ? 2 : 0));
         return;
-    } else if((tp=checkstring(ep, (unsigned char *)"BATTERY"))){
+    } else if ((tp = checkstring(ep, (unsigned char *)"BATTERY"))) {
         iret = port_picocalc_battery_pct();
-        targ=T_INT;
+        targ = T_INT;
         return;
-    } else if(checkstring(ep, (unsigned char *)"BCOLOUR") || checkstring(ep, (unsigned char *)"BCOLOR")){
-            iret=gui_bcolour;
-            targ=T_INT;
-            return;
-    } else if(checkstring(ep, (unsigned char *)"BOOT COUNT")){
+    } else if (checkstring(ep, (unsigned char *)"BCOLOUR") || checkstring(ep, (unsigned char *)"BCOLOR")) {
+        iret = gui_bcolour;
+        targ = T_INT;
+        return;
+    } else if (checkstring(ep, (unsigned char *)"BOOT COUNT")) {
         int boot_count;
-        int FatFSFileSystemSave=FatFSFileSystem;
-        FatFSFileSystem=0;
-        int fnbr=FindFreeFileNbr();
-        BasicFileOpen("bootcount",fnbr,FA_READ);
+        int FatFSFileSystemSave = FatFSFileSystem;
+        FatFSFileSystem = 0;
+        int fnbr = FindFreeFileNbr();
+        BasicFileOpen("bootcount", fnbr, FA_READ);
         {
             ssize_t rc = hal_fs_read(hal_fds[fnbr], &boot_count, sizeof(boot_count));
-            if (rc < 0) { FSerror = (int)rc; ErrorCheck(fnbr); }
-            else FSerror = 0;
+            if (rc < 0) {
+                FSerror = (int)rc;
+                ErrorCheck(fnbr);
+            } else
+                FSerror = 0;
         }
         FileClose(fnbr);
-        FatFSFileSystem=FatFSFileSystemSave;
-        iret=boot_count;
-        targ=T_INT;
-    } else if(checkstring(ep, (unsigned char *)"BOOT")){
-        const char *boot_label = NULL;
-        if(restart_reason==0xFFFFFFFF) boot_label = "Restart";
-        else if(restart_reason==0xFFFFFFFE) boot_label = "S/W Watchdog";
-        else if(restart_reason==0xFFFFFFFD) boot_label = "H/W Watchdog";
-        else if(restart_reason==0xFFFFFFFC) boot_label = "Firmware update";
-        else boot_label = port_boot_reason_label(restart_reason);
-        if (boot_label) strcpy((char *)sret, boot_label);
-        else sprintf((char *)sret, "Unknown code %X",(unsigned int)restart_reason);
+        FatFSFileSystem = FatFSFileSystemSave;
+        iret = boot_count;
+        targ = T_INT;
+    } else if (checkstring(ep, (unsigned char *)"BOOT")) {
+        const char * boot_label = NULL;
+        if (restart_reason == 0xFFFFFFFF)
+            boot_label = "Restart";
+        else if (restart_reason == 0xFFFFFFFE)
+            boot_label = "S/W Watchdog";
+        else if (restart_reason == 0xFFFFFFFD)
+            boot_label = "H/W Watchdog";
+        else if (restart_reason == 0xFFFFFFFC)
+            boot_label = "Firmware update";
+        else
+            boot_label = port_boot_reason_label(restart_reason);
+        if (boot_label)
+            strcpy((char *)sret, boot_label);
+        else
+            sprintf((char *)sret, "Unknown code %X", (unsigned int)restart_reason);
         CtoM(sret);
-        targ=T_STR;
+        targ = T_STR;
         return;
-    } else if(*ep=='c' || *ep=='C'){
-        if(checkstring(ep, (unsigned char *)"CALLTABLE")){
+    } else if (*ep == 'c' || *ep == 'C') {
+        if (checkstring(ep, (unsigned char *)"CALLTABLE")) {
             iret = (int64_t)(uint32_t)CallTable;
             targ = T_INT;
             return;
-        } else if((tp=checkstring(ep, (unsigned char *)"CHARGING"))){
+        } else if ((tp = checkstring(ep, (unsigned char *)"CHARGING"))) {
             iret = port_picocalc_is_charging();
-            targ=T_INT;
+            targ = T_INT;
             return;
-        } else if(checkstring(ep, (unsigned char *)"CPUSPEED")){
-            IntToStr((char *)sret,Option.CPU_Speed*1000,10);
+        } else if (checkstring(ep, (unsigned char *)"CPUSPEED")) {
+            IntToStr((char *)sret, Option.CPU_Speed * 1000, 10);
             CtoM(sret);
-            targ=T_STR;
+            targ = T_STR;
             return;
-        } else if(checkstring(ep, (unsigned char *)"CURRENT")){
-            if(ProgMemory[0]==1 && ProgMemory[1]==39 && ProgMemory[2]==35){
-                strcpy((char *)sret,(char *)&ProgMemory[3]);
-            } else strcpy((char *)sret,"NONE");
+        } else if (checkstring(ep, (unsigned char *)"CURRENT")) {
+            if (ProgMemory[0] == 1 && ProgMemory[1] == 39 && ProgMemory[2] == 35) {
+                strcpy((char *)sret, (char *)&ProgMemory[3]);
+            } else
+                strcpy((char *)sret, "NONE");
             CtoM(sret);
-            targ=T_STR;
+            targ = T_STR;
             return;
-        } else error("Syntax");
-    }  else if(*ep=='d' || *ep=='D'){
-        if(checkstring(ep, (unsigned char *)"DEVICE")){
+        } else
+            error("Syntax");
+    } else if (*ep == 'd' || *ep == 'D') {
+        if (checkstring(ep, (unsigned char *)"DEVICE")) {
             fun_device();
             return;
-        } else if((tp=checkstring(ep, (unsigned char *)"DRIVE"))){
-            strcpy((char *)sret,FatFSFileSystem ? "B:":"A:");
+        } else if ((tp = checkstring(ep, (unsigned char *)"DRIVE"))) {
+            strcpy((char *)sret, FatFSFileSystem ? "B:" : "A:");
             CtoM(sret);
-            targ=T_STR;
+            targ = T_STR;
             return;
-        } else if((tp=checkstring(ep, (unsigned char *)"DEBUG"))){
-            iret=abs(hal_time_us_64()-mSecTimer*1000);
-            targ=T_INT;
+        } else if ((tp = checkstring(ep, (unsigned char *)"DEBUG"))) {
+            iret = abs(hal_time_us_64() - mSecTimer * 1000);
+            targ = T_INT;
             return;
-        } else if(checkstring(ep, (unsigned char *)"DISK SIZE")){
-            if(FatFSFileSystem){
-                if(!InitSDCard()) error((char *)FErrorMsg[20]);					// setup the SD card
-                FATFS *fs;
+        } else if (checkstring(ep, (unsigned char *)"DISK SIZE")) {
+            if (FatFSFileSystem) {
+                if (!InitSDCard()) error((char *)FErrorMsg[20]); // setup the SD card
+                FATFS * fs;
                 DWORD fre_clust;
                 /* Get volume information and free clusters of drive 1 */
                 f_getfree("0:", &fre_clust, &fs);
                 /* Get total sectors and free sectors */
-                iret= (uint64_t)(fs->n_fatent - 2) * (uint64_t)fs->csize *(uint64_t)FF_MAX_SS;
+                iret = (uint64_t)(fs->n_fatent - 2) * (uint64_t)fs->csize * (uint64_t)FF_MAX_SS;
             } else {
-                iret=(Option.FlashSize-(Option.modbuff ? 1024*Option.modbuffsize : 0)-RoundUpK4(TOP_OF_SYSTEM_FLASH));
+                iret = (Option.FlashSize - (Option.modbuff ? 1024 * Option.modbuffsize : 0) - RoundUpK4(TOP_OF_SYSTEM_FLASH));
             }
-            targ=T_INT;
+            targ = T_INT;
             return;
-        } else error("Syntax");
-    } else if(*ep=='e' || *ep=='E'){
-        if(checkstring(ep, (unsigned char *)"ERRNO")){
+        } else
+            error("Syntax");
+    } else if (*ep == 'e' || *ep == 'E') {
+        if (checkstring(ep, (unsigned char *)"ERRNO")) {
             iret = MMerrno;
-            targ=T_INT;
+            targ = T_INT;
             return;
-        } else if((tp=checkstring(ep, (unsigned char *)"EXISTS DIR"))){
-            char dir[FF_MAX_LFN]={0};
-            char *p = (char *)getFstring(tp);
+        } else if ((tp = checkstring(ep, (unsigned char *)"EXISTS DIR"))) {
+            char dir[FF_MAX_LFN] = {0};
+            char * p = (char *)getFstring(tp);
             int filesystem;
-            targ=T_INT;
-            iret=ExistsDir(p,dir,&filesystem);
+            targ = T_INT;
+            iret = ExistsDir(p, dir, &filesystem);
             return;
-        } else if((tp=checkstring(ep, (unsigned char *)"EXISTS FILE"))){
-            char *p = (char *)getFstring(tp);
-            iret=ExistsFile(p);
-            targ=T_INT;
+        } else if ((tp = checkstring(ep, (unsigned char *)"EXISTS FILE"))) {
+            char * p = (char *)getFstring(tp);
+            iret = ExistsFile(p);
+            targ = T_INT;
             return;
-        } else if(checkstring(ep, (unsigned char *)"ERRMSG")){
-            int i=OptionFileErrorAbort;
+        } else if (checkstring(ep, (unsigned char *)"ERRMSG")) {
+            int i = OptionFileErrorAbort;
             strcpy((char *)sret, MMErrMsg);
             CtoM(sret);
-            targ=T_STR;
-            OptionFileErrorAbort=i;
+            targ = T_STR;
+            OptionFileErrorAbort = i;
             return;
-        } else error("Syntax");
-    } else if(*ep=='f' || *ep=='F'){
-        if((tp=checkstring(ep, (unsigned char *)"FONT POINTER"))){
-            iret=(int64_t)((uint32_t)&FontTable[getint(tp,1,FONT_TABLE_SIZE)-1]);
-            targ=T_INT;
+        } else
+            error("Syntax");
+    } else if (*ep == 'f' || *ep == 'F') {
+        if ((tp = checkstring(ep, (unsigned char *)"FONT POINTER"))) {
+            iret = (int64_t)((uint32_t)&FontTable[getint(tp, 1, FONT_TABLE_SIZE) - 1]);
+            targ = T_INT;
             return;
-        } else if((tp=checkstring(ep, (unsigned char *)"FONT ADDRESS"))){
-            iret=(int64_t)((uint32_t)FontTable[getint(tp,1,FONT_TABLE_SIZE)-1]);
-            targ=T_INT;
+        } else if ((tp = checkstring(ep, (unsigned char *)"FONT ADDRESS"))) {
+            iret = (int64_t)((uint32_t)FontTable[getint(tp, 1, FONT_TABLE_SIZE) - 1]);
+            targ = T_INT;
             return;
-        } else if((tp=checkstring(ep, (unsigned char *)"FLASH ADDRESS"))){
+        } else if ((tp = checkstring(ep, (unsigned char *)"FLASH ADDRESS"))) {
             /* uintptr_t round-trip — `(unsigned int)` truncates pointers
              * on 64-bit hosts (macOS / wasm64) and silently zeroes the
              * upper bits, returning 0 to BASIC. */
-            iret=(int64_t)(uintptr_t)(flash_target_contents + (getint(tp,1,MAXFLASHSLOTS) - 1) * MAX_PROG_SIZE);
-            targ=T_INT;
+            iret = (int64_t)(uintptr_t)(flash_target_contents + (getint(tp, 1, MAXFLASHSLOTS) - 1) * MAX_PROG_SIZE);
+            targ = T_INT;
             return;
-        } else if((tp=checkstring(ep, (unsigned char *)"FILESIZE"))){
-            char *p = (char *)getFstring(tp);
-            iret=FileSize(p);
-            targ=T_INT;
+        } else if ((tp = checkstring(ep, (unsigned char *)"FILESIZE"))) {
+            char * p = (char *)getFstring(tp);
+            iret = FileSize(p);
+            targ = T_INT;
             return;
-        } else if(checkstring(ep, (unsigned char *)"FREE SPACE")){
-            if(FatFSFileSystem){
-                if(!InitSDCard()) error((char *)FErrorMsg[20]);					// setup the SD card
-                FATFS *fs;
+        } else if (checkstring(ep, (unsigned char *)"FREE SPACE")) {
+            if (FatFSFileSystem) {
+                if (!InitSDCard()) error((char *)FErrorMsg[20]); // setup the SD card
+                FATFS * fs;
                 DWORD fre_clust;
                 /* Get volume information and free clusters of drive 1 */
                 f_getfree("0:", &fre_clust, &fs);
                 /* Get total sectors and free sectors */
-                iret = (uint64_t)fre_clust * (uint64_t)fs->csize  *(uint64_t)FF_MAX_SS;
+                iret = (uint64_t)fre_clust * (uint64_t)fs->csize * (uint64_t)FF_MAX_SS;
             } else {
-                iret=Option.FlashSize-(Option.modbuff ? 1024*Option.modbuffsize : 0)-RoundUpK4(TOP_OF_SYSTEM_FLASH)-lfs_fs_size(&lfs)*4096;
+                iret = Option.FlashSize - (Option.modbuff ? 1024 * Option.modbuffsize : 0) - RoundUpK4(TOP_OF_SYSTEM_FLASH) - lfs_fs_size(&lfs) * 4096;
             }
-            targ=T_INT;
-            return;
-        } else if(checkstring(ep, (unsigned char *)"FLASHTOP")){
-            iret = (int64_t)(uint32_t)TOP_OF_SYSTEM_FLASH ;
             targ = T_INT;
             return;
-        } else if(checkstring(ep, (unsigned char *)"FONTWIDTH")){
+        } else if (checkstring(ep, (unsigned char *)"FLASHTOP")) {
+            iret = (int64_t)(uint32_t)TOP_OF_SYSTEM_FLASH;
+            targ = T_INT;
+            return;
+        } else if (checkstring(ep, (unsigned char *)"FONTWIDTH")) {
             iret = FontTable[gui_font >> 4][0] * (gui_font & 0b1111);
-            targ=T_INT;
+            targ = T_INT;
             return;
-        } else if(checkstring(ep, (unsigned char *)"FLASH")){
-            iret=FlashLoad;
-            targ=T_INT;
+        } else if (checkstring(ep, (unsigned char *)"FLASH")) {
+            iret = FlashLoad;
+            targ = T_INT;
             return;
-        } else if(checkstring(ep, (unsigned char *)"FCOLOUR") || checkstring(ep, (unsigned char *)"FCOLOR") ){
-            iret=gui_fcolour;
-            targ=T_INT;
+        } else if (checkstring(ep, (unsigned char *)"FCOLOUR") || checkstring(ep, (unsigned char *)"FCOLOR")) {
+            iret = gui_fcolour;
+            targ = T_INT;
             return;
-        } else if(checkstring(ep, (unsigned char *)"FONT")){
-            iret=(gui_font >> 4)+1;
-            targ=T_INT;
+        } else if (checkstring(ep, (unsigned char *)"FONT")) {
+            iret = (gui_font >> 4) + 1;
+            targ = T_INT;
             return;
-        } else if(checkstring(ep, (unsigned char *)"FONTHEIGHT")){
+        } else if (checkstring(ep, (unsigned char *)"FONTHEIGHT")) {
             iret = FontTable[gui_font >> 4][1] * (gui_font & 0b1111);
-            targ=T_INT;
+            targ = T_INT;
             return;
-        } else error("Syntax");
-    } else if(*ep=='h' || *ep=='H'){
-        if(checkstring(ep, (unsigned char *)"HEAP")){
-            iret=FreeSpaceOnHeap();
-            targ=T_INT;
+        } else
+            error("Syntax");
+    } else if (*ep == 'h' || *ep == 'H') {
+        if (checkstring(ep, (unsigned char *)"HEAP")) {
+            iret = FreeSpaceOnHeap();
+            targ = T_INT;
             return;
-        } else if(checkstring(ep, (unsigned char *)"HPOS")){
+        } else if (checkstring(ep, (unsigned char *)"HPOS")) {
             iret = CurrentX;
-            targ=T_INT;
+            targ = T_INT;
             return;
-        } else error("Syntax");
-    } else if(checkstring(ep,(unsigned char *)"ID")){
-        strcpy((char *)sret,id_out);
+        } else
+            error("Syntax");
+    } else if (checkstring(ep, (unsigned char *)"ID")) {
+        strcpy((char *)sret, id_out);
         CtoM(sret);
-        targ=T_STR;
+        targ = T_STR;
         return;
     } else if (port_web_mminfo(ep, &iret, sret, &targ)) {
         return;
-    }
-    else if (checkstring(ep, (unsigned char *)"INTERRUPTS")) {
-        if (port_mminfo_interrupts(&iret)) { targ = T_INT; return; }
+    } else if (checkstring(ep, (unsigned char *)"INTERRUPTS")) {
+        if (port_mminfo_interrupts(&iret)) {
+            targ = T_INT;
+            return;
+        }
     }
     /* LCDPANEL / LCD320 are SPI-LCD-port concepts — VGA has no
      * runtime panel switcher. Hooks return 1 if matched. */
-    else if (port_mminfo_lcdpanel(ep, sret, &targ)) return;
-    else if (port_mminfo_lcd320(ep, &iret, &targ)) return;
+    else if (port_mminfo_lcdpanel(ep, sret, &targ))
+        return;
+    else if (port_mminfo_lcd320(ep, &iret, &targ))
+        return;
     /* USB device info: routed through port_usb_* hooks so the HID[4]
      * array (≈336 B BSS) only exists on USB device builds. */
-    else if((tp=checkstring(ep, (unsigned char *)"USB VID"))){
-        int n=getint((unsigned char *)tp,1,4);
-        iret=port_usb_hid_field(n, 0);
-        targ=T_INT;
+    else if ((tp = checkstring(ep, (unsigned char *)"USB VID"))) {
+        int n = getint((unsigned char *)tp, 1, 4);
+        iret = port_usb_hid_field(n, 0);
+        targ = T_INT;
         return;
-    }
-    else if((tp=checkstring(ep, (unsigned char *)"USB PID"))){
-        int n=getint((unsigned char *)tp,1,4);
-        iret=port_usb_hid_field(n, 1);
-        targ=T_INT;
+    } else if ((tp = checkstring(ep, (unsigned char *)"USB PID"))) {
+        int n = getint((unsigned char *)tp, 1, 4);
+        iret = port_usb_hid_field(n, 1);
+        targ = T_INT;
         return;
-    }
-    else if((tp=checkstring(ep, (unsigned char *)"USB"))){
-        int n=getint((unsigned char *)tp,0,4);
-        iret = (n==0) ? port_usb_count() : port_usb_hid_field(n, 2);
-        targ=T_INT;
+    } else if ((tp = checkstring(ep, (unsigned char *)"USB"))) {
+        int n = getint((unsigned char *)tp, 0, 4);
+        iret = (n == 0) ? port_usb_count() : port_usb_hid_field(n, 2);
+        targ = T_INT;
         return;
-    }
-    else if (checkstring(ep, (unsigned char *)"LINE")) {
+    } else if (checkstring(ep, (unsigned char *)"LINE")) {
         if (!CurrentLinePtr) {
             strcpy((char *)sret, "UNKNOWN");
         } else if (CurrentLinePtr >= ProgMemory + MAX_PROG_SIZE) {
@@ -1897,217 +2033,257 @@ void MIPS16 fun_info(void){
             sprintf((char *)sret, "%d", CountLines(CurrentLinePtr));
         }
         CtoM(sret);
-        targ=T_STR;
+        targ = T_STR;
         return;
-    }
-    else if((tp=checkstring(ep,(unsigned char *)"MODBUFF ADDRESS"))){
-        iret=(int64_t)((uint32_t)(char *)(XIP_BASE + RoundUpK4(TOP_OF_SYSTEM_FLASH)));
-        targ=T_INT;
+    } else if ((tp = checkstring(ep, (unsigned char *)"MODBUFF ADDRESS"))) {
+        iret = (int64_t)((uint32_t)(char *)(XIP_BASE + RoundUpK4(TOP_OF_SYSTEM_FLASH)));
+        targ = T_INT;
         return;
-    }
-    else if((tp=checkstring(ep, (unsigned char *)"MODIFIED"))){
-//		int i,j;
-	    DIR djd;
-	    FILINFO fnod;
-        sret = GetTempMemory(STRINGSIZE);                                    // this will last for the life of the command
-        targ=T_STR;
-		memset(&djd,0,sizeof(DIR));
-		memset(&fnod,0,sizeof(FILINFO));
-		char *p = (char *)getFstring(tp);
-        char q[FF_MAX_LFN]={0};
-        int waste=0, t=FatFSFileSystem+1;
-        t = drivecheck(p,&waste);
-        p+=waste;
-        getfullfilename(p,q);
-        FatFSFileSystem=t-1;
-        if(FatFSFileSystem==0){
+    } else if ((tp = checkstring(ep, (unsigned char *)"MODIFIED"))) {
+        //		int i,j;
+        DIR djd;
+        FILINFO fnod;
+        sret = GetTempMemory(STRINGSIZE); // this will last for the life of the command
+        targ = T_STR;
+        memset(&djd, 0, sizeof(DIR));
+        memset(&fnod, 0, sizeof(FILINFO));
+        char * p = (char *)getFstring(tp);
+        char q[FF_MAX_LFN] = {0};
+        int waste = 0, t = FatFSFileSystem + 1;
+        t = drivecheck(p, &waste);
+        p += waste;
+        getfullfilename(p, q);
+        FatFSFileSystem = t - 1;
+        if (FatFSFileSystem == 0) {
             int dt;
-            FSerror=lfs_getattr(&lfs, q, 'A', &dt,    4);
-            if(FSerror!=4) return;
+            FSerror = lfs_getattr(&lfs, q, 'A', &dt, 4);
+            if (FSerror != 4)
+                return;
             else {
-                WORD *p=(WORD *)&dt;
-                fnod.fdate=(WORD)p[1];
-                fnod.ftime=(WORD)p[0];
+                WORD * p = (WORD *)&dt;
+                fnod.fdate = (WORD)p[1];
+                fnod.ftime = (WORD)p[0];
             }
         } else {
-			if(!InitSDCard()) {iret= -1; return;}
+            if (!InitSDCard()) {
+                iret = -1;
+                return;
+            }
             FSerror = f_stat(p, &fnod);
-            if(FSerror != FR_OK) return;
+            if (FSerror != FR_OK) return;
         }
-	    IntToStr((char *)sret , ((fnod.fdate>>9)&0x7F)+1980, 10);
-	    sret[4] = '-'; IntToStrPad((char *)sret + 5, (fnod.fdate>>5)&0xF, '0', 2, 10);
-	    sret[7] = '-'; IntToStrPad((char *)sret + 8, fnod.fdate&0x1F, '0', 2, 10);
-	    sret[10] = ' ';
-	    IntToStrPad((char *)sret+11, (fnod.ftime>>11)&0x1F, '0', 2, 10);
-	    sret[13] = ':'; IntToStrPad((char *)sret + 14, (fnod.ftime>>5)&0x3F, '0', 2, 10);
-	    sret[16] = ':'; IntToStrPad((char *)sret + 17, (fnod.ftime&0x1F)*2, '0', 2, 10);
-        FatFSFileSystem=FatFSFileSystemSave;
-		CtoM(sret);
-	    targ=T_STR;
-		return;
-	} else if((tp=checkstring(ep, (unsigned char *)"ONEWIRE"))){
+        IntToStr((char *)sret, ((fnod.fdate >> 9) & 0x7F) + 1980, 10);
+        sret[4] = '-';
+        IntToStrPad((char *)sret + 5, (fnod.fdate >> 5) & 0xF, '0', 2, 10);
+        sret[7] = '-';
+        IntToStrPad((char *)sret + 8, fnod.fdate & 0x1F, '0', 2, 10);
+        sret[10] = ' ';
+        IntToStrPad((char *)sret + 11, (fnod.ftime >> 11) & 0x1F, '0', 2, 10);
+        sret[13] = ':';
+        IntToStrPad((char *)sret + 14, (fnod.ftime >> 5) & 0x3F, '0', 2, 10);
+        sret[16] = ':';
+        IntToStrPad((char *)sret + 17, (fnod.ftime & 0x1F) * 2, '0', 2, 10);
+        FatFSFileSystem = FatFSFileSystemSave;
+        CtoM(sret);
+        targ = T_STR;
+        return;
+    } else if ((tp = checkstring(ep, (unsigned char *)"ONEWIRE"))) {
         fun_mmOW();
         return;
-	} else if((tp=checkstring(ep, (unsigned char *)"OPTION"))){
-        if(checkstring(tp, (unsigned char *)"AUTORUN")){
-			if(Option.Autorun == false)strcpy((char *)sret,"Off");
-            else if(Option.Autorun==MAXFLASHSLOTS+1)strcpy((char *)sret,"On");
-			else {
+    } else if ((tp = checkstring(ep, (unsigned char *)"OPTION"))) {
+        if (checkstring(tp, (unsigned char *)"AUTORUN")) {
+            if (Option.Autorun == false)
+                strcpy((char *)sret, "Off");
+            else if (Option.Autorun == MAXFLASHSLOTS + 1)
+                strcpy((char *)sret, "On");
+            else {
                 char b[10];
-                IntToStr(b,Option.Autorun,10);
-                strcpy((char *)sret,b);
+                IntToStr(b, Option.Autorun, 10);
+                strcpy((char *)sret, b);
             }
             CtoM(sret);
-            targ=T_STR;
+            targ = T_STR;
             return;
-		} else if(checkstring(tp, (unsigned char *)"BASE")){
-			if(g_OptionBase==1)iret=1;
-			else iret=0;
-			targ=T_INT;
-			return;
-		} else if(checkstring(tp, (unsigned char *)"AUDIO")){
-            if(Option.AUDIO_L)strcpy((char *)sret,"PWM");
-            else if(Option.AUDIO_MISO_PIN)strcpy((char *)sret,"VS1053");
-            else if(Option.AUDIO_CLK_PIN)strcpy((char *)sret,"SPI");
-			else if(Option.audio_i2s_bclk)strcpy((char *)sret,"I2S");
-            else strcpy((char *)sret,"NONE");
-            CtoM(sret);
-            targ=T_STR;
-			return;
-		} else if(checkstring(tp, (unsigned char *)"BREAK")){
-			iret=BreakKey;
-			targ=T_INT;
-			return;
-		} else if(checkstring(tp, (unsigned char *)"AUTOREFRESH")){
-			if(Option.Refresh)strcpy((char *)sret,"ON");
-			else strcpy((char *)sret,"OFF");
-            CtoM(sret);
-            targ=T_STR;
+        } else if (checkstring(tp, (unsigned char *)"BASE")) {
+            if (g_OptionBase == 1)
+                iret = 1;
+            else
+                iret = 0;
+            targ = T_INT;
             return;
-		} else if(checkstring(tp, (unsigned char *)"ANGLE")){
-			if(optionangle==1.0)strcpy((char *)sret,"RADIANS");
-			else strcpy((char *)sret,"DEGREES");
+        } else if (checkstring(tp, (unsigned char *)"AUDIO")) {
+            if (Option.AUDIO_L)
+                strcpy((char *)sret, "PWM");
+            else if (Option.AUDIO_MISO_PIN)
+                strcpy((char *)sret, "VS1053");
+            else if (Option.AUDIO_CLK_PIN)
+                strcpy((char *)sret, "SPI");
+            else if (Option.audio_i2s_bclk)
+                strcpy((char *)sret, "I2S");
+            else
+                strcpy((char *)sret, "NONE");
             CtoM(sret);
-            targ=T_STR;
+            targ = T_STR;
             return;
- 		} else if(checkstring(tp, (unsigned char *)"DEFAULT")){
-			if(DefaultType == T_INT)strcpy((char *)sret,"Integer");
-			else if(DefaultType == T_NBR)strcpy((char *)sret,"Float");
-			else if(DefaultType == T_STR)strcpy((char *)sret,"String");
-			else strcpy((char *)sret,"None");
+        } else if (checkstring(tp, (unsigned char *)"BREAK")) {
+            iret = BreakKey;
+            targ = T_INT;
+            return;
+        } else if (checkstring(tp, (unsigned char *)"AUTOREFRESH")) {
+            if (Option.Refresh)
+                strcpy((char *)sret, "ON");
+            else
+                strcpy((char *)sret, "OFF");
             CtoM(sret);
-            targ=T_STR;
+            targ = T_STR;
             return;
-			} else if(checkstring(tp, (unsigned char *)"KEYBOARD")){
-				/* USB builds populate Option.USBKeyboard; PS/2 builds populate
+        } else if (checkstring(tp, (unsigned char *)"ANGLE")) {
+            if (optionangle == 1.0)
+                strcpy((char *)sret, "RADIANS");
+            else
+                strcpy((char *)sret, "DEGREES");
+            CtoM(sret);
+            targ = T_STR;
+            return;
+        } else if (checkstring(tp, (unsigned char *)"DEFAULT")) {
+            if (DefaultType == T_INT)
+                strcpy((char *)sret, "Integer");
+            else if (DefaultType == T_NBR)
+                strcpy((char *)sret, "Float");
+            else if (DefaultType == T_STR)
+                strcpy((char *)sret, "String");
+            else
+                strcpy((char *)sret, "None");
+            CtoM(sret);
+            targ = T_STR;
+            return;
+        } else if (checkstring(tp, (unsigned char *)"KEYBOARD")) {
+            /* USB builds populate Option.USBKeyboard; PS/2 builds populate
 				 * Option.KeyboardConfig. The other field stays zero. */
-				int kb = Option.USBKeyboard ? Option.USBKeyboard : Option.KeyboardConfig;
-				if (kb == CONFIG_I2C) strcpy((char *)sret, "I2C");
-				else strcpy((char *)sret, (char *)KBrdList[kb]);
-				CtoM(sret);
-				targ=T_STR;
-				return;
- 		} else if(checkstring(tp, (unsigned char *)"EXPLICIT")){
-			if(OptionExplicit == false)strcpy((char *)sret,"Off");
-			else strcpy((char *)sret,"On");
+            int kb = Option.USBKeyboard ? Option.USBKeyboard : Option.KeyboardConfig;
+            if (kb == CONFIG_I2C)
+                strcpy((char *)sret, "I2C");
+            else
+                strcpy((char *)sret, (char *)KBrdList[kb]);
             CtoM(sret);
-            targ=T_STR;
+            targ = T_STR;
             return;
-		} else if(checkstring(tp, (unsigned char *)"FLASH SIZE")){
+        } else if (checkstring(tp, (unsigned char *)"EXPLICIT")) {
+            if (OptionExplicit == false)
+                strcpy((char *)sret, "Off");
+            else
+                strcpy((char *)sret, "On");
+            CtoM(sret);
+            targ = T_STR;
+            return;
+        } else if (checkstring(tp, (unsigned char *)"FLASH SIZE")) {
             uint8_t rxbuf[4] = {0};
             hal_flash_read_jedec_id(rxbuf);
-            iret= 1 << rxbuf[3];
-			targ=T_INT;
-			return;
-        } else if(checkstring(tp, (unsigned char *)"HEIGHT")){
+            iret = 1 << rxbuf[3];
+            targ = T_INT;
+            return;
+        } else if (checkstring(tp, (unsigned char *)"HEIGHT")) {
             iret = Option.Height;
             targ = T_INT;
             return;
-        } else if(checkstring(tp, (unsigned char *)"CONSOLE")){
-			if(Option.DISPLAY_CONSOLE)strcpy((char *)sret,"Both");
-			else strcpy((char *)sret,"Serial");
+        } else if (checkstring(tp, (unsigned char *)"CONSOLE")) {
+            if (Option.DISPLAY_CONSOLE)
+                strcpy((char *)sret, "Both");
+            else
+                strcpy((char *)sret, "Serial");
             CtoM(sret);
-            targ=T_STR;
+            targ = T_STR;
             return;
-        } else if(checkstring(tp, (unsigned char *)"WIDTH")){
+        } else if (checkstring(tp, (unsigned char *)"WIDTH")) {
             iret = Option.Width;
             targ = T_INT;
             return;
-		} else if(checkstring(tp, (unsigned char *)"SSID") && port_web_get_ssid(sret, &targ)) {
+        } else if (checkstring(tp, (unsigned char *)"SSID") && port_web_get_ssid(sret, &targ)) {
             return;
-		} else error("Syntax");
-    } else if(*ep=='p' || *ep=='P'){
-        if((tp=checkstring(ep, (unsigned char *)"PINNO"))){
+        } else
+            error("Syntax");
+    } else if (*ep == 'p' || *ep == 'P') {
+        if ((tp = checkstring(ep, (unsigned char *)"PINNO"))) {
             int pin;
             MMFLOAT f;
             int64_t i64;
-            unsigned char *ss;
-            int t=0;
+            unsigned char * ss;
+            int t = 0;
             char code, *ptr;
-            char *string=GetTempMemory(STRINGSIZE);
+            char * string = GetTempMemory(STRINGSIZE);
             skipspace(tp);
             iret = port_pinno_alias_for_name((const char *)tp);
-            if (iret) { targ = T_INT; return; }
-            if(codecheck(tp))evaluate(tp, &f, &i64, &ss, &t, false);
-            if(t & T_STR ){
-                ptr=(char *)getCstring(tp);
-                strcpy(string,ptr);
+            if (iret) {
+                targ = T_INT;
+                return;
+            }
+            if (codecheck(tp)) evaluate(tp, &f, &i64, &ss, &t, false);
+            if (t & T_STR) {
+                ptr = (char *)getCstring(tp);
+                strcpy(string, ptr);
             } else {
-                strcpy(string,(char *)tp);
+                strcpy(string, (char *)tp);
             }
             iret = port_pinno_alias_for_name((const char *)string);
-            if (iret) { targ = T_INT; return; }
-            if(!(code=codecheck( (unsigned char *)string)))string+=2;
-            else error("Syntax");
+            if (iret) {
+                targ = T_INT;
+                return;
+            }
+            if (!(code = codecheck((unsigned char *)string)))
+                string += 2;
+            else
+                error("Syntax");
             pin = getinteger((unsigned char *)string);
-            if(!code)pin=codemap(pin);
+            if (!code) pin = codemap(pin);
             if (port_pin_is_reserved_alias(pin)) {
                 iret = pin;
                 targ = T_INT;
                 return;
             }
-            if(IsInvalidPin(pin))error("Invalid pin");
-            iret=pin;
-            targ=T_INT;
+            if (IsInvalidPin(pin)) error("Invalid pin");
+            iret = pin;
+            targ = T_INT;
             return;
-        } else if((tp=checkstring(ep, (unsigned char *)"PERSISTENT"))){
-            iret=_persistent;
-            targ=T_INT;
+        } else if ((tp = checkstring(ep, (unsigned char *)"PERSISTENT"))) {
+            iret = _persistent;
+            targ = T_INT;
             return;
-        } else if((tp=checkstring(ep, (unsigned char *)"PIO RX DMA"))){
-            iret=dma_channel_is_busy(dma_rx_chan);
-            targ=T_INT;
+        } else if ((tp = checkstring(ep, (unsigned char *)"PIO RX DMA"))) {
+            iret = dma_channel_is_busy(dma_rx_chan);
+            targ = T_INT;
             return;
-        } else if((tp=checkstring(ep, (unsigned char *)"PIO TX DMA"))){
-            iret=dma_channel_is_busy(dma_tx_chan);
-            targ=T_INT;
+        } else if ((tp = checkstring(ep, (unsigned char *)"PIO TX DMA"))) {
+            iret = dma_channel_is_busy(dma_tx_chan);
+            targ = T_INT;
             return;
-        } else if((tp=checkstring(ep, (unsigned char *)"PWM COUNT"))){
+        } else if ((tp = checkstring(ep, (unsigned char *)"PWM COUNT"))) {
             /* rp2040: 8 slices (0..7). rp2350a (30-pin / RP2040 fixed-
              * true): only 0..7 accessible. rp2350b: 0..11. */
             int max_slice = rp2350a ? 7 : (HAL_PORT_PWM_SLICE_COUNT - 1);
-            int channel=getint(tp,0,max_slice);
-            iret=pwm_hw->slice[channel].top;
-            targ=T_INT;
+            int channel = getint(tp, 0, max_slice);
+            iret = pwm_hw->slice[channel].top;
+            targ = T_INT;
             return;
-        } else if((tp=checkstring(ep, (unsigned char *)"PWM DUTY"))){
-            getargs(&tp,3,(unsigned char *)",");
-            if(argc!=3)error("Syntax");
+        } else if ((tp = checkstring(ep, (unsigned char *)"PWM DUTY"))) {
+            getargs(&tp, 3, (unsigned char *)",");
+            if (argc != 3) error("Syntax");
             int max_slice = rp2350a ? 7 : (HAL_PORT_PWM_SLICE_COUNT - 1);
-            int channel=getint(argv[0],0,max_slice);
-            int AorB=getint(argv[2],0,1);
-            if(AorB)iret=((pwm_hw->slice[channel].cc) >> 16);
-            else iret=(pwm_hw->slice[channel].cc & 0xFFFF);
-            targ=T_INT;
+            int channel = getint(argv[0], 0, max_slice);
+            int AorB = getint(argv[2], 0, 1);
+            if (AorB)
+                iret = ((pwm_hw->slice[channel].cc) >> 16);
+            else
+                iret = (pwm_hw->slice[channel].cc & 0xFFFF);
+            targ = T_INT;
             return;
-        } else if((tp=checkstring(ep, (unsigned char *)"PIN"))){
+        } else if ((tp = checkstring(ep, (unsigned char *)"PIN"))) {
             int pin;
             char code;
-            if(!(code=codecheck(tp)))tp+=2;
+            if (!(code = codecheck(tp))) tp += 2;
             pin = getinteger(tp);
-            if(!code)pin=codemap(pin);
+            if (!code) pin = codemap(pin);
             {
-                const char *reserved = port_pin_reserved_label(pin);
+                const char * reserved = port_pin_reserved_label(pin);
                 if (reserved) {
                     strcpy((char *)sret, reserved);
                     CtoM(sret);
@@ -2115,177 +2291,197 @@ void MIPS16 fun_info(void){
                     return;
                 }
             }
-            if(IsInvalidPin(pin))strcpy((char *)sret,"Invalid");
-            else strcpy((char *)sret,PinFunction[ExtCurrentConfig[pin] & 0xFF]);
-            if(ExtCurrentConfig[pin] & EXT_BOOT_RESERVED){
+            if (IsInvalidPin(pin))
+                strcpy((char *)sret, "Invalid");
+            else
+                strcpy((char *)sret, PinFunction[ExtCurrentConfig[pin] & 0xFF]);
+            if (ExtCurrentConfig[pin] & EXT_BOOT_RESERVED) {
                 strcpy((char *)sret, "Boot Reserved : ");
-                strcat((char *)sret,pinsearch(pin));
+                strcat((char *)sret, pinsearch(pin));
             }
-            if(ExtCurrentConfig[pin] & EXT_COM_RESERVED)strcat((char *)sret, ": Reserved for function");
-            if(ExtCurrentConfig[pin] & EXT_DS18B20_RESERVED)strcat((char *)sret, ": In use for DS18B20");
+            if (ExtCurrentConfig[pin] & EXT_COM_RESERVED) strcat((char *)sret, ": Reserved for function");
+            if (ExtCurrentConfig[pin] & EXT_DS18B20_RESERVED) strcat((char *)sret, ": In use for DS18B20");
             CtoM(sret);
-            targ=T_STR;
+            targ = T_STR;
             return;
-        } else if(checkstring(ep, (unsigned char *)"PROGRAM")){
+        } else if (checkstring(ep, (unsigned char *)"PROGRAM")) {
             iret = (int64_t)(uint32_t)ProgMemory;
             targ = T_INT;
             return;
-        } else if(checkstring(ep, (unsigned char *)"PSRAM SIZE")){
+        } else if (checkstring(ep, (unsigned char *)"PSRAM SIZE")) {
             iret = PSRAMsize;
             targ = T_INT;
             return;
-        } else if(checkstring(ep, (unsigned char *)"PS2")){
+        } else if (checkstring(ep, (unsigned char *)"PS2")) {
             /* PS2code is 0 on USB-keyboard builds (USBKeyboard.c stubs it). */
             iret = (int64_t)(uint32_t)PS2code;
             targ = T_INT;
             return;
-        } else if(checkstring(ep, (unsigned char *)"PATH")){
-//            strcpy((char *)sret,GetCWD());
-//            if(sret[strlen((char *)sret)-1]!='/')strcat((char *)sret,"/");
-            if(ProgMemory[0]==1 && ProgMemory[1]==39 && ProgMemory[2]==35){
-                strcpy((char *)sret,(char *)&ProgMemory[3]);
-                for(int i=strlen((char *)sret)-1;i>0;i--){
-                    if(sret[i]!='/')sret[i]=0;
-                    else break;
+        } else if (checkstring(ep, (unsigned char *)"PATH")) {
+            //            strcpy((char *)sret,GetCWD());
+            //            if(sret[strlen((char *)sret)-1]!='/')strcat((char *)sret,"/");
+            if (ProgMemory[0] == 1 && ProgMemory[1] == 39 && ProgMemory[2] == 35) {
+                strcpy((char *)sret, (char *)&ProgMemory[3]);
+                for (int i = strlen((char *)sret) - 1; i > 0; i--) {
+                    if (sret[i] != '/')
+                        sret[i] = 0;
+                    else
+                        break;
                 }
-            } else strcpy((char *)sret,"NONE");
+            } else
+                strcpy((char *)sret, "NONE");
             CtoM(sret);
-            targ=T_STR;
+            targ = T_STR;
             return;
-        } else if(checkstring(ep, (unsigned char *)"PLATFORM")){
-			strcpy((char *)sret,(char *)Option.platform);
+        } else if (checkstring(ep, (unsigned char *)"PLATFORM")) {
+            strcpy((char *)sret, (char *)Option.platform);
             CtoM(sret);
-            targ=T_STR;
+            targ = T_STR;
             return;
-        } else error("Syntax");
-    } else if(*ep=='s' || *ep=='S'){
-        if(checkstring(ep, (unsigned char *)"SDCARD")){
-            int i=OptionFileErrorAbort;
-            OptionFileErrorAbort=0;
+        } else
+            error("Syntax");
+    } else if (*ep == 's' || *ep == 'S') {
+        if (checkstring(ep, (unsigned char *)"SDCARD")) {
+            int i = OptionFileErrorAbort;
+            OptionFileErrorAbort = 0;
             FatFSFileSystemSave = FatFSFileSystem;
-            FatFSFileSystem=1;
-            if(!(Option.SD_CS || Option.CombinedCS))strcpy((char *)sret,"Not Configured");
-            else if(!InitSDCard())strcpy((char *)sret,"Not present");
-            else  strcpy((char *)sret,"Ready");
+            FatFSFileSystem = 1;
+            if (!(Option.SD_CS || Option.CombinedCS))
+                strcpy((char *)sret, "Not Configured");
+            else if (!InitSDCard())
+                strcpy((char *)sret, "Not present");
+            else
+                strcpy((char *)sret, "Ready");
             CtoM(sret);
-            targ=T_STR;
-            OptionFileErrorAbort=i;
+            targ = T_STR;
+            OptionFileErrorAbort = i;
             FatFSFileSystem = FatFSFileSystemSave;
             return;
-        } else if(checkstring(ep, (unsigned char *)"SYSTEM I2C")){
-            if(!Option.SYSTEM_I2C_SDA)strcpy((char *)sret,"Not set");
-            else  if(I2C0locked) strcpy((char *)sret,"I2C");
-            else strcpy((char *)sret,"I2C2");
+        } else if (checkstring(ep, (unsigned char *)"SYSTEM I2C")) {
+            if (!Option.SYSTEM_I2C_SDA)
+                strcpy((char *)sret, "Not set");
+            else if (I2C0locked)
+                strcpy((char *)sret, "I2C");
+            else
+                strcpy((char *)sret, "I2C2");
             CtoM(sret);
-            targ=T_STR;
+            targ = T_STR;
             return;
-        } else if(checkstring(ep, (unsigned char *)"SPI SPEED")){
+        } else if (checkstring(ep, (unsigned char *)"SPI SPEED")) {
             SPISpeedSet(Option.DISPLAY_TYPE);
-            if(PinDef[Option.SYSTEM_CLK].mode & SPI0SCK){
-                iret=spi_get_baudrate(spi0);
-            } else if(PinDef[Option.SYSTEM_CLK].mode & SPI1SCK){
-                iret=spi_get_baudrate(spi1);
-            } else error("System SPI not configured");
-           targ=T_INT;
+            if (PinDef[Option.SYSTEM_CLK].mode & SPI0SCK) {
+                iret = spi_get_baudrate(spi0);
+            } else if (PinDef[Option.SYSTEM_CLK].mode & SPI1SCK) {
+                iret = spi_get_baudrate(spi1);
+            } else
+                error("System SPI not configured");
+            targ = T_INT;
             return;
-        } else if(checkstring(ep, (unsigned char *)"STACK")){
-            iret=(int64_t)((uint32_t)__get_MSP());
-            targ=T_INT;
+        } else if (checkstring(ep, (unsigned char *)"STACK")) {
+            iret = (int64_t)((uint32_t)__get_MSP());
+            targ = T_INT;
             return;
-        } else if((tp=checkstring(ep, (unsigned char *)"SYSTICK"))){
+        } else if ((tp = checkstring(ep, (unsigned char *)"SYSTICK"))) {
             iret = (int64_t)(uint32_t)systick_hw->cvr;
             targ = T_INT;
             return;
-        } else if(checkstring(ep, (unsigned char *)"SYSTEM HEAP")){
+        } else if (checkstring(ep, (unsigned char *)"SYSTEM HEAP")) {
             iret = (int64_t)(uint32_t)getFreeHeap();
-            targ=T_INT;
+            targ = T_INT;
             return;
-        } else if(checkstring(ep, (unsigned char *)"SOUND")){
-            strcpy((char *)sret,PlayingStr[CurrentlyPlaying]);
+        } else if (checkstring(ep, (unsigned char *)"SOUND")) {
+            strcpy((char *)sret, PlayingStr[CurrentlyPlaying]);
             CtoM(sret);
-            targ=T_STR;
+            targ = T_STR;
             return;
         } else if (checkstring(ep, (unsigned char *)"SCROLL")) {
-            if (port_mminfo_scroll_start(&iret)) { targ = T_INT; return; }
+            if (port_mminfo_scroll_start(&iret)) {
+                targ = T_INT;
+                return;
+            }
             error("Syntax");
         } else if (checkstring(ep, (unsigned char *)"SCREENBUFF")) {
-            if (port_mminfo_screenbuff(&iret)) { targ = T_INT; return; }
+            if (port_mminfo_screenbuff(&iret)) {
+                targ = T_INT;
+                return;
+            }
             error("Syntax");
-        } else error("Syntax");
-    }
-    else if (checkstring(ep, (unsigned char *)"TOUCH")) {
+        } else
+            error("Syntax");
+    } else if (checkstring(ep, (unsigned char *)"TOUCH")) {
         if (port_mminfo_touch_status(sret)) {
             CtoM(sret);
             targ = T_STR;
             return;
         }
         error("Syntax");
-    }
-	else if(checkstring(ep, (unsigned char *)"TRACK")){
-		if(CurrentlyPlaying == P_MP3 || CurrentlyPlaying == P_FLAC || CurrentlyPlaying == P_WAV|| CurrentlyPlaying == P_MOD || CurrentlyPlaying == P_MIDI) strcpy((char *)sret,WAVfilename);
-		else strcpy((char *)sret,"OFF");
+    } else if (checkstring(ep, (unsigned char *)"TRACK")) {
+        if (CurrentlyPlaying == P_MP3 || CurrentlyPlaying == P_FLAC || CurrentlyPlaying == P_WAV || CurrentlyPlaying == P_MOD || CurrentlyPlaying == P_MIDI)
+            strcpy((char *)sret, WAVfilename);
+        else
+            strcpy((char *)sret, "OFF");
         CtoM(sret);
-        targ=T_STR;
+        targ = T_STR;
         return;
-    }
-    else if(*ep=='v' || *ep=='V'){
-        if(checkstring(ep, (unsigned char *)"VARCNT")){
-            iret=(int64_t)((uint32_t)g_varcnt);
-            targ=T_INT;
+    } else if (*ep == 'v' || *ep == 'V') {
+        if (checkstring(ep, (unsigned char *)"VARCNT")) {
+            iret = (int64_t)((uint32_t)g_varcnt);
+            targ = T_INT;
             return;
-        } else if(checkstring(ep, (unsigned char *)"VERSION")){
+        } else if (checkstring(ep, (unsigned char *)"VERSION")) {
             fun_version();
             return;
-        } else if(checkstring(ep, (unsigned char *)"VPOS")){
+        } else if (checkstring(ep, (unsigned char *)"VPOS")) {
             iret = CurrentY;
-            targ=T_INT;
+            targ = T_INT;
             return;
-        } else if((tp=checkstring(ep, (unsigned char *)"VALID CPUSPEED"))){
-                iret=1;
-                uint32_t speed=getint(tp,MIN_CPU,MAX_CPU);
-                uint vco, postdiv1, postdiv2;
-                if (!check_sys_clock_khz(speed, &vco, &postdiv1, &postdiv2))iret=0;
-                targ=T_INT;
-                return;
-        } else error("Syntax");
-	} else if(checkstring(ep, (unsigned char *)"WRITEBUFF")){
-        iret=(int64_t)((uint32_t)WriteBuf);
-        targ=T_INT;
+        } else if ((tp = checkstring(ep, (unsigned char *)"VALID CPUSPEED"))) {
+            iret = 1;
+            uint32_t speed = getint(tp, MIN_CPU, MAX_CPU);
+            uint vco, postdiv1, postdiv2;
+            if (!check_sys_clock_khz(speed, &vco, &postdiv1, &postdiv2)) iret = 0;
+            targ = T_INT;
+            return;
+        } else
+            error("Syntax");
+    } else if (checkstring(ep, (unsigned char *)"WRITEBUFF")) {
+        iret = (int64_t)((uint32_t)WriteBuf);
+        targ = T_INT;
         return;
-    } else if((tp=checkstring(ep, (unsigned char *)"UPTIME"))){
-        fret = (MMFLOAT)hal_time_us_64()/1000000.0;
+    } else if ((tp = checkstring(ep, (unsigned char *)"UPTIME"))) {
+        fret = (MMFLOAT)hal_time_us_64() / 1000000.0;
         targ = T_NBR;
         return;
-    } else if((tp=checkstring(ep, (unsigned char *)"MAX GP"))){
+    } else if ((tp = checkstring(ep, (unsigned char *)"MAX GP"))) {
         /* rp2040: 30 GPIOs (0..29). rp2350a==true: 0..29. rp2350a==false
          * (RP2350B): 0..47. HAL_PORT_GPIO_COUNT is 30 on rp2040, 48 on
          * rp2350. */
         iret = (HAL_PORT_GPIO_COUNT > 30 && !rp2350a) ? 47 : 29;
         targ = T_INT;
         return;
-    } else error("Syntax");
+    } else
+        error("Syntax");
 }
-
 
 void cmd_watchdog(void) {
     int i;
-    unsigned char *p;
+    unsigned char * p;
 
-    if((p=checkstring(cmdline, (unsigned char *)"HW"))){
-        if(checkstring(p, (unsigned char *)"OFF") != NULL) {
+    if ((p = checkstring(cmdline, (unsigned char *)"HW"))) {
+        if (checkstring(p, (unsigned char *)"OFF") != NULL) {
             hal_watchdog_disable();
-            _excep_code=0;
+            _excep_code = 0;
         } else {
-            i = getint(p,1,8331);
-            hal_watchdog_enable_ms(i,1);
-            _excep_code=POSSIBLE_WATCHDOG;
+            i = getint(p, 1, 8331);
+            hal_watchdog_enable_ms(i, 1);
+            _excep_code = POSSIBLE_WATCHDOG;
         }
 
-    } else if(checkstring(cmdline, (unsigned char *)"OFF") != NULL) {
+    } else if (checkstring(cmdline, (unsigned char *)"OFF") != NULL) {
         WDTimer = 0;
     } else {
         i = getinteger(cmdline);
-        if(i < 1) error("Invalid argument");
+        if (i < 1) error("Invalid argument");
         WDTimer = i;
     }
 }
@@ -2295,56 +2491,57 @@ void fun_restart(void) {
     targ = T_INT;
 }
 
-
 void cmd_cpu(void) {
-    unsigned char *p;
-    if((p = checkstring(cmdline, (unsigned char *)"RESTART"))) {
+    unsigned char * p;
+    if ((p = checkstring(cmdline, (unsigned char *)"RESTART"))) {
         _excep_code = RESET_COMMAND;
-//        while(ConsoleTxBufTail != ConsoleTxBufHead);
+        //        while(ConsoleTxBufTail != ConsoleTxBufHead);
         uSec(10000);
-        SoftReset();                                                // this will restart the processor ? only works when not in debug
-    } else if((p = checkstring(cmdline, (unsigned char *)"SLEEP"))) {
-//        	int pullup=0;
-            MMFLOAT totalseconds;
-            getargs(&p, 3, (unsigned char *)",");
-            totalseconds=getnumber(p);
-            if(totalseconds<=0.0)error("Invalid period");
-            hal_time_sleep_us(totalseconds*1000000);
+        SoftReset(); // this will restart the processor ? only works when not in debug
+    } else if ((p = checkstring(cmdline, (unsigned char *)"SLEEP"))) {
+        //        	int pullup=0;
+        MMFLOAT totalseconds;
+        getargs(&p, 3, (unsigned char *)",");
+        totalseconds = getnumber(p);
+        if (totalseconds <= 0.0) error("Invalid period");
+        hal_time_sleep_us(totalseconds * 1000000);
 
-    } else error("Syntax");
+    } else
+        error("Syntax");
 }
-void cmd_csubinterrupt(void){
-    getargs(&cmdline,1,(unsigned char *)",");
-    if(argc != 0){
-        if(checkstring(argv[0],(unsigned char *)"0")){
+void cmd_csubinterrupt(void) {
+    getargs(&cmdline, 1, (unsigned char *)",");
+    if (argc != 0) {
+        if (checkstring(argv[0], (unsigned char *)"0")) {
             CSubInterrupt = NULL;
-            CSubComplete=0;
+            CSubComplete = 0;
         } else {
             CSubInterrupt = (char *)GetIntAddress(argv[0]);
-            CSubComplete=0;
+            CSubComplete = 0;
             InterruptUsed = true;
         }
-    } else CSubComplete=1;
+    } else
+        CSubComplete = 1;
 }
 void cmd_cfunction(void) {
-    unsigned char *p;
+    unsigned char * p;
     unsigned short EndToken;
     CommandToken tkn;
-    EndToken = GetCommandValue((unsigned char *)"End DefineFont");           // this terminates a DefineFont
-    if(cmdtoken == cmdCSUB) EndToken = GetCommandValue((unsigned char *)"End CSub");                 // this terminates a CSUB
+    EndToken = GetCommandValue((unsigned char *)"End DefineFont");                    // this terminates a DefineFont
+    if (cmdtoken == cmdCSUB) EndToken = GetCommandValue((unsigned char *)"End CSub"); // this terminates a CSUB
     p = cmdline;
-    while(*p != 0xff) {
-        if(*p == 0) p++;                                            // if it is at the end of an element skip the zero marker
-        if(*p == 0) error("Missing END declaration");               // end of the program
-        if(*p == T_NEWLINE) p++;                                    // skip over the newline token
-        if(*p == T_LINENBR) p += 3;                                 // skip over the line number
+    while (*p != 0xff) {
+        if (*p == 0) p++;                              // if it is at the end of an element skip the zero marker
+        if (*p == 0) error("Missing END declaration"); // end of the program
+        if (*p == T_NEWLINE) p++;                      // skip over the newline token
+        if (*p == T_LINENBR) p += 3;                   // skip over the line number
         skipspace(p);
-        if(*p == T_LABEL) {
-            p += p[1] + 2;                                          // skip over the label
-            skipspace(p);                                           // and any following spaces
+        if (*p == T_LABEL) {
+            p += p[1] + 2; // skip over the label
+            skipspace(p);  // and any following spaces
         }
-        tkn=commandtbl_decode(p);
-        if(tkn == EndToken) {                                        // found an END token
+        tkn = commandtbl_decode(p);
+        if (tkn == EndToken) { // found an END token
             nextstmt = (unsigned char *)p;
             skipelement(nextstmt);
             return;
@@ -2354,81 +2551,81 @@ void cmd_cfunction(void) {
 }
 
 // utility function used by cmd_poke() to validate an address
-unsigned int GetPokeAddr(unsigned char *p) {
+unsigned int GetPokeAddr(unsigned char * p) {
     unsigned int i;
     i = getinteger(p);
-//    if(!POKERANGE(i)) error("Address");
+    //    if(!POKERANGE(i)) error("Address");
     return i;
 }
 
-
 void cmd_poke(void) {
     unsigned char *p, *q;
-    void *pp;
-    if((p = checkstring(cmdline, (unsigned char *)"DISPLAY"))){
-        if(!Option.DISPLAY_TYPE)error("Display not configured");
-        if((q=checkstring(p,(unsigned char *)"HRES"))){
-            HRes=getint(q,0,1920);
+    void * pp;
+    if ((p = checkstring(cmdline, (unsigned char *)"DISPLAY"))) {
+        if (!Option.DISPLAY_TYPE) error("Display not configured");
+        if ((q = checkstring(p, (unsigned char *)"HRES"))) {
+            HRes = getint(q, 0, 1920);
             return;
-        } else if((q=checkstring(p,(unsigned char *)"VRES"))){
-            VRes=getint(q,0,1200);
+        } else if ((q = checkstring(p, (unsigned char *)"VRES"))) {
+            VRes = getint(q, 0, 1200);
             return;
         } else if (port_poke_display_panel(p)) {
             return;
-        } error("Syntax");
+        }
+        error("Syntax");
     } else {
         getargs(&cmdline, 5, (unsigned char *)",");
-        if((p = checkstring(argv[0], (unsigned char *)"BYTE"))) {
-            if(argc != 3) error("Argument count");
-            uint32_t a=GetPokeAddr(p);
-            uint8_t *padd=(uint8_t *)(a);
+        if ((p = checkstring(argv[0], (unsigned char *)"BYTE"))) {
+            if (argc != 3) error("Argument count");
+            uint32_t a = GetPokeAddr(p);
+            uint8_t * padd = (uint8_t *)(a);
             *padd = getinteger(argv[2]);
             return;
         }
-        if((p = checkstring(argv[0], (unsigned char *)"SHORT"))) {
-            if(argc != 3) error("Argument count");
-            uint32_t a=GetPokeAddr(p);
-            if(a % 2)error("Address not divisible by 2");
-            uint16_t *padd=(uint16_t *)(a);
-            *padd = getinteger(argv[2]);
-            return;
-        }
-
-        if((p = checkstring(argv[0], (unsigned char *)"WORD"))) {
-            if(argc != 3) error("Argument count");
-            uint32_t a=GetPokeAddr(p);
-            if(a % 4)error("Address not divisible by 4");
-            uint32_t *padd=(uint32_t *)(a);
+        if ((p = checkstring(argv[0], (unsigned char *)"SHORT"))) {
+            if (argc != 3) error("Argument count");
+            uint32_t a = GetPokeAddr(p);
+            if (a % 2) error("Address not divisible by 2");
+            uint16_t * padd = (uint16_t *)(a);
             *padd = getinteger(argv[2]);
             return;
         }
 
-        if((p = checkstring(argv[0], (unsigned char *)"INTEGER"))) {
-            if(argc != 3) error("Argument count");
-            uint32_t a=GetPokeAddr(p);
-            if(a % 8)error("Address not divisible by 8");
-            uint64_t *padd=(uint64_t *)(a);
+        if ((p = checkstring(argv[0], (unsigned char *)"WORD"))) {
+            if (argc != 3) error("Argument count");
+            uint32_t a = GetPokeAddr(p);
+            if (a % 4) error("Address not divisible by 4");
+            uint32_t * padd = (uint32_t *)(a);
             *padd = getinteger(argv[2]);
             return;
         }
-        if((p = checkstring(argv[0], (unsigned char *)"FLOAT"))) {
-            if(argc != 3) error("Argument count");
-            uint32_t a=GetPokeAddr(p);
-            if(a % 8)error("Address not divisible by 8");
-            MMFLOAT *padd=(MMFLOAT *)(a);
+
+        if ((p = checkstring(argv[0], (unsigned char *)"INTEGER"))) {
+            if (argc != 3) error("Argument count");
+            uint32_t a = GetPokeAddr(p);
+            if (a % 8) error("Address not divisible by 8");
+            uint64_t * padd = (uint64_t *)(a);
+            *padd = getinteger(argv[2]);
+            return;
+        }
+        if ((p = checkstring(argv[0], (unsigned char *)"FLOAT"))) {
+            if (argc != 3) error("Argument count");
+            uint32_t a = GetPokeAddr(p);
+            if (a % 8) error("Address not divisible by 8");
+            MMFLOAT * padd = (MMFLOAT *)(a);
             *padd = getnumber(argv[2]);
             return;
         }
 
-        if(argc != 5) error("Argument count");
+        if (argc != 5) error("Argument count");
 
-        if(checkstring(argv[0], (unsigned char *)"VARTBL")) {
+        if (checkstring(argv[0], (unsigned char *)"VARTBL")) {
             *((char *)g_vartbl + (unsigned int)getinteger(argv[2])) = getinteger(argv[4]);
             return;
         }
-        if((p = checkstring(argv[0], (unsigned char *)"VAR"))) {
+        if ((p = checkstring(argv[0], (unsigned char *)"VAR"))) {
             pp = findvar(p, V_FIND | V_EMPTY_OK | V_NOFIND_ERR);
-            if(g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
+            if (g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
             *((char *)pp + (unsigned int)getinteger(argv[2])) = getinteger(argv[4]);
             return;
         }
@@ -2437,170 +2634,171 @@ void cmd_poke(void) {
     }
 }
 
-
 // function to find a CFunction
 // only used by fun_peek() below
-unsigned int GetCFunAddr(int *ip, int i,unsigned char *offset) {
-    while(*ip != 0xffffffff) {
+unsigned int GetCFunAddr(int * ip, int i, unsigned char * offset) {
+    while (*ip != 0xffffffff) {
         //if(*ip++ == (unsigned int)(subfun[i]-ProgMemory)) {                      // if we have a match
-        if(*ip++ == (unsigned int)(subfun[i]-offset)) {                      // if we have a match
-            ip++;                                                   // step over the size word
-            i = *ip++;                                              // get the offset
-            return (unsigned int)(ip + i);                          // return the entry point
+        if (*ip++ == (unsigned int)(subfun[i] - offset)) { // if we have a match
+            ip++;                                          // step over the size word
+            i = *ip++;                                     // get the offset
+            return (unsigned int)(ip + i);                 // return the entry point
         }
         ip += (*ip + 4) / sizeof(unsigned int);
     }
     return 0;
 }
 
-
-
-
-
 // utility function used by fun_peek() to validate an address
-unsigned int MMB_HOT_FUNC(GetPeekAddr)(unsigned char *p) {
+unsigned int MMB_HOT_FUNC(GetPeekAddr)(unsigned char * p) {
     unsigned int i;
     i = getinteger(p);
-//    if(!PEEKRANGE(i)) error("Address");
+    //    if(!PEEKRANGE(i)) error("Address");
     return i;
 }
 
-#define SPIsend(a) {uint8_t b=a;xmit_byte_multi(&b,1);}
-#define SPIsend2(a) {SPIsend(0);SPIsend(a);}
+#define SPIsend(a)              \
+    {                           \
+        uint8_t b = a;          \
+        xmit_byte_multi(&b, 1); \
+    }
+#define SPIsend2(a) \
+    {               \
+        SPIsend(0); \
+        SPIsend(a); \
+    }
 
 // Will return a byte within the PIC32 virtual memory space.
 void fun_peek(void) {
-    unsigned char *p;
-    void *pp;
+    unsigned char * p;
+    void * pp;
     getargs(&ep, 3, (unsigned char *)",");
-    if((p = checkstring(argv[0], (unsigned char *)"INT8"))){
-        if(argc != 1) error("Syntax");
+    if ((p = checkstring(argv[0], (unsigned char *)"INT8"))) {
+        if (argc != 1) error("Syntax");
         iret = *(unsigned char *)GetPeekAddr(p);
         targ = T_INT;
         return;
     }
 
-    if((p = checkstring(argv[0], (unsigned char *)"VARADDR"))){
-        if(argc != 1) error("Syntax");
+    if ((p = checkstring(argv[0], (unsigned char *)"VARADDR"))) {
+        if (argc != 1) error("Syntax");
         pp = findvar(p, V_FIND | V_EMPTY_OK | V_NOFIND_ERR);
         iret = (unsigned int)pp;
         targ = T_INT;
         return;
-        }
+    }
 
-    if((p = checkstring(argv[0], (unsigned char *)"BP"))){
-        if(argc != 1) error("Syntax");
-        findvar(p, V_FIND  | V_NOFIND_ERR);
-        if(!(g_vartbl[g_VarIndex].type & T_INT))error("Not integer variable");
+    if ((p = checkstring(argv[0], (unsigned char *)"BP"))) {
+        if (argc != 1) error("Syntax");
+        findvar(p, V_FIND | V_NOFIND_ERR);
+        if (!(g_vartbl[g_VarIndex].type & T_INT)) error("Not integer variable");
         iret = *(unsigned char *)(uint32_t)g_vartbl[g_VarIndex].val.i;
         g_vartbl[g_VarIndex].val.i++;
         targ = T_INT;
         return;
     }
-    if((p = checkstring(argv[0], (unsigned char *)"WP"))){
-        if(argc != 1) error("Syntax");
-        findvar(p, V_FIND  | V_NOFIND_ERR);
-        if(!(g_vartbl[g_VarIndex].type & T_INT))error("Not integer variable");
-        if(g_vartbl[g_VarIndex].val.i & 3)error("Not on word boundary");
+    if ((p = checkstring(argv[0], (unsigned char *)"WP"))) {
+        if (argc != 1) error("Syntax");
+        findvar(p, V_FIND | V_NOFIND_ERR);
+        if (!(g_vartbl[g_VarIndex].type & T_INT)) error("Not integer variable");
+        if (g_vartbl[g_VarIndex].val.i & 3) error("Not on word boundary");
         iret = *(unsigned int *)(uint32_t)g_vartbl[g_VarIndex].val.i;
-        g_vartbl[g_VarIndex].val.i+=4;
+        g_vartbl[g_VarIndex].val.i += 4;
         targ = T_INT;
         return;
     }
-    if((p = checkstring(argv[0], (unsigned char *)"SP"))){
-        if(argc != 1) error("Syntax");
-        findvar(p, V_FIND  | V_NOFIND_ERR);
-        if(!(g_vartbl[g_VarIndex].type & T_INT))error("Not integer variable");
-        if(g_vartbl[g_VarIndex].val.i & 1)error("Not on short boundary");
+    if ((p = checkstring(argv[0], (unsigned char *)"SP"))) {
+        if (argc != 1) error("Syntax");
+        findvar(p, V_FIND | V_NOFIND_ERR);
+        if (!(g_vartbl[g_VarIndex].type & T_INT)) error("Not integer variable");
+        if (g_vartbl[g_VarIndex].val.i & 1) error("Not on short boundary");
         iret = *(unsigned short *)(uint32_t)g_vartbl[g_VarIndex].val.i;
-        g_vartbl[g_VarIndex].val.i+=2;
+        g_vartbl[g_VarIndex].val.i += 2;
         targ = T_INT;
         return;
     }
-    if((p = checkstring(argv[0], (unsigned char *)"VAR"))){
+    if ((p = checkstring(argv[0], (unsigned char *)"VAR"))) {
         pp = findvar(p, V_FIND | V_EMPTY_OK | V_NOFIND_ERR);
         iret = *((char *)pp + (int)getinteger(argv[2]));
         targ = T_INT;
         return;
     }
 
-    if((p = checkstring(argv[0], (unsigned char *)"VARHEADER"))){
-        if(argc != 1) error("Syntax");
+    if ((p = checkstring(argv[0], (unsigned char *)"VARHEADER"))) {
+        if (argc != 1) error("Syntax");
         pp = findvar(p, V_FIND | V_EMPTY_OK | V_NOFIND_ERR);
         iret = (unsigned int)&g_vartbl[g_VarIndex].name[0];
         targ = T_INT;
         return;
-        }
+    }
 
-    if((p = checkstring(argv[0], (unsigned char *)"CFUNADDR"))){
-    	int i,j;
-        if(argc != 1) error("Syntax");
-        i = FindSubFun(p, true);                                    // search for a function first
-        if(i == -1) i = FindSubFun(p, false);                       // and if not found try for a subroutine
-        if(i == -1){
+    if ((p = checkstring(argv[0], (unsigned char *)"CFUNADDR"))) {
+        int i, j;
+        if (argc != 1) error("Syntax");
+        i = FindSubFun(p, true);               // search for a function first
+        if (i == -1) i = FindSubFun(p, false); // and if not found try for a subroutine
+        if (i == -1) {
             skipspace(p);
-            getargs(&p,1,(unsigned char *)",");
-            if(argc!=1)error("Syntax");
-            unsigned char *q=getCstring(argv[0]);
-            i = FindSubFun(q, true);                                    // search for a function first
-            if(i == -1) i = FindSubFun(q, false);                       // and if not found try for a subroutine
-        } if(i == -1 || !(commandtbl_decode(subfun[i]) == cmdCSUB)) error("Invalid argument");
+            getargs(&p, 1, (unsigned char *)",");
+            if (argc != 1) error("Syntax");
+            unsigned char * q = getCstring(argv[0]);
+            i = FindSubFun(q, true);               // search for a function first
+            if (i == -1) i = FindSubFun(q, false); // and if not found try for a subroutine
+        }
+        if (i == -1 || !(commandtbl_decode(subfun[i]) == cmdCSUB)) error("Invalid argument");
         // search through program flash and the library looking for a match to the function being called
-        j = GetCFunAddr((int *)CFunctionFlash, i,ProgMemory);
-        if(!j) j = GetCFunAddr((int *)CFunctionLibrary, i,LibMemory);         //Check the library
-        if(!j) error("Internal fault 6(sorry)");
-        iret = (unsigned int)j;                                     // return the entry point
+        j = GetCFunAddr((int *)CFunctionFlash, i, ProgMemory);
+        if (!j) j = GetCFunAddr((int *)CFunctionLibrary, i, LibMemory); //Check the library
+        if (!j) error("Internal fault 6(sorry)");
+        iret = (unsigned int)j; // return the entry point
         targ = T_INT;
         return;
     }
 
-    if((p = checkstring(argv[0], (unsigned char *)"WORD"))){
-        if(argc != 1) error("Syntax");
+    if ((p = checkstring(argv[0], (unsigned char *)"WORD"))) {
+        if (argc != 1) error("Syntax");
         iret = *(unsigned int *)(GetPeekAddr(p) & 0b11111111111111111111111111111100);
         targ = T_INT;
         return;
-        }
-    if((p = checkstring(argv[0], (unsigned char *)"SHORT"))){
-        if(argc != 1) error("Syntax");
-        iret = (unsigned long long int) (*(unsigned short *)(GetPeekAddr(p) & 0b11111111111111111111111111111110));
+    }
+    if ((p = checkstring(argv[0], (unsigned char *)"SHORT"))) {
+        if (argc != 1) error("Syntax");
+        iret = (unsigned long long int)(*(unsigned short *)(GetPeekAddr(p) & 0b11111111111111111111111111111110));
         targ = T_INT;
         return;
-        }
-    if((p = checkstring(argv[0], (unsigned char *)"INTEGER"))){
-        if(argc != 1) error("Syntax");
+    }
+    if ((p = checkstring(argv[0], (unsigned char *)"INTEGER"))) {
+        if (argc != 1) error("Syntax");
         iret = *(uint64_t *)(GetPeekAddr(p) & 0xFFFFFFF8);
         targ = T_INT;
         return;
-        }
+    }
 
-    if((p = checkstring(argv[0], (unsigned char *)"FLOAT"))){
-        if(argc != 1) error("Syntax");
+    if ((p = checkstring(argv[0], (unsigned char *)"FLOAT"))) {
+        if (argc != 1) error("Syntax");
         fret = *(MMFLOAT *)(GetPeekAddr(p) & 0xFFFFFFF8);
         targ = T_NBR;
         return;
-        }
+    }
 
-    if(argc != 3) error("Syntax");
+    if (argc != 3) error("Syntax");
 
-    if((checkstring(argv[0], (unsigned char *)"PROGMEM"))){
+    if ((checkstring(argv[0], (unsigned char *)"PROGMEM"))) {
         iret = *((char *)ProgMemory + (int)getinteger(argv[2]));
         targ = T_INT;
         return;
     }
 
-    if((checkstring(argv[0], (unsigned char *)"VARTBL"))){
+    if ((checkstring(argv[0], (unsigned char *)"VARTBL"))) {
         iret = *((char *)g_vartbl + (int)getinteger(argv[2]));
         targ = T_INT;
         return;
     }
 
-
     // default action is the old syntax of  b = PEEK(hiaddr, loaddr)
     iret = *(char *)(((int)getinteger(argv[0]) << 16) + (int)getinteger(argv[2]));
     targ = T_INT;
 }
-
-
 
 /***********************************************************************************************
 interrupt check
@@ -2628,70 +2826,70 @@ Tick Interrupts (1 to 4 in that order)
 // will return true if interrupt detected or false if not
 int checkdetailinterrupts(void) {
     int i, v;
-    char *intaddr;
+    char * intaddr;
     static char rti[2];
-    for(int i=1;i<=MAXPID;i++){
-        if(PIDchannels[i].interrupt!=NULL && hal_time_us_64()>PIDchannels[i].timenext && PIDchannels[i].active){
-            PIDchannels[i].timenext=hal_time_us_64()+(PIDchannels[i].PIDparams->T * 1000000);
-            intaddr=(char *)PIDchannels[i].interrupt;
+    for (int i = 1; i <= MAXPID; i++) {
+        if (PIDchannels[i].interrupt != NULL && hal_time_us_64() > PIDchannels[i].timenext && PIDchannels[i].active) {
+            PIDchannels[i].timenext = hal_time_us_64() + (PIDchannels[i].PIDparams->T * 1000000);
+            intaddr = (char *)PIDchannels[i].interrupt;
             goto GotAnInterrupt;
         }
     }
 
     // check for an  ON KEY loc  interrupt
-    if(KeyInterrupt != NULL && Keycomplete) {
-		Keycomplete=false;
-		intaddr = KeyInterrupt;									    // set the next stmt to the interrupt location
-		goto GotAnInterrupt;
-	}
-
-    if(OnKeyGOSUB && kbhitConsole()) {
-        intaddr = (char *)OnKeyGOSUB;                                       // set the next stmt to the interrupt location
+    if (KeyInterrupt != NULL && Keycomplete) {
+        Keycomplete = false;
+        intaddr = KeyInterrupt; // set the next stmt to the interrupt location
         goto GotAnInterrupt;
     }
-    if(OnPS2GOSUB && PS2int) {
+
+    if (OnKeyGOSUB && kbhitConsole()) {
+        intaddr = (char *)OnKeyGOSUB; // set the next stmt to the interrupt location
+        goto GotAnInterrupt;
+    }
+    if (OnPS2GOSUB && PS2int) {
         /* PS2int is always false on USB-keyboard builds. */
         intaddr = (char *)OnPS2GOSUB;
-        PS2int=false;
+        PS2int = false;
         goto GotAnInterrupt;
     }
-    if(piointerrupt){  // have any PIO interrupts been set
-        for(int pio=0 ;pio<PIOMAX;pio++){
+    if (piointerrupt) { // have any PIO interrupts been set
+        for (int pio = 0; pio < PIOMAX; pio++) {
             PIO pioinuse = port_pio_for_index(pio);
-            for(int sm=0;sm<4;sm++){
-                int TXlevel=((pioinuse->flevel)>>(sm*4)) & 0xf;
-                int RXlevel=((pioinuse->flevel)>>(sm*4+4)) & 0xf;
-                if(RXlevel && pioRXinterrupts[sm][pio]){ //is there a character in the buffer and has an interrupt been set?
-                    intaddr=pioRXinterrupts[sm][pio];
+            for (int sm = 0; sm < 4; sm++) {
+                int TXlevel = ((pioinuse->flevel) >> (sm * 4)) & 0xf;
+                int RXlevel = ((pioinuse->flevel) >> (sm * 4 + 4)) & 0xf;
+                if (RXlevel && pioRXinterrupts[sm][pio]) { //is there a character in the buffer and has an interrupt been set?
+                    intaddr = pioRXinterrupts[sm][pio];
                     goto GotAnInterrupt;
                 }
-                if(TXlevel && pioTXinterrupts[sm][pio]){
-                    int full=(pioinuse->sm->shiftctrl & (1<<30))  ? 8 : 4;
-                    if(TXlevel != full && pioTXlast[sm][pio]==full){ // was the buffer full last time and not now and is an interrupt set?
-                        intaddr=pioTXinterrupts[sm][pio];
-                        pioTXlast[sm][pio]=TXlevel;
+                if (TXlevel && pioTXinterrupts[sm][pio]) {
+                    int full = (pioinuse->sm->shiftctrl & (1 << 30)) ? 8 : 4;
+                    if (TXlevel != full && pioTXlast[sm][pio] == full) { // was the buffer full last time and not now and is an interrupt set?
+                        intaddr = pioTXinterrupts[sm][pio];
+                        pioTXlast[sm][pio] = TXlevel;
                         goto GotAnInterrupt;
                     }
                 }
-                pioTXlast[sm][pio]=TXlevel;
+                pioTXlast[sm][pio] = TXlevel;
             }
         }
     }
-    if(DMAinterruptRX){
-        if(!dma_channel_is_busy(dma_rx_chan)){
-            PIO pio = (dma_rx_pio ? pio1: pio0);
+    if (DMAinterruptRX) {
+        if (!dma_channel_is_busy(dma_rx_chan)) {
+            PIO pio = (dma_rx_pio ? pio1 : pio0);
             intaddr = (char *)DMAinterruptRX;
-            DMAinterruptRX=NULL;
+            DMAinterruptRX = NULL;
             pio_sm_set_enabled(pio, dma_rx_sm, false);
             goto GotAnInterrupt;
         }
     }
-    if(DMAinterruptTX){
-        if(!dma_channel_is_busy(dma_tx_chan)){
-            PIO pio = (dma_tx_pio ? pio1: pio0);
-            if((pio->flevel>>(dma_tx_sm*8) & 0xf)==0){
+    if (DMAinterruptTX) {
+        if (!dma_channel_is_busy(dma_tx_chan)) {
+            PIO pio = (dma_tx_pio ? pio1 : pio0);
+            if ((pio->flevel >> (dma_tx_sm * 8) & 0xf) == 0) {
                 intaddr = (char *)DMAinterruptTX;
-                DMAinterruptTX=NULL;
+                DMAinterruptTX = NULL;
                 pio_sm_set_enabled(pio, dma_tx_sm, false);
                 goto GotAnInterrupt;
             }
@@ -2703,136 +2901,134 @@ int checkdetailinterrupts(void) {
 
     if (COLLISIONInterrupt != NULL && CollisionFound) {
         CollisionFound = false;
-        intaddr = (char *)COLLISIONInterrupt;									    // set the next stmt to the interrupt location
+        intaddr = (char *)COLLISIONInterrupt; // set the next stmt to the interrupt location
         goto GotAnInterrupt;
     }
     /* WEB-only interrupt sources. Globals are zero on non-WEB builds
      * (see top-of-file unconditional defs + host_runtime.c stubs), so
      * the conditions never fire. */
-    if(TCPreceived && TCPreceiveInterrupt){
+    if (TCPreceived && TCPreceiveInterrupt) {
         intaddr = (char *)TCPreceiveInterrupt;
         TCPreceived = 0;
         goto GotAnInterrupt;
     }
-    if(MQTTComplete && MQTTInterrupt != NULL) {
+    if (MQTTComplete && MQTTInterrupt != NULL) {
         MQTTComplete = false;
         intaddr = (char *)MQTTInterrupt;
         goto GotAnInterrupt;
     }
-    if(UDPreceive && UDPinterrupt != NULL) {
+    if (UDPreceive && UDPinterrupt != NULL) {
         UDPreceive = false;
         intaddr = (char *)UDPinterrupt;
         goto GotAnInterrupt;
     }
-    for(int i=0;i<6;i++){
-        if(nunInterruptc[i] !=NULL && nunfoundc[i]){
-            nunfoundc[i]=false;
-            intaddr=nunInterruptc[i];
+    for (int i = 0; i < 6; i++) {
+        if (nunInterruptc[i] != NULL && nunfoundc[i]) {
+            nunfoundc[i] = false;
+            intaddr = nunInterruptc[i];
             goto GotAnInterrupt;
         }
     }
-    if(ADCInterrupt && dmarunning){
-        if(!dma_channel_is_busy(ADC_dma_chan)){
+    if (ADCInterrupt && dmarunning) {
+        if (!dma_channel_is_busy(ADC_dma_chan)) {
             __compiler_memory_barrier();
             adc_run(false);
             adc_fifo_drain();
-            int k=0;
-            for(int i=0;i<ADCmax;i++){
-                for(int j=0;j<ADCopen;j++){
-                    if(j==0)*a1float++ = (MMFLOAT)ADCbuffer[k++]*ADCscale[0]+ADCbottom[0];
-                    if(j==1)*a2float++ = (MMFLOAT)ADCbuffer[k++]*ADCscale[1]+ADCbottom[1];
-                    if(j==2)*a3float++ = (MMFLOAT)ADCbuffer[k++]*ADCscale[2]+ADCbottom[2];
-                    if(j==3)*a4float++ = (MMFLOAT)ADCbuffer[k++]*ADCscale[3]+ADCbottom[3];
+            int k = 0;
+            for (int i = 0; i < ADCmax; i++) {
+                for (int j = 0; j < ADCopen; j++) {
+                    if (j == 0) *a1float++ = (MMFLOAT)ADCbuffer[k++] * ADCscale[0] + ADCbottom[0];
+                    if (j == 1) *a2float++ = (MMFLOAT)ADCbuffer[k++] * ADCscale[1] + ADCbottom[1];
+                    if (j == 2) *a3float++ = (MMFLOAT)ADCbuffer[k++] * ADCscale[2] + ADCbottom[2];
+                    if (j == 3) *a4float++ = (MMFLOAT)ADCbuffer[k++] * ADCscale[3] + ADCbottom[3];
                 }
             }
-        intaddr = ADCInterrupt;                                   // get a pointer to the interrupt routine
-        dmarunning=false;
-        hal_pin_adc_init();
-        last_adc=99;
-        FreeMemory((void *)ADCbuffer);
-        goto GotAnInterrupt;
+            intaddr = ADCInterrupt; // get a pointer to the interrupt routine
+            dmarunning = false;
+            hal_pin_adc_init();
+            last_adc = 99;
+            FreeMemory((void *)ADCbuffer);
+            goto GotAnInterrupt;
         }
     }
-    if(ADCInterrupt && ADCDualBuffering){
-        ADCDualBuffering=false;
+    if (ADCInterrupt && ADCDualBuffering) {
+        ADCDualBuffering = false;
         intaddr = ADCInterrupt;
         goto GotAnInterrupt;
     }
 
-
-
     if ((I2C_Status & I2C_Status_Slave_Receive_Rdy)) {
-        I2C_Status &= ~I2C_Status_Slave_Receive_Rdy;                // clear completed flag
-        intaddr = I2C_Slave_Receive_IntLine;                        // set the next stmt to the interrupt location
+        I2C_Status &= ~I2C_Status_Slave_Receive_Rdy; // clear completed flag
+        intaddr = I2C_Slave_Receive_IntLine;         // set the next stmt to the interrupt location
         goto GotAnInterrupt;
     }
     if ((I2C_Status & I2C_Status_Slave_Send_Rdy)) {
-        I2C_Status &= ~I2C_Status_Slave_Send_Rdy;                   // clear completed flag
-        intaddr = I2C_Slave_Send_IntLine;                           // set the next stmt to the interrupt location
+        I2C_Status &= ~I2C_Status_Slave_Send_Rdy; // clear completed flag
+        intaddr = I2C_Slave_Send_IntLine;         // set the next stmt to the interrupt location
         goto GotAnInterrupt;
     }
     if ((I2C2_Status & I2C_Status_Slave_Receive_Rdy)) {
-        I2C2_Status &= ~I2C_Status_Slave_Receive_Rdy;                // clear completed flag
-        intaddr = I2C2_Slave_Receive_IntLine;                        // set the next stmt to the interrupt location
+        I2C2_Status &= ~I2C_Status_Slave_Receive_Rdy; // clear completed flag
+        intaddr = I2C2_Slave_Receive_IntLine;         // set the next stmt to the interrupt location
         goto GotAnInterrupt;
     }
     if ((I2C2_Status & I2C_Status_Slave_Send_Rdy)) {
-        I2C2_Status &= ~I2C_Status_Slave_Send_Rdy;                   // clear completed flag
-        intaddr = I2C2_Slave_Send_IntLine;                           // set the next stmt to the interrupt location
+        I2C2_Status &= ~I2C_Status_Slave_Send_Rdy; // clear completed flag
+        intaddr = I2C2_Slave_Send_IntLine;         // set the next stmt to the interrupt location
         goto GotAnInterrupt;
     }
-    if(WAVInterrupt != NULL && WAVcomplete) {
-        WAVcomplete=false;
-		intaddr = WAVInterrupt;									    // set the next stmt to the interrupt location
-		goto GotAnInterrupt;
-	}
+    if (WAVInterrupt != NULL && WAVcomplete) {
+        WAVcomplete = false;
+        intaddr = WAVInterrupt; // set the next stmt to the interrupt location
+        goto GotAnInterrupt;
+    }
 
     // interrupt routines for the serial ports
-    if(com1_interrupt != NULL && SerialRxStatus(1) >= com1_ilevel) {// do we need to interrupt?
-        intaddr = com1_interrupt;                                   // set the next stmt to the interrupt location
+    if (com1_interrupt != NULL && SerialRxStatus(1) >= com1_ilevel) { // do we need to interrupt?
+        intaddr = com1_interrupt;                                     // set the next stmt to the interrupt location
         goto GotAnInterrupt;
     }
-    if(com2_interrupt != NULL && SerialRxStatus(2) >= com2_ilevel) {// do we need to interrupt?
-        intaddr = com2_interrupt;                                   // set the next stmt to the interrupt location
+    if (com2_interrupt != NULL && SerialRxStatus(2) >= com2_ilevel) { // do we need to interrupt?
+        intaddr = com2_interrupt;                                     // set the next stmt to the interrupt location
         goto GotAnInterrupt;
     }
-    if(IrGotMsg && IrInterrupt != NULL) {
+    if (IrGotMsg && IrInterrupt != NULL) {
         IrGotMsg = false;
-        intaddr = (char *)IrInterrupt;                                      // set the next stmt to the interrupt location
+        intaddr = (char *)IrInterrupt; // set the next stmt to the interrupt location
         goto GotAnInterrupt;
     }
 
-    if(KeypadInterrupt != NULL && KeypadCheck()) {
-        intaddr = (char *)KeypadInterrupt;                                  // set the next stmt to the interrupt location
+    if (KeypadInterrupt != NULL && KeypadCheck()) {
+        intaddr = (char *)KeypadInterrupt; // set the next stmt to the interrupt location
         goto GotAnInterrupt;
     }
 
-    if(CSubInterrupt != NULL && CSubComplete) {
-        intaddr = CSubInterrupt;                                  // set the next stmt to the interrupt location
-        CSubComplete=0;
+    if (CSubInterrupt != NULL && CSubComplete) {
+        intaddr = CSubInterrupt; // set the next stmt to the interrupt location
+        CSubComplete = 0;
         goto GotAnInterrupt;
     }
 
-    for(i = 0; i < NBRINTERRUPTS; i++) {                            // scan through the interrupt table
-        if(inttbl[i].pin != 0) {                                    // if this entry has an interrupt pin set
-            v = ExtInp(inttbl[i].pin);                              // get the current value of the pin
+    for (i = 0; i < NBRINTERRUPTS; i++) { // scan through the interrupt table
+        if (inttbl[i].pin != 0) {         // if this entry has an interrupt pin set
+            v = ExtInp(inttbl[i].pin);    // get the current value of the pin
             // check if interrupt occured
-            if((inttbl[i].lohi == T_HILO && v < inttbl[i].last) || (inttbl[i].lohi == T_LOHI && v > inttbl[i].last) || (inttbl[i].lohi == T_BOTH && v != inttbl[i].last)) {
-                intaddr = inttbl[i].intp;                           // set the next stmt to the interrupt location
-                inttbl[i].last = v;                                 // save the new pin value
+            if ((inttbl[i].lohi == T_HILO && v < inttbl[i].last) || (inttbl[i].lohi == T_LOHI && v > inttbl[i].last) || (inttbl[i].lohi == T_BOTH && v != inttbl[i].last)) {
+                intaddr = inttbl[i].intp; // set the next stmt to the interrupt location
+                inttbl[i].last = v;       // save the new pin value
                 goto GotAnInterrupt;
             } else
-                inttbl[i].last = v;                                 // no interrupt, just update the pin value
+                inttbl[i].last = v; // no interrupt, just update the pin value
         }
     }
 
     // check if one of the tick interrupts is enabled and if it has occured
-    for(i = 0; i < NBRSETTICKS; i++) {
-        if(TickInt[i] != NULL && TickTimer[i] > TickPeriod[i]) {
+    for (i = 0; i < NBRSETTICKS; i++) {
+        if (TickInt[i] != NULL && TickTimer[i] > TickPeriod[i]) {
             // reset for the next tick but skip any ticks completely missed
-            while(TickTimer[i] > TickPeriod[i]) TickTimer[i] -= TickPeriod[i];
+            while (TickTimer[i] > TickPeriod[i]) TickTimer[i] -= TickPeriod[i];
             intaddr = (char *)TickInt[i];
-            if(intaddr)goto GotAnInterrupt;
+            if (intaddr) goto GotAnInterrupt;
         }
     }
 
@@ -2841,50 +3037,49 @@ int checkdetailinterrupts(void) {
 
     // an interrupt was found if we jumped to here
 GotAnInterrupt:
-    g_LocalIndex++;                                                   // IRETURN will decrement this
+    g_LocalIndex++; // IRETURN will decrement this
     mmbasic_runtime_interrupt_save_error_state(&SaveOptionErrorSkip,
                                                SaveErrorMessage,
                                                sizeof(SaveErrorMessage),
                                                &Saveerrno,
                                                &OptionErrorSkip, MMErrMsg,
                                                &MMerrno);
-    InterruptReturn = nextstmt;                                     // for when IRETURN is executed
+    InterruptReturn = nextstmt; // for when IRETURN is executed
     // if the interrupt is pointing to a SUB token we need to call a subroutine
-    CommandToken tkn=commandtbl_decode((const unsigned char *)intaddr);
-    if(tkn == cmdSUB) {
-        if(gosubindex >= MAXGOSUB) error("Too many SUBs for interrupt");
+    CommandToken tkn = commandtbl_decode((const unsigned char *)intaddr);
+    if (tkn == cmdSUB) {
+        if (gosubindex >= MAXGOSUB) error("Too many SUBs for interrupt");
         intaddr = (char *)mmbasic_runtime_interrupt_prepare_sub_return(
             cmdIRET, C_BASETOKEN, (unsigned char *)intaddr,
             CurrentInterruptName, MAXVARLEN, false,
             rti, sizeof(rti),
             &gosubindex, errorstack, gosubstack, CurrentLinePtr,
-            &g_LocalIndex);                                       // point to the body of the subroutine
+            &g_LocalIndex); // point to the body of the subroutine
     }
-    nextstmt = (unsigned char *)intaddr;                                             // the next command will be in the interrupt routine
+    nextstmt = (unsigned char *)intaddr; // the next command will be in the interrupt routine
     return 1;
 }
 int MMB_HOT_FUNC(check_interrupt)(void) {
     hal_gui_controls_periodic();
     hal_keyboard_service();
 
-    if(!InterruptUsed) return 0;                                    // quick exit if there are no interrupts set
-    if(InterruptReturn != NULL || CurrentLinePtr == NULL) return 0; // skip if we are in an interrupt or in immediate mode
+    if (!InterruptUsed) return 0;                                    // quick exit if there are no interrupts set
+    if (InterruptReturn != NULL || CurrentLinePtr == NULL) return 0; // skip if we are in an interrupt or in immediate mode
     return checkdetailinterrupts();
 }
-
 
 // get the address for a MMBasic interrupt
 // this will handle a line number, a label or a subroutine
 // all areas of MMBasic that can generate an interrupt use this function
-unsigned char *GetIntAddress(unsigned char *p) {
+unsigned char * GetIntAddress(unsigned char * p) {
     int i;
-    if(isnamestart((uint8_t)*p)) {                                           // if it starts with a valid name char
-        i = FindSubFun(p, 0);                                       // try to find a matching subroutine
-        if(i == -1)
-            return findlabel(p);                                    // if a subroutine was NOT found it must be a label
+    if (isnamestart((uint8_t)*p)) { // if it starts with a valid name char
+        i = FindSubFun(p, 0);       // try to find a matching subroutine
+        if (i == -1)
+            return findlabel(p); // if a subroutine was NOT found it must be a label
         else
-            return subfun[i];                                       // if a subroutine was found, return the address of the sub
+            return subfun[i]; // if a subroutine was found, return the address of the sub
     }
 
-    return findline(getinteger(p), true);                           // otherwise try for a line number
+    return findline(getinteger(p), true); // otherwise try for a line number
 }

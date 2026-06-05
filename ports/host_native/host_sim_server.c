@@ -25,10 +25,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-extern size_t host_sim_framebuffer_copy(uint32_t *dst, size_t dst_pixels);
-extern void host_sim_framebuffer_dims(int *w, int *h);
+extern size_t host_sim_framebuffer_copy(uint32_t * dst, size_t dst_pixels);
+extern void host_sim_framebuffer_dims(int * w, int * h);
 extern void host_sim_push_key(int code);
-extern size_t host_sim_cmd_drain(uint8_t **out_buf, size_t *out_cap);
+extern size_t host_sim_cmd_drain(uint8_t ** out_buf, size_t * out_cap);
 
 /*
  * Per-connection state. New clients need one full-frame FRMB to bootstrap
@@ -46,7 +46,7 @@ struct sim_server {
     char web_root[1024];
     atomic_int running;
     uint64_t last_frame_ms;
-    uint32_t *staging;
+    uint32_t * staging;
     size_t staging_capacity;
 };
 
@@ -58,19 +58,22 @@ static struct sim_server g_server;
  * current framebuffer contents. After that the client just consumes the
  * CMDS stream.
  */
-static void send_bootstrap_frame(struct mg_connection *c, struct sim_server *s,
+static void send_bootstrap_frame(struct mg_connection * c, struct sim_server * s,
                                  int w, int h) {
     size_t pixels = (size_t)w * (size_t)h;
     if (pixels > s->staging_capacity) {
         free(s->staging);
         s->staging = calloc(pixels, sizeof(uint32_t));
-        if (!s->staging) { s->staging_capacity = 0; return; }
+        if (!s->staging) {
+            s->staging_capacity = 0;
+            return;
+        }
         s->staging_capacity = pixels;
     }
     host_sim_framebuffer_copy(s->staging, pixels);
 
     size_t msg_len = web_console_frmb_len(w, h);
-    uint8_t *msg = malloc(msg_len);
+    uint8_t * msg = malloc(msg_len);
     if (!msg) return;
     if (!web_console_pack_frmb(msg, msg_len, w, h, s->staging, pixels)) {
         free(msg);
@@ -91,22 +94,22 @@ static void send_bootstrap_frame(struct mg_connection *c, struct sim_server *s,
  * Fresh clients get one FRMB snapshot first so their canvas starts with
  * whatever's already been drawn.
  */
-static void broadcast_frame(struct sim_server *s) {
+static void broadcast_frame(struct sim_server * s) {
     int w = 0, h = 0;
     host_sim_framebuffer_dims(&w, &h);
     if (w <= 0 || h <= 0) return;
 
     /* Drain all queued commands once. */
-    uint8_t *cmd_bytes = NULL;
+    uint8_t * cmd_bytes = NULL;
     size_t cmd_cap = 0;
     size_t cmd_len = host_sim_cmd_drain(&cmd_bytes, &cmd_cap);
 
     /* Bootstrap any new connections with a full frame; then broadcast the
      * drained command stream (if non-empty) to everyone. */
-    struct mg_connection *c;
+    struct mg_connection * c;
     for (c = s->mgr.conns; c != NULL; c = c->next) {
         if (!c->is_websocket) continue;
-        sim_client *cs = (sim_client *)c->data;
+        sim_client * cs = (sim_client *)c->data;
         _Static_assert(sizeof(sim_client) <= MG_DATA_SIZE, "sim_client too big for c->data");
         if (!cs->bootstrapped) {
             send_bootstrap_frame(c, s, w, h);
@@ -120,8 +123,11 @@ static void broadcast_frame(struct sim_server *s) {
     }
 
     size_t msg_len = web_console_cmds_len(cmd_len);
-    uint8_t *msg = malloc(msg_len);
-    if (!msg) { free(cmd_bytes); return; }
+    uint8_t * msg = malloc(msg_len);
+    if (!msg) {
+        free(cmd_bytes);
+        return;
+    }
     if (!web_console_pack_cmds(msg, msg_len, w, h, cmd_bytes, cmd_len)) {
         free(cmd_bytes);
         free(msg);
@@ -136,11 +142,11 @@ static void broadcast_frame(struct sim_server *s) {
     free(msg);
 }
 
-static void ev_handler(struct mg_connection *c, int ev, void *ev_data) {
-    struct sim_server *s = (struct sim_server *)c->fn_data;
+static void ev_handler(struct mg_connection * c, int ev, void * ev_data) {
+    struct sim_server * s = (struct sim_server *)c->fn_data;
 
     if (ev == MG_EV_HTTP_MSG) {
-        struct mg_http_message *hm = (struct mg_http_message *)ev_data;
+        struct mg_http_message * hm = (struct mg_http_message *)ev_data;
         if (mg_match(hm->uri, mg_str("/ws"), NULL)) {
             mg_ws_upgrade(c, hm, NULL);
         } else {
@@ -149,7 +155,7 @@ static void ev_handler(struct mg_connection *c, int ev, void *ev_data) {
             mg_http_serve_dir(c, hm, &opts);
         }
     } else if (ev == MG_EV_WS_MSG) {
-        struct mg_ws_message *wm = (struct mg_ws_message *)ev_data;
+        struct mg_ws_message * wm = (struct mg_ws_message *)ev_data;
         /* Only text frames carry our JSON protocol. */
         if ((wm->flags & 0x0f) == WEBSOCKET_OP_TEXT) {
             int code = -1;
@@ -168,15 +174,15 @@ static void ev_handler(struct mg_connection *c, int ev, void *ev_data) {
         /* Drain audio events (JSON TEXT frames) and forward to every
          * connected WS client. Audio volume is low, so one message per
          * TEXT frame is fine — no batching needed. */
-        char **audio_msgs = NULL;
+        char ** audio_msgs = NULL;
         int audio_count = 0;
         host_sim_audio_drain(&audio_msgs, &audio_count);
         if (audio_count > 0) {
             for (int i = 0; i < audio_count; ++i) {
-                const char *msg = audio_msgs[i];
+                const char * msg = audio_msgs[i];
                 if (!msg) continue;
                 size_t len = strlen(msg);
-                for (struct mg_connection *wc = s->mgr.conns; wc; wc = wc->next) {
+                for (struct mg_connection * wc = s->mgr.conns; wc; wc = wc->next) {
                     if (wc->is_websocket)
                         mg_ws_send(wc, msg, len, WEBSOCKET_OP_TEXT);
                 }
@@ -187,17 +193,17 @@ static void ev_handler(struct mg_connection *c, int ev, void *ev_data) {
     }
 }
 
-static void sim_log_sink(char ch, void *param) {
+static void sim_log_sink(char ch, void * param) {
     (void)ch;
-    (void)param;  /* swallow all Mongoose log output — the REPL owns stdout/stderr */
+    (void)param; /* swallow all Mongoose log output — the REPL owns stdout/stderr */
 }
 
-static void *server_thread(void *arg) {
-    struct sim_server *s = (struct sim_server *)arg;
+static void * server_thread(void * arg) {
+    struct sim_server * s = (struct sim_server *)arg;
     mg_log_set(MG_LL_NONE);
     mg_log_set_fn(sim_log_sink, NULL);
     mg_mgr_init(&s->mgr);
-    struct mg_connection *lc = mg_http_listen(&s->mgr, s->listen_url, ev_handler, s);
+    struct mg_connection * lc = mg_http_listen(&s->mgr, s->listen_url, ev_handler, s);
     if (!lc) {
         atomic_store(&s->running, 0);
         mg_mgr_free(&s->mgr);
@@ -210,7 +216,7 @@ static void *server_thread(void *arg) {
     return NULL;
 }
 
-int host_sim_server_start(const char *listen_addr, int port, const char *web_root) {
+int host_sim_server_start(const char * listen_addr, int port, const char * web_root) {
     memset(&g_server, 0, sizeof(g_server));
     snprintf(g_server.listen_url, sizeof(g_server.listen_url),
              "http://%s:%d", listen_addr ? listen_addr : "127.0.0.1", port);
@@ -270,9 +276,9 @@ extern volatile unsigned char TickActive[NBRSETTICKS];
 static pthread_t host_sim_tick_thread;
 static atomic_int host_sim_tick_running;
 
-static void *host_sim_tick_body(void *unused) {
+static void * host_sim_tick_body(void * unused) {
     (void)unused;
-    struct timespec req = { 0, 1 * 1000 * 1000 };   /* 1 ms */
+    struct timespec req = {0, 1 * 1000 * 1000}; /* 1 ms */
     while (atomic_load(&host_sim_tick_running)) {
         nanosleep(&req, NULL);
         mSecTimer++;
@@ -292,8 +298,9 @@ static void *host_sim_tick_body(void *unused) {
         if (Timer1) Timer1--;
         if (++CursorTimer > CURSOR_OFF + CURSOR_ON) CursorTimer = 0;
         if (ScrewUpTimer) ScrewUpTimer--;
-        if (WDTimer) WDTimer--;   /* on device triggers watchdog; here just counts */
-        for (int i = 0; i < NBRSETTICKS; ++i) if (TickActive[i]) TickTimer[i]++;
+        if (WDTimer) WDTimer--; /* on device triggers watchdog; here just counts */
+        for (int i = 0; i < NBRSETTICKS; ++i)
+            if (TickActive[i]) TickTimer[i]++;
     }
     return NULL;
 }
@@ -321,7 +328,7 @@ static struct {
     pthread_mutex_t lock;
     uint8_t buf[HOST_SIM_KEYQ_LEN];
     int head, tail;
-} host_sim_keyq = { .lock = PTHREAD_MUTEX_INITIALIZER };
+} host_sim_keyq = {.lock = PTHREAD_MUTEX_INITIALIZER};
 
 void host_sim_push_key(int code) {
     if (code < 0 || code > 0xff) return;
@@ -363,7 +370,7 @@ int host_sim_pop_key(void) {
 extern int host_sim_active;
 
 static pthread_mutex_t host_sim_cmd_lock = PTHREAD_MUTEX_INITIALIZER;
-static uint8_t *host_sim_cmd_buf = NULL;
+static uint8_t * host_sim_cmd_buf = NULL;
 static size_t host_sim_cmd_cap = 0;
 static size_t host_sim_cmd_len = 0;
 
@@ -375,14 +382,17 @@ int host_sim_cmds_target_is_front(void) {
     return (WriteBuf == NULL || WriteBuf == DisplayBuf);
 }
 
-static void host_sim_cmd_append(const void *bytes, size_t len) {
+static void host_sim_cmd_append(const void * bytes, size_t len) {
     if (!host_sim_active) return;
     pthread_mutex_lock(&host_sim_cmd_lock);
     if (host_sim_cmd_len + len > host_sim_cmd_cap) {
         size_t new_cap = host_sim_cmd_cap ? host_sim_cmd_cap * 2 : 4096;
         while (new_cap < host_sim_cmd_len + len) new_cap *= 2;
-        uint8_t *nb = realloc(host_sim_cmd_buf, new_cap);
-        if (!nb) { pthread_mutex_unlock(&host_sim_cmd_lock); return; }
+        uint8_t * nb = realloc(host_sim_cmd_buf, new_cap);
+        if (!nb) {
+            pthread_mutex_unlock(&host_sim_cmd_lock);
+            return;
+        }
         host_sim_cmd_buf = nb;
         host_sim_cmd_cap = new_cap;
     }
@@ -391,7 +401,7 @@ static void host_sim_cmd_append(const void *bytes, size_t len) {
     pthread_mutex_unlock(&host_sim_cmd_lock);
 }
 
-size_t host_sim_cmd_drain(uint8_t **out_buf, size_t *out_cap) {
+size_t host_sim_cmd_drain(uint8_t ** out_buf, size_t * out_cap) {
     pthread_mutex_lock(&host_sim_cmd_lock);
     *out_buf = host_sim_cmd_buf;
     *out_cap = host_sim_cmd_cap;
@@ -432,7 +442,7 @@ void host_sim_emit_scroll(int lines, int bg) {
     host_sim_cmd_append(buf, len);
 }
 
-void host_sim_emit_blit(int x, int y, int w, int h, const uint32_t *pixels) {
+void host_sim_emit_blit(int x, int y, int w, int h, const uint32_t * pixels) {
     if (w <= 0 || h <= 0 || !pixels) return;
     pthread_mutex_lock(&host_sim_cmd_lock);
     size_t body_len = (size_t)w * (size_t)h * 4;
@@ -440,8 +450,11 @@ void host_sim_emit_blit(int x, int y, int w, int h, const uint32_t *pixels) {
     if (host_sim_cmd_len + total > host_sim_cmd_cap) {
         size_t new_cap = host_sim_cmd_cap ? host_sim_cmd_cap * 2 : 4096;
         while (new_cap < host_sim_cmd_len + total) new_cap *= 2;
-        uint8_t *nb = realloc(host_sim_cmd_buf, new_cap);
-        if (!nb) { pthread_mutex_unlock(&host_sim_cmd_lock); return; }
+        uint8_t * nb = realloc(host_sim_cmd_buf, new_cap);
+        if (!nb) {
+            pthread_mutex_unlock(&host_sim_cmd_lock);
+            return;
+        }
         host_sim_cmd_buf = nb;
         host_sim_cmd_cap = new_cap;
     }

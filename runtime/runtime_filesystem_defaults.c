@@ -22,9 +22,10 @@
  * docs/port-duplication-audit.md Finding 7.
  */
 
-int port_drivecheck_remap(int t) { return t; }
+int port_drivecheck_remap(int t) {
+    return t;
+}
 
-const char *port_filesystem_prefix(int filesystem)
-{
+const char * port_filesystem_prefix(int filesystem) {
     return filesystem ? "B:" : "A:";
 }

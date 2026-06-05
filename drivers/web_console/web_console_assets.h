@@ -14,13 +14,13 @@ extern "C" {
 #endif
 
 typedef struct {
-    const char *path;
-    const char *content_type;
-    const char *data;
+    const char * path;
+    const char * content_type;
+    const char * data;
     size_t len;
 } web_console_asset_t;
 
-const web_console_asset_t *web_console_asset_find(const char *path);
+const web_console_asset_t * web_console_asset_find(const char * path);
 
 #ifdef __cplusplus
 }

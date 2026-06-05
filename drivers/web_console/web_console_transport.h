@@ -24,16 +24,16 @@ typedef enum {
     WEB_CONSOLE_TRANSPORT_ERROR = -3,
 } web_console_transport_result_t;
 
-typedef void (*web_console_transport_text_rx_fn)(void *ctx,
-                                                 const char *text,
+typedef void (*web_console_transport_text_rx_fn)(void * ctx,
+                                                 const char * text,
                                                  size_t len);
 
 typedef struct web_console_transport {
-    void *ctx;
-    int (*send_binary)(void *ctx, const void *data, size_t len);
-    int (*send_text)(void *ctx, const char *text, size_t len);
-    int (*can_send)(void *ctx);
-    void (*close)(void *ctx);
+    void * ctx;
+    int (*send_binary)(void * ctx, const void * data, size_t len);
+    int (*send_text)(void * ctx, const char * text, size_t len);
+    int (*can_send)(void * ctx);
+    void (*close)(void * ctx);
 } web_console_transport_t;
 
 #ifdef __cplusplus

@@ -29,17 +29,20 @@ extern int host_sim_active;
  * malloc'd JSON strings. The buffer grows on demand; drain empties it.
  */
 static pthread_mutex_t audio_lock = PTHREAD_MUTEX_INITIALIZER;
-static char **audio_msgs = NULL;
+static char ** audio_msgs = NULL;
 static int audio_count = 0;
 static int audio_cap = 0;
 
-static void push_msg(const char *msg) {
+static void push_msg(const char * msg) {
     if (!host_sim_active || !msg) return;
     pthread_mutex_lock(&audio_lock);
     if (audio_count == audio_cap) {
         int new_cap = audio_cap ? audio_cap * 2 : 16;
-        char **nb = realloc(audio_msgs, (size_t)new_cap * sizeof(char *));
-        if (!nb) { pthread_mutex_unlock(&audio_lock); return; }
+        char ** nb = realloc(audio_msgs, (size_t)new_cap * sizeof(char *));
+        if (!nb) {
+            pthread_mutex_unlock(&audio_lock);
+            return;
+        }
         audio_msgs = nb;
         audio_cap = new_cap;
     }
@@ -65,7 +68,7 @@ void host_sim_audio_stop(void) {
         push_msg(buf);
 }
 
-void host_sim_audio_sound(int slot, const char *ch, const char *type,
+void host_sim_audio_sound(int slot, const char * ch, const char * type,
                           double freq_hz, int volume) {
     char buf[160];
     if (web_console_audio_build_sound(buf, sizeof(buf), slot, ch, type,
@@ -91,9 +94,9 @@ void host_sim_audio_resume(void) {
         push_msg(buf);
 }
 
-size_t host_sim_audio_drain(char ***out_msgs, int *out_count) {
+size_t host_sim_audio_drain(char *** out_msgs, int * out_count) {
     pthread_mutex_lock(&audio_lock);
-    char **msgs = audio_msgs;
+    char ** msgs = audio_msgs;
     int count = audio_count;
     audio_msgs = NULL;
     audio_count = 0;
@@ -105,26 +108,43 @@ size_t host_sim_audio_drain(char ***out_msgs, int *out_count) {
     return (size_t)count;
 }
 
-void host_sim_audio_free_drain(char **msgs, int count) {
+void host_sim_audio_free_drain(char ** msgs, int count) {
     if (!msgs) return;
     for (int i = 0; i < count; ++i) free(msgs[i]);
     free(msgs);
 }
 
-#else  /* !MMBASIC_SIM */
+#else /* !MMBASIC_SIM */
 
 void host_sim_audio_tone(double l, double r, int h, int64_t m) {
-    (void)l; (void)r; (void)h; (void)m;
+    (void)l;
+    (void)r;
+    (void)h;
+    (void)m;
 }
 void host_sim_audio_stop(void) {}
-void host_sim_audio_sound(int s, const char *c, const char *t, double f, int v) {
-    (void)s; (void)c; (void)t; (void)f; (void)v;
+void host_sim_audio_sound(int s, const char * c, const char * t, double f, int v) {
+    (void)s;
+    (void)c;
+    (void)t;
+    (void)f;
+    (void)v;
 }
-void host_sim_audio_volume(int l, int r) { (void)l; (void)r; }
+void host_sim_audio_volume(int l, int r) {
+    (void)l;
+    (void)r;
+}
 void host_sim_audio_pause(void) {}
 void host_sim_audio_resume(void) {}
 
-size_t host_sim_audio_drain(char ***m, int *c) { *m = NULL; *c = 0; return 0; }
-void host_sim_audio_free_drain(char **m, int c) { (void)m; (void)c; }
+size_t host_sim_audio_drain(char *** m, int * c) {
+    *m = NULL;
+    *c = 0;
+    return 0;
+}
+void host_sim_audio_free_drain(char ** m, int c) {
+    (void)m;
+    (void)c;
+}
 
 #endif

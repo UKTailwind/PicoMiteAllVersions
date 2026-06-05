@@ -44,17 +44,17 @@ extern "C" {
  * working with a `struct tm *` from `gmtime` family should still copy
  * if they want to pass the same buffer to `_epoch_to_tm` afterwards).
  */
-time_t hal_calendar_tm_to_epoch(const struct tm *tm);
+time_t hal_calendar_tm_to_epoch(const struct tm * tm);
 
 /* Convert Unix epoch seconds to broken-down UTC time. Writes through
  * `*out` (caller-owned buffer) — reentrant; no internal static state.
  * Fills tm_sec/min/hour/mday/mon/year/wday/yday; tm_isdst is set to 0
  * (UTC has no DST).
  */
-void hal_calendar_epoch_to_tm(time_t epoch, struct tm *out);
+void hal_calendar_epoch_to_tm(time_t epoch, struct tm * out);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif  /* HAL_CALENDAR_H */
+#endif /* HAL_CALENDAR_H */

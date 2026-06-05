@@ -29,30 +29,30 @@ extern "C" {
 #endif
 
 typedef enum {
-    HAL_STORAGE_DEV_SDCARD = 0,      /* removable SD/MMC (FatFS) */
-    HAL_STORAGE_DEV_INTERNAL_FLASH,  /* internal flash backing LFS (A: on device) */
+    HAL_STORAGE_DEV_SDCARD = 0,     /* removable SD/MMC (FatFS) */
+    HAL_STORAGE_DEV_INTERNAL_FLASH, /* internal flash backing LFS (A: on device) */
     HAL_STORAGE_DEV_COUNT,
 } hal_storage_dev_t;
 
-#define HAL_STORAGE_OK                  0
-#define HAL_STORAGE_ERR_IO             -1
-#define HAL_STORAGE_ERR_NODISK         -2
-#define HAL_STORAGE_ERR_MEDIA_CHANGED  -3
-#define HAL_STORAGE_ERR_PROTECTED      -4
-#define HAL_STORAGE_ERR_BAD_ARG        -5
-#define HAL_STORAGE_ERR_UNSUPPORTED    -6
+#define HAL_STORAGE_OK 0
+#define HAL_STORAGE_ERR_IO -1
+#define HAL_STORAGE_ERR_NODISK -2
+#define HAL_STORAGE_ERR_MEDIA_CHANGED -3
+#define HAL_STORAGE_ERR_PROTECTED -4
+#define HAL_STORAGE_ERR_BAD_ARG -5
+#define HAL_STORAGE_ERR_UNSUPPORTED -6
 
-int    hal_storage_init       (hal_storage_dev_t dev);
-size_t hal_storage_block_size (hal_storage_dev_t dev);
+int hal_storage_init(hal_storage_dev_t dev);
+size_t hal_storage_block_size(hal_storage_dev_t dev);
 size_t hal_storage_block_count(hal_storage_dev_t dev);
-int    hal_storage_read       (hal_storage_dev_t dev, uint32_t lba, uint32_t count,       void *buf);
-int    hal_storage_write      (hal_storage_dev_t dev, uint32_t lba, uint32_t count, const void *buf);
-int    hal_storage_erase      (hal_storage_dev_t dev, uint32_t lba, uint32_t count);
-int    hal_storage_sync       (hal_storage_dev_t dev);
-bool   hal_storage_present    (hal_storage_dev_t dev);
+int hal_storage_read(hal_storage_dev_t dev, uint32_t lba, uint32_t count, void * buf);
+int hal_storage_write(hal_storage_dev_t dev, uint32_t lba, uint32_t count, const void * buf);
+int hal_storage_erase(hal_storage_dev_t dev, uint32_t lba, uint32_t count);
+int hal_storage_sync(hal_storage_dev_t dev);
+bool hal_storage_present(hal_storage_dev_t dev);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif  /* HAL_STORAGE_H */
+#endif /* HAL_STORAGE_H */

@@ -21,9 +21,9 @@
 #include "../host_native/port_tokens.h"
 
 #undef HAL_PORT_VIDEO_CMD_TOKENS
-#define HAL_PORT_VIDEO_CMD_TOKENS \
-    { (unsigned char *)"Camera",  T_CMD, 0, cmd_camera }, \
-    { (unsigned char *)"Refresh", T_CMD, 0, cmd_refresh }, \
-    { (unsigned char *)"MODE",    T_CMD, 0, cmd_mode },
+#define HAL_PORT_VIDEO_CMD_TOKENS                            \
+    {(unsigned char *)"Camera", T_CMD, 0, cmd_camera},       \
+        {(unsigned char *)"Refresh", T_CMD, 0, cmd_refresh}, \
+        {(unsigned char *)"MODE", T_CMD, 0, cmd_mode},
 
 #endif /* PORT_TOKENS_WASM_H */

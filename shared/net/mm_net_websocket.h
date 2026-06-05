@@ -44,20 +44,20 @@ typedef struct {
     uint16_t close_code;
 } mm_net_ws_frame_t;
 
-int mm_net_ws_compute_accept(const char *key,
+int mm_net_ws_compute_accept(const char * key,
                              char out[MM_NET_WS_ACCEPT_LEN]);
-int mm_net_ws_validate_upgrade_request(const void *request, size_t request_len,
-                                       const char *expected_path,
+int mm_net_ws_validate_upgrade_request(const void * request, size_t request_len,
+                                       const char * expected_path,
                                        char key_out[MM_NET_WS_MAX_KEY_LEN]);
-int mm_net_ws_format_upgrade_response(char *out, size_t out_len,
-                                      const char *accept);
-int mm_net_ws_encode_frame(uint8_t opcode, const void *payload,
-                           size_t payload_len, uint8_t *out, size_t out_len,
-                           size_t *written);
-int mm_net_ws_decode_frame(const uint8_t *in, size_t in_len,
-                           size_t payload_limit, uint8_t *payload_out,
-                           size_t payload_out_len, mm_net_ws_frame_t *frame,
-                           size_t *consumed);
+int mm_net_ws_format_upgrade_response(char * out, size_t out_len,
+                                      const char * accept);
+int mm_net_ws_encode_frame(uint8_t opcode, const void * payload,
+                           size_t payload_len, uint8_t * out, size_t out_len,
+                           size_t * written);
+int mm_net_ws_decode_frame(const uint8_t * in, size_t in_len,
+                           size_t payload_limit, uint8_t * payload_out,
+                           size_t payload_out_len, mm_net_ws_frame_t * frame,
+                           size_t * consumed);
 
 #ifdef __cplusplus
 }

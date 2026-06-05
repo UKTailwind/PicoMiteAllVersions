@@ -17,7 +17,11 @@
  */
 #include <stdbool.h>
 
-bool port_terminal_handle_cls(void) { return false; }
+bool port_terminal_handle_cls(void) {
+    return false;
+}
 void port_terminal_emit_colour(int fg, int bg, int has_bg) {
-    (void)fg; (void)bg; (void)has_bg;
+    (void)fg;
+    (void)bg;
+    (void)has_bg;
 }

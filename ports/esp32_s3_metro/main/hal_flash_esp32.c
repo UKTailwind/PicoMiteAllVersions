@@ -21,13 +21,12 @@
 #include "hal/hal_flash.h"
 
 extern void flash_range_erase(uint32_t off, uint32_t count);
-extern void flash_range_program(uint32_t off, const uint8_t *data, size_t len);
+extern void flash_range_program(uint32_t off, const uint8_t * data, size_t len);
 extern unsigned char esp32_flash_option_buf[];
 
 static int s_nvs_ready;
 
-static int esp32_flash_ensure_nvs(void)
-{
+static int esp32_flash_ensure_nvs(void) {
     if (s_nvs_ready) return 0;
 
     esp_err_t err = nvs_flash_init();
@@ -42,30 +41,26 @@ static int esp32_flash_ensure_nvs(void)
     return 0;
 }
 
-static int esp32_options_open(nvs_handle_t *out)
-{
+static int esp32_options_open(nvs_handle_t * out) {
     int rc = esp32_flash_ensure_nvs();
     if (rc != 0) return rc;
     return (nvs_open("mmbasic", NVS_READWRITE, out) == ESP_OK) ? 0 : -EIO;
 }
 
-int hal_flash_erase(uint32_t off, size_t len)
-{
+int hal_flash_erase(uint32_t off, size_t len) {
     if (len == 0) return 0;
     flash_range_erase(off, (uint32_t)len);
     return 0;
 }
 
-int hal_flash_program(uint32_t off, const void *buf, size_t len)
-{
+int hal_flash_program(uint32_t off, const void * buf, size_t len) {
     if (len == 0) return 0;
     if (buf == NULL) return -EINVAL;
     flash_range_program(off, (const uint8_t *)buf, len);
     return 0;
 }
 
-int hal_flash_unique_id(uint8_t out[8])
-{
+int hal_flash_unique_id(uint8_t out[8]) {
     if (out == NULL) return -EINVAL;
     uint8_t mac[6] = {0};
     if (esp_efuse_mac_get_default(mac) != ESP_OK) return -EIO;
@@ -75,8 +70,7 @@ int hal_flash_unique_id(uint8_t out[8])
     return 0;
 }
 
-int hal_flash_read_jedec_id(uint8_t out[4])
-{
+int hal_flash_read_jedec_id(uint8_t out[4]) {
     if (out == NULL) return -EINVAL;
 
     uint32_t size = 0;
@@ -96,10 +90,11 @@ int hal_flash_read_jedec_id(uint8_t out[4])
 
 void hal_flash_write_begin(void) {}
 void hal_flash_write_end(void) {}
-int hal_flash_write_active(void) { return 0; }
+int hal_flash_write_active(void) {
+    return 0;
+}
 
-int hal_flash_read_options(void *buf, size_t len)
-{
+int hal_flash_read_options(void * buf, size_t len) {
     if (buf == NULL) return -EINVAL;
 
     nvs_handle_t nvs;
@@ -131,8 +126,7 @@ int hal_flash_read_options(void *buf, size_t len)
     return 0;
 }
 
-int hal_flash_write_options(const void *buf, size_t len)
-{
+int hal_flash_write_options(const void * buf, size_t len) {
     if (buf == NULL || len == 0) return -EINVAL;
 
     nvs_handle_t nvs;
@@ -148,8 +142,7 @@ int hal_flash_write_options(const void *buf, size_t len)
     return 0;
 }
 
-int hal_flash_erase_program_area(void)
-{
+int hal_flash_erase_program_area(void) {
     flash_range_erase(0, MAX_PROG_SIZE);
     return 0;
 }

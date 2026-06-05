@@ -39,6 +39,7 @@
 #define MAIN_THREAD_ASYNC_EM_ASM EM_ASM
 #endif
 
+// clang-format off
 void host_sim_audio_tone(double left_hz, double right_hz,
                          int has_duration, int64_t duration_ms) {
     MAIN_THREAD_ASYNC_EM_ASM({
@@ -60,7 +61,7 @@ void host_sim_audio_stop(void) {
     });
 }
 
-void host_sim_audio_sound(int slot, const char *ch, const char *type,
+void host_sim_audio_sound(int slot, const char * ch, const char * type,
                           double freq_hz, int volume) {
     MAIN_THREAD_ASYNC_EM_ASM({
         var chStr = UTF8ToString($1);
@@ -102,34 +103,49 @@ void host_sim_audio_resume(void) {
         }
     });
 }
+// clang-format on
 
-size_t host_sim_audio_drain(char ***out_msgs, int *out_count) {
+size_t host_sim_audio_drain(char *** out_msgs, int * out_count) {
     if (out_msgs) *out_msgs = NULL;
     if (out_count) *out_count = 0;
     return 0;
 }
 
-void host_sim_audio_free_drain(char **msgs, int count) {
-    (void)msgs; (void)count;
+void host_sim_audio_free_drain(char ** msgs, int count) {
+    (void)msgs;
+    (void)count;
 }
 
-#else  /* !MMBASIC_WASM — shouldn't be linked, but stub so the TU still builds. */
+#else /* !MMBASIC_WASM — shouldn't be linked, but stub so the TU still builds. */
 
 void host_sim_audio_tone(double l, double r, int h, int64_t m) {
-    (void)l; (void)r; (void)h; (void)m;
+    (void)l;
+    (void)r;
+    (void)h;
+    (void)m;
 }
 void host_sim_audio_stop(void) {}
-void host_sim_audio_sound(int s, const char *c, const char *t, double f, int v) {
-    (void)s; (void)c; (void)t; (void)f; (void)v;
+void host_sim_audio_sound(int s, const char * c, const char * t, double f, int v) {
+    (void)s;
+    (void)c;
+    (void)t;
+    (void)f;
+    (void)v;
 }
-void host_sim_audio_volume(int l, int r) { (void)l; (void)r; }
+void host_sim_audio_volume(int l, int r) {
+    (void)l;
+    (void)r;
+}
 void host_sim_audio_pause(void) {}
 void host_sim_audio_resume(void) {}
-size_t host_sim_audio_drain(char ***m, int *c) {
+size_t host_sim_audio_drain(char *** m, int * c) {
     if (m) *m = NULL;
     if (c) *c = 0;
     return 0;
 }
-void host_sim_audio_free_drain(char **m, int c) { (void)m; (void)c; }
+void host_sim_audio_free_drain(char ** m, int c) {
+    (void)m;
+    (void)c;
+}
 
 #endif

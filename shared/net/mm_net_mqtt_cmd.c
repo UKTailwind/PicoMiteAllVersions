@@ -7,8 +7,8 @@
 #include "MMBasic_Includes.h"
 #include "shared/net/mm_net_mqtt_cmd.h"
 
-void mm_net_mqtt_parse_connect(unsigned char *arg,
-                               mm_net_mqtt_connect_args_t *out) {
+void mm_net_mqtt_parse_connect(unsigned char * arg,
+                               mm_net_mqtt_connect_args_t * out) {
     memset(out, 0, sizeof(*out));
     getargs(&arg, 9, (unsigned char *)",");
     if (!(argc == 7 || argc == 9)) error("Syntax");
@@ -22,8 +22,8 @@ void mm_net_mqtt_parse_connect(unsigned char *arg,
     }
 }
 
-void mm_net_mqtt_parse_publish(unsigned char *arg,
-                               mm_net_mqtt_publish_args_t *out) {
+void mm_net_mqtt_parse_publish(unsigned char * arg,
+                               mm_net_mqtt_publish_args_t * out) {
     memset(out, 0, sizeof(*out));
     out->qos = 1;
     out->retain = 1;
@@ -35,8 +35,8 @@ void mm_net_mqtt_parse_publish(unsigned char *arg,
     if (argc == 7) out->retain = getint(argv[6], 0, 1);
 }
 
-void mm_net_mqtt_parse_subscribe(unsigned char *arg,
-                                 mm_net_mqtt_subscribe_args_t *out) {
+void mm_net_mqtt_parse_subscribe(unsigned char * arg,
+                                 mm_net_mqtt_subscribe_args_t * out) {
     memset(out, 0, sizeof(*out));
     getargs(&arg, 3, (unsigned char *)",");
     if (!(argc == 1 || argc == 3)) error("Syntax");
@@ -44,8 +44,8 @@ void mm_net_mqtt_parse_subscribe(unsigned char *arg,
     if (argc == 3) out->qos = getint(argv[2], 0, 2);
 }
 
-void mm_net_mqtt_parse_topic(unsigned char *arg,
-                             mm_net_mqtt_topic_args_t *out) {
+void mm_net_mqtt_parse_topic(unsigned char * arg,
+                             mm_net_mqtt_topic_args_t * out) {
     memset(out, 0, sizeof(*out));
     out->topic = (char *)getCstring(arg);
 }

@@ -72,7 +72,7 @@ void port_pio_pin_reset_inputs(void);
  * drivers/audio_i2s_pio/{audio_i2s_pio_load,audio_i2s_pio_stub}.c.
  * Pass the PIO instance as a void* so this header doesn't drag in
  * hardware/pio.h on host builds (the impls cast back to PIO). */
-void port_audio_i2s_pio_add_program(void *pio);
+void port_audio_i2s_pio_add_program(void * pio);
 
 #ifdef __cplusplus
 }

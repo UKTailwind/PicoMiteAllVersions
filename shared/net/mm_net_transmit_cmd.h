@@ -23,13 +23,13 @@ typedef struct {
     mm_net_transmit_kind_t kind;
     int pcb;
     int status;
-    const char *filename;
-    const char *content_type;
+    const char * filename;
+    const char * content_type;
     int extra;
 } mm_net_transmit_args_t;
 
-int mm_net_transmit_parse(unsigned char *cmd, int max_pcb,
-                          mm_net_transmit_args_t *out);
+int mm_net_transmit_parse(unsigned char * cmd, int max_pcb,
+                          mm_net_transmit_args_t * out);
 
 #ifdef __cplusplus
 }

@@ -24,10 +24,10 @@ void port_bc_bridge_clear_subfun_hash(void) {
     memset(funtbl, 0, sizeof(struct s_funtbl) * MAXSUBFUN);
 }
 
-void port_bc_bridge_rehash_subfun(unsigned char **subfun_arr) {
+void port_bc_bridge_rehash_subfun(unsigned char ** subfun_arr) {
     memset(funtbl, 0, sizeof(struct s_funtbl) * MAXSUBFUN);
     for (int i = 0; i < MAXSUBFUN && subfun_arr[i] != NULL; i++) {
-        unsigned char *np = subfun_arr[i];
+        unsigned char * np = subfun_arr[i];
         np += sizeof(CommandToken);
         while (*np == ' ') np++;
         char name[MAXVARLEN + 1];
@@ -41,8 +41,10 @@ void port_bc_bridge_rehash_subfun(unsigned char **subfun_arr) {
             np++;
             namelen++;
         } while (isnamechar(*np));
-        if (namelen < MAXVARLEN) name[namelen] = 0;
-        else namelen = MAXVARLEN;
+        if (namelen < MAXVARLEN)
+            name[namelen] = 0;
+        else
+            namelen = MAXVARLEN;
         hash %= MAXSUBHASH;
         while (funtbl[hash].name[0] != 0) {
             hash++;
@@ -56,6 +58,8 @@ void port_bc_bridge_rehash_subfun(unsigned char **subfun_arr) {
 #else
 
 void port_bc_bridge_clear_subfun_hash(void) {}
-void port_bc_bridge_rehash_subfun(unsigned char **subfun_arr) { (void)subfun_arr; }
+void port_bc_bridge_rehash_subfun(unsigned char ** subfun_arr) {
+    (void)subfun_arr;
+}
 
 #endif

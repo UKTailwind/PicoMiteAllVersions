@@ -12,7 +12,7 @@
 static __attribute__((aligned(16)))
 uint8_t pc386_libc_heap_storage[PC386_LIBC_HEAP_SIZE];
 
-void *heap_region_base(void) {
+void * heap_region_base(void) {
     return pc386_libc_heap_storage;
 }
 

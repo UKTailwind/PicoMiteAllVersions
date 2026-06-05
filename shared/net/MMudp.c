@@ -36,8 +36,8 @@ void close_udp_server(void) {
     mm_net_udp_service_stop(&pico_udp_service);
 }
 
-void cmd_udp(unsigned char *p) {
-    unsigned char *tp;
+void cmd_udp(unsigned char * p) {
+    unsigned char * tp;
     tp = checkstring(p, (unsigned char *)"INTERRUPT");
     if (tp) {
         UDPinterrupt = mm_net_udp_parse_interrupt(tp);

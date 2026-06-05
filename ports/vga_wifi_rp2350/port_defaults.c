@@ -13,8 +13,7 @@
 
 extern int checkslice(int pin1, int pin2, int ignore);
 
-void port_set_default_options(void)
-{
+void port_set_default_options(void) {
     Option.DISPLAY_CONSOLE = 1;
     Option.DISPLAY_TYPE = SCREENMODE1;
     Option.X_TILE = 80;
@@ -29,13 +28,11 @@ void port_set_default_options(void)
      * uses Height/Width/dummy in that slot). */
 }
 
-void port_print_supported_boards(void)
-{
+void port_print_supported_boards(void) {
     MMPrintString("VGA + WiFi (F2 validation)\r\n");
 }
 
-int port_factory_reset_board(unsigned char *p)
-{
+int port_factory_reset_board(unsigned char * p) {
     (void)p;
     return 0;
 }
@@ -44,7 +41,7 @@ int port_factory_reset_board(unsigned char *p)
  * implementations live in vga_rp2350; F2 reuses the same logic via a
  * minimal proxy. CPUSPEED/AUTOREFRESH/LCDPANEL not relevant on a VGA
  * port. */
-extern bool check_sys_clock_khz(uint32_t freq, uint *vco, uint *postdiv1, uint *postdiv2);
+extern bool check_sys_clock_khz(uint32_t freq, uint * vco, uint * postdiv1, uint * postdiv2);
 extern void ResetDisplay(void);
 extern void ClearScreen(int colour);
 extern short HRes;
@@ -52,13 +49,12 @@ extern short VRes;
 extern short CurrentX;
 extern short CurrentY;
 extern int ScreenSize;
-extern unsigned char *WriteBuf;
+extern unsigned char * WriteBuf;
 extern volatile int DISPLAY_TYPE;
 extern void VGArecovery(int pin);
 
-int port_display_option_setter(unsigned char *cmdline)
-{
-    unsigned char *tp;
+int port_display_option_setter(unsigned char * cmdline) {
+    unsigned char * tp;
     tp = checkstring(cmdline, (unsigned char *)"RESOLUTION");
     if (tp) {
         getargs(&tp, 3, (unsigned char *)",");
@@ -68,10 +64,12 @@ int port_display_option_setter(unsigned char *cmdline)
                 int i = getint(argv[2], Freq252P, Freq378P);
                 if (!(i == Freq252P || i == Freq480P || i == Freq378P)) error("Invalid speed");
                 Option.CPU_Speed = i;
-            } else Option.CPU_Speed = Freq252P;
+            } else
+                Option.CPU_Speed = Freq252P;
             Option.DISPLAY_TYPE = SCREENMODE1;
             Option.DefaultFont = 1;
-        } else error("Syntax");
+        } else
+            error("Syntax");
         Option.X_TILE = 80;
         Option.Y_TILE = 40;
         SaveOptions();
@@ -132,29 +130,27 @@ int SSD1963data = 0;
 void port_clear_lcd_spi_if_shares_system(void) {}
 
 /* CYW43-reserved virtual-pin aliases — same as web_rp2350. */
-static int starts_with_gp(const char *s, char d1, char d2)
-{
+static int starts_with_gp(const char * s, char d1, char d2) {
     return (s[0] == 'G' || s[0] == 'g') && (s[1] == 'P' || s[1] == 'p') && s[2] == d1 && s[3] == d2;
 }
-int port_pinno_alias_for_name(const char *name)
-{
+int port_pinno_alias_for_name(const char * name) {
     if (starts_with_gp(name, '2', '3')) return 41;
     if (starts_with_gp(name, '2', '4')) return 42;
     if (starts_with_gp(name, '2', '5')) return 43;
     if (starts_with_gp(name, '2', '9')) return 44;
     return 0;
 }
-int port_pin_is_reserved_alias(int pin) { return pin >= 41 && pin <= 44; }
-const char *port_pin_reserved_label(int pin)
-{
+int port_pin_is_reserved_alias(int pin) {
+    return pin >= 41 && pin <= 44;
+}
+const char * port_pin_reserved_label(int pin) {
     if (pin >= 41 && pin <= 44) return "Boot Reserved : CYW43";
     return NULL;
 }
 
 /* OPTION LCDPANEL CONSOLE: pre-fill the tile-color arrays. Same as
  * vga_rp2350. */
-void port_apply_default_console_colors(int default_fc, int default_bc)
-{
+void port_apply_default_console_colors(int default_fc, int default_bc) {
     int fcolour = RGB121pack(default_fc);
     int bcolour = RGB121pack(default_bc);
     for (int xp = 0; xp < X_TILE; xp++) {

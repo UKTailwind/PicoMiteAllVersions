@@ -19,17 +19,16 @@
 
 #include "lfs.h"
 
-#define BLOCK_SIZE      4096      /* matches ESP32 internal flash erase */
-#define READ_SIZE       1
-#define PROG_SIZE       256
-#define CACHE_SIZE      256
-#define LOOKAHEAD_SIZE  256
+#define BLOCK_SIZE 4096 /* matches ESP32 internal flash erase */
+#define READ_SIZE 1
+#define PROG_SIZE 256
+#define CACHE_SIZE 256
+#define LOOKAHEAD_SIZE 256
 
-static const esp_partition_t *s_part = NULL;
+static const esp_partition_t * s_part = NULL;
 
-static int esp_lfs_read(const struct lfs_config *c, lfs_block_t block,
-                        lfs_off_t off, void *buf, lfs_size_t size)
-{
+static int esp_lfs_read(const struct lfs_config * c, lfs_block_t block,
+                        lfs_off_t off, void * buf, lfs_size_t size) {
     (void)c;
     if (!s_part) return LFS_ERR_IO;
     if (esp_partition_read(s_part, block * BLOCK_SIZE + off, buf, size) != ESP_OK)
@@ -37,9 +36,8 @@ static int esp_lfs_read(const struct lfs_config *c, lfs_block_t block,
     return 0;
 }
 
-static int esp_lfs_prog(const struct lfs_config *c, lfs_block_t block,
-                        lfs_off_t off, const void *buf, lfs_size_t size)
-{
+static int esp_lfs_prog(const struct lfs_config * c, lfs_block_t block,
+                        lfs_off_t off, const void * buf, lfs_size_t size) {
     (void)c;
     if (!s_part) return LFS_ERR_IO;
     if (esp_partition_write(s_part, block * BLOCK_SIZE + off, buf, size) != ESP_OK)
@@ -47,8 +45,7 @@ static int esp_lfs_prog(const struct lfs_config *c, lfs_block_t block,
     return 0;
 }
 
-static int esp_lfs_erase(const struct lfs_config *c, lfs_block_t block)
-{
+static int esp_lfs_erase(const struct lfs_config * c, lfs_block_t block) {
     (void)c;
     if (!s_part) return LFS_ERR_IO;
     if (esp_partition_erase_range(s_part, block * BLOCK_SIZE, BLOCK_SIZE) != ESP_OK)
@@ -56,28 +53,31 @@ static int esp_lfs_erase(const struct lfs_config *c, lfs_block_t block)
     return 0;
 }
 
-static int esp_lfs_sync(const struct lfs_config *c) { (void)c; return 0; }
+static int esp_lfs_sync(const struct lfs_config * c) {
+    (void)c;
+    return 0;
+}
 
 static uint8_t s_read_buf[CACHE_SIZE];
 static uint8_t s_prog_buf[CACHE_SIZE];
 static uint8_t s_lookahead_buf[LOOKAHEAD_SIZE];
 
 struct lfs_config pico_lfs_cfg = {
-    .read  = esp_lfs_read,
-    .prog  = esp_lfs_prog,
+    .read = esp_lfs_read,
+    .prog = esp_lfs_prog,
     .erase = esp_lfs_erase,
-    .sync  = esp_lfs_sync,
+    .sync = esp_lfs_sync,
 
-    .read_size      = READ_SIZE,
-    .prog_size      = PROG_SIZE,
-    .block_size     = BLOCK_SIZE,
-    .block_count    = 0,    /* filled at boot from partition size */
-    .block_cycles   = 500,
-    .cache_size     = CACHE_SIZE,
+    .read_size = READ_SIZE,
+    .prog_size = PROG_SIZE,
+    .block_size = BLOCK_SIZE,
+    .block_count = 0, /* filled at boot from partition size */
+    .block_cycles = 500,
+    .cache_size = CACHE_SIZE,
     .lookahead_size = LOOKAHEAD_SIZE,
 
-    .read_buffer      = s_read_buf,
-    .prog_buffer      = s_prog_buf,
+    .read_buffer = s_read_buf,
+    .prog_buffer = s_prog_buf,
     .lookahead_buffer = s_lookahead_buf,
 };
 
@@ -89,57 +89,57 @@ static int s_mounted = 0;
 /* Embedded demo files. IDF's EMBED_TXTFILES generates these symbols
  * as `_binary_<filename>_start/end`. The asm() rename matches
  * IDF's mangling (dots replaced with underscores). */
-extern const char demo_hello_start[]    asm("_binary_hello_bas_start");
-extern const char demo_hello_end[]      asm("_binary_hello_bas_end");
+extern const char demo_hello_start[] asm("_binary_hello_bas_start");
+extern const char demo_hello_end[] asm("_binary_hello_bas_end");
 extern const char demo_fizzbuzz_start[] asm("_binary_fizzbuzz_bas_start");
-extern const char demo_fizzbuzz_end[]   asm("_binary_fizzbuzz_bas_end");
-extern const char demo_sieve_start[]    asm("_binary_sieve_bas_start");
-extern const char demo_sieve_end[]      asm("_binary_sieve_bas_end");
-extern const char demo_mand_start[]     asm("_binary_mand_bas_start");
-extern const char demo_mand_end[]       asm("_binary_mand_bas_end");
+extern const char demo_fizzbuzz_end[] asm("_binary_fizzbuzz_bas_end");
+extern const char demo_sieve_start[] asm("_binary_sieve_bas_start");
+extern const char demo_sieve_end[] asm("_binary_sieve_bas_end");
+extern const char demo_mand_start[] asm("_binary_mand_bas_start");
+extern const char demo_mand_end[] asm("_binary_mand_bas_end");
 extern const char demo_web_hello_start[] asm("_binary_web_hello_bas_start");
-extern const char demo_web_hello_end[]   asm("_binary_web_hello_bas_end");
-extern const char demo_site_start[]      asm("_binary_site_bas_start");
-extern const char demo_site_end[]        asm("_binary_site_bas_end");
+extern const char demo_web_hello_end[] asm("_binary_web_hello_bas_end");
+extern const char demo_site_start[] asm("_binary_site_bas_start");
+extern const char demo_site_end[] asm("_binary_site_bas_end");
 extern const char demo_site_index_start[] asm("_binary_site_index_htm_start");
-extern const char demo_site_index_end[]   asm("_binary_site_index_htm_end");
+extern const char demo_site_index_end[] asm("_binary_site_index_htm_end");
 extern const char demo_site_status_start[] asm("_binary_site_status_htm_start");
-extern const char demo_site_status_end[]   asm("_binary_site_status_htm_end");
+extern const char demo_site_status_end[] asm("_binary_site_status_htm_end");
 extern const char demo_site_about_start[] asm("_binary_site_about_htm_start");
-extern const char demo_site_about_end[]   asm("_binary_site_about_htm_end");
+extern const char demo_site_about_end[] asm("_binary_site_about_htm_end");
 extern const char demo_site_gpio_start[] asm("_binary_site_gpio_htm_start");
-extern const char demo_site_gpio_end[]   asm("_binary_site_gpio_htm_end");
+extern const char demo_site_gpio_end[] asm("_binary_site_gpio_htm_end");
 extern const char demo_site_files_start[] asm("_binary_site_files_htm_start");
-extern const char demo_site_files_end[]   asm("_binary_site_files_htm_end");
+extern const char demo_site_files_end[] asm("_binary_site_files_htm_end");
 extern const char demo_site_style_start[] asm("_binary_site_style_css_start");
-extern const char demo_site_style_end[]   asm("_binary_site_style_css_end");
+extern const char demo_site_style_end[] asm("_binary_site_style_css_end");
 
 struct embedded_demo {
-    const char *name;
-    const char *start;
-    const char *end;
+    const char * name;
+    const char * start;
+    const char * end;
     int refresh;
 };
 
 static const struct embedded_demo s_demos[] = {
-    { "hello.bas",    demo_hello_start,    demo_hello_end,    0 },
-    { "fizzbuzz.bas", demo_fizzbuzz_start, demo_fizzbuzz_end, 0 },
-    { "sieve.bas",    demo_sieve_start,    demo_sieve_end,    0 },
-    { "mand.bas",     demo_mand_start,     demo_mand_end,     0 },
-    { "web_hello.bas", demo_web_hello_start, demo_web_hello_end, 0 },
-    { "site.bas",     demo_site_start,     demo_site_end,     1 },
-    { "server.bas",   demo_site_start,     demo_site_end,     1 },
-    { "index.htm",    demo_site_index_start, demo_site_index_end, 1 },
-    { "status.htm",   demo_site_status_start, demo_site_status_end, 1 },
-    { "about.htm",    demo_site_about_start, demo_site_about_end, 1 },
-    { "gpio.htm",     demo_site_gpio_start, demo_site_gpio_end, 1 },
-    { "files.htm",    demo_site_files_start, demo_site_files_end, 1 },
-    { "style.css",    demo_site_style_start, demo_site_style_end, 1 },
+    {"hello.bas", demo_hello_start, demo_hello_end, 0},
+    {"fizzbuzz.bas", demo_fizzbuzz_start, demo_fizzbuzz_end, 0},
+    {"sieve.bas", demo_sieve_start, demo_sieve_end, 0},
+    {"mand.bas", demo_mand_start, demo_mand_end, 0},
+    {"web_hello.bas", demo_web_hello_start, demo_web_hello_end, 0},
+    {"site.bas", demo_site_start, demo_site_end, 1},
+    {"server.bas", demo_site_start, demo_site_end, 1},
+    {"index.htm", demo_site_index_start, demo_site_index_end, 1},
+    {"status.htm", demo_site_status_start, demo_site_status_end, 1},
+    {"about.htm", demo_site_about_start, demo_site_about_end, 1},
+    {"gpio.htm", demo_site_gpio_start, demo_site_gpio_end, 1},
+    {"files.htm", demo_site_files_start, demo_site_files_end, 1},
+    {"style.css", demo_site_style_start, demo_site_style_end, 1},
 };
 
 static void populate_demos(void) {
     for (size_t i = 0; i < sizeof s_demos / sizeof s_demos[0]; i++) {
-        const struct embedded_demo *d = &s_demos[i];
+        const struct embedded_demo * d = &s_demos[i];
         size_t len = (size_t)(d->end - d->start);
         if (len && d->start[len - 1] == '\0') len--;
         lfs_file_t f;
@@ -180,11 +180,17 @@ int esp32_lfs_mount(void) {
     if (err == LFS_ERR_CORRUPT) {
         ESP_LOGI("lfs", "no filesystem; formatting...");
         err = lfs_format(&lfs, &pico_lfs_cfg);
-        if (err) { ESP_LOGE("lfs", "lfs_format failed: %d", err); return -1; }
+        if (err) {
+            ESP_LOGE("lfs", "lfs_format failed: %d", err);
+            return -1;
+        }
         err = lfs_mount(&lfs, &pico_lfs_cfg);
         formatted = 1;
     }
-    if (err) { ESP_LOGE("lfs", "lfs_mount failed: %d", err); return -1; }
+    if (err) {
+        ESP_LOGE("lfs", "lfs_mount failed: %d", err);
+        return -1;
+    }
     s_mounted = 1;
     ESP_LOGI("lfs", "LittleFS mounted (A:)");
     (void)formatted;

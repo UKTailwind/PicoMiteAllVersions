@@ -35,7 +35,7 @@ void esp32_console_init(void) {
     usb_serial_jtag_vfs_set_rx_line_endings(ESP_LINE_ENDINGS_LF);
     usb_serial_jtag_vfs_set_tx_line_endings(ESP_LINE_ENDINGS_LF);
 
-    setvbuf(stdin,  NULL, _IONBF, 0);
+    setvbuf(stdin, NULL, _IONBF, 0);
     setvbuf(stdout, NULL, _IONBF, 0);
 
     int flags = fcntl(STDIN_FILENO, F_GETFL, 0);
@@ -47,14 +47,16 @@ void esp32_console_init(void) {
  * byte through this helper. We forward straight to fwrite(stdout), which
  * goes to USB Serial/JTAG via the driver installed above. */
 
-void esp32_console_write_bytes(const char *text, int len) {
+void esp32_console_write_bytes(const char * text, int len) {
     fwrite(text, 1, len, stdout);
 }
 
 /* USB Serial/JTAG is a byte-level raw pipe — no terminal line discipline,
  * no readline. Tell MMInkey to route through the byte-level reads + the
  * ANSI escape decoder rather than the line-buffered fgetc fallback. */
-int esp32_console_raw_mode_is_active(void) { return 1; }
+int esp32_console_raw_mode_is_active(void) {
+    return 1;
+}
 
 /* ---- byte-level reads ----
  * esp32_console_read_byte_nonblock returns -1 when nothing's available so the
@@ -65,14 +67,22 @@ int esp32_console_raw_mode_is_active(void) { return 1; }
 static int s_pushback = -1;
 
 int esp32_console_read_byte_nonblock(void) {
-    if (s_pushback >= 0) { int c = s_pushback; s_pushback = -1; return c; }
+    if (s_pushback >= 0) {
+        int c = s_pushback;
+        s_pushback = -1;
+        return c;
+    }
     unsigned char c;
     int n = usb_serial_jtag_read_bytes(&c, 1, 0);
     return (n == 1) ? (int)c : -1;
 }
 
 int esp32_console_read_byte_blocking_ms(int ms) {
-    if (s_pushback >= 0) { int c = s_pushback; s_pushback = -1; return c; }
+    if (s_pushback >= 0) {
+        int c = s_pushback;
+        s_pushback = -1;
+        return c;
+    }
     TickType_t ticks = (ms < 0) ? portMAX_DELAY : pdMS_TO_TICKS(ms);
     if (ms > 0 && ticks == 0) ticks = 1;
     unsigned char c;
@@ -80,7 +90,9 @@ int esp32_console_read_byte_blocking_ms(int ms) {
     return (n == 1) ? (int)c : -1;
 }
 
-void esp32_console_push_back_byte(int c) { s_pushback = c; }
+void esp32_console_push_back_byte(int c) {
+    s_pushback = c;
+}
 
 /* MMBasic-facing console glue (MMputchar, MMPrintString, MMInkey,
  * SerialConsolePutC, ConsoleRxBuf*, MMgetline, …) lives in

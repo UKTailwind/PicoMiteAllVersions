@@ -22,7 +22,7 @@
 #include <sys/stat.h>
 
 /* Forward-declared in lieu of pulling in unistd.h. */
-char *getcwd(char *buf, size_t size);
+char * getcwd(char * buf, size_t size);
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 #include "bytecode.h"
@@ -37,8 +37,8 @@ char *getcwd(char *buf, size_t size);
 /* All needed externs come from Hardware_Includes.h / MMBasic.h */
 extern char MMErrMsg[];
 extern int MMerrno;
-void host_runtime_configure(int timeout_ms, const char *screenshot_path);
-void host_runtime_configure_keys(const char *keys, int delay_ms);
+void host_runtime_configure(int timeout_ms, const char * screenshot_path);
+void host_runtime_configure_keys(const char * keys, int delay_ms);
 void host_runtime_finish(void);
 int host_runtime_timed_out(void);
 uint32_t host_runtime_get_pixel(int x, int y);
@@ -48,7 +48,7 @@ int host_runtime_height(void);
 /* flash_progmemory is NULL on host -- we need to allocate backing storage.
  * flash_prog_buf is non-static so the simulated flash routines can write
  * through to it. */
-extern const uint8_t *flash_progmemory;
+extern const uint8_t * flash_progmemory;
 /* Sized to mirror device program-flash region — MAX_PROG_SIZE for the
  * program area + same for the CFunction tail. Tracks the variant
  * config rather than the old fixed 256 KB so MEMORY output matches
@@ -71,8 +71,8 @@ static const mm_runtime_adapter host_boot_adapter = {
 #define CAPTURE_SIZE (64 * 1024)
 static char interp_output[CAPTURE_SIZE];
 static char vm_output[CAPTURE_SIZE];
-static char *capture_buf = NULL;
-static char *capture_ptr = NULL;
+static char * capture_buf = NULL;
+static char * capture_ptr = NULL;
 static int capture_remaining = 0;
 
 /* Hook into MMPrintString to capture output */
@@ -87,16 +87,16 @@ typedef struct {
 typedef struct {
     int width;
     int height;
-    uint32_t *pixels;
+    uint32_t * pixels;
 } FramebufferSnapshot;
 
 #define MAX_PIXEL_ASSERTS 64
 
 /* We override MMPrintString etc in host_stubs.c, so we need a way
  * to redirect output.  We'll use a global function pointer. */
-void (*host_output_hook)(const char *text, int len) = NULL;
+void (*host_output_hook)(const char * text, int len) = NULL;
 
-void host_capture_hook(const char *text, int len) {
+void host_capture_hook(const char * text, int len) {
     if (len > capture_remaining) len = capture_remaining;
     if (len > 0) {
         memcpy(capture_ptr, text, len);
@@ -105,9 +105,9 @@ void host_capture_hook(const char *text, int len) {
     }
 }
 
-static void strip_ansi_sequences(char *buf) {
-    char *src = buf;
-    char *dst = buf;
+static void strip_ansi_sequences(char * buf) {
+    char * src = buf;
+    char * dst = buf;
 
     while (*src) {
         if ((unsigned char)src[0] == 0x1B && src[1] == '[') {
@@ -123,10 +123,10 @@ static void strip_ansi_sequences(char *buf) {
     *dst = '\0';
 }
 
-static void start_capture(char *buf, int size) {
+static void start_capture(char * buf, int size) {
     capture_buf = buf;
     capture_ptr = buf;
-    capture_remaining = size - 1;  /* leave room for null terminator */
+    capture_remaining = size - 1; /* leave room for null terminator */
     buf[0] = '\0';
     host_output_hook = host_capture_hook;
     capturing = 1;
@@ -139,15 +139,17 @@ static void stop_capture(void) {
     if (capture_buf) strip_ansi_sequences(capture_buf);
 }
 
-static int parse_pixel_assert(const char *spec, PixelAssert *out) {
-    char *end;
+static int parse_pixel_assert(const char * spec, PixelAssert * out) {
+    char * end;
     long x = strtol(spec, &end, 10);
     if (end == spec || *end != ',') return -1;
     long y = strtol(end + 1, &end, 10);
     if (end == spec || *end != ',') return -1;
-    const char *rgb_text = end + 1;
-    if (*rgb_text == '#') rgb_text++;
-    else if (rgb_text[0] == '0' && (rgb_text[1] == 'x' || rgb_text[1] == 'X')) rgb_text += 2;
+    const char * rgb_text = end + 1;
+    if (*rgb_text == '#')
+        rgb_text++;
+    else if (rgb_text[0] == '0' && (rgb_text[1] == 'x' || rgb_text[1] == 'X'))
+        rgb_text += 2;
     unsigned long rgb = strtoul(rgb_text, &end, 16);
     if (*rgb_text == '\0' || *end != '\0' || rgb > 0xFFFFFFUL) return -1;
     out->x = (int)x;
@@ -156,13 +158,13 @@ static int parse_pixel_assert(const char *spec, PixelAssert *out) {
     return 0;
 }
 
-static int check_pixel_assertions(const char *label, const PixelAssert *asserts, int count) {
+static int check_pixel_assertions(const char * label, const PixelAssert * asserts, int count) {
     int failures = 0;
     int width = host_runtime_width();
     int height = host_runtime_height();
 
     for (int i = 0; i < count; ++i) {
-        const PixelAssert *pa = &asserts[i];
+        const PixelAssert * pa = &asserts[i];
         if (pa->x < 0 || pa->y < 0 || pa->x >= width || pa->y >= height) {
             printf("%s pixel assertion %d out of bounds: (%d,%d) not in %dx%d\n",
                    label, i + 1, pa->x, pa->y, width, height);
@@ -181,7 +183,7 @@ static int check_pixel_assertions(const char *label, const PixelAssert *asserts,
     return failures;
 }
 
-static int capture_framebuffer(FramebufferSnapshot *snap) {
+static int capture_framebuffer(FramebufferSnapshot * snap) {
     if (!snap) return -1;
     snap->width = host_runtime_width();
     snap->height = host_runtime_height();
@@ -202,7 +204,7 @@ static int capture_framebuffer(FramebufferSnapshot *snap) {
     return 0;
 }
 
-static void free_framebuffer_snapshot(FramebufferSnapshot *snap) {
+static void free_framebuffer_snapshot(FramebufferSnapshot * snap) {
     if (!snap) return;
     free(snap->pixels);
     snap->pixels = NULL;
@@ -210,7 +212,7 @@ static void free_framebuffer_snapshot(FramebufferSnapshot *snap) {
     snap->height = 0;
 }
 
-static int compare_framebuffer_snapshot(const FramebufferSnapshot *expected) {
+static int compare_framebuffer_snapshot(const FramebufferSnapshot * expected) {
     if (!expected || !expected->pixels) {
         printf("Framebuffer compare failed: no interpreter snapshot\n");
         return 1;
@@ -249,8 +251,8 @@ static int compare_framebuffer_snapshot(const FramebufferSnapshot *expected) {
  * Load a .bas file into a NUL-terminated source buffer.
  * Caller must free the returned buffer.
  */
-char *read_basic_source_file(const char *filename) {
-    FILE *f = fopen(filename, "r");
+char * read_basic_source_file(const char * filename) {
+    FILE * f = fopen(filename, "r");
     if (!f) {
         fprintf(stderr, "Cannot open %s\n", filename);
         return NULL;
@@ -259,8 +261,11 @@ char *read_basic_source_file(const char *filename) {
     fseek(f, 0, SEEK_END);
     long fsize = ftell(f);
     fseek(f, 0, SEEK_SET);
-    char *source = malloc(fsize + 1);
-    if (!source) { fclose(f); return NULL; }
+    char * source = malloc(fsize + 1);
+    if (!source) {
+        fclose(f);
+        return NULL;
+    }
     fread(source, 1, fsize, f);
     source[fsize] = '\0';
     fclose(f);
@@ -271,7 +276,7 @@ char *read_basic_source_file(const char *filename) {
  * Run via the old interpreter with output capture.
  * Returns 0 on normal completion, non-zero on error.
  */
-static int run_interpreter(char *output, int outsize) {
+static int run_interpreter(char * output, int outsize) {
     start_capture(output, outsize);
     int result = 0;
 
@@ -299,8 +304,8 @@ static int run_interpreter(char *output, int outsize) {
  * Run via the bytecode VM with output capture.
  * Returns 0 on normal completion, non-zero on error.
  */
-static int run_bytecode_vm_source(const char *source, const char *source_name,
-                                  char *output, int outsize) {
+static int run_bytecode_vm_source(const char * source, const char * source_name,
+                                  char * output, int outsize) {
     start_capture(output, outsize);
     int result = 0;
 
@@ -340,8 +345,8 @@ typedef enum {
 
 extern int host_repl_mode;
 extern void host_raw_mode_enter(void);
-extern int host_terminal_get_size(int *rows, int *cols);
-extern int MMPromptPos;  /* defined in MMBasic_Prompt.c */
+extern int host_terminal_get_size(int * rows, int * cols);
+extern int MMPromptPos; /* defined in MMBasic_Prompt.c */
 extern int gui_fcolour, gui_bcolour;
 extern int PromptFC, PromptBC;
 
@@ -349,14 +354,14 @@ extern int PromptFC, PromptBC;
  * resolve paths relative to this directory on the real filesystem
  * instead of going through the in-memory FAT that the test harness uses.
  * Set by run_repl from cwd, or overridden with --sd-root. */
-extern const char *host_sd_root;
+extern const char * host_sd_root;
 
 /*
  * Parse `--foo bar` or `--foo=bar`. On match returns the value and advances
  * *pi past the consumed argv entry. Returns NULL if argv[*pi] isn't this
  * option.
  */
-static const char *opt_value(char **argv, int argc, int *pi, const char *name) {
+static const char * opt_value(char ** argv, int argc, int * pi, const char * name) {
     int i = *pi;
     size_t n = strlen(name);
     if (strcmp(argv[i], name) == 0) {
@@ -402,11 +407,11 @@ static int run_repl(void) {
             tty_rows = SCREENHEIGHT;
             tty_cols = SCREENWIDTH;
         }
-        if (tty_cols < SCREENWIDTH)  tty_cols = SCREENWIDTH;
+        if (tty_cols < SCREENWIDTH) tty_cols = SCREENWIDTH;
         if (tty_rows < SCREENHEIGHT) tty_rows = SCREENHEIGHT;
         if (tty_cols > 127) tty_cols = 127;
         if (tty_rows > 127) tty_rows = 127;
-        Option.Width  = (char)tty_cols;
+        Option.Width = (char)tty_cols;
         Option.Height = (char)tty_rows;
     }
 
@@ -431,21 +436,21 @@ static int run_repl(void) {
      * raw mode disables OPOST, so '\n' stops translating to '\r\n'. */
     host_raw_mode_enter();
 
-    mmbasic_runtime_enter_repl(NULL, 0);   /* does not return */
+    mmbasic_runtime_enter_repl(NULL, 0); /* does not return */
 
     host_runtime_finish();
     return 0;
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char ** argv) {
     host_options_set_executable_path(argc > 0 ? argv[0] : NULL);
 
     HostMode mode = MODE_SOURCE_COMPARE;
     int timeout_ms = 0;
-    const char *screenshot_path = NULL;
+    const char * screenshot_path = NULL;
     int dump_vm_disasm = 0;
     int opt_level = 1;
-    const char *immediate_line = NULL;
+    const char * immediate_line = NULL;
     PixelAssert pixel_asserts[MAX_PIXEL_ASSERTS];
     int pixel_assert_count = 0;
     int compare_framebuffer = 0;
@@ -471,19 +476,19 @@ int main(int argc, char **argv) {
         return 0;
     }
 
-    const char *filename = NULL;
-    const char *key_script = NULL;
+    const char * filename = NULL;
+    const char * key_script = NULL;
     int key_delay_ms = 0;
-    const char *sd_root_arg = NULL;
-    const char *listen_addr = "127.0.0.1";
+    const char * sd_root_arg = NULL;
+    const char * listen_addr = "127.0.0.1";
     int listen_port = 8080;
-    const char *resolution_arg = NULL;
+    const char * resolution_arg = NULL;
     /* `../web` is the sim UI's canonical home (repo-root `web/`). The
      * `ports/host_wasm/web/` directory now holds the WASM bundle (picomite.wasm,
      * app.mjs for the browser-native port) — if we default to `web`
      * here, the sim serves the WASM UI instead of its own WebSocket-
      * backed page. Keep --web-root as an escape hatch. */
-    const char *web_root = "../web";
+    const char * web_root = "../web";
 
     /* First pass: scan for --immediate / --try-compile / --repl / --sim
      * (no filename needed for these modes). Accept `--foo=bar` as well as
@@ -519,48 +524,73 @@ int main(int argc, char **argv) {
         filename = argv[1];
     }
 
-    /* Accept both `--foo bar` and `--foo=bar`. opt_value() returns the
+/* Accept both `--foo bar` and `--foo=bar`. opt_value() returns the
      * value string on match (either the next argv entry, advancing i, or
      * the text after the `=`), or NULL on no match. */
-    #define OPT_VALUE(name_) opt_value(argv, argc, &i, (name_))
+#define OPT_VALUE(name_) opt_value(argv, argc, &i, (name_))
 
     for (int i = (filename ? 2 : 1); i < argc; ++i) {
-        const char *v;
-        if (strcmp(argv[i], "--immediate") == 0 && i + 1 < argc) { i++; continue; }
-        if (strcmp(argv[i], "--try-compile") == 0 && i + 1 < argc) { i++; continue; }
+        const char * v;
+        if (strcmp(argv[i], "--immediate") == 0 && i + 1 < argc) {
+            i++;
+            continue;
+        }
+        if (strcmp(argv[i], "--try-compile") == 0 && i + 1 < argc) {
+            i++;
+            continue;
+        }
         if (strncmp(argv[i], "--immediate=", 12) == 0) continue;
         if (strncmp(argv[i], "--try-compile=", 14) == 0) continue;
         if (strcmp(argv[i], "--repl") == 0) continue;
         if (strcmp(argv[i], "--sim") == 0) continue;
-        if ((v = OPT_VALUE("--sd-root"))   != NULL) { sd_root_arg = v; continue; }
-        if ((v = OPT_VALUE("--listen"))    != NULL) { listen_addr = v; continue; }
-        if ((v = OPT_VALUE("--port"))      != NULL) { listen_port = atoi(v); continue; }
-        if ((v = OPT_VALUE("--web-root"))  != NULL) { web_root = v; continue; }
-        if ((v = OPT_VALUE("--resolution"))!= NULL) { resolution_arg = v; continue; }
-        if ((v = OPT_VALUE("--slowdown"))  != NULL) {
+        if ((v = OPT_VALUE("--sd-root")) != NULL) {
+            sd_root_arg = v;
+            continue;
+        }
+        if ((v = OPT_VALUE("--listen")) != NULL) {
+            listen_addr = v;
+            continue;
+        }
+        if ((v = OPT_VALUE("--port")) != NULL) {
+            listen_port = atoi(v);
+            continue;
+        }
+        if ((v = OPT_VALUE("--web-root")) != NULL) {
+            web_root = v;
+            continue;
+        }
+        if ((v = OPT_VALUE("--resolution")) != NULL) {
+            resolution_arg = v;
+            continue;
+        }
+        if ((v = OPT_VALUE("--slowdown")) != NULL) {
             extern int host_sim_slowdown_us;
             host_sim_slowdown_us = atoi(v);
             continue;
         }
-        if (strcmp(argv[i], "--interp") == 0) mode = MODE_INTERP_ONLY;
-        else if (strcmp(argv[i], "--vm") == 0) mode = MODE_VM_SOURCE_ONLY;
+        if (strcmp(argv[i], "--interp") == 0)
+            mode = MODE_INTERP_ONLY;
+        else if (strcmp(argv[i], "--vm") == 0)
+            mode = MODE_VM_SOURCE_ONLY;
         else if (strcmp(argv[i], "--vm-disasm") == 0) {
             mode = MODE_VM_SOURCE_ONLY;
             dump_vm_disasm = 1;
-        }
-        else if (strcmp(argv[i], "-O0") == 0) opt_level = 0;
-        else if (strcmp(argv[i], "-O1") == 0) opt_level = 1;
-        else if (strcmp(argv[i], "--vm-source") == 0) mode = MODE_VM_SOURCE_ONLY;
-        else if (strcmp(argv[i], "--source-compare") == 0) mode = MODE_SOURCE_COMPARE;
+        } else if (strcmp(argv[i], "-O0") == 0)
+            opt_level = 0;
+        else if (strcmp(argv[i], "-O1") == 0)
+            opt_level = 1;
+        else if (strcmp(argv[i], "--vm-source") == 0)
+            mode = MODE_VM_SOURCE_ONLY;
+        else if (strcmp(argv[i], "--source-compare") == 0)
+            mode = MODE_SOURCE_COMPARE;
         else if (strcmp(argv[i], "--immediate") == 0 && i + 1 < argc) {
             mode = MODE_IMMEDIATE;
             immediate_line = argv[++i];
-        }
-        else if (strcmp(argv[i], "--try-compile") == 0 && i + 1 < argc) {
+        } else if (strcmp(argv[i], "--try-compile") == 0 && i + 1 < argc) {
             mode = MODE_TRY_COMPILE;
             immediate_line = argv[++i];
-        }
-        else if (strcmp(argv[i], "--compare-framebuffer") == 0) compare_framebuffer = 1;
+        } else if (strcmp(argv[i], "--compare-framebuffer") == 0)
+            compare_framebuffer = 1;
         else if (strcmp(argv[i], "--timeout-ms") == 0 && i + 1 < argc) {
             timeout_ms = atoi(argv[++i]);
         } else if (strcmp(argv[i], "--screenshot") == 0 && i + 1 < argc) {
@@ -590,7 +620,7 @@ int main(int argc, char **argv) {
     /* Initialize the MMBasic runtime */
     mmbasic_runtime_init_common(&host_boot_adapter,
                                 MMBASIC_RUNTIME_INIT_FLAG_LOAD_OPTIONS |
-                                MMBASIC_RUNTIME_INIT_FLAG_INIT_BASIC);
+                                    MMBASIC_RUNTIME_INIT_FLAG_INIT_BASIC);
     bc_opt_level = opt_level;
     host_runtime_configure(timeout_ms, screenshot_path);
     host_runtime_configure_keys(key_script, key_delay_ms);
@@ -604,8 +634,8 @@ int main(int argc, char **argv) {
     if (sd_root_arg && *sd_root_arg &&
         mode != MODE_REPL && mode != MODE_SIM) {
         strncpy(script_sd_root, sd_root_arg, sizeof(script_sd_root) - 1);
-        mkdir(script_sd_root, 0755);  /* ignore EEXIST */
-        extern const char *host_sd_root;
+        mkdir(script_sd_root, 0755); /* ignore EEXIST */
+        extern const char * host_sd_root;
         host_sd_root = script_sd_root;
     }
 
@@ -664,17 +694,17 @@ int main(int argc, char **argv) {
          * paths like `../web` must be expanded. If the user didn't override,
          * probe common locations first. */
         static char resolved_web_root[PATH_MAX];
-        const char *final_web_root = web_root;
+        const char * final_web_root = web_root;
         /* Candidate order: explicit --web-root first, then the sim UI
          * (../web, repo-root), then the WASM bundle as a last resort
          * (mostly so the sim still boots inside a pruned checkout that
          * only has ports/host_wasm/web/). */
-        const char *candidates[] = { web_root, "../web", "web", NULL };
+        const char * candidates[] = {web_root, "../web", "web", NULL};
         for (int ci = 0; candidates[ci]; ++ci) {
             char probe[PATH_MAX];
             snprintf(probe, sizeof(probe), "%s/index.html", candidates[ci]);
             if (realpath(probe, resolved_web_root)) {
-                char *last_slash = strrchr(resolved_web_root, '/');
+                char * last_slash = strrchr(resolved_web_root, '/');
                 if (last_slash) *last_slash = '\0';
                 final_web_root = resolved_web_root;
                 break;
@@ -683,14 +713,15 @@ int main(int argc, char **argv) {
         if (final_web_root == web_root) {
             fprintf(stderr,
                     "Warning: could not locate web root (tried '%s', 'web', '../web'). "
-                    "Pass --web-root DIR.\n", web_root);
+                    "Pass --web-root DIR.\n",
+                    web_root);
         } else {
             fprintf(stderr, "Serving web UI from: %s\n", final_web_root);
         }
 
         extern int host_sim_active;
         host_sim_active = 1;
-        host_sim_tick_start();   /* 1ms housekeeping thread, matches device timer_callback */
+        host_sim_tick_start(); /* 1ms housekeeping thread, matches device timer_callback */
 
         /* --resolution WxH: override the simulated display size. Must run
          * before anything reads HRes/VRes or touches the framebuffer. */
@@ -724,9 +755,9 @@ int main(int argc, char **argv) {
         gui_font = 0x01;
         gui_font_width = 8;
         gui_font_height = 12;
-        Option.Width  = HRes / gui_font_width;
+        Option.Width = HRes / gui_font_width;
         Option.Height = VRes / gui_font_height;
-        Option.Tab    = 4;
+        Option.Tab = 4;
         Option.DefaultFont = 0x01;
         /* Enable BASIC-syntax highlighting in EDIT mode, like the real
          * PicoCalc. Editor.c sets gui_fcolour per-token (cyan keywords,
@@ -739,8 +770,8 @@ int main(int argc, char **argv) {
          * (called from the error path) restores the same look. */
         gui_fcolour = 0x00FF00;
         gui_bcolour = 0x000000;
-        PromptFC    = 0x00FF00;
-        PromptBC    = 0x000000;
+        PromptFC = 0x00FF00;
+        PromptBC = 0x000000;
         Option.DefaultFC = 0x00FF00;
         Option.DefaultBC = 0x000000;
 
@@ -755,15 +786,17 @@ int main(int argc, char **argv) {
         return rc;
     }
 #else
-    (void)listen_addr; (void)listen_port; (void)web_root;
+    (void)listen_addr;
+    (void)listen_port;
+    (void)web_root;
 #endif
 
-    char *source_text = read_basic_source_file(filename);
+    char * source_text = read_basic_source_file(filename);
     if (!source_text) return 1;
 
     if (mode != MODE_VM_SOURCE_ONLY) {
         if (mmbasic_tokenise_source_to_progmem(source_text,
-                MMBASIC_SOURCE_FLAGS_HOST_LOAD) != 0) {
+                                               MMBASIC_SOURCE_FLAGS_HOST_LOAD) != 0) {
             free(source_text);
             return 1;
         }
@@ -775,9 +808,12 @@ int main(int argc, char **argv) {
         int rc = run_interpreter(interp_output, CAPTURE_SIZE);
         printf("%s", interp_output);
         int pixel_failures = (rc == 0) ? check_pixel_assertions("Interpreter", pixel_asserts, pixel_assert_count) : 0;
-        if (rc == 2) printf("\n--- Timed Out ---\n");
-        else if (pixel_failures) printf("\n--- Pixel Assertions Failed ---\n");
-        else printf("\n--- Done ---\n");
+        if (rc == 2)
+            printf("\n--- Timed Out ---\n");
+        else if (pixel_failures)
+            printf("\n--- Pixel Assertions Failed ---\n");
+        else
+            printf("\n--- Done ---\n");
         free(source_text);
         if (rc == 2) return 124;
         return (rc != 0 || pixel_failures) ? 1 : 0;
@@ -790,9 +826,12 @@ int main(int argc, char **argv) {
         bc_debug_enabled = 0;
         printf("%s", vm_output);
         int pixel_failures = (rc == 0) ? check_pixel_assertions("Bytecode VM Source", pixel_asserts, pixel_assert_count) : 0;
-        if (rc == 2) printf("\n--- Timed Out ---\n");
-        else if (pixel_failures) printf("\n--- Pixel Assertions Failed ---\n");
-        else printf("\n--- Done ---\n");
+        if (rc == 2)
+            printf("\n--- Timed Out ---\n");
+        else if (pixel_failures)
+            printf("\n--- Pixel Assertions Failed ---\n");
+        else
+            printf("\n--- Done ---\n");
         free(source_text);
         if (rc == 2) return 124;
         return (rc != 0 || pixel_failures) ? 1 : 0;
@@ -814,7 +853,7 @@ int main(int argc, char **argv) {
         }
 
         printf("--- Bytecode VM Source Frontend ---\n");
-        bc_alloc_reset();  /* reset memory tracking before VM run */
+        bc_alloc_reset(); /* reset memory tracking before VM run */
         int r2 = run_bytecode_vm_source(source_text, filename, vm_output, CAPTURE_SIZE);
         int p2 = (r2 == 0) ? check_pixel_assertions("Bytecode VM Source", pixel_asserts, pixel_assert_count) : 0;
         if (compare_framebuffer && r1 == 0 && r2 == 0 && fb_compare_failures == 0) {
@@ -828,7 +867,7 @@ int main(int argc, char **argv) {
         /* Memory simulation report */
         {
             size_t cap = bc_alloc_bytes_capacity();
-            size_t hw  = bc_alloc_bytes_high_water();
+            size_t hw = bc_alloc_bytes_high_water();
             size_t cur = bc_alloc_bytes_used();
             if (cap > 0) {
                 printf("VM heap: %zu / %zu bytes (peak %zu, %.0f%%)\n",

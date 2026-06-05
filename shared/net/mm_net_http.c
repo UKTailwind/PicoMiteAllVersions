@@ -7,18 +7,19 @@
 
 #include "shared/net/mm_net_http.h"
 
-size_t mm_net_http_extract_path(const void *request, size_t request_len,
-                                char *out, size_t out_len) {
+size_t mm_net_http_extract_path(const void * request, size_t request_len,
+                                char * out, size_t out_len) {
     if (!out || out_len == 0) return 0;
     out[0] = 0;
     if (!request || request_len == 0) return 0;
 
-    const unsigned char *buf = (const unsigned char *)request;
+    const unsigned char * buf = (const unsigned char *)request;
     size_t sp1 = request_len;
     size_t sp2 = request_len;
     for (size_t i = 0; i < request_len; i++) {
         if (buf[i] == ' ') {
-            if (sp1 == request_len) sp1 = i;
+            if (sp1 == request_len)
+                sp1 = i;
             else {
                 sp2 = i;
                 break;
@@ -40,7 +41,7 @@ static int ascii_tolower(int c) {
     return c;
 }
 
-static int ascii_strcasecmp(const char *a, const char *b) {
+static int ascii_strcasecmp(const char * a, const char * b) {
     while (*a && *b) {
         int ca = ascii_tolower((unsigned char)*a++);
         int cb = ascii_tolower((unsigned char)*b++);
@@ -49,12 +50,12 @@ static int ascii_strcasecmp(const char *a, const char *b) {
     return ascii_tolower((unsigned char)*a) - ascii_tolower((unsigned char)*b);
 }
 
-const char *mm_net_http_mime_from_name(const char *name,
-                                       const char *fallback) {
+const char * mm_net_http_mime_from_name(const char * name,
+                                        const char * fallback) {
     if (!fallback) fallback = "application/octet-stream";
     if (!name) return fallback;
 
-    const char *dot = strrchr(name, '.');
+    const char * dot = strrchr(name, '.');
     if (!dot) return fallback;
     if (ascii_strcasecmp(dot, ".html") == 0 ||
         ascii_strcasecmp(dot, ".htm") == 0) return "text/html";
@@ -74,19 +75,25 @@ const char *mm_net_http_mime_from_name(const char *name,
     return fallback;
 }
 
-const char *mm_net_http_status_reason(int status) {
+const char * mm_net_http_status_reason(int status) {
     switch (status) {
-        case 200: return "OK";
-        case 400: return "Bad Request";
-        case 403: return "Forbidden";
-        case 404: return "Not Found";
-        case 500: return "Internal Server Error";
-        default: return "OK";
+    case 200:
+        return "OK";
+    case 400:
+        return "Bad Request";
+    case 403:
+        return "Forbidden";
+    case 404:
+        return "Not Found";
+    case 500:
+        return "Internal Server Error";
+    default:
+        return "OK";
     }
 }
 
-int mm_net_http_format_status_body(char *out, size_t out_len, int status,
-                                   const char *reason) {
+int mm_net_http_format_status_body(char * out, size_t out_len, int status,
+                                   const char * reason) {
     if (!out || out_len == 0) return -1;
     if (!reason) reason = mm_net_http_status_reason(status);
     int n = snprintf(out, out_len, "%d %s\r\n", status, reason);
@@ -94,10 +101,10 @@ int mm_net_http_format_status_body(char *out, size_t out_len, int status,
     return n;
 }
 
-int mm_net_http_format_response_header(char *out, size_t out_len, int status,
-                                       const char *reason,
-                                       const char *server,
-                                       const char *content_type,
+int mm_net_http_format_response_header(char * out, size_t out_len, int status,
+                                       const char * reason,
+                                       const char * server,
+                                       const char * content_type,
                                        size_t content_len) {
     if (!out || out_len == 0) return -1;
     if (!reason) reason = mm_net_http_status_reason(status);
@@ -115,11 +122,11 @@ int mm_net_http_format_response_header(char *out, size_t out_len, int status,
     return n;
 }
 
-int mm_net_http_send_response(int status, const char *reason,
-                              const char *content_type,
-                              const void *body, size_t body_len,
-                              const char *server_name,
-                              mm_net_http_send_fn send_fn, void *send_ctx) {
+int mm_net_http_send_response(int status, const char * reason,
+                              const char * content_type,
+                              const void * body, size_t body_len,
+                              const char * server_name,
+                              mm_net_http_send_fn send_fn, void * send_ctx) {
     if (!send_fn) return -2;
     char header[256];
     int header_len = mm_net_http_format_response_header(

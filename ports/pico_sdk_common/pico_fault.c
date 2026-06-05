@@ -1,13 +1,13 @@
 #include "pico_runtime_internal.h"
 
 static void __not_in_flash_func(picomite_runtime_checkabort_service)(void) {
-    ProcessWeb(1);          /* stub no-op on non-WiFi */
+    ProcessWeb(1); /* stub no-op on non-WiFi */
     routinechecks();
 }
 
 static void __not_in_flash_func(picomite_runtime_before_abort)(void) {
-    WDTimer = 0;                                                // turn off the watchdog timer
-    calibrate=0;
+    WDTimer = 0; // turn off the watchdog timer
+    calibrate = 0;
     ShowCursor(false);
     hal_display_merge_abort();
 }
@@ -25,18 +25,18 @@ void __not_in_flash_func(CheckAbort)(void) {
 }
 extern void bc_crash_save_fault(void);
 extern void bc_crash_dump_if_any(void);
-void sigbus(void){
+void sigbus(void) {
     bc_crash_save_fault();
     MMPrintString("Error: Invalid address - resetting\r\n");
-	uSec(5000000);
-	fileio_flash_write_begin();
-//	flash_range_erase(PROGSTART, MAX_PROG_SIZE);
+    uSec(5000000);
+    fileio_flash_write_begin();
+    //	flash_range_erase(PROGSTART, MAX_PROG_SIZE);
     LoadOptions();
-    if(Option.NoReset==0){
-        Option.Autorun=0;
+    if (Option.NoReset == 0) {
+        Option.Autorun = 0;
         SaveOptions();
     }
-	fileio_flash_write_end();
-    memset(inpbuf,0,STRINGSIZE);
+    fileio_flash_write_end();
+    memset(inpbuf, 0, STRINGSIZE);
     SoftReset();
 }

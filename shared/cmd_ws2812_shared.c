@@ -33,44 +33,42 @@ enum {
     WS2812_EXT_DIG_OUT = 8
 };
 
-static int ws2812_parse_pin_arg(unsigned char *arg)
-{
-    unsigned char *p = arg;
+static int ws2812_parse_pin_arg(unsigned char * arg) {
+    unsigned char * p = arg;
     skipspace(p);
     if ((p[0] == 'G' || p[0] == 'g') && (p[1] == 'P' || p[1] == 'p') && isdigit(p[2]))
         return codemap(getinteger(p + 2));
     return getinteger(p);
 }
 
-void cmd_WS2812(void)
-{
-    int64_t *src = NULL;
+void cmd_WS2812(void) {
+    int64_t * src = NULL;
     int64_t single_colour = 0;
     hal_ws2812_type_t type = HAL_WS2812_B;
     int colours = 3;
     int nbr;
     int pin;
-    uint8_t *bytes;
+    uint8_t * bytes;
 
     getargs(&cmdline, 7, (unsigned char *)",");
     if (argc != 7) error("Argument count");
 
     switch (toupper(*argv[0])) {
-        case 'O':
-            type = HAL_WS2812_ORIGINAL;
-            break;
-        case 'B':
-            type = HAL_WS2812_B;
-            break;
-        case 'S':
-            type = HAL_WS2812_SK6812;
-            break;
-        case 'W':
-            type = HAL_WS2812_SK6812W;
-            colours = 4;
-            break;
-        default:
-            error("Syntax");
+    case 'O':
+        type = HAL_WS2812_ORIGINAL;
+        break;
+    case 'B':
+        type = HAL_WS2812_B;
+        break;
+    case 'S':
+        type = HAL_WS2812_SK6812;
+        break;
+    case 'W':
+        type = HAL_WS2812_SK6812W;
+        colours = 4;
+        break;
+    default:
+        error("Syntax");
     }
 
     pin = ws2812_parse_pin_arg(argv[2]);
@@ -94,9 +92,9 @@ void cmd_WS2812(void)
     bytes = GetTempMemory(nbr * colours);
     for (int i = 0; i < nbr; i++) {
         uint32_t colour = (uint32_t)src[i];
-        bytes[i * colours + 0] = (uint8_t)((colour >> 8) & 0xff);   /* G */
-        bytes[i * colours + 1] = (uint8_t)((colour >> 16) & 0xff);  /* R */
-        bytes[i * colours + 2] = (uint8_t)(colour & 0xff);          /* B */
+        bytes[i * colours + 0] = (uint8_t)((colour >> 8) & 0xff);  /* G */
+        bytes[i * colours + 1] = (uint8_t)((colour >> 16) & 0xff); /* R */
+        bytes[i * colours + 2] = (uint8_t)(colour & 0xff);         /* B */
         if (colours == 4)
             bytes[i * colours + 3] = (uint8_t)((colour >> 24) & 0xff);
     }

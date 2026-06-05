@@ -16,11 +16,11 @@
 extern "C" {
 #endif
 
-typedef void (*host_fs_emit_line)(const char *name);
+typedef void (*host_fs_emit_line)(const char * name);
 
 /* List entries of `dir`, filtering by glob `pattern`. For each match,
  * call `emit(name)`. Returns 0 on success, -1 on error. */
-int host_fs_list_dir(const char *dir, const char *pattern, host_fs_emit_line emit);
+int host_fs_list_dir(const char * dir, const char * pattern, host_fs_emit_line emit);
 
 /* Stateful directory walker — the iteration primitives FileIO.c's cmd_files
  * / cmd_copy / cmd_kill / fun_dir need. Opaque because POSIX DIR clashes
@@ -33,28 +33,28 @@ int host_fs_list_dir(const char *dir, const char *pattern, host_fs_emit_line emi
  *                     the same case-insensitive glob as host_fs_list_dir.
  * host_fs_walk_close: releases the walker. Safe on NULL. */
 typedef struct host_fs_walker host_fs_walker_t;
-host_fs_walker_t *host_fs_walk_open(const char *dir, const char *pattern);
-int host_fs_walk_next(host_fs_walker_t *w,
-                      char *name_out, int name_cap,
-                      int *is_dir_out,
-                      unsigned long long *size_out,
-                      int64_t *mtime_epoch_out);
-void host_fs_walk_close(host_fs_walker_t *w);
+host_fs_walker_t * host_fs_walk_open(const char * dir, const char * pattern);
+int host_fs_walk_next(host_fs_walker_t * w,
+                      char * name_out, int name_cap,
+                      int * is_dir_out,
+                      unsigned long long * size_out,
+                      int64_t * mtime_epoch_out);
+void host_fs_walk_close(host_fs_walker_t * w);
 
 /* Whole-path operations. Each returns 0 on success, -1 on error. Used by
  * the host f_unlink / f_rename / f_mkdir / f_chdir / f_getcwd wrappers
  * when host_sd_root is set. Paths are absolute
  * or relative-to-cwd — the caller has already joined host_sd_root. */
-int host_fs_unlink(const char *path);
-int host_fs_rename(const char *from, const char *to);
-int host_fs_mkdir(const char *path);
-int host_fs_rmdir(const char *path);
-int host_fs_chdir(const char *path);
-int host_fs_getcwd(char *out, int out_cap);
+int host_fs_unlink(const char * path);
+int host_fs_rename(const char * from, const char * to);
+int host_fs_mkdir(const char * path);
+int host_fs_rmdir(const char * path);
+int host_fs_chdir(const char * path);
+int host_fs_getcwd(char * out, int out_cap);
 
 /* Use argv[0] to place host options.ini next to the executable, then
  * load it into the simulated flash option block before LoadOptions(). */
-void host_options_set_executable_path(const char *argv0);
+void host_options_set_executable_path(const char * argv0);
 
 #ifdef __cplusplus
 }

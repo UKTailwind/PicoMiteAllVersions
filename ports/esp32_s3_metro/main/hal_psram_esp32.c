@@ -51,12 +51,11 @@ uintptr_t PSRAMbase = 0;
 /* Slab handle retained for the lifetime of the program; freed only at
  * reset. cache_sync uses these to scope esp_cache_msync to exactly the
  * slab — no point invalidating ESP-IDF-owned SPIRAM regions. */
-static void *s_psram_slab = NULL;
+static void * s_psram_slab = NULL;
 static size_t s_psram_slab_bytes = 0;
 
-void hal_psram_init(void)
-{
-    if (s_psram_slab != NULL) return;  /* idempotent */
+void hal_psram_init(void) {
+    if (s_psram_slab != NULL) return; /* idempotent */
 
     /* CONFIG_SPIRAM_BOOT_INIT=y in sdkconfig brings up PSRAM during the
      * ESP-IDF bootloader, so we only call esp_psram_init() if it hasn't
@@ -65,7 +64,8 @@ void hal_psram_init(void)
         esp_err_t err = esp_psram_init();
         if (err != ESP_OK) {
             printf("hal_psram_init: esp_psram_init failed (%d); "
-                   "PSRAM disabled\n", (int)err);
+                   "PSRAM disabled\n",
+                   (int)err);
             return;
         }
     }
@@ -81,14 +81,15 @@ void hal_psram_init(void)
      * in the slab tail and is addressed linearly by cmd_psram via
      * PSRAMblock.
      */
-    const size_t heap_bytes  = (size_t)HAL_PORT_PSRAM_SLAB_BYTES;
-    const size_t slot_bytes  = (size_t)HAL_PORT_PSRAM_BLOCK_SIZE;
-    const size_t slab_bytes  = heap_bytes + 0x60000u + slot_bytes;
-    void *slab = heap_caps_aligned_alloc(PAGESIZE, slab_bytes,
-                                         MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    const size_t heap_bytes = (size_t)HAL_PORT_PSRAM_SLAB_BYTES;
+    const size_t slot_bytes = (size_t)HAL_PORT_PSRAM_BLOCK_SIZE;
+    const size_t slab_bytes = heap_bytes + 0x60000u + slot_bytes;
+    void * slab = heap_caps_aligned_alloc(PAGESIZE, slab_bytes,
+                                          MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (!slab) {
         printf("hal_psram_init: heap_caps_aligned_alloc(%u) failed; "
-               "PSRAM disabled\n", (unsigned)slab_bytes);
+               "PSRAM disabled\n",
+               (unsigned)slab_bytes);
         return;
     }
 
@@ -103,19 +104,17 @@ void hal_psram_init(void)
            (unsigned long)PSRAMbase, (unsigned)PSRAMsize);
 }
 
-void hal_psram_cache_sync(void)
-{
+void hal_psram_cache_sync(void) {
     if (!s_psram_slab) return;
     (void)esp_cache_msync(s_psram_slab, s_psram_slab_bytes,
                           ESP_CACHE_MSYNC_FLAG_DIR_C2M |
-                          ESP_CACHE_MSYNC_FLAG_INVALIDATE);
+                              ESP_CACHE_MSYNC_FLAG_INVALIDATE);
 }
 
-uint8_t *hal_psram_nocache_alias(uint8_t *base)
-{
+uint8_t * hal_psram_nocache_alias(uint8_t * base) {
     (void)base;
-    return NULL;  /* ESP32-S3 has no cache-bypass alias for PSRAM. */
+    return NULL; /* ESP32-S3 has no cache-bypass alias for PSRAM. */
 }
 
-void hal_psram_save_settings(void)    {}
+void hal_psram_save_settings(void) {}
 void hal_psram_restore_settings(void) {}

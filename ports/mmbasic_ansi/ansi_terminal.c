@@ -89,7 +89,7 @@ int ansi_terminal_enter(void) {
     return 0;
 }
 
-int ansi_terminal_get_size(int *rows, int *cols) {
+int ansi_terminal_get_size(int * rows, int * cols) {
     ansi_terminal_resized = 0;
     return ansi_terminal_query_size(rows, cols);
 }

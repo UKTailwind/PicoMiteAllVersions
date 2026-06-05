@@ -13,36 +13,41 @@
 
 #include "kprint.h"
 
-static const char *type_name(uint32_t type) {
+static const char * type_name(uint32_t type) {
     switch (type) {
-        case MB1_MEM_AVAILABLE:        return "available";
-        case MB1_MEM_RESERVED:         return "reserved";
-        case MB1_MEM_ACPI_RECLAIMABLE: return "ACPI reclaim";
-        case MB1_MEM_NVS:              return "ACPI NVS";
-        case MB1_MEM_BADRAM:           return "bad RAM";
-        default:                       return "unknown";
+    case MB1_MEM_AVAILABLE:
+        return "available";
+    case MB1_MEM_RESERVED:
+        return "reserved";
+    case MB1_MEM_ACPI_RECLAIMABLE:
+        return "ACPI reclaim";
+    case MB1_MEM_NVS:
+        return "ACPI NVS";
+    case MB1_MEM_BADRAM:
+        return "bad RAM";
+    default:
+        return "unknown";
     }
 }
 
 static void for_each_entry(
-    const mb1_info_t *info,
-    void (*visit)(const mb1_mmap_entry_t *e, void *ctx),
-    void *ctx)
-{
+    const mb1_info_t * info,
+    void (*visit)(const mb1_mmap_entry_t * e, void * ctx),
+    void * ctx) {
     if ((info->flags & MB1_INFO_MMAP) == 0) {
         return;
     }
-    const uint8_t *cursor = (const uint8_t *) (uintptr_t) info->mmap_addr;
-    const uint8_t *end    = cursor + info->mmap_length;
+    const uint8_t * cursor = (const uint8_t *)(uintptr_t)info->mmap_addr;
+    const uint8_t * end = cursor + info->mmap_length;
     while (cursor + sizeof(uint32_t) <= end) {
-        const mb1_mmap_entry_t *e = (const mb1_mmap_entry_t *) cursor;
+        const mb1_mmap_entry_t * e = (const mb1_mmap_entry_t *)cursor;
         visit(e, ctx);
         cursor += e->size + sizeof(e->size);
     }
 }
 
-static void print_entry(const mb1_mmap_entry_t *e, void *ctx) {
-    (void) ctx;
+static void print_entry(const mb1_mmap_entry_t * e, void * ctx) {
+    (void)ctx;
     kputs("  ");
     kputhex64(e->addr);
     kputs("  ");
@@ -52,7 +57,7 @@ static void print_entry(const mb1_mmap_entry_t *e, void *ctx) {
     kputc('\n');
 }
 
-void mmap_print(const mb1_info_t *info) {
+void mmap_print(const mb1_info_t * info) {
     if ((info->flags & MB1_INFO_MMAP) == 0) {
         kputs("Memory map: not provided by bootloader\n");
         if (info->flags & MB1_INFO_MEMORY) {
@@ -68,20 +73,20 @@ void mmap_print(const mb1_info_t *info) {
     for_each_entry(info, print_entry, NULL);
 }
 
-static void summarize_entry(const mb1_mmap_entry_t *e, void *ctx) {
-    mmap_summary_t *s = (mmap_summary_t *) ctx;
+static void summarize_entry(const mb1_mmap_entry_t * e, void * ctx) {
+    mmap_summary_t * s = (mmap_summary_t *)ctx;
     s->entry_count++;
     if (e->type == MB1_MEM_AVAILABLE) {
         s->available_count++;
         s->total_available_bytes += e->length;
         if (e->length > s->largest_region_bytes) {
             s->largest_region_bytes = e->length;
-            s->largest_region_base  = e->addr;
+            s->largest_region_base = e->addr;
         }
     }
 }
 
-bool mmap_summarize(const mb1_info_t *info, mmap_summary_t *out) {
+bool mmap_summarize(const mb1_info_t * info, mmap_summary_t * out) {
     *out = (mmap_summary_t){0};
     if ((info->flags & MB1_INFO_MMAP) == 0) {
         return false;

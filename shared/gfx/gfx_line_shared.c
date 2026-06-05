@@ -1,22 +1,22 @@
 #include "vm_device_support.h"
 #include "gfx_line_shared.h"
 
-static int gfx_line_arg_value(const GfxLineArg *arg, int index) {
+static int gfx_line_arg_value(const GfxLineArg * arg, int index) {
     if (!arg->present || arg->count <= 0 || arg->get_int == NULL) return 0;
     return arg->get_int(arg->ctx, (arg->count > 1) ? index : 0);
 }
 
-static void gfx_line_fail_msg(const GfxLineErrorSink *errors, const char *msg) {
+static void gfx_line_fail_msg(const GfxLineErrorSink * errors, const char * msg) {
     if (errors && errors->fail_msg) errors->fail_msg(errors->ctx, msg);
 }
 
-static void gfx_line_fail_range(const GfxLineErrorSink *errors, const char *label,
+static void gfx_line_fail_range(const GfxLineErrorSink * errors, const char * label,
                                 int value, int min, int max) {
     if (errors && errors->fail_range) errors->fail_range(errors->ctx, label, value, min, max);
 }
 
-void gfx_line_execute(GfxLineMode mode, const GfxLineArg *args, int field_count,
-                      const GfxLineErrorSink *errors) {
+void gfx_line_execute(GfxLineMode mode, const GfxLineArg * args, int field_count,
+                      const GfxLineErrorSink * errors) {
     int x1 = 0, y1 = 0, x2 = 0, y2 = 0, w = 1, c = gui_fcolour;
     const int max_colour = (int)WHITE;
 

@@ -19,7 +19,7 @@
 #include "bc_alloc.h"
 #include "vm_device_support.h"
 
-static inline void vm_file_line_append(uint8_t *dest, int *len, int ch) {
+static inline void vm_file_line_append(uint8_t * dest, int * len, int ch) {
     if (ch == '\t') {
         do {
             if (++(*len) > MAXSTRLEN) error("Line is too long");
@@ -31,22 +31,22 @@ static inline void vm_file_line_append(uint8_t *dest, int *len, int ch) {
     dest[*len] = (uint8_t)ch;
 }
 
-static inline int vm_file_is_drive_spec(const char *s) {
+static inline int vm_file_is_drive_spec(const char * s) {
     return s && ((s[0] == 'A' || s[0] == 'a' || s[0] == 'B' || s[0] == 'b') && s[1] == ':');
 }
 
-static inline int vm_file_drive_index(const char *s) {
+static inline int vm_file_drive_index(const char * s) {
     if (!vm_file_is_drive_spec(s)) error("Invalid disk");
     return (s[0] == 'B' || s[0] == 'b') ? 1 : 0;
 }
 
-static inline void vm_file_normalize_resolved_path(char *path) {
+static inline void vm_file_normalize_resolved_path(char * path) {
     char temp[FF_MAX_LFN] = {0};
-    char *parts[64];
+    char * parts[64];
     int depth = 0;
     int absolute = 0;
-    char *token;
-    char *saveptr = NULL;
+    char * token;
+    char * saveptr = NULL;
 
     if (!path || !*path) {
         strcpy(path, "/");
@@ -75,4 +75,4 @@ static inline void vm_file_normalize_resolved_path(char *path) {
     if (path[0] == '\0') strcpy(path, absolute ? "/" : ".");
 }
 
-#endif  /* VM_SYS_FILE_INTERNAL_H */
+#endif /* VM_SYS_FILE_INTERNAL_H */

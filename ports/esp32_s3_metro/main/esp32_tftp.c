@@ -25,9 +25,8 @@ static esp32_tftp_server_t s_tftp = {
     .port = 0,
 };
 
-static int esp32_tftp_peer_text(const mm_net_tftp_peer_t *peer, char *out,
-                                size_t out_len)
-{
+static int esp32_tftp_peer_text(const mm_net_tftp_peer_t * peer, char * out,
+                                size_t out_len) {
     if (!peer || !out || out_len == 0) return 0;
     if (peer->family == 4)
         return inet_ntop(AF_INET, peer->bytes, out, out_len) != NULL;
@@ -36,9 +35,8 @@ static int esp32_tftp_peer_text(const mm_net_tftp_peer_t *peer, char *out,
     return 0;
 }
 
-static int esp32_tftp_send(void *ctx, const mm_net_tftp_peer_t *peer,
-                           const void *buf, size_t len)
-{
+static int esp32_tftp_send(void * ctx, const mm_net_tftp_peer_t * peer,
+                           const void * buf, size_t len) {
     (void)ctx;
     if (!s_tftp.socket) return 0;
     char host[INET6_ADDRSTRLEN];
@@ -47,9 +45,8 @@ static int esp32_tftp_send(void *ctx, const mm_net_tftp_peer_t *peer,
                                    1000) == HAL_NET_OK;
 }
 
-static int esp32_tftp_open_file(void *ctx, const char *filename, int write,
-                                void **handle)
-{
+static int esp32_tftp_open_file(void * ctx, const char * filename, int write,
+                                void ** handle) {
     (void)ctx;
     hal_fs_fd_t fd;
     int flags = write ? (HAL_FS_O_WRONLY | HAL_FS_O_CREAT | HAL_FS_O_TRUNC)
@@ -59,22 +56,19 @@ static int esp32_tftp_open_file(void *ctx, const char *filename, int write,
     return 0;
 }
 
-static ssize_t esp32_tftp_read_file(void *ctx, void *handle, void *buf,
-                                    size_t len)
-{
+static ssize_t esp32_tftp_read_file(void * ctx, void * handle, void * buf,
+                                    size_t len) {
     (void)ctx;
     return hal_fs_read((hal_fs_fd_t)(intptr_t)handle, buf, len);
 }
 
-static ssize_t esp32_tftp_write_file(void *ctx, void *handle, const void *buf,
-                                     size_t len)
-{
+static ssize_t esp32_tftp_write_file(void * ctx, void * handle, const void * buf,
+                                     size_t len) {
     (void)ctx;
     return hal_fs_write((hal_fs_fd_t)(intptr_t)handle, buf, len);
 }
 
-static void esp32_tftp_close_file(void *ctx, void *handle)
-{
+static void esp32_tftp_close_file(void * ctx, void * handle) {
     (void)ctx;
     hal_fs_close((hal_fs_fd_t)(intptr_t)handle);
 }
@@ -87,14 +81,12 @@ static const mm_net_tftp_ops_t esp32_tftp_ops = {
     .send = esp32_tftp_send,
 };
 
-static void esp32_tftp_ensure_init(void)
-{
+static void esp32_tftp_ensure_init(void) {
     if (!s_tftp.session.ops)
         mm_net_tftp_init(&s_tftp.session, &esp32_tftp_ops, NULL);
 }
 
-void esp32_tftp_poll(void)
-{
+void esp32_tftp_poll(void) {
     if (!s_tftp.socket) return;
     esp32_tftp_ensure_init();
     for (;;) {
@@ -114,8 +106,7 @@ void esp32_tftp_poll(void)
     }
 }
 
-void esp32_tftp_server_stop(void)
-{
+void esp32_tftp_server_stop(void) {
     esp32_tftp_ensure_init();
     mm_net_tftp_close(&s_tftp.session);
     if (s_tftp.socket) {
@@ -125,8 +116,7 @@ void esp32_tftp_server_stop(void)
     s_tftp.port = 0;
 }
 
-int esp32_tftp_server_open(void)
-{
+int esp32_tftp_server_open(void) {
     if (Option.disabletftp || !WIFIconnected) {
         esp32_tftp_server_stop();
         return 0;
@@ -145,8 +135,7 @@ int esp32_tftp_server_open(void)
     return 1;
 }
 
-void esp32_tftp_close_session(void)
-{
+void esp32_tftp_close_session(void) {
     esp32_tftp_ensure_init();
     mm_net_tftp_close(&s_tftp.session);
 }

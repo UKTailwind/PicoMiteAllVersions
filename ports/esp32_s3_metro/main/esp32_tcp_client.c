@@ -17,18 +17,17 @@ typedef struct {
     int stream_open;
     volatile int stream_running;
     TaskHandle_t stream_task;
-    uint8_t *stream_buf;
+    uint8_t * stream_buf;
     int stream_size;
-    int64_t *stream_read;
-    int64_t *stream_write;
+    int64_t * stream_read;
+    int64_t * stream_write;
 } esp32_tcp_client_t;
 
 static esp32_tcp_client_t s_client = {
     .client = 0,
 };
 
-static void esp32_tcp_client_stream_task(void *arg)
-{
+static void esp32_tcp_client_stream_task(void * arg) {
     (void)arg;
     uint8_t tmp[ESP32_TCP_CLIENT_RX_CHUNK];
     while (s_client.stream_running && s_client.client) {
@@ -57,8 +56,7 @@ static void esp32_tcp_client_stream_task(void *arg)
     vTaskDelete(NULL);
 }
 
-static void esp32_tcp_client_stop_stream(void)
-{
+static void esp32_tcp_client_stop_stream(void) {
     if (!s_client.stream_task) {
         s_client.stream_running = 0;
         return;
@@ -69,8 +67,7 @@ static void esp32_tcp_client_stop_stream(void)
     }
 }
 
-void esp32_tcp_client_close(void)
-{
+void esp32_tcp_client_close(void) {
     esp32_tcp_client_stop_stream();
     if (s_client.client) {
         hal_net_tcp_client_close(s_client.client);
@@ -78,8 +75,7 @@ void esp32_tcp_client_close(void)
     memset(&s_client, 0, sizeof s_client);
 }
 
-static void esp32_tcp_client_open_cmd(unsigned char *arg, int stream_open)
-{
+static void esp32_tcp_client_open_cmd(unsigned char * arg, int stream_open) {
     mm_net_tcp_client_open_args_t parsed;
     mm_net_tcp_client_parse_open(arg, &parsed);
 
@@ -93,8 +89,7 @@ static void esp32_tcp_client_open_cmd(unsigned char *arg, int stream_open)
     MMPrintString("Connected\r\n");
 }
 
-static void esp32_tcp_client_request_cmd(unsigned char *arg)
-{
+static void esp32_tcp_client_request_cmd(unsigned char * arg) {
     if (!s_client.client) error("No connection");
     if (s_client.stream_running) error("Connection busy");
 
@@ -126,8 +121,7 @@ static void esp32_tcp_client_request_cmd(unsigned char *arg)
     parsed.dest[0] = total;
 }
 
-static void esp32_tcp_client_stream_cmd(unsigned char *arg)
-{
+static void esp32_tcp_client_stream_cmd(unsigned char * arg) {
     if (!s_client.client) error("No connection");
 
     mm_net_tcp_client_stream_args_t parsed;
@@ -157,9 +151,8 @@ static void esp32_tcp_client_stream_cmd(unsigned char *arg)
     }
 }
 
-int esp32_tcp_client_cmd(unsigned char *line)
-{
-    unsigned char *tp;
+int esp32_tcp_client_cmd(unsigned char * line) {
+    unsigned char * tp;
     if ((tp = checkstring(line, (unsigned char *)"OPEN TCP CLIENT"))) {
         esp32_tcp_client_open_cmd(tp, 0);
         return 1;

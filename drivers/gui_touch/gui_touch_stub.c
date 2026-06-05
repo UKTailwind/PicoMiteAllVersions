@@ -6,5 +6,11 @@
  * branch or the "Unknown command" error.
  */
 
-int hal_port_gui_touch_cmd(unsigned char *cmdline) { (void)cmdline; return 0; }
-int hal_port_gui_touch_test(unsigned char *p)      { (void)p;       return 0; }
+int hal_port_gui_touch_cmd(unsigned char * cmdline) {
+    (void)cmdline;
+    return 0;
+}
+int hal_port_gui_touch_test(unsigned char * p) {
+    (void)p;
+    return 0;
+}

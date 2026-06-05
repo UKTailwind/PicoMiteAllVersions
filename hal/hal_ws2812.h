@@ -23,11 +23,10 @@ typedef enum {
 } hal_ws2812_type_t;
 
 int hal_ws2812_write(uint32_t gpio, hal_ws2812_type_t type,
-                     const uint8_t *wire_bytes, size_t wire_len);
+                     const uint8_t * wire_bytes, size_t wire_len);
 
 #ifdef __cplusplus
 }
 #endif
 
 #endif /* HAL_WS2812_H */
-

@@ -37,7 +37,9 @@ static const int srcSigFracBits = 52;
 // srcBits - srcSigFracBits - 1
 static const int srcExpBits = 11;
 
-static inline int src_rep_t_clz_impl(src_rep_t a) { return __builtin_clzll(a); }
+static inline int src_rep_t_clz_impl(src_rep_t a) {
+    return __builtin_clzll(a);
+}
 #define src_rep_t_clz src_rep_t_clz_impl
 
 #elif defined SRC_80
@@ -67,7 +69,7 @@ static const int srcSigFracBits = 10;
 static const int srcExpBits = 5;
 
 static inline int src_rep_t_clz_impl(src_rep_t a) {
-  return __builtin_clz(a) - 16;
+    return __builtin_clz(a) - 16;
 }
 
 #define src_rep_t_clz src_rep_t_clz_impl
@@ -131,49 +133,49 @@ static const int dstExpBits = 15;
 // Currently they depend on macros/constants defined above.
 
 static inline src_rep_t extract_sign_from_src(src_rep_t x) {
-  const src_rep_t srcSignMask = SRC_REP_C(1) << (srcBits - 1);
-  return (x & srcSignMask) >> (srcBits - 1);
+    const src_rep_t srcSignMask = SRC_REP_C(1) << (srcBits - 1);
+    return (x & srcSignMask) >> (srcBits - 1);
 }
 
 static inline src_rep_t extract_exp_from_src(src_rep_t x) {
-  const int srcSigBits = srcBits - 1 - srcExpBits;
-  const src_rep_t srcExpMask = ((SRC_REP_C(1) << srcExpBits) - 1) << srcSigBits;
-  return (x & srcExpMask) >> srcSigBits;
+    const int srcSigBits = srcBits - 1 - srcExpBits;
+    const src_rep_t srcExpMask = ((SRC_REP_C(1) << srcExpBits) - 1) << srcSigBits;
+    return (x & srcExpMask) >> srcSigBits;
 }
 
 static inline src_rep_t extract_sig_frac_from_src(src_rep_t x) {
-  const src_rep_t srcSigFracMask = (SRC_REP_C(1) << srcSigFracBits) - 1;
-  return x & srcSigFracMask;
+    const src_rep_t srcSigFracMask = (SRC_REP_C(1) << srcSigFracBits) - 1;
+    return x & srcSigFracMask;
 }
 
 #ifdef src_rep_t_clz
 static inline int clz_in_sig_frac(src_rep_t sigFrac) {
-      const int skip = 1 + srcExpBits;
-      return src_rep_t_clz(sigFrac) - skip;
+    const int skip = 1 + srcExpBits;
+    return src_rep_t_clz(sigFrac) - skip;
 }
 #endif
 
 static inline dst_rep_t construct_dst_rep(dst_rep_t sign, dst_rep_t exp, dst_rep_t sigFrac) {
-  return (sign << (dstBits - 1)) | (exp << (dstBits - 1 - dstExpBits)) | sigFrac;
+    return (sign << (dstBits - 1)) | (exp << (dstBits - 1 - dstExpBits)) | sigFrac;
 }
 
 // Two helper routines for conversion to and from the representation of
 // floating-point data as integer values follow.
 
 static inline src_rep_t srcToRep(src_t x) {
-  const union {
-    src_t f;
-    src_rep_t i;
-  } rep = {.f = x};
-  return rep.i;
+    const union {
+        src_t f;
+        src_rep_t i;
+    } rep = {.f = x};
+    return rep.i;
 }
 
 static inline dst_t dstFromRep(dst_rep_t x) {
-  const union {
-    dst_t f;
-    dst_rep_t i;
-  } rep = {.i = x};
-  return rep.f;
+    const union {
+        dst_t f;
+        dst_rep_t i;
+    } rep = {.i = x};
+    return rep.f;
 }
 // End helper routines.  Conversion implementation follows.
 

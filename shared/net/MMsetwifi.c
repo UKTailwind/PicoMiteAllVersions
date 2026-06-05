@@ -24,17 +24,17 @@
 
 extern char id_out[12];
 extern bool optionsuppressstatus;
-extern void setwifi(unsigned char *tp);
+extern void setwifi(unsigned char * tp);
 extern void WebConnect(void);
 extern int open_tcp_server(uint16_t port);
 extern void close_tcp_server(void);
 extern int open_udp_server(uint16_t port);
 extern void close_udp_server(void);
 extern int pico_tcp_server_request_pending(int pcb);
-extern const char *pico_tcp_server_path(int pcb);
+extern const char * pico_tcp_server_path(int pcb);
 extern int cmd_mqtt(void);
-extern void cmd_ntp(unsigned char *tp);
-extern void cmd_udp(unsigned char *tp);
+extern void cmd_ntp(unsigned char * tp);
+extern void cmd_udp(unsigned char * tp);
 extern int cmd_tcpclient(void);
 extern int cmd_tcpserver(void);
 extern int cmd_tftp_server_init(void);
@@ -43,7 +43,7 @@ extern void pico_telnet_close(void);
 extern void pico_tftp_close(void);
 
 static void pico_validate_static_ip(
-    const mm_net_wifi_credentials_t *credentials) {
+    const mm_net_wifi_credentials_t * credentials) {
     ip4_addr_t ipaddr;
     if (!ip4addr_aton(credentials->ipaddress, &ipaddr))
         error("Invalid IP address");
@@ -53,8 +53,7 @@ static void pico_validate_static_ip(
         error("Invalid gateway address");
 }
 
-void setwifi(unsigned char *tp)
-{
+void setwifi(unsigned char * tp) {
     char default_hostname[32];
     strcpy(default_hostname, "PICO");
     strcat(default_hostname, id_out);
@@ -64,8 +63,7 @@ void setwifi(unsigned char *tp)
 
 /* WEB-specific printoptions block. Called from MM_Misc.c's printoptions
  * unconditionally; non-WEB builds get a no-op stub elsewhere. */
-void port_web_print_options(void)
-{
+void port_web_print_options(void) {
     mm_net_print_wifi_option((char *)Option.SSID, (char *)Option.PASSWORD,
                              Option.hostname, Option.ipaddress, Option.mask,
                              Option.gateway);
@@ -75,14 +73,12 @@ void port_web_print_options(void)
     mm_net_print_service_options((int)Option.Telnet, Option.disabletftp);
 }
 
-static mm_net_lifecycle_result_t pico_lifecycle_apply_wifi(unsigned char *arg)
-{
+static mm_net_lifecycle_result_t pico_lifecycle_apply_wifi(unsigned char * arg) {
     setwifi(arg);
     return MM_NET_LIFECYCLE_OK;
 }
 
-static int pico_lifecycle_open_tftp(void)
-{
+static int pico_lifecycle_open_tftp(void) {
     return cmd_tftp_server_init();
 }
 
@@ -99,8 +95,7 @@ static const mm_net_lifecycle_hooks_t pico_lifecycle_hooks = {
     .reboot_after_option_mask = MM_NET_LIFECYCLE_REBOOT_WIFI,
 };
 
-static void pico_lifecycle_reboot_required(void)
-{
+static void pico_lifecycle_reboot_required(void) {
     _excep_code = RESET_COMMAND;
     SoftReset();
 }
@@ -111,8 +106,7 @@ static const mm_net_lifecycle_result_handler_t pico_lifecycle_result_handler = {
 
 /* WEB-only OPTION setters: WEB MESSAGES / WIFI / TCP SERVER PORT /
  * UDP SERVER PORT / TELNET / TFTP. Returns 1 if matched. */
-int port_web_option_setter(unsigned char *cmdline)
-{
+int port_web_option_setter(unsigned char * cmdline) {
     return mm_net_lifecycle_handle_option_result(
         mm_net_lifecycle_option_setter(cmdline, &pico_lifecycle_hooks),
         &pico_lifecycle_result_handler);
@@ -120,9 +114,8 @@ int port_web_option_setter(unsigned char *cmdline)
 
 /* WEB-only MM.<X> info function: TCP REQUEST / TCP PORT / UDP PORT /
  * IP ADDRESS / MAX CONNECTIONS / WIFI STATUS / TCPIP STATUS. */
-int port_web_mminfo(unsigned char *ep, int64_t *out_iret,
-                    unsigned char *out_sret, int *out_targ)
-{
+int port_web_mminfo(unsigned char * ep, int64_t * out_iret,
+                    unsigned char * out_sret, int * out_targ) {
     const mm_net_info_hooks_t hooks = {
         .tcp_path = pico_tcp_server_path,
         .tcp_request_pending = pico_tcp_server_request_pending,
@@ -138,11 +131,10 @@ int port_web_mminfo(unsigned char *ep, int64_t *out_iret,
 
 /* OPTION SSID$ getter — separate so MM_Misc.c's OPTION info chain stays
  * unconditional. */
-int port_web_get_ssid(unsigned char *out_sret, int *out_targ)
-{
-    strcpy((char *)out_sret,(char *)Option.SSID);
+int port_web_get_ssid(unsigned char * out_sret, int * out_targ) {
+    strcpy((char *)out_sret, (char *)Option.SSID);
     CtoM(out_sret);
-    *out_targ=T_STR;
+    *out_targ = T_STR;
     return 1;
 }
 
@@ -153,7 +145,7 @@ int port_web_get_ssid(unsigned char *out_sret, int *out_targ)
 volatile int WIFIconnected = 0;
 int startupcomplete = 0;
 
-void WebConnect(void){
+void WebConnect(void) {
     static const mm_net_lifecycle_wifi_connect_t connect = {
         .hooks = &pico_lifecycle_hooks,
         .default_hostname = NULL,
@@ -166,7 +158,7 @@ void WebConnect(void){
 
 /* WiFi ports don't expose OPTION PICO ON/OFF (CYW43 actually owns the
  * shadow pins). */
-int port_setter_pico_pins(unsigned char *cmdline) {
+int port_setter_pico_pins(unsigned char * cmdline) {
     (void)cmdline;
     return 0;
 }
@@ -192,7 +184,7 @@ extern int startupcomplete;
 static void cyw43_pio_divider_for_clk_sys(void) {
     uint32_t clk_hz = clock_get_hz(clk_sys);
     uint32_t div = (clk_hz + 44999999u) / 45000000u;
-    if (div < 2) div = 2;   /* SDK minimum */
+    if (div < 2) div = 2; /* SDK minimum */
     cyw43_set_pio_clock_divisor((uint16_t)div, 0);
 }
 #endif
@@ -208,7 +200,7 @@ void port_repl_wifi_arch_init_and_connect(void) {
 }
 
 /* WiFi ports leave GPIO 23 to the CYW43 module — no PWM shadow. */
-void hal_pwm_mode_shadow_apply(void) { }
+void hal_pwm_mode_shadow_apply(void) {}
 
 /* WiFi PIO pin-reset loop walks the full NBRPINS range — the CYW43
  * radio doesn't expose a shadow-pin range that needs to be skipped. */
@@ -222,14 +214,15 @@ void port_pio_pin_reset_inputs(void) {
 
 /* WiFi ports limit OPTION HEARTBEAT to ON/OFF — no pin reassignment
  * (the heartbeat LED lives on the CYW43 module). */
-int port_setter_heartbeat(unsigned char *cmdline) {
-    unsigned char *tp = checkstring(cmdline, (unsigned char *)"HEARTBEAT");
+int port_setter_heartbeat(unsigned char * cmdline) {
+    unsigned char * tp = checkstring(cmdline, (unsigned char *)"HEARTBEAT");
     if (!tp) return 0;
     if (checkstring(tp, (unsigned char *)"OFF") || checkstring(tp, (unsigned char *)"DISABLE")) {
         Option.NoHeartbeat = 1;
     } else if (checkstring(tp, (unsigned char *)"ON") || checkstring(tp, (unsigned char *)"ENABLE")) {
         Option.NoHeartbeat = 0;
-    } else error("Syntax");
+    } else
+        error("Syntax");
     SaveOptions();
     return 1;
 }
@@ -241,9 +234,9 @@ int port_setter_heartbeat(unsigned char *cmdline) {
  * MMweb_stubs.c and never reference fun_json (excluded from the
  * non-WiFi token-palette in port_tokens.h). */
 
-extern int  startupcomplete;
+extern int startupcomplete;
 
-static void pico_web_connect_cmd(unsigned char *arg) {
+static void pico_web_connect_cmd(unsigned char * arg) {
     if (*arg) {
         setwifi(arg);
         WebConnect();
@@ -252,7 +245,7 @@ static void pico_web_connect_cmd(unsigned char *arg) {
     }
 }
 
-static void pico_web_scan_cmd(unsigned char *arg) {
+static void pico_web_scan_cmd(unsigned char * arg) {
     mm_net_wifi_scan_command(arg);
 }
 
@@ -261,26 +254,26 @@ static int pico_web_is_connected(void) {
            hal_net_tcpip_status() == CYW43_LINK_UP;
 }
 
-static int pico_web_mqtt_cmd(unsigned char *line) {
+static int pico_web_mqtt_cmd(unsigned char * line) {
     (void)line;
     return cmd_mqtt();
 }
 
-static int pico_web_tcp_client_cmd(unsigned char *line) {
+static int pico_web_tcp_client_cmd(unsigned char * line) {
     (void)line;
     return cmd_tcpclient();
 }
 
-static int pico_web_tcp_server_cmd(unsigned char *arg) {
+static int pico_web_tcp_server_cmd(unsigned char * arg) {
     (void)arg;
     return cmd_tcpserver();
 }
 
-static void pico_web_ntp_cmd(unsigned char *arg) {
+static void pico_web_ntp_cmd(unsigned char * arg) {
     cmd_ntp(arg);
 }
 
-static int pico_web_udp_cmd(unsigned char *arg) {
+static int pico_web_udp_cmd(unsigned char * arg) {
     cmd_udp(arg);
     return 1;
 }
@@ -302,17 +295,17 @@ void cmd_web(void) {
 }
 
 void fun_json(void) {
-    char *json_string = NULL;
-    const cJSON *root = NULL;
-    void *ptr1 = NULL;
-    char *p;
+    char * json_string = NULL;
+    const cJSON * root = NULL;
+    void * ptr1 = NULL;
+    char * p;
     sret = GetTempMemory(STRINGSIZE);
-    int64_t *dest = NULL;
+    int64_t * dest = NULL;
     MMFLOAT tempd;
     int i, j, k, mode, index;
     char field[32], num[6];
     getargs(&ep, 3, (unsigned char *)",");
-    char *a = GetTempMemory(STRINGSIZE);
+    char * a = GetTempMemory(STRINGSIZE);
     ptr1 = findvar(argv[0], V_FIND | V_EMPTY_OK);
     if (g_vartbl[g_VarIndex].type & T_INT) {
         if (g_vartbl[g_VarIndex].dims[1] != 0) error("Invalid variable");
@@ -321,16 +314,20 @@ void fun_json(void) {
         }
         dest = (int64_t *)ptr1;
         json_string = (char *)&dest[1];
-    } else error("Argument 1 must be integer array");
+    } else
+        error("Argument 1 must be integer array");
     cJSON_InitHooks(NULL);
-    cJSON *parse = cJSON_Parse(json_string);
+    cJSON * parse = cJSON_Parse(json_string);
     if (parse == NULL) error("Invalid JSON data");
     root = parse;
     p = (char *)getCstring((unsigned char *)argv[2]);
     int len = strlen(p);
     memset(field, 0, 32);
     memset(num, 0, 6);
-    i = 0; j = 0; k = 0; mode = 0;
+    i = 0;
+    j = 0;
+    k = 0;
+    mode = 0;
     while (i < len) {
         if (p[i] == '[') {
             mode = 1;
@@ -356,19 +353,31 @@ void fun_json(void) {
                 mode = 0;
             }
         } else {
-            if (mode == 0) field[j++] = p[i];
-            else if (p[i] != '[') num[k++] = p[i];
+            if (mode == 0)
+                field[j++] = p[i];
+            else if (p[i] != '[')
+                num[k++] = p[i];
         }
         i++;
     }
     root = cJSON_GetObjectItem(root, field);
 
-    if (cJSON_IsObject(root))  { cJSON_Delete(parse); error("Not an item"); return; }
-    if (cJSON_IsInvalid(root)) { cJSON_Delete(parse); error("Not an item"); return; }
+    if (cJSON_IsObject(root)) {
+        cJSON_Delete(parse);
+        error("Not an item");
+        return;
+    }
+    if (cJSON_IsInvalid(root)) {
+        cJSON_Delete(parse);
+        error("Not an item");
+        return;
+    }
     if (cJSON_IsNumber(root)) {
         tempd = root->valuedouble;
-        if ((MMFLOAT)((int64_t)tempd) == tempd) IntToStr(a, (int64_t)tempd, 10);
-        else FloatToStr(a, tempd, 0, STR_AUTO_PRECISION, ' ');
+        if ((MMFLOAT)((int64_t)tempd) == tempd)
+            IntToStr(a, (int64_t)tempd, 10);
+        else
+            FloatToStr(a, tempd, 0, STR_AUTO_PRECISION, ' ');
         cJSON_Delete(parse);
         sret = (unsigned char *)a;
         sret = CtoM(sret);
@@ -378,8 +387,10 @@ void fun_json(void) {
     if (cJSON_IsBool(root)) {
         int64_t tempint = root->valueint;
         cJSON_Delete(parse);
-        if (tempint) strcpy((char *)sret, "true");
-        else strcpy((char *)sret, "false");
+        if (tempint)
+            strcpy((char *)sret, "true");
+        else
+            strcpy((char *)sret, "false");
         sret = CtoM(sret);
         targ = T_STR;
         return;

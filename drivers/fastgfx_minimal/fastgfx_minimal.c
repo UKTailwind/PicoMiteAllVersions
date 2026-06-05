@@ -32,11 +32,11 @@
 #include "hal/hal_vga_ops.h"
 #include "bc_alloc.h"
 
-static int            fastgfx_active        = 0;
-static uint32_t       fastgfx_frame_us      = 0;   /* 0 = unlimited */
-static uint64_t       fastgfx_last_swap_us  = 0;
-static uint8_t       *fastgfx_back_buf      = NULL;
-static unsigned char *fastgfx_saved_writebuf = NULL;
+static int fastgfx_active = 0;
+static uint32_t fastgfx_frame_us = 0; /* 0 = unlimited */
+static uint64_t fastgfx_last_swap_us = 0;
+static uint8_t * fastgfx_back_buf = NULL;
+static unsigned char * fastgfx_saved_writebuf = NULL;
 
 /* Copy the back buffer onto the scanout. Called from SWAP and
  * during CLOSE so the last drawn frame stays on screen. */
@@ -58,9 +58,9 @@ void bc_fastgfx_create(void) {
      * the first frame. */
     memcpy(fastgfx_back_buf, (const void *)FRAMEBUFFER, framebuffersize);
     fastgfx_saved_writebuf = WriteBuf;
-    WriteBuf               = (unsigned char *)fastgfx_back_buf;
-    fastgfx_active         = 1;
-    fastgfx_last_swap_us   = hal_time_us_64();
+    WriteBuf = (unsigned char *)fastgfx_back_buf;
+    fastgfx_active = 1;
+    fastgfx_last_swap_us = hal_time_us_64();
     /* Don't touch frame_us — FPS may have been set before CREATE, and
      * we want it to survive a CLOSE+CREATE cycle. bc_fastgfx_reset()
      * at FRUN entry clears everything. */
@@ -92,7 +92,8 @@ void bc_fastgfx_swap(void) {
     fastgfx_present();
     if (fastgfx_frame_us > 0) {
         uint64_t deadline = fastgfx_last_swap_us + fastgfx_frame_us;
-        while (hal_time_us_64() < deadline) { /* spin */ }
+        while (hal_time_us_64() < deadline) { /* spin */
+        }
     }
     fastgfx_last_swap_us = hal_time_us_64();
 }
@@ -121,8 +122,8 @@ void bc_fastgfx_reset(void) {
         bc_free(fastgfx_back_buf);
         fastgfx_back_buf = NULL;
     }
-    fastgfx_active       = 0;
-    fastgfx_frame_us     = 0;
+    fastgfx_active = 0;
+    fastgfx_frame_us = 0;
     fastgfx_last_swap_us = 0;
 }
 
@@ -130,10 +131,12 @@ void bc_fastgfx_reset(void) {
  * vm_framebuffer_unsupported stub errors on FRAMEBUFFER MERGE before
  * it can fire), but the symbol's declared in Draw.h so we provide a
  * no-op definition to keep the link surface complete. */
-void merge_optimized(uint8_t colour) { (void)colour; }
+void merge_optimized(uint8_t colour) {
+    (void)colour;
+}
 
 void cmd_fastgfx(void) {
-    unsigned char *p = NULL;
+    unsigned char * p = NULL;
     if ((p = checkstring(cmdline, (unsigned char *)"CREATE"))) {
         checkend(p);
         bc_fastgfx_create();

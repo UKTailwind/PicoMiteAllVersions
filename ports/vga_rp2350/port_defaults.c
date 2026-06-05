@@ -8,8 +8,7 @@
 
 extern int checkslice(int pin1, int pin2, int ignore);
 extern void port_picocalc_factory_reset_options(void);
-void port_set_default_options(void)
-{
+void port_set_default_options(void) {
     Option.DISPLAY_CONSOLE = 1;
     Option.DISPLAY_TYPE = SCREENMODE1;
     Option.X_TILE = 80;
@@ -34,8 +33,7 @@ void port_set_default_options(void)
 
 /* Boards advertised by `CONFIGURE LIST`. */
 #include "MMBasic.h"
-void port_print_supported_boards(void)
-{
+void port_print_supported_boards(void) {
 #if HAL_PORT_KEYBOARD_USB_HOST
     MMPrintString("CMM1.5\r\n");
 #else
@@ -52,173 +50,179 @@ void port_print_supported_boards(void)
  * dispatch lives here in the port impl file (allowed). Returns 1 if a
  * board name matched (call doesn't return — SoftReset). Returns 0 if
  * no name matched, so MM_Misc.c can fall through to the error. */
-int port_factory_reset_board(unsigned char *p)
-{
+int port_factory_reset_board(unsigned char * p) {
 #if HAL_PORT_KEYBOARD_USB_HOST
-    if(checkstring(p,(unsigned char *) "CMM1.5"))  {
+    if (checkstring(p, (unsigned char *)"CMM1.5")) {
         ResetOptions(false);
-        Option.CPU_Speed=252000;
+        Option.CPU_Speed = 252000;
         Option.AllPins = 1;
         Option.ColourCode = 1;
-        Option.SYSTEM_I2C_SDA=PINMAP[14];
-        Option.SYSTEM_I2C_SCL=PINMAP[15];
+        Option.SYSTEM_I2C_SDA = PINMAP[14];
+        Option.SYSTEM_I2C_SCL = PINMAP[15];
         Option.RTC = true;
-        Option.SD_CS=PINMAP[13];
-        Option.SYSTEM_CLK=PINMAP[10];
-        Option.SYSTEM_MOSI=PINMAP[11];
-        Option.SYSTEM_MISO=PINMAP[12];
-        Option.VGA_HSYNC=PINMAP[23];
-        Option.VGA_BLUE=PINMAP[18];
-        Option.AUDIO_L=PINMAP[16];
-        Option.AUDIO_R=PINMAP[17];
-        Option.modbuffsize=512;
+        Option.SD_CS = PINMAP[13];
+        Option.SYSTEM_CLK = PINMAP[10];
+        Option.SYSTEM_MOSI = PINMAP[11];
+        Option.SYSTEM_MISO = PINMAP[12];
+        Option.VGA_HSYNC = PINMAP[23];
+        Option.VGA_BLUE = PINMAP[18];
+        Option.AUDIO_L = PINMAP[16];
+        Option.AUDIO_R = PINMAP[17];
+        Option.modbuffsize = 512;
         Option.modbuff = true;
-        Option.AUDIO_SLICE=checkslice(PINMAP[16],PINMAP[17], 0);
-        strcpy((char *)Option.platform,"CMM1.5");
+        Option.AUDIO_SLICE = checkslice(PINMAP[16], PINMAP[17], 0);
+        strcpy((char *)Option.platform, "CMM1.5");
         SaveOptions();
-        printoptions();uSec(100000);
+        printoptions();
+        uSec(100000);
         _excep_code = RESET_COMMAND;
         SoftReset();
         return 1;
     }
 #else
-    if(checkstring(p,(unsigned char *) "PICOMITEVGA V1.1"))  {
+    if (checkstring(p, (unsigned char *)"PICOMITEVGA V1.1")) {
         ResetOptions(false);
-        Option.CPU_Speed=252000;
+        Option.CPU_Speed = 252000;
         Option.AllPins = 1;
         Option.ColourCode = 1;
-        Option.SYSTEM_I2C_SDA=PINMAP[14];
-        Option.SYSTEM_I2C_SCL=PINMAP[15];
+        Option.SYSTEM_I2C_SDA = PINMAP[14];
+        Option.SYSTEM_I2C_SCL = PINMAP[15];
         Option.RTC = true;
-        Option.SD_CS=PINMAP[13];
-        Option.SYSTEM_CLK=PINMAP[10];
-        Option.SYSTEM_MOSI=PINMAP[11];
-        Option.SYSTEM_MISO=PINMAP[12];
-        Option.VGA_HSYNC=PINMAP[16];
-        Option.VGA_BLUE=PINMAP[18];
-        Option.AUDIO_CS_PIN=PINMAP[24];
-        Option.AUDIO_CLK_PIN=PINMAP[22];
-        Option.AUDIO_MOSI_PIN=PINMAP[23];
-        Option.AUDIO_SLICE=checkslice(PINMAP[22],PINMAP[22], 1);
-        Option.modbuffsize=512;
+        Option.SD_CS = PINMAP[13];
+        Option.SYSTEM_CLK = PINMAP[10];
+        Option.SYSTEM_MOSI = PINMAP[11];
+        Option.SYSTEM_MISO = PINMAP[12];
+        Option.VGA_HSYNC = PINMAP[16];
+        Option.VGA_BLUE = PINMAP[18];
+        Option.AUDIO_CS_PIN = PINMAP[24];
+        Option.AUDIO_CLK_PIN = PINMAP[22];
+        Option.AUDIO_MOSI_PIN = PINMAP[23];
+        Option.AUDIO_SLICE = checkslice(PINMAP[22], PINMAP[22], 1);
+        Option.modbuffsize = 512;
         Option.modbuff = true;
-        strcpy((char *)Option.platform,"PICOMITEVGA V1.1");
+        strcpy((char *)Option.platform, "PICOMITEVGA V1.1");
         SaveOptions();
-        printoptions();uSec(100000);
+        printoptions();
+        uSec(100000);
         _excep_code = RESET_COMMAND;
         SoftReset();
         return 1;
     }
-    if(checkstring(p,(unsigned char *) "PICOMITEVGA V1.0"))  {
+    if (checkstring(p, (unsigned char *)"PICOMITEVGA V1.0")) {
         ResetOptions(false);
-        Option.CPU_Speed=252000;
+        Option.CPU_Speed = 252000;
         Option.AllPins = 1;
         Option.ColourCode = 1;
-        Option.SYSTEM_I2C_SDA=PINMAP[14];
-        Option.SYSTEM_I2C_SCL=PINMAP[15];
+        Option.SYSTEM_I2C_SDA = PINMAP[14];
+        Option.SYSTEM_I2C_SCL = PINMAP[15];
         Option.RTC = true;
-        Option.SD_CS=PINMAP[13];
-        Option.SYSTEM_CLK=PINMAP[10];
-        Option.SYSTEM_MOSI=PINMAP[11];
-        Option.SYSTEM_MISO=PINMAP[12];
-        Option.VGA_HSYNC=PINMAP[16];
-        Option.VGA_BLUE=PINMAP[18];
-        Option.AUDIO_L=PINMAP[22];
-        Option.AUDIO_R=PINMAP[23];
-        Option.modbuffsize=512;
+        Option.SD_CS = PINMAP[13];
+        Option.SYSTEM_CLK = PINMAP[10];
+        Option.SYSTEM_MOSI = PINMAP[11];
+        Option.SYSTEM_MISO = PINMAP[12];
+        Option.VGA_HSYNC = PINMAP[16];
+        Option.VGA_BLUE = PINMAP[18];
+        Option.AUDIO_L = PINMAP[22];
+        Option.AUDIO_R = PINMAP[23];
+        Option.modbuffsize = 512;
         Option.modbuff = true;
-        Option.AUDIO_SLICE=checkslice(PINMAP[22],PINMAP[23], 0);
-        strcpy((char *)Option.platform,"PICOMITEVGA V1.0");
+        Option.AUDIO_SLICE = checkslice(PINMAP[22], PINMAP[23], 0);
+        strcpy((char *)Option.platform, "PICOMITEVGA V1.0");
         SaveOptions();
-        printoptions();uSec(100000);
+        printoptions();
+        uSec(100000);
         _excep_code = RESET_COMMAND;
         SoftReset();
         return 1;
     }
-    if(checkstring(p,(unsigned char *) "VGA DESIGN 1"))  {
+    if (checkstring(p, (unsigned char *)"VGA DESIGN 1")) {
         ResetOptions(false);
-        Option.CPU_Speed=252000;
+        Option.CPU_Speed = 252000;
         Option.ColourCode = 1;
-        Option.SYSTEM_CLK=PINMAP[10];
-        Option.SYSTEM_MOSI=PINMAP[11];
-        Option.SYSTEM_MISO=PINMAP[12];
-        Option.SD_CS=PINMAP[13];
-        Option.VGA_HSYNC=PINMAP[16];
-        Option.VGA_BLUE=PINMAP[18];
-        strcpy((char *)Option.platform,"VGA Design 1");
+        Option.SYSTEM_CLK = PINMAP[10];
+        Option.SYSTEM_MOSI = PINMAP[11];
+        Option.SYSTEM_MISO = PINMAP[12];
+        Option.SD_CS = PINMAP[13];
+        Option.VGA_HSYNC = PINMAP[16];
+        Option.VGA_BLUE = PINMAP[18];
+        strcpy((char *)Option.platform, "VGA Design 1");
         SaveOptions();
-        printoptions();uSec(100000);
+        printoptions();
+        uSec(100000);
         _excep_code = RESET_COMMAND;
         SoftReset();
         return 1;
     }
-    if(checkstring(p,(unsigned char *) "VGA DESIGN 2"))  {
+    if (checkstring(p, (unsigned char *)"VGA DESIGN 2")) {
         ResetOptions(false);
-        Option.CPU_Speed=252000;
+        Option.CPU_Speed = 252000;
         Option.ColourCode = 1;
-        Option.SYSTEM_I2C_SDA=PINMAP[14];
-        Option.SYSTEM_I2C_SCL=PINMAP[15];
+        Option.SYSTEM_I2C_SDA = PINMAP[14];
+        Option.SYSTEM_I2C_SCL = PINMAP[15];
         Option.RTC = true;
-        Option.SYSTEM_CLK=PINMAP[10];
-        Option.SYSTEM_MOSI=PINMAP[11];
-        Option.SYSTEM_MISO=PINMAP[12];
-        Option.SD_CS=PINMAP[13];
-        Option.VGA_HSYNC=PINMAP[16];
-        Option.VGA_BLUE=PINMAP[18];
-        Option.AUDIO_L=PINMAP[6];
-        Option.AUDIO_R=PINMAP[7];
-        Option.modbuffsize=192;
+        Option.SYSTEM_CLK = PINMAP[10];
+        Option.SYSTEM_MOSI = PINMAP[11];
+        Option.SYSTEM_MISO = PINMAP[12];
+        Option.SD_CS = PINMAP[13];
+        Option.VGA_HSYNC = PINMAP[16];
+        Option.VGA_BLUE = PINMAP[18];
+        Option.AUDIO_L = PINMAP[6];
+        Option.AUDIO_R = PINMAP[7];
+        Option.modbuffsize = 192;
         Option.modbuff = true;
-        Option.AUDIO_SLICE=checkslice(PINMAP[6],PINMAP[7], 0);
-        strcpy((char *)Option.platform,"VGA Design 2");
+        Option.AUDIO_SLICE = checkslice(PINMAP[6], PINMAP[7], 0);
+        strcpy((char *)Option.platform, "VGA Design 2");
         SaveOptions();
-        printoptions();uSec(100000);
+        printoptions();
+        uSec(100000);
         _excep_code = RESET_COMMAND;
         SoftReset();
         return 1;
     }
-    if(checkstring(p,(unsigned char *) "SWEETIEPI"))  {
+    if (checkstring(p, (unsigned char *)"SWEETIEPI")) {
         Option.AllPins = 1;
         Option.ColourCode = 1;
-        Option.SYSTEM_I2C_SDA=PINMAP[0];
-        Option.SYSTEM_I2C_SCL=PINMAP[1];
-        Option.SD_CS=PINMAP[29];
-        Option.SD_CLK_PIN=PINMAP[3];
-        Option.SD_MOSI_PIN=PINMAP[4];
-        Option.SD_MISO_PIN=PINMAP[2];
-        Option.VGA_HSYNC=PINMAP[14];
-        Option.VGA_BLUE=PINMAP[10];
-        Option.AUDIO_CS_PIN=PINMAP[5];
-        Option.AUDIO_CLK_PIN=PINMAP[6];
-        Option.AUDIO_MOSI_PIN=PINMAP[7];
-        Option.AUDIO_SLICE=checkslice(PINMAP[6],PINMAP[6], 1);
-        Option.modbuffsize=192;
+        Option.SYSTEM_I2C_SDA = PINMAP[0];
+        Option.SYSTEM_I2C_SCL = PINMAP[1];
+        Option.SD_CS = PINMAP[29];
+        Option.SD_CLK_PIN = PINMAP[3];
+        Option.SD_MOSI_PIN = PINMAP[4];
+        Option.SD_MISO_PIN = PINMAP[2];
+        Option.VGA_HSYNC = PINMAP[14];
+        Option.VGA_BLUE = PINMAP[10];
+        Option.AUDIO_CS_PIN = PINMAP[5];
+        Option.AUDIO_CLK_PIN = PINMAP[6];
+        Option.AUDIO_MOSI_PIN = PINMAP[7];
+        Option.AUDIO_SLICE = checkslice(PINMAP[6], PINMAP[6], 1);
+        Option.modbuffsize = 192;
         Option.modbuff = true;
-        strcpy((char *)Option.platform,"SWEETIEPI");
+        strcpy((char *)Option.platform, "SWEETIEPI");
         SaveOptions();
-        printoptions();uSec(100000);
+        printoptions();
+        uSec(100000);
         _excep_code = RESET_COMMAND;
         SoftReset();
         return 1;
     }
-    if(checkstring(p,(unsigned char *) "VGA BASIC"))  {
+    if (checkstring(p, (unsigned char *)"VGA BASIC")) {
         Option.ColourCode = 1;
-        Option.SYSTEM_I2C_SDA=PINMAP[0];
-        Option.SYSTEM_I2C_SCL=PINMAP[1];
-        Option.SD_CS=PINMAP[14];
-        Option.SD_CLK_PIN=PINMAP[13];
-        Option.SD_MOSI_PIN=PINMAP[15];
-        Option.SD_MISO_PIN=PINMAP[12];
-        Option.VGA_HSYNC=PINMAP[16];
-        Option.VGA_BLUE=PINMAP[18];
-        Option.AUDIO_L=PINMAP[6];
-        Option.AUDIO_R=PINMAP[7];
-        Option.modbuffsize=192;
+        Option.SYSTEM_I2C_SDA = PINMAP[0];
+        Option.SYSTEM_I2C_SCL = PINMAP[1];
+        Option.SD_CS = PINMAP[14];
+        Option.SD_CLK_PIN = PINMAP[13];
+        Option.SD_MOSI_PIN = PINMAP[15];
+        Option.SD_MISO_PIN = PINMAP[12];
+        Option.VGA_HSYNC = PINMAP[16];
+        Option.VGA_BLUE = PINMAP[18];
+        Option.AUDIO_L = PINMAP[6];
+        Option.AUDIO_R = PINMAP[7];
+        Option.modbuffsize = 192;
         Option.modbuff = true;
-        Option.AUDIO_SLICE=checkslice(PINMAP[6],PINMAP[7], 0);
-        strcpy((char *)Option.platform,"VGA BASIC");
+        Option.AUDIO_SLICE = checkslice(PINMAP[6], PINMAP[7], 0);
+        strcpy((char *)Option.platform, "VGA BASIC");
         SaveOptions();
-        printoptions();uSec(100000);
+        printoptions();
+        uSec(100000);
         _excep_code = RESET_COMMAND;
         SoftReset();
         return 1;
@@ -237,116 +241,116 @@ extern short VRes;
 extern short CurrentX;
 extern short CurrentY;
 extern int ScreenSize;
-extern unsigned char *WriteBuf;
+extern unsigned char * WriteBuf;
 extern volatile int DISPLAY_TYPE;
 extern void VGArecovery(int pin);
 
-int port_display_option_setter(unsigned char *cmdline)
-{
-    unsigned char *tp;
+int port_display_option_setter(unsigned char * cmdline) {
+    unsigned char * tp;
     tp = checkstring(cmdline, (unsigned char *)"RESOLUTION");
-    if(tp) {
-        getargs(&tp,3,(unsigned char *)",");
-        if(CurrentLinePtr) error("Invalid in a program");
-        if((checkstring(argv[0], (unsigned char *)"640")) || (checkstring(argv[0], (unsigned char *)"640x480"))){
-            if(argc==3){
-                int i=getint(argv[2],Freq252P,Freq378P);
-                if(!(i==Freq252P || i==Freq480P || i==Freq378P))error("Invalid speed");
+    if (tp) {
+        getargs(&tp, 3, (unsigned char *)",");
+        if (CurrentLinePtr) error("Invalid in a program");
+        if ((checkstring(argv[0], (unsigned char *)"640")) || (checkstring(argv[0], (unsigned char *)"640x480"))) {
+            if (argc == 3) {
+                int i = getint(argv[2], Freq252P, Freq378P);
+                if (!(i == Freq252P || i == Freq480P || i == Freq378P)) error("Invalid speed");
                 Option.CPU_Speed = i;
-            } else Option.CPU_Speed = Freq252P;
-            Option.DISPLAY_TYPE=SCREENMODE1;
-            Option.DefaultFont = 1 ;
-        }
-        else if(checkstring(argv[0], (unsigned char *)"800") || checkstring(argv[0], (unsigned char *)"800x600")){
+            } else
+                Option.CPU_Speed = Freq252P;
+            Option.DISPLAY_TYPE = SCREENMODE1;
+            Option.DefaultFont = 1;
+        } else if (checkstring(argv[0], (unsigned char *)"800") || checkstring(argv[0], (unsigned char *)"800x600")) {
             Option.CPU_Speed = FreqSVGA;
-            Option.DISPLAY_TYPE=SCREENMODE1;
-            Option.DefaultFont= 1 ;
-        }
-        else if(checkstring(argv[0], (unsigned char *)"848") || checkstring(argv[0], (unsigned char *)"848x480")){
+            Option.DISPLAY_TYPE = SCREENMODE1;
+            Option.DefaultFont = 1;
+        } else if (checkstring(argv[0], (unsigned char *)"848") || checkstring(argv[0], (unsigned char *)"848x480")) {
             Option.CPU_Speed = Freq848;
-            Option.DISPLAY_TYPE=SCREENMODE1;
-            Option.DefaultFont= 1 ;
-        }
-        else if(checkstring(argv[0], (unsigned char *)"720") || checkstring(argv[0], (unsigned char *)"720x400")){
+            Option.DISPLAY_TYPE = SCREENMODE1;
+            Option.DefaultFont = 1;
+        } else if (checkstring(argv[0], (unsigned char *)"720") || checkstring(argv[0], (unsigned char *)"720x400")) {
             Option.CPU_Speed = Freq400;
-            Option.DISPLAY_TYPE=SCREENMODE1;
-            Option.DefaultFont= 1 ;
-        }
-        else error("Syntax");
-        Option.X_TILE=(Option.CPU_Speed==Freq848 ? 106 : Option.CPU_Speed==Freq400 ? 90 : Option.CPU_Speed==FreqSVGA? 100: 80);
-        Option.Y_TILE=(Option.CPU_Speed==Freq400 ? 33 : Option.CPU_Speed==FreqSVGA? 50: 40);
+            Option.DISPLAY_TYPE = SCREENMODE1;
+            Option.DefaultFont = 1;
+        } else
+            error("Syntax");
+        Option.X_TILE = (Option.CPU_Speed == Freq848 ? 106 : Option.CPU_Speed == Freq400 ? 90
+                                                         : Option.CPU_Speed == FreqSVGA  ? 100
+                                                                                         : 80);
+        Option.Y_TILE = (Option.CPU_Speed == Freq400 ? 33 : Option.CPU_Speed == FreqSVGA ? 50
+                                                                                         : 40);
         SaveOptions();
         _excep_code = RESET_COMMAND;
         SoftReset();
         return 1;
     }
     tp = checkstring(cmdline, (unsigned char *)"VGA PINS");
-    if(tp) {
-        int pin1,pin2,testpin;
-        getargs(&tp,3,(unsigned char *)",");
-        if(CurrentLinePtr) error("Invalid in a program");
+    if (tp) {
+        int pin1, pin2, testpin;
+        getargs(&tp, 3, (unsigned char *)",");
+        if (CurrentLinePtr) error("Invalid in a program");
         char code;
-        if(!(code=codecheck(argv[0])))argv[0]+=2;
+        if (!(code = codecheck(argv[0]))) argv[0] += 2;
         pin1 = getinteger(argv[0]);
-        if(!code)pin1=codemap(pin1);
-        if(!(code=codecheck(argv[2])))argv[2]+=2;
+        if (!code) pin1 = codemap(pin1);
+        if (!(code = codecheck(argv[2]))) argv[2] += 2;
         pin2 = getinteger(argv[2]);
-        if(!code)pin2=codemap(pin2);
-        ExtCurrentConfig[Option.VGA_BLUE]=EXT_NOT_CONFIG;
-        ExtCurrentConfig[Option.VGA_HSYNC]=EXT_NOT_CONFIG;
-        ExtCurrentConfig[PINMAP[PinDef[Option.VGA_BLUE].GPno+1]]=EXT_NOT_CONFIG;
-        ExtCurrentConfig[PINMAP[PinDef[Option.VGA_BLUE].GPno+2]]=EXT_NOT_CONFIG;
-        ExtCurrentConfig[PINMAP[PinDef[Option.VGA_BLUE].GPno+3]]=EXT_NOT_CONFIG;
-        ExtCurrentConfig[PINMAP[PinDef[Option.VGA_HSYNC].GPno+1]]=EXT_NOT_CONFIG;
-        if(ExtCurrentConfig[pin1] != EXT_NOT_CONFIG)VGArecovery(pin1);
-        if(ExtCurrentConfig[pin2] != EXT_NOT_CONFIG)VGArecovery(pin2);
-        testpin=PINMAP[PinDef[pin1].GPno+1];
-        if(ExtCurrentConfig[testpin] != EXT_NOT_CONFIG)VGArecovery(testpin);
-        testpin=PINMAP[PinDef[pin2].GPno+1];
-        if(ExtCurrentConfig[testpin] != EXT_NOT_CONFIG)VGArecovery(testpin);
-        testpin=PINMAP[PinDef[pin2].GPno+2];
-        if(ExtCurrentConfig[testpin] != EXT_NOT_CONFIG)VGArecovery(testpin);
-        testpin=PINMAP[PinDef[pin2].GPno+3];
-        if(ExtCurrentConfig[testpin] != EXT_NOT_CONFIG)VGArecovery(testpin);
-        uint64_t map=0;
-        if(Option.audio_i2s_bclk){
-            map|=(uint64_t)((uint64_t)1<<(uint64_t)PinDef[Option.audio_i2s_data].GPno);
-            map|=(uint64_t)((uint64_t)1<<(uint64_t)PinDef[Option.audio_i2s_bclk].GPno);
-            map|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.audio_i2s_bclk].GPno+1));
+        if (!code) pin2 = codemap(pin2);
+        ExtCurrentConfig[Option.VGA_BLUE] = EXT_NOT_CONFIG;
+        ExtCurrentConfig[Option.VGA_HSYNC] = EXT_NOT_CONFIG;
+        ExtCurrentConfig[PINMAP[PinDef[Option.VGA_BLUE].GPno + 1]] = EXT_NOT_CONFIG;
+        ExtCurrentConfig[PINMAP[PinDef[Option.VGA_BLUE].GPno + 2]] = EXT_NOT_CONFIG;
+        ExtCurrentConfig[PINMAP[PinDef[Option.VGA_BLUE].GPno + 3]] = EXT_NOT_CONFIG;
+        ExtCurrentConfig[PINMAP[PinDef[Option.VGA_HSYNC].GPno + 1]] = EXT_NOT_CONFIG;
+        if (ExtCurrentConfig[pin1] != EXT_NOT_CONFIG) VGArecovery(pin1);
+        if (ExtCurrentConfig[pin2] != EXT_NOT_CONFIG) VGArecovery(pin2);
+        testpin = PINMAP[PinDef[pin1].GPno + 1];
+        if (ExtCurrentConfig[testpin] != EXT_NOT_CONFIG) VGArecovery(testpin);
+        testpin = PINMAP[PinDef[pin2].GPno + 1];
+        if (ExtCurrentConfig[testpin] != EXT_NOT_CONFIG) VGArecovery(testpin);
+        testpin = PINMAP[PinDef[pin2].GPno + 2];
+        if (ExtCurrentConfig[testpin] != EXT_NOT_CONFIG) VGArecovery(testpin);
+        testpin = PINMAP[PinDef[pin2].GPno + 3];
+        if (ExtCurrentConfig[testpin] != EXT_NOT_CONFIG) VGArecovery(testpin);
+        uint64_t map = 0;
+        if (Option.audio_i2s_bclk) {
+            map |= (uint64_t)((uint64_t)1 << (uint64_t)PinDef[Option.audio_i2s_data].GPno);
+            map |= (uint64_t)((uint64_t)1 << (uint64_t)PinDef[Option.audio_i2s_bclk].GPno);
+            map |= (uint64_t)((uint64_t)1 << (uint64_t)(PinDef[Option.audio_i2s_bclk].GPno + 1));
         }
-        map|=(uint64_t)((uint64_t)1<<(uint64_t)PinDef[pin2].GPno);
-        map|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[pin2].GPno+1));
-        map|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[pin2].GPno+2));
-        map|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[pin2].GPno+3));
-        map|=(uint64_t)((uint64_t)1<<(uint64_t)PinDef[pin1].GPno);
-        map|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[pin1].GPno+1));
-        if((map & (uint64_t)0xFFFF) && (map & (uint64_t)0xFFFF00000000))error("Attempt to define incompatible PIO pins");
-        Option.VGA_HSYNC=pin1;
-        Option.VGA_BLUE=pin2;
+        map |= (uint64_t)((uint64_t)1 << (uint64_t)PinDef[pin2].GPno);
+        map |= (uint64_t)((uint64_t)1 << (uint64_t)(PinDef[pin2].GPno + 1));
+        map |= (uint64_t)((uint64_t)1 << (uint64_t)(PinDef[pin2].GPno + 2));
+        map |= (uint64_t)((uint64_t)1 << (uint64_t)(PinDef[pin2].GPno + 3));
+        map |= (uint64_t)((uint64_t)1 << (uint64_t)PinDef[pin1].GPno);
+        map |= (uint64_t)((uint64_t)1 << (uint64_t)(PinDef[pin1].GPno + 1));
+        if ((map & (uint64_t)0xFFFF) && (map & (uint64_t)0xFFFF00000000)) error("Attempt to define incompatible PIO pins");
+        Option.VGA_HSYNC = pin1;
+        Option.VGA_BLUE = pin2;
         SaveOptions();
         _excep_code = RESET_COMMAND;
         SoftReset();
         return 1;
     }
     tp = checkstring(cmdline, (unsigned char *)"DEFAULT MODE");
-    if(tp) {
-        int mode=getint(tp,1,MAXMODES);
-        if(mode==3){
-            Option.DISPLAY_TYPE=SCREENMODE3;
-            Option.DefaultFont = 1 ;
-        } else if(mode==2){
-            Option.DISPLAY_TYPE=SCREENMODE2;
-            Option.DefaultFont=(6<<4) | 1 ;
+    if (tp) {
+        int mode = getint(tp, 1, MAXMODES);
+        if (mode == 3) {
+            Option.DISPLAY_TYPE = SCREENMODE3;
+            Option.DefaultFont = 1;
+        } else if (mode == 2) {
+            Option.DISPLAY_TYPE = SCREENMODE2;
+            Option.DefaultFont = (6 << 4) | 1;
         } else {
-            Option.DISPLAY_TYPE=SCREENMODE1;
-            Option.DefaultFont= 1 ;
+            Option.DISPLAY_TYPE = SCREENMODE1;
+            Option.DefaultFont = 1;
         }
         SaveOptions();
-        DISPLAY_TYPE= Option.DISPLAY_TYPE;
+        DISPLAY_TYPE = Option.DISPLAY_TYPE;
         memset((void *)WriteBuf, 0, ScreenSize);
         ResetDisplay();
-        CurrentX = CurrentY =0;
-        if(Option.DISPLAY_TYPE!=SCREENMODE1)ClearScreen(Option.DefaultBC);
+        CurrentX = CurrentY = 0;
+        if (Option.DISPLAY_TYPE != SCREENMODE1) ClearScreen(Option.DefaultBC);
         SetFont(Option.DefaultFont);
         return 1;
     }
@@ -360,27 +364,27 @@ int port_display_option_setter(unsigned char *cmdline)
  * on VGA ports because it touches piomap[QVGA_PIO_NUM] which is
  * VGA-stack-only. */
 extern uint64_t piomap[];
-void VGArecovery(int pin){
-        ExtCurrentConfig[Option.VGA_BLUE]=EXT_BOOT_RESERVED;
-        ExtCurrentConfig[Option.VGA_HSYNC]=EXT_BOOT_RESERVED;
-        ExtCurrentConfig[PINMAP[PinDef[Option.VGA_BLUE].GPno+1]]=EXT_BOOT_RESERVED;
-        ExtCurrentConfig[PINMAP[PinDef[Option.VGA_BLUE].GPno+2]]=EXT_BOOT_RESERVED;
-        ExtCurrentConfig[PINMAP[PinDef[Option.VGA_BLUE].GPno+3]]=EXT_BOOT_RESERVED;
-        ExtCurrentConfig[PINMAP[PinDef[Option.VGA_HSYNC].GPno+1]]=EXT_BOOT_RESERVED;
+void VGArecovery(int pin) {
+    ExtCurrentConfig[Option.VGA_BLUE] = EXT_BOOT_RESERVED;
+    ExtCurrentConfig[Option.VGA_HSYNC] = EXT_BOOT_RESERVED;
+    ExtCurrentConfig[PINMAP[PinDef[Option.VGA_BLUE].GPno + 1]] = EXT_BOOT_RESERVED;
+    ExtCurrentConfig[PINMAP[PinDef[Option.VGA_BLUE].GPno + 2]] = EXT_BOOT_RESERVED;
+    ExtCurrentConfig[PINMAP[PinDef[Option.VGA_BLUE].GPno + 3]] = EXT_BOOT_RESERVED;
+    ExtCurrentConfig[PINMAP[PinDef[Option.VGA_HSYNC].GPno + 1]] = EXT_BOOT_RESERVED;
 
-        if(pin)error("Pin %/| is in use",pin,pin);
+    if (pin) error("Pin %/| is in use", pin, pin);
 #ifdef rp2350
-        piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)PinDef[Option.VGA_BLUE].GPno);
-        piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.VGA_BLUE].GPno+1));
-        piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.VGA_BLUE].GPno+2));
-        piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.VGA_BLUE].GPno+3));
-        piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)PinDef[Option.VGA_HSYNC].GPno);
-        piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.VGA_HSYNC].GPno+1));
-        if(Option.audio_i2s_bclk){
-            piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)PinDef[Option.audio_i2s_data].GPno);
-            piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)PinDef[Option.audio_i2s_bclk].GPno);
-            piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.audio_i2s_bclk].GPno+1));
-        }
+    piomap[QVGA_PIO_NUM] |= (uint64_t)((uint64_t)1 << (uint64_t)PinDef[Option.VGA_BLUE].GPno);
+    piomap[QVGA_PIO_NUM] |= (uint64_t)((uint64_t)1 << (uint64_t)(PinDef[Option.VGA_BLUE].GPno + 1));
+    piomap[QVGA_PIO_NUM] |= (uint64_t)((uint64_t)1 << (uint64_t)(PinDef[Option.VGA_BLUE].GPno + 2));
+    piomap[QVGA_PIO_NUM] |= (uint64_t)((uint64_t)1 << (uint64_t)(PinDef[Option.VGA_BLUE].GPno + 3));
+    piomap[QVGA_PIO_NUM] |= (uint64_t)((uint64_t)1 << (uint64_t)PinDef[Option.VGA_HSYNC].GPno);
+    piomap[QVGA_PIO_NUM] |= (uint64_t)((uint64_t)1 << (uint64_t)(PinDef[Option.VGA_HSYNC].GPno + 1));
+    if (Option.audio_i2s_bclk) {
+        piomap[QVGA_PIO_NUM] |= (uint64_t)((uint64_t)1 << (uint64_t)PinDef[Option.audio_i2s_data].GPno);
+        piomap[QVGA_PIO_NUM] |= (uint64_t)((uint64_t)1 << (uint64_t)PinDef[Option.audio_i2s_bclk].GPno);
+        piomap[QVGA_PIO_NUM] |= (uint64_t)((uint64_t)1 << (uint64_t)(PinDef[Option.audio_i2s_bclk].GPno + 1));
+    }
 #endif
 }
 
@@ -395,15 +399,23 @@ int SSD1963data = 0;
 void port_clear_lcd_spi_if_shares_system(void) {}
 
 /* Port has no pin aliases for MM.PINNO / MM.PIN. */
-int port_pinno_alias_for_name(const char *name) { (void)name; return 0; }
-int port_pin_is_reserved_alias(int pin) { (void)pin; return 0; }
-const char *port_pin_reserved_label(int pin) { (void)pin; return NULL; }
+int port_pinno_alias_for_name(const char * name) {
+    (void)name;
+    return 0;
+}
+int port_pin_is_reserved_alias(int pin) {
+    (void)pin;
+    return 0;
+}
+const char * port_pin_reserved_label(int pin) {
+    (void)pin;
+    return NULL;
+}
 
 /* OPTION LCDPANEL CONSOLE: pre-fill the tile-color arrays with the
  * default fg/bg so existing tiles render in the new colours. RGB121
  * 16-bit tile representation. */
-void port_apply_default_console_colors(int default_fc, int default_bc)
-{
+void port_apply_default_console_colors(int default_fc, int default_bc) {
     int fcolour = RGB121pack(default_fc);
     int bcolour = RGB121pack(default_bc);
     for (int xp = 0; xp < X_TILE; xp++) {

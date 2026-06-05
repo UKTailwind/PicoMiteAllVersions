@@ -25,7 +25,7 @@ void kbd_init(void);
 bool kbd_set_typematic(uint8_t value);
 
 /* Pop the next raw scancode from the ring, or return -1 if empty. */
-int  kbd_get_scancode(void);
+int kbd_get_scancode(void);
 
 /* True if the ring has bytes waiting. */
 bool kbd_has_scancode(void);
@@ -41,7 +41,7 @@ bool kbd_has_scancode(void);
  *     port.
  * Modifier keys (Shift / Ctrl / Alt / Caps) are tracked internally
  * and never returned. */
-int  kbd_get_key(void);
+int kbd_get_key(void);
 
 /* Clear held-key repeat bookkeeping. Does not flush queued scancodes. */
 void kbd_clear_repeat_state(void);

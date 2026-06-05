@@ -23,7 +23,7 @@ static int remaining_ms(int64_t deadline) {
     return rem > 60000 ? 60000 : (int)rem;
 }
 
-static void set_error(wasm_proxy_http_response_t *out, const char *msg) {
+static void set_error(wasm_proxy_http_response_t * out, const char * msg) {
     if (!out) return;
     snprintf(out->error, sizeof(out->error), "%s", msg ? msg : "error");
 }
@@ -36,8 +36,10 @@ static int wait_fd(int fd, int write_ready, int64_t deadline) {
     fd_set wfds;
     FD_ZERO(&rfds);
     FD_ZERO(&wfds);
-    if (write_ready) FD_SET(fd, &wfds);
-    else FD_SET(fd, &rfds);
+    if (write_ready)
+        FD_SET(fd, &wfds);
+    else
+        FD_SET(fd, &rfds);
 
     struct timeval tv;
     tv.tv_sec = rem / 1000;
@@ -48,7 +50,7 @@ static int wait_fd(int fd, int write_ready, int64_t deadline) {
     return rc;
 }
 
-static int connect_with_timeout(const struct addrinfo *ai,
+static int connect_with_timeout(const struct addrinfo * ai,
                                 int64_t deadline) {
     int fd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
     if (fd < 0) return -1;
@@ -80,8 +82,8 @@ static int connect_with_timeout(const struct addrinfo *ai,
     return fd;
 }
 
-static int send_all(int fd, const uint8_t *data, size_t len,
-                    int64_t deadline, wasm_proxy_http_response_t *out) {
+static int send_all(int fd, const uint8_t * data, size_t len,
+                    int64_t deadline, wasm_proxy_http_response_t * out) {
     size_t pos = 0;
     while (pos < len) {
         ssize_t n = send(fd, data + pos, len - pos, 0);
@@ -103,7 +105,7 @@ static int send_all(int fd, const uint8_t *data, size_t len,
     return WASM_PROXY_HTTP_OK;
 }
 
-static int recv_response(int fd, wasm_proxy_http_response_t *out,
+static int recv_response(int fd, wasm_proxy_http_response_t * out,
                          size_t cap, int64_t deadline) {
     while (out->len < cap) {
         ssize_t n = recv(fd, out->data + out->len, cap - out->len, 0);
@@ -127,10 +129,10 @@ static int recv_response(int fd, wasm_proxy_http_response_t *out,
     return WASM_PROXY_HTTP_OK;
 }
 
-int wasm_proxy_http_request(const char *host, int port,
-                            const uint8_t *request, size_t request_len,
+int wasm_proxy_http_request(const char * host, int port,
+                            const uint8_t * request, size_t request_len,
                             size_t max_response_bytes, int timeout_ms,
-                            wasm_proxy_http_response_t *out) {
+                            wasm_proxy_http_response_t * out) {
     if (!out) return WASM_PROXY_HTTP_BAD_REQUEST;
     memset(out, 0, sizeof(*out));
     if (!host || !*host || port < 1 || port > 65535 || !request ||
@@ -157,7 +159,7 @@ int wasm_proxy_http_request(const char *host, int port,
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
 
-    struct addrinfo *res = NULL;
+    struct addrinfo * res = NULL;
     int gai = getaddrinfo(host, service, &hints, &res);
     if (gai != 0) {
         snprintf(out->error, sizeof(out->error), "resolve failed: %s",
@@ -167,7 +169,7 @@ int wasm_proxy_http_request(const char *host, int port,
 
     int64_t deadline = now_ms() + timeout_ms;
     int fd = -1;
-    for (const struct addrinfo *ai = res; ai; ai = ai->ai_next) {
+    for (const struct addrinfo * ai = res; ai; ai = ai->ai_next) {
         fd = connect_with_timeout(ai, deadline);
         if (fd >= 0) break;
         if (remaining_ms(deadline) <= 0) break;
@@ -187,7 +189,7 @@ int wasm_proxy_http_request(const char *host, int port,
     return rc;
 }
 
-void wasm_proxy_http_response_free(wasm_proxy_http_response_t *resp) {
+void wasm_proxy_http_response_free(wasm_proxy_http_response_t * resp) {
     if (!resp) return;
     free(resp->data);
     resp->data = NULL;

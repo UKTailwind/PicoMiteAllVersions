@@ -14,7 +14,22 @@ static hal_net_tcp_server_t esp32_telnet_server;
 static hal_net_tcp_conn_t esp32_telnet_conn;
 /* RFC 854 IAC parser + CR-NUL dedup live in shared/net/mm_net_telnet_rx.c. */
 static const uint8_t esp32_telnet_init_options[] = {
-    255, 251, 3, 255, 253, 3, 255, 251, 1, 255, 253, 34, 255, 254, 34, 0,
+    255,
+    251,
+    3,
+    255,
+    253,
+    3,
+    255,
+    251,
+    1,
+    255,
+    253,
+    34,
+    255,
+    254,
+    34,
+    0,
 };
 
 static void esp32_telnet_close_conn(void) {
@@ -64,7 +79,7 @@ void esp32_telnet_putc(int c, int flush) {
 
 /* RFC 854 IAC parser + ConsoleRxBuf delivery live in
  * shared/net/mm_net_telnet_rx.c — shared across every port. */
-static void esp32_telnet_receive_bytes(const uint8_t *data, size_t len) {
+static void esp32_telnet_receive_bytes(const uint8_t * data, size_t len) {
     mm_net_telnet_rx_feed(data, len);
 }
 

@@ -15,7 +15,7 @@
 #include "vm_sys_time.h"
 #include "vm_device_support.h"
 
-static void vm_sys_time_set_mstring(uint8_t *out, const char *text) {
+static void vm_sys_time_set_mstring(uint8_t * out, const char * text) {
     size_t len = strlen(text);
     if (len > MAXSTRLEN) len = MAXSTRLEN;
     out[0] = (uint8_t)len;
@@ -27,9 +27,9 @@ static void vm_sys_time_set_mstring(uint8_t *out, const char *text) {
  * this reads readusclock() + MMBasic's TimeOffsetToUptime; on host it
  * checks the MMBASIC_HOST_DATE / MMBASIC_HOST_TIME env-var overrides
  * (for deterministic tests) and falls back to localtime(). */
-extern int port_vm_time_get_tm(struct tm *out);
+extern int port_vm_time_get_tm(struct tm * out);
 
-void vm_sys_time_date(uint8_t *out) {
+void vm_sys_time_date(uint8_t * out) {
     struct tm tm;
     char text[32];
     if (!port_vm_time_get_tm(&tm)) {
@@ -41,7 +41,7 @@ void vm_sys_time_date(uint8_t *out) {
     vm_sys_time_set_mstring(out, text);
 }
 
-void vm_sys_time_time(uint8_t *out) {
+void vm_sys_time_time(uint8_t * out) {
     struct tm tm;
     char text[16];
     if (!port_vm_time_get_tm(&tm)) {

@@ -24,7 +24,7 @@ void hal_audio_tone(double left_hz, double right_hz,
     host_sim_audio_tone(left_hz, right_hz, has_duration, duration_ms);
 }
 
-void hal_audio_sound(int slot, const char *ch, const char *type,
+void hal_audio_sound(int slot, const char * ch, const char * type,
                      double freq_hz, int volume) {
     host_sim_audio_sound(slot, ch, type, freq_hz, volume);
 }
@@ -48,17 +48,37 @@ void hal_audio_resume(void) {
 /* Streamed-sample sink: host has no audio output device, so the shared
  * decode engine runs but its PCM goes nowhere. Reporting "always room,
  * never queued" lets a stream decode straight through and finish. */
-int  hal_audio_sample_begin(int sample_rate_hz) { (void)sample_rate_hz; return 0; }
+int hal_audio_sample_begin(int sample_rate_hz) {
+    (void)sample_rate_hz;
+    return 0;
+}
 void hal_audio_sample_end(void) {}
 void hal_audio_sample_eof(void) {}
-int  hal_audio_sample_space(void) { return 4096; }
-int  hal_audio_sample_queued(void) { return 0; }
-int  hal_audio_sample_push(const int16_t *frames, int n) { (void)frames; return n; }
-int  hal_audio_sample_acquire(int16_t **frames, int *frame_capacity) {
-    (void)frames; (void)frame_capacity; return 0;
+int hal_audio_sample_space(void) {
+    return 4096;
 }
-void hal_audio_sample_commit(int frame_count) { (void)frame_count; }
+int hal_audio_sample_queued(void) {
+    return 0;
+}
+int hal_audio_sample_push(const int16_t * frames, int n) {
+    (void)frames;
+    return n;
+}
+int hal_audio_sample_acquire(int16_t ** frames, int * frame_capacity) {
+    (void)frames;
+    (void)frame_capacity;
+    return 0;
+}
+void hal_audio_sample_commit(int frame_count) {
+    (void)frame_count;
+}
 
-void *hal_audio_workmem_alloc(unsigned long bytes) { return malloc((size_t)bytes); }
-void *hal_audio_workmem_realloc(void *p, unsigned long bytes) { return realloc(p, (size_t)bytes); }
-void  hal_audio_workmem_free(void *p) { free(p); }
+void * hal_audio_workmem_alloc(unsigned long bytes) {
+    return malloc((size_t)bytes);
+}
+void * hal_audio_workmem_realloc(void * p, unsigned long bytes) {
+    return realloc(p, (size_t)bytes);
+}
+void hal_audio_workmem_free(void * p) {
+    free(p);
+}

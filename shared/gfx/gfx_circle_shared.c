@@ -1,29 +1,29 @@
 #include "vm_device_support.h"
 #include "gfx_circle_shared.h"
 
-static int gfx_circle_arg_int(const GfxCircleArg *arg, int index) {
+static int gfx_circle_arg_int(const GfxCircleArg * arg, int index) {
     if (!arg->present || arg->count <= 0 || arg->get_int == NULL) return 0;
     return arg->get_int(arg->ctx, (arg->count > 1) ? index : 0);
 }
 
-static MMFLOAT gfx_circle_arg_float(const GfxCircleArg *arg, int index) {
+static MMFLOAT gfx_circle_arg_float(const GfxCircleArg * arg, int index) {
     if (!arg->present || arg->count <= 0) return 0;
     if (arg->get_float != NULL) return arg->get_float(arg->ctx, (arg->count > 1) ? index : 0);
     if (arg->get_int != NULL) return (MMFLOAT)arg->get_int(arg->ctx, (arg->count > 1) ? index : 0);
     return 0;
 }
 
-static void gfx_circle_fail_msg(const GfxCircleErrorSink *errors, const char *msg) {
+static void gfx_circle_fail_msg(const GfxCircleErrorSink * errors, const char * msg) {
     if (errors && errors->fail_msg) errors->fail_msg(errors->ctx, msg);
 }
 
-static void gfx_circle_fail_range(const GfxCircleErrorSink *errors, const char *label,
+static void gfx_circle_fail_range(const GfxCircleErrorSink * errors, const char * label,
                                   int value, int min, int max) {
     if (errors && errors->fail_range) errors->fail_range(errors->ctx, label, value, min, max);
 }
 
-void gfx_circle_execute(GfxCircleMode mode, const GfxCircleArg *args, int field_count,
-                        const GfxCircleErrorSink *errors) {
+void gfx_circle_execute(GfxCircleMode mode, const GfxCircleArg * args, int field_count,
+                        const GfxCircleErrorSink * errors) {
     int x = 0, y = 0, r = 0, w = 1, c = gui_fcolour, f = -1;
     MMFLOAT a = 1;
     const int max_colour = (int)WHITE;

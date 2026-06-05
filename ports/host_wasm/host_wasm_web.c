@@ -79,10 +79,10 @@ static uint16_t wasm_proxy_tftp_port = 69;
 static uint16_t wasm_proxy_telnet_port = 23;
 static int wasm_proxy_tcp_stream_id;
 static int wasm_tcp_client_stream_active;
-static uint8_t *wasm_tcp_client_stream_buf;
+static uint8_t * wasm_tcp_client_stream_buf;
 static int wasm_tcp_client_stream_size;
-static int64_t *wasm_tcp_client_stream_read;
-static int64_t *wasm_tcp_client_stream_write;
+static int64_t * wasm_tcp_client_stream_read;
+static int64_t * wasm_tcp_client_stream_write;
 static hal_net_mqtt_client_t wasm_mqtt_client;
 static int wasm_mqtt_connected;
 static int wasm_mqtt_proxy_transport;
@@ -246,7 +246,7 @@ int wasm_proxy_mode(void) {
 }
 
 #ifdef __EMSCRIPTEN__
-static int wasm_mqtt_js_open(const char *url_ptr) {
+static int wasm_mqtt_js_open(const char * url_ptr) {
     return MAIN_THREAD_EM_ASM_INT({
         const url = UTF8ToString($0);
         const state = {};
@@ -275,11 +275,10 @@ static int wasm_mqtt_js_open(const char *url_ptr) {
         } catch (e) {
             state.state = -1;
             return 0;
-        }
-    }, url_ptr);
+        } }, url_ptr);
 }
 
-static int wasm_mqtt_js_send(const uint8_t *data, int len) {
+static int wasm_mqtt_js_send(const uint8_t * data, int len) {
     return MAIN_THREAD_EM_ASM_INT({
         const state = Module.__picomiteMqtt;
         if (!state || $1 < 0) return -1;
@@ -293,19 +292,17 @@ static int wasm_mqtt_js_send(const uint8_t *data, int len) {
             state.tx.push(msg);
             return 0;
         }
-        return -1;
-    }, data, len);
+        return -1; }, data, len);
 }
 
-static int wasm_mqtt_js_recv(uint8_t *dst, int cap) {
+static int wasm_mqtt_js_recv(uint8_t * dst, int cap) {
     return MAIN_THREAD_EM_ASM_INT({
         const state = Module.__picomiteMqtt;
         if (!state || !state.rx.length) return 0;
         const msg = state.rx.shift();
         if (msg.length > $1) return -1;
         HEAPU8.set(msg, $0);
-        return msg.length;
-    }, dst, cap);
+        return msg.length; }, dst, cap);
 }
 
 static void wasm_mqtt_js_close(void) {
@@ -317,7 +314,8 @@ static void wasm_mqtt_js_close(void) {
         state.tx = [];
         try {
             if (state.ws) state.ws.close();
-        } catch (e) {}
+        } catch (e) {
+        }
         Module.__picomiteMqtt = null;
     });
 }
@@ -355,27 +353,27 @@ static void wasm_tcp_service_init(void) {
 }
 
 #ifdef __EMSCRIPTEN__
-static int wasm_proxy_tcp_open_js(const char *host, int port, int timeout_ms);
-static int wasm_proxy_tcp_stream_js(int stream_id, const uint8_t *write_data,
-                                    int write_len, uint8_t *dst, int dst_cap,
+static int wasm_proxy_tcp_open_js(const char * host, int port, int timeout_ms);
+static int wasm_proxy_tcp_stream_js(int stream_id, const uint8_t * write_data,
+                                    int write_len, uint8_t * dst, int dst_cap,
                                     int timeout_ms);
 static void wasm_proxy_tcp_close_js(int stream_id);
 static int wasm_proxy_tcp_listen_js(int port, int backlog);
 static void wasm_proxy_tcp_listener_close_js(int listener_id);
 static int wasm_proxy_tcp_accept_conn_js(int listener_id);
-static int wasm_proxy_tcp_accept_js(int listener_id, uint8_t *dst, int dst_cap,
-                                    int *out_conn_id);
-static int wasm_proxy_tcp_conn_recv_js(int conn_id, uint8_t *dst,
+static int wasm_proxy_tcp_accept_js(int listener_id, uint8_t * dst, int dst_cap,
+                                    int * out_conn_id);
+static int wasm_proxy_tcp_conn_recv_js(int conn_id, uint8_t * dst,
                                        int dst_cap);
-static int wasm_proxy_tcp_conn_send_js(int conn_id, const uint8_t *data,
+static int wasm_proxy_tcp_conn_send_js(int conn_id, const uint8_t * data,
                                        int len, int timeout_ms);
 static void wasm_proxy_tcp_conn_close_js(int conn_id);
 static int wasm_proxy_udp_bind_js(int port);
-static int wasm_proxy_udp_send_js(int socket_id, const char *host, int port,
-                                  const uint8_t *data, int len,
+static int wasm_proxy_udp_send_js(int socket_id, const char * host, int port,
+                                  const uint8_t * data, int len,
                                   int timeout_ms);
-static int wasm_proxy_udp_recv_js(int socket_id, uint8_t *dst, int dst_cap,
-                                  hal_net_addr_t *from);
+static int wasm_proxy_udp_recv_js(int socket_id, uint8_t * dst, int dst_cap,
+                                  hal_net_addr_t * from);
 static void wasm_proxy_udp_close_js(int socket_id);
 #endif
 
@@ -386,9 +384,9 @@ static uint16_t wasm_mqtt_next_id(void) {
     return id;
 }
 
-static int wasm_mqtt_decode_frame(const uint8_t *frame, size_t frame_len,
-                                  uint8_t *header, const uint8_t **body,
-                                  size_t *body_len) {
+static int wasm_mqtt_decode_frame(const uint8_t * frame, size_t frame_len,
+                                  uint8_t * header, const uint8_t ** body,
+                                  size_t * body_len) {
     if (!frame || frame_len < 2 || !header || !body || !body_len) return 0;
     *header = frame[0];
     size_t multiplier = 1;
@@ -409,7 +407,7 @@ static int wasm_mqtt_decode_frame(const uint8_t *frame, size_t frame_len,
     return 0;
 }
 
-static int wasm_mqtt_rx_append(const uint8_t *data, size_t len) {
+static int wasm_mqtt_rx_append(const uint8_t * data, size_t len) {
     if (!data || len == 0) return HAL_NET_OK;
     if (len > sizeof(wasm_mqtt_rx) - wasm_mqtt_rx_len) return HAL_NET_ERR;
     memcpy(wasm_mqtt_rx + wasm_mqtt_rx_len, data, len);
@@ -417,8 +415,8 @@ static int wasm_mqtt_rx_append(const uint8_t *data, size_t len) {
     return HAL_NET_OK;
 }
 
-static int wasm_mqtt_rx_take_packet(uint8_t *header, uint8_t *body,
-                                    size_t body_cap, size_t *body_len) {
+static int wasm_mqtt_rx_take_packet(uint8_t * header, uint8_t * body,
+                                    size_t body_cap, size_t * body_len) {
     if (body_len) *body_len = 0;
     if (!header || !body || !body_len || wasm_mqtt_rx_len < 2)
         return HAL_NET_WOULD_BLOCK;
@@ -469,7 +467,7 @@ static int wasm_mqtt_proxy_read_some(uint32_t timeout_ms) {
 }
 
 static int wasm_mqtt_transport_send_packet(uint8_t header,
-                                           const uint8_t *body,
+                                           const uint8_t * body,
                                            size_t body_len,
                                            uint32_t timeout_ms) {
     uint8_t packet[WASM_MQTT_FRAME_MAX];
@@ -491,7 +489,7 @@ static int wasm_mqtt_transport_send_packet(uint8_t header,
         return wasm_mqtt_rx_append(reply, (size_t)got);
     }
     return wasm_mqtt_js_send(packet, (int)total) == 0 ? HAL_NET_OK
-                                                     : HAL_NET_ERR;
+                                                      : HAL_NET_ERR;
 #else
     (void)packet;
     (void)timeout_ms;
@@ -499,8 +497,8 @@ static int wasm_mqtt_transport_send_packet(uint8_t header,
 #endif
 }
 
-static int wasm_mqtt_read_packet(uint8_t *header, uint8_t *body,
-                                 size_t body_cap, size_t *body_len,
+static int wasm_mqtt_read_packet(uint8_t * header, uint8_t * body,
+                                 size_t body_cap, size_t * body_len,
                                  uint32_t timeout_ms) {
     if (body_len) *body_len = 0;
     if (!header || !body || !body_len) return HAL_NET_ERR;
@@ -510,7 +508,7 @@ static int wasm_mqtt_read_packet(uint8_t *header, uint8_t *body,
         int got = wasm_mqtt_js_recv(frame, sizeof(frame));
         if (got == 0) return HAL_NET_WOULD_BLOCK;
         if (got < 0) return HAL_NET_ERR;
-        const uint8_t *decoded_body = NULL;
+        const uint8_t * decoded_body = NULL;
         size_t decoded_body_len = 0;
         if (!wasm_mqtt_decode_frame(frame, (size_t)got, header,
                                     &decoded_body, &decoded_body_len))
@@ -522,8 +520,8 @@ static int wasm_mqtt_read_packet(uint8_t *header, uint8_t *body,
     }
 
     uint64_t deadline = timeout_ms
-        ? hal_time_us_64() + (uint64_t)timeout_ms * 1000ULL
-        : 0;
+                            ? hal_time_us_64() + (uint64_t)timeout_ms * 1000ULL
+                            : 0;
     for (;;) {
         int rc = wasm_mqtt_rx_take_packet(header, body, body_cap, body_len);
         if (rc != HAL_NET_WOULD_BLOCK) return rc;
@@ -541,10 +539,10 @@ static int wasm_mqtt_read_packet(uint8_t *header, uint8_t *body,
 #endif
 }
 
-static void wasm_mqtt_handle_publish(uint8_t header, const uint8_t *body,
+static void wasm_mqtt_handle_publish(uint8_t header, const uint8_t * body,
                                      size_t body_len) {
     char topic[MAXSTRLEN + 1];
-    const uint8_t *payload = NULL;
+    const uint8_t * payload = NULL;
     size_t payload_len = 0;
     if (mm_net_mqtt_decode_publish(header, body, body_len, topic,
                                    sizeof(topic), &payload, &payload_len)) {
@@ -559,8 +557,8 @@ static int wasm_mqtt_wait_for_type(uint8_t want_type, uint32_t timeout_ms) {
     uint8_t body[1024];
     size_t body_len = 0;
     uint64_t deadline = timeout_ms
-        ? hal_time_us_64() + (uint64_t)timeout_ms * 1000ULL
-        : 0;
+                            ? hal_time_us_64() + (uint64_t)timeout_ms * 1000ULL
+                            : 0;
     for (;;) {
         uint32_t wait_ms = timeout_ms;
         if (deadline) {
@@ -577,12 +575,12 @@ static int wasm_mqtt_wait_for_type(uint8_t want_type, uint32_t timeout_ms) {
     }
 }
 
-static int wasm_mqtt_send_packet(uint8_t header, const uint8_t *body,
+static int wasm_mqtt_send_packet(uint8_t header, const uint8_t * body,
                                  size_t body_len) {
     return wasm_mqtt_transport_send_packet(header, body, body_len, 5000);
 }
 
-static int wasm_mqtt_build_url(const char *host, uint16_t port, char *out,
+static int wasm_mqtt_build_url(const char * host, uint16_t port, char * out,
                                size_t out_len) {
     if (!host || !*host || !out || out_len == 0) return 0;
     if (strncmp(host, "ws://", 5) == 0 || strncmp(host, "wss://", 6) == 0) {
@@ -590,10 +588,10 @@ static int wasm_mqtt_build_url(const char *host, uint16_t port, char *out,
         return n > 0 && (size_t)n < out_len;
     }
 
-    const char *path = strchr(host, '/');
+    const char * path = strchr(host, '/');
     size_t host_len = path ? (size_t)(path - host) : strlen(host);
     if (host_len == 0 || host_len >= 300) return 0;
-    const char *scheme = (port == 443) ? "wss" : "ws";
+    const char * scheme = (port == 443) ? "wss" : "ws";
     int default_port = (port == 443) ? 443 : 80;
     int n = snprintf(out, out_len, "%s://%.*s", scheme, (int)host_len, host);
     if (n < 0 || (size_t)n >= out_len) return 0;
@@ -676,7 +674,7 @@ static void wasm_tcp_clear_requests(void) {
     mm_net_tcp_service_clear_requests(&wasm_tcp_server);
 }
 
-static const char *wasm_info_tcp_path(int slot) {
+static const char * wasm_info_tcp_path(int slot) {
     wasm_tcp_service_init();
     return mm_net_tcp_service_path(&wasm_tcp_server, slot);
 }
@@ -706,7 +704,7 @@ static void wasm_udp_close_server(void) {
     mm_net_udp_service_stop(&wasm_udp_server);
 }
 
-static int wasm_tftp_peer_text(const mm_net_tftp_peer_t *peer, char *out,
+static int wasm_tftp_peer_text(const mm_net_tftp_peer_t * peer, char * out,
                                size_t out_len) {
     if (!peer || !out || out_len == 0) return 0;
     if (peer->family == 4) {
@@ -720,8 +718,8 @@ static int wasm_tftp_peer_text(const mm_net_tftp_peer_t *peer, char *out,
     return 0;
 }
 
-static int wasm_tftp_send(void *ctx, const mm_net_tftp_peer_t *peer,
-                          const void *buf, size_t len) {
+static int wasm_tftp_send(void * ctx, const mm_net_tftp_peer_t * peer,
+                          const void * buf, size_t len) {
     (void)ctx;
     char host[64];
     if (!wasm_tftp_server_opened ||
@@ -731,8 +729,8 @@ static int wasm_tftp_send(void *ctx, const mm_net_tftp_peer_t *peer,
                                    len, 1000) == HAL_NET_OK;
 }
 
-static int wasm_tftp_open_file(void *ctx, const char *filename, int write,
-                               void **handle) {
+static int wasm_tftp_open_file(void * ctx, const char * filename, int write,
+                               void ** handle) {
     (void)ctx;
     hal_fs_fd_t fd;
     int flags = write ? (HAL_FS_O_WRONLY | HAL_FS_O_CREAT | HAL_FS_O_TRUNC)
@@ -742,19 +740,19 @@ static int wasm_tftp_open_file(void *ctx, const char *filename, int write,
     return 0;
 }
 
-static ssize_t wasm_tftp_read_file(void *ctx, void *handle, void *buf,
+static ssize_t wasm_tftp_read_file(void * ctx, void * handle, void * buf,
                                    size_t len) {
     (void)ctx;
     return hal_fs_read((hal_fs_fd_t)(intptr_t)handle, buf, len);
 }
 
-static ssize_t wasm_tftp_write_file(void *ctx, void *handle, const void *buf,
+static ssize_t wasm_tftp_write_file(void * ctx, void * handle, const void * buf,
                                     size_t len) {
     (void)ctx;
     return hal_fs_write((hal_fs_fd_t)(intptr_t)handle, buf, len);
 }
 
-static void wasm_tftp_close_file(void *ctx, void *handle) {
+static void wasm_tftp_close_file(void * ctx, void * handle) {
     (void)ctx;
     hal_fs_close((hal_fs_fd_t)(intptr_t)handle);
 }
@@ -856,7 +854,7 @@ static int wasm_telnet_open_server(void) {
     return 0;
 }
 
-static void wasm_telnet_receive_bytes(const uint8_t *data, size_t len) {
+static void wasm_telnet_receive_bytes(const uint8_t * data, size_t len) {
     if (!data || len == 0) return;
     for (size_t i = 0; i < len; ++i) {
         int c = data[i];
@@ -1040,7 +1038,7 @@ void hal_net_poll(void) {
 }
 
 int hal_net_tcp_server_open(uint16_t port, int backlog,
-                            hal_net_tcp_server_t *out) {
+                            hal_net_tcp_server_t * out) {
     if (out) *out = 0;
     if (!out || !wasm_proxy_detected || !wasm_proxy_tcp_server_capability)
         return HAL_NET_UNSUPPORTED;
@@ -1065,7 +1063,7 @@ int hal_net_tcp_server_close(hal_net_tcp_server_t server) {
 }
 
 int hal_net_tcp_accept_conn(hal_net_tcp_server_t server,
-                            hal_net_tcp_conn_t *conn) {
+                            hal_net_tcp_conn_t * conn) {
     if (conn) *conn = 0;
     if (!server || !conn ||
         !wasm_proxy_detected || !wasm_proxy_tcp_server_capability)
@@ -1082,8 +1080,8 @@ int hal_net_tcp_accept_conn(hal_net_tcp_server_t server,
 }
 
 int hal_net_tcp_accept_event(hal_net_tcp_server_t server,
-                             hal_net_tcp_conn_t *conn,
-                             uint8_t *buf, size_t cap, size_t *len) {
+                             hal_net_tcp_conn_t * conn,
+                             uint8_t * buf, size_t cap, size_t * len) {
     if (conn) *conn = 0;
     if (len) *len = 0;
     if (!server || !conn || !buf || cap == 0 ||
@@ -1102,8 +1100,8 @@ int hal_net_tcp_accept_event(hal_net_tcp_server_t server,
 #endif
 }
 
-int hal_net_tcp_conn_recv(hal_net_tcp_conn_t conn, void *buf, size_t cap,
-                          size_t *len) {
+int hal_net_tcp_conn_recv(hal_net_tcp_conn_t conn, void * buf, size_t cap,
+                          size_t * len) {
     if (len) *len = 0;
     if (!conn || !buf || cap == 0 || !len ||
         !wasm_proxy_detected || !wasm_proxy_tcp_server_capability)
@@ -1120,7 +1118,7 @@ int hal_net_tcp_conn_recv(hal_net_tcp_conn_t conn, void *buf, size_t cap,
 #endif
 }
 
-int hal_net_tcp_conn_send(hal_net_tcp_conn_t conn, const void *buf, size_t len,
+int hal_net_tcp_conn_send(hal_net_tcp_conn_t conn, const void * buf, size_t len,
                           uint32_t timeout_ms) {
     if (!conn || (!buf && len) ||
         !wasm_proxy_detected || !wasm_proxy_tcp_server_capability)
@@ -1134,8 +1132,8 @@ int hal_net_tcp_conn_send(hal_net_tcp_conn_t conn, const void *buf, size_t len,
 #endif
 }
 
-int hal_net_tcp_conn_send_some(hal_net_tcp_conn_t conn, const void *buf,
-                               size_t cap, size_t *sent) {
+int hal_net_tcp_conn_send_some(hal_net_tcp_conn_t conn, const void * buf,
+                               size_t cap, size_t * sent) {
     if (sent) *sent = 0;
     if (!conn || (!buf && cap) ||
         !wasm_proxy_detected || !wasm_proxy_tcp_server_capability)
@@ -1163,7 +1161,7 @@ int hal_net_tcp_conn_close(hal_net_tcp_conn_t conn) {
 #endif
 }
 
-int hal_net_udp_bind(uint16_t port, hal_net_udp_socket_t *out) {
+int hal_net_udp_bind(uint16_t port, hal_net_udp_socket_t * out) {
     if (out) *out = 0;
     if (!out || !wasm_proxy_detected || !wasm_proxy_udp_capability)
         return HAL_NET_UNSUPPORTED;
@@ -1189,8 +1187,8 @@ int hal_net_udp_close(hal_net_udp_socket_t sock) {
 #endif
 }
 
-int hal_net_udp_socket_send(hal_net_udp_socket_t sock, const char *host,
-                            uint16_t port, const void *buf, size_t len,
+int hal_net_udp_socket_send(hal_net_udp_socket_t sock, const char * host,
+                            uint16_t port, const void * buf, size_t len,
                             uint32_t timeout_ms) {
     if (!host || (!buf && len) ||
         !wasm_proxy_detected || !wasm_proxy_udp_capability)
@@ -1208,13 +1206,13 @@ int hal_net_udp_socket_send(hal_net_udp_socket_t sock, const char *host,
 #endif
 }
 
-int hal_net_udp_send(const char *host, uint16_t port,
-                     const void *buf, size_t len, uint32_t timeout_ms) {
+int hal_net_udp_send(const char * host, uint16_t port,
+                     const void * buf, size_t len, uint32_t timeout_ms) {
     return hal_net_udp_socket_send(0, host, port, buf, len, timeout_ms);
 }
 
-int hal_net_udp_recv_event(hal_net_udp_socket_t sock, hal_net_addr_t *from,
-                           void *buf, size_t cap, size_t *len) {
+int hal_net_udp_recv_event(hal_net_udp_socket_t sock, hal_net_addr_t * from,
+                           void * buf, size_t cap, size_t * len) {
     if (len) *len = 0;
     if (!sock || !from || !buf || cap == 0 ||
         !wasm_proxy_detected || !wasm_proxy_udp_capability)
@@ -1232,9 +1230,9 @@ int hal_net_udp_recv_event(hal_net_udp_socket_t sock, hal_net_addr_t *from,
 #endif
 }
 
-int hal_net_mqtt_connect(const char *host, uint16_t port, const char *user,
-                         const char *pass, const char *client_id,
-                         uint32_t timeout_ms, hal_net_mqtt_client_t *out) {
+int hal_net_mqtt_connect(const char * host, uint16_t port, const char * user,
+                         const char * pass, const char * client_id,
+                         uint32_t timeout_ms, hal_net_mqtt_client_t * out) {
     if (!host || !client_id || !out) return HAL_NET_ERR;
     *out = 0;
     closeMQTT();
@@ -1245,7 +1243,7 @@ int hal_net_mqtt_connect(const char *host, uint16_t port, const char *user,
             !wasm_proxy_mqtt_plain_capability)
             return HAL_NET_UNSUPPORTED;
         int stream_id = wasm_proxy_tcp_open_js(host, (int)port,
-                                              (int)timeout_ms);
+                                               (int)timeout_ms);
         if (stream_id <= 0) return HAL_NET_ERR;
         wasm_mqtt_proxy_transport = 1;
         wasm_mqtt_proxy_stream_id = stream_id;
@@ -1262,7 +1260,7 @@ int hal_net_mqtt_connect(const char *host, uint16_t port, const char *user,
 #endif
 
     uint8_t body[1024];
-    uint8_t *p = body;
+    uint8_t * p = body;
     p = mm_net_mqtt_write_utf8(p, "MQTT");
     *p++ = 4;
     uint8_t flags = 0x02;
@@ -1292,14 +1290,14 @@ int hal_net_mqtt_connect(const char *host, uint16_t port, const char *user,
     return HAL_NET_OK;
 }
 
-int hal_net_mqtt_publish(hal_net_mqtt_client_t client, const char *topic,
-                         const void *payload, size_t len, int qos,
+int hal_net_mqtt_publish(hal_net_mqtt_client_t client, const char * topic,
+                         const void * payload, size_t len, int qos,
                          int retain) {
     if (!wasm_mqtt_connected || client != wasm_mqtt_client || !topic ||
         (!payload && len))
         return HAL_NET_ERR;
     uint8_t body[1024];
-    uint8_t *p = body;
+    uint8_t * p = body;
     p = mm_net_mqtt_write_utf8(p, topic);
     if (qos) {
         uint16_t id = wasm_mqtt_next_id();
@@ -1320,12 +1318,12 @@ int hal_net_mqtt_publish(hal_net_mqtt_client_t client, const char *topic,
     return HAL_NET_OK;
 }
 
-int hal_net_mqtt_subscribe(hal_net_mqtt_client_t client, const char *topic,
+int hal_net_mqtt_subscribe(hal_net_mqtt_client_t client, const char * topic,
                            int qos, uint32_t timeout_ms) {
     if (!wasm_mqtt_connected || client != wasm_mqtt_client || !topic)
         return HAL_NET_ERR;
     uint8_t body[512];
-    uint8_t *p = body;
+    uint8_t * p = body;
     uint16_t id = wasm_mqtt_next_id();
     *p++ = (uint8_t)(id >> 8);
     *p++ = (uint8_t)id;
@@ -1339,12 +1337,12 @@ int hal_net_mqtt_subscribe(hal_net_mqtt_client_t client, const char *topic,
     return HAL_NET_OK;
 }
 
-int hal_net_mqtt_unsubscribe(hal_net_mqtt_client_t client, const char *topic,
+int hal_net_mqtt_unsubscribe(hal_net_mqtt_client_t client, const char * topic,
                              uint32_t timeout_ms) {
     if (!wasm_mqtt_connected || client != wasm_mqtt_client || !topic)
         return HAL_NET_ERR;
     uint8_t body[512];
-    uint8_t *p = body;
+    uint8_t * p = body;
     uint16_t id = wasm_mqtt_next_id();
     *p++ = (uint8_t)(id >> 8);
     *p++ = (uint8_t)id;
@@ -1357,9 +1355,9 @@ int hal_net_mqtt_unsubscribe(hal_net_mqtt_client_t client, const char *topic,
     return HAL_NET_OK;
 }
 
-int hal_net_mqtt_recv_event(hal_net_mqtt_client_t client, char *topic,
-                            size_t topic_cap, void *payload,
-                            size_t payload_cap, size_t *payload_len) {
+int hal_net_mqtt_recv_event(hal_net_mqtt_client_t client, char * topic,
+                            size_t topic_cap, void * payload,
+                            size_t payload_cap, size_t * payload_len) {
     if (payload_len) *payload_len = 0;
     if (topic && topic_cap) topic[0] = 0;
     if (!wasm_mqtt_connected || client != wasm_mqtt_client || !topic ||
@@ -1371,7 +1369,7 @@ int hal_net_mqtt_recv_event(hal_net_mqtt_client_t client, char *topic,
     size_t body_len = 0;
     int rc = wasm_mqtt_read_packet(&header, body, sizeof(body), &body_len, 0);
     if (rc != HAL_NET_OK) return rc;
-    const uint8_t *decoded_payload = NULL;
+    const uint8_t * decoded_payload = NULL;
     size_t decoded_payload_len = 0;
     if (!mm_net_mqtt_decode_publish(header, body, body_len, topic, topic_cap,
                                     &decoded_payload, &decoded_payload_len))
@@ -1393,33 +1391,33 @@ int hal_net_mqtt_close(hal_net_mqtt_client_t client) {
     return HAL_NET_OK;
 }
 
-static int request_line_to_fetch(const uint8_t *request, size_t request_len,
-                                 char *method, size_t method_len,
-                                 char *url, size_t url_len,
-                                 const char **headers,
-                                 int *header_count,
-                                 char **owned_request,
-                                 char **body, size_t *body_len) {
+static int request_line_to_fetch(const uint8_t * request, size_t request_len,
+                                 char * method, size_t method_len,
+                                 char * url, size_t url_len,
+                                 const char ** headers,
+                                 int * header_count,
+                                 char ** owned_request,
+                                 char ** body, size_t * body_len) {
     *owned_request = NULL;
     *body = NULL;
     *body_len = 0;
     *header_count = 0;
     if (!request || request_len == 0) return 0;
 
-    char *copy = (char *)malloc(request_len + 1);
+    char * copy = (char *)malloc(request_len + 1);
     if (!copy) error("Out of memory");
     memcpy(copy, request, request_len);
     copy[request_len] = '\0';
     *owned_request = copy;
 
-    char *line_end = strpbrk(copy, "\r\n");
+    char * line_end = strpbrk(copy, "\r\n");
     if (!line_end) return 0;
     *line_end = '\0';
-    char *sp1 = strchr(copy, ' ');
+    char * sp1 = strchr(copy, ' ');
     if (!sp1) return 0;
     *sp1++ = '\0';
     while (*sp1 == ' ') sp1++;
-    char *sp2 = strchr(sp1, ' ');
+    char * sp2 = strchr(sp1, ' ');
     if (!sp2) return 0;
     *sp2++ = '\0';
     while (*sp2 == ' ') sp2++;
@@ -1431,7 +1429,7 @@ static int request_line_to_fetch(const uint8_t *request, size_t request_len,
         if (strlen(sp1) + 1 > url_len) return 0;
         snprintf(url, url_len, "%s", sp1);
     } else if (sp1[0] == '/') {
-        const char *scheme = (wasm_tcp_port == 443) ? "https" : "http";
+        const char * scheme = (wasm_tcp_port == 443) ? "https" : "http";
         int default_port = (strcmp(scheme, "https") == 0) ? 443 : 80;
         int n = snprintf(url, url_len, "%s://%s", scheme, wasm_tcp_host);
         if (n < 0 || (size_t)n >= url_len) return 0;
@@ -1446,17 +1444,17 @@ static int request_line_to_fetch(const uint8_t *request, size_t request_len,
         return 0;
     }
 
-    char *headers_start = line_end + 1;
+    char * headers_start = line_end + 1;
     while (*headers_start == '\r' || *headers_start == '\n') headers_start++;
 
-    char *headers_end = strstr(headers_start, "\r\n\r\n");
+    char * headers_end = strstr(headers_start, "\r\n\r\n");
     size_t skip = 4;
     if (!headers_end) {
         headers_end = strstr(headers_start, "\n\n");
         skip = 2;
     }
     if (headers_end) {
-        char *payload = headers_end + skip;
+        char * payload = headers_end + skip;
         *headers_end = '\0';
         if (payload < copy + request_len) {
             *body = payload;
@@ -1464,18 +1462,18 @@ static int request_line_to_fetch(const uint8_t *request, size_t request_len,
         }
     }
 
-    char *line = headers_start;
+    char * line = headers_start;
     while (*line && *header_count < WASM_FETCH_MAX_HEADERS) {
         while (*line == '\r' || *line == '\n') line++;
         if (!*line) break;
-        char *next = strpbrk(line, "\r\n");
+        char * next = strpbrk(line, "\r\n");
         if (next) *next++ = '\0';
 
-        char *colon = strchr(line, ':');
+        char * colon = strchr(line, ':');
         if (colon) {
             *colon++ = '\0';
             while (*colon == ' ' || *colon == '\t') colon++;
-            char *end = colon + strlen(colon);
+            char * end = colon + strlen(colon);
             while (end > colon && (end[-1] == ' ' || end[-1] == '\t'))
                 *--end = '\0';
             if (strcasecmp(line, "Host") != 0 &&
@@ -1496,8 +1494,8 @@ static int request_line_to_fetch(const uint8_t *request, size_t request_len,
     return 1;
 }
 
-static void append_response(uint8_t *dst, int cap, int *total,
-                            const void *src, size_t len) {
+static void append_response(uint8_t * dst, int cap, int * total,
+                            const void * src, size_t len) {
     if (!dst || cap <= 0 || !total || !src || len == 0) return;
     if (*total >= cap) return;
     size_t room = (size_t)(cap - *total);
@@ -1506,23 +1504,23 @@ static void append_response(uint8_t *dst, int cap, int *total,
     *total += (int)len;
 }
 
-static void append_response_text(uint8_t *dst, int cap, int *total,
-                                 const char *text) {
+static void append_response_text(uint8_t * dst, int cap, int * total,
+                                 const char * text) {
     append_response(dst, cap, total, text, strlen(text));
 }
 
-static void append_response_fmt(uint8_t *dst, int cap, int *total,
-                                const char *fmt, int status,
-                                const char *status_text) {
+static void append_response_fmt(uint8_t * dst, int cap, int * total,
+                                const char * fmt, int status,
+                                const char * status_text) {
     char line[160];
     snprintf(line, sizeof(line), fmt, status, status_text ? status_text : "");
     append_response_text(dst, cap, total, line);
 }
 
-static int request_line_is_http_request(const uint8_t *request,
+static int request_line_is_http_request(const uint8_t * request,
                                         size_t request_len,
                                         int port,
-                                        int *is_https) {
+                                        int * is_https) {
     if (is_https) *is_https = 0;
     if (!request || request_len == 0 || request_len > 4096) return 0;
 
@@ -1536,11 +1534,11 @@ static int request_line_is_http_request(const uint8_t *request,
     line[n] = '\0';
     if (n == 0 || n + 1 == sizeof(line)) return 0;
 
-    char *sp1 = strchr(line, ' ');
+    char * sp1 = strchr(line, ' ');
     if (!sp1) return 0;
     *sp1++ = '\0';
     while (*sp1 == ' ') sp1++;
-    char *sp2 = strchr(sp1, ' ');
+    char * sp2 = strchr(sp1, ' ');
     if (!sp2) return 0;
     *sp2++ = '\0';
     while (*sp2 == ' ') sp2++;
@@ -1557,9 +1555,9 @@ static int request_line_is_http_request(const uint8_t *request,
 }
 
 #ifdef __EMSCRIPTEN__
-static int wasm_proxy_http_request_js(const char *host, int port,
-                                      const uint8_t *request, int request_len,
-                                      uint8_t *dst, int dst_cap,
+static int wasm_proxy_http_request_js(const char * host, int port,
+                                      const uint8_t * request, int request_len,
+                                      uint8_t * dst, int dst_cap,
                                       int timeout_ms) {
     return EM_ASM_INT({
         const host = UTF8ToString($0);
@@ -1597,11 +1595,10 @@ static int wasm_proxy_http_request_js(const char *host, int port,
             Module.__picomiteProxyHttpError =
                 e && e.message ? e.message : String(e);
             return -1;
-        }
-    }, host, port, request, request_len, dst, dst_cap, timeout_ms);
+        } }, host, port, request, request_len, dst, dst_cap, timeout_ms);
 }
 
-static int wasm_proxy_tcp_open_js(const char *host, int port, int timeout_ms) {
+static int wasm_proxy_tcp_open_js(const char * host, int port, int timeout_ms) {
     return EM_ASM_INT({
         const host = UTF8ToString($0);
         const port = $1;
@@ -1626,12 +1623,11 @@ static int wasm_proxy_tcp_open_js(const char *host, int port, int timeout_ms) {
             Module.__picomiteProxyTcpError =
                 e && e.message ? e.message : String(e);
             return -1;
-        }
-    }, host, port, timeout_ms);
+        } }, host, port, timeout_ms);
 }
 
-static int wasm_proxy_tcp_stream_js(int stream_id, const uint8_t *write_data,
-                                    int write_len, uint8_t *dst, int dst_cap,
+static int wasm_proxy_tcp_stream_js(int stream_id, const uint8_t * write_data,
+                                    int write_len, uint8_t * dst, int dst_cap,
                                     int timeout_ms) {
     return EM_ASM_INT({
         const streamId = $0;
@@ -1669,8 +1665,7 @@ static int wasm_proxy_tcp_stream_js(int stream_id, const uint8_t *write_data,
             Module.__picomiteProxyTcpError =
                 e && e.message ? e.message : String(e);
             return -1;
-        }
-    }, stream_id, write_data, write_len, dst, dst_cap, timeout_ms);
+        } }, stream_id, write_data, write_len, dst, dst_cap, timeout_ms);
 }
 
 static void wasm_proxy_tcp_close_js(int stream_id) {
@@ -1683,8 +1678,7 @@ static void wasm_proxy_tcp_close_js(int stream_id) {
             const xhr = new XMLHttpRequest();
             xhr.open('POST', url.toString(), false);
             xhr.send(new Uint8Array(0));
-        } catch (e) {}
-    }, stream_id);
+        } catch (e) {} }, stream_id);
 }
 
 static int wasm_proxy_tcp_listen_js(int port, int backlog) {
@@ -1709,8 +1703,7 @@ static int wasm_proxy_tcp_listen_js(int port, int backlog) {
             Module.__picomiteProxyTcpError =
                 e && e.message ? e.message : String(e);
             return -1;
-        }
-    }, port, backlog);
+        } }, port, backlog);
 }
 
 static void wasm_proxy_tcp_listener_close_js(int listener_id) {
@@ -1723,8 +1716,7 @@ static void wasm_proxy_tcp_listener_close_js(int listener_id) {
             const xhr = new XMLHttpRequest();
             xhr.open('POST', url.toString(), false);
             xhr.send(new Uint8Array(0));
-        } catch (e) {}
-    }, listener_id);
+        } catch (e) {} }, listener_id);
 }
 
 static int wasm_proxy_tcp_accept_conn_js(int listener_id) {
@@ -1748,12 +1740,11 @@ static int wasm_proxy_tcp_accept_conn_js(int listener_id) {
             Module.__picomiteProxyTcpError =
                 e && e.message ? e.message : String(e);
             return -1;
-        }
-    }, listener_id);
+        } }, listener_id);
 }
 
-static int wasm_proxy_tcp_accept_js(int listener_id, uint8_t *dst, int dst_cap,
-                                    int *out_conn_id) {
+static int wasm_proxy_tcp_accept_js(int listener_id, uint8_t * dst, int dst_cap,
+                                    int * out_conn_id) {
     return EM_ASM_INT({
         const listenerId = $0;
         const dstPtr = $1;
@@ -1787,11 +1778,10 @@ static int wasm_proxy_tcp_accept_js(int listener_id, uint8_t *dst, int dst_cap,
             Module.__picomiteProxyTcpError =
                 e && e.message ? e.message : String(e);
             return -1;
-        }
-    }, listener_id, dst, dst_cap, out_conn_id);
+        } }, listener_id, dst, dst_cap, out_conn_id);
 }
 
-static int wasm_proxy_tcp_conn_recv_js(int conn_id, uint8_t *dst,
+static int wasm_proxy_tcp_conn_recv_js(int conn_id, uint8_t * dst,
                                        int dst_cap) {
     return EM_ASM_INT({
         const connId = $0;
@@ -1821,11 +1811,10 @@ static int wasm_proxy_tcp_conn_recv_js(int conn_id, uint8_t *dst,
             Module.__picomiteProxyTcpError =
                 e && e.message ? e.message : String(e);
             return -1;
-        }
-    }, conn_id, dst, dst_cap);
+        } }, conn_id, dst, dst_cap);
 }
 
-static int wasm_proxy_tcp_conn_send_js(int conn_id, const uint8_t *data,
+static int wasm_proxy_tcp_conn_send_js(int conn_id, const uint8_t * data,
                                        int len, int timeout_ms) {
     return EM_ASM_INT({
         const connId = $0;
@@ -1853,8 +1842,7 @@ static int wasm_proxy_tcp_conn_send_js(int conn_id, const uint8_t *data,
             Module.__picomiteProxyTcpError =
                 e && e.message ? e.message : String(e);
             return -1;
-        }
-    }, conn_id, data, len, timeout_ms);
+        } }, conn_id, data, len, timeout_ms);
 }
 
 static void wasm_proxy_tcp_conn_close_js(int conn_id) {
@@ -1867,8 +1855,7 @@ static void wasm_proxy_tcp_conn_close_js(int conn_id) {
             const xhr = new XMLHttpRequest();
             xhr.open('POST', url.toString(), false);
             xhr.send(new Uint8Array(0));
-        } catch (e) {}
-    }, conn_id);
+        } catch (e) {} }, conn_id);
 }
 
 static int wasm_proxy_udp_bind_js(int port) {
@@ -1891,12 +1878,11 @@ static int wasm_proxy_udp_bind_js(int port) {
             Module.__picomiteProxyUdpError =
                 e && e.message ? e.message : String(e);
             return -1;
-        }
-    }, port);
+        } }, port);
 }
 
-static int wasm_proxy_udp_send_js(int socket_id, const char *host, int port,
-                                  const uint8_t *data, int len,
+static int wasm_proxy_udp_send_js(int socket_id, const char * host, int port,
+                                  const uint8_t * data, int len,
                                   int timeout_ms) {
     return EM_ASM_INT({
         const socketId = $0;
@@ -1928,12 +1914,11 @@ static int wasm_proxy_udp_send_js(int socket_id, const char *host, int port,
             Module.__picomiteProxyUdpError =
                 e && e.message ? e.message : String(e);
             return -1;
-        }
-    }, socket_id, host, port, data, len, timeout_ms);
+        } }, socket_id, host, port, data, len, timeout_ms);
 }
 
-static int wasm_proxy_udp_recv_js(int socket_id, uint8_t *dst, int dst_cap,
-                                  hal_net_addr_t *from) {
+static int wasm_proxy_udp_recv_js(int socket_id, uint8_t * dst, int dst_cap,
+                                  hal_net_addr_t * from) {
     return EM_ASM_INT({
         const socketId = $0;
         const dstPtr = $1;
@@ -1982,8 +1967,7 @@ static int wasm_proxy_udp_recv_js(int socket_id, uint8_t *dst, int dst_cap,
             Module.__picomiteProxyUdpError =
                 e && e.message ? e.message : String(e);
             return -1;
-        }
-    }, socket_id, dst, dst_cap, from);
+        } }, socket_id, dst, dst_cap, from);
 }
 
 static void wasm_proxy_udp_close_js(int socket_id) {
@@ -1996,12 +1980,11 @@ static void wasm_proxy_udp_close_js(int socket_id) {
             const xhr = new XMLHttpRequest();
             xhr.open('POST', url.toString(), false);
             xhr.send(new Uint8Array(0));
-        } catch (e) {}
-    }, socket_id);
+        } catch (e) {} }, socket_id);
 }
 #endif
 
-static void wasm_tcp_client_open_cmd(unsigned char *tp) {
+static void wasm_tcp_client_open_cmd(unsigned char * tp) {
     mm_net_tcp_client_open_args_t parsed;
     mm_net_tcp_client_parse_open(tp, &parsed);
 
@@ -2012,7 +1995,7 @@ static void wasm_tcp_client_open_cmd(unsigned char *tp) {
     if (!optionsuppressstatus) MMPrintString("Connected\r\n");
 }
 
-static void wasm_tcp_client_open_stream_cmd(unsigned char *tp) {
+static void wasm_tcp_client_open_stream_cmd(unsigned char * tp) {
     if (!wasm_proxy_detected || !wasm_proxy_tcp_stream_capability)
         wasm_web_unsupported();
 
@@ -2035,7 +2018,7 @@ static void wasm_tcp_client_open_stream_cmd(unsigned char *tp) {
 #endif
 }
 
-static void wasm_tcp_client_request_cmd(unsigned char *tp) {
+static void wasm_tcp_client_request_cmd(unsigned char * tp) {
     if (!wasm_tcp_client_opened) error("No connection");
     if (wasm_tcp_client_stream_active || wasm_proxy_tcp_stream_id > 0)
         error("Connection busy");
@@ -2063,10 +2046,10 @@ static void wasm_tcp_client_request_cmd(unsigned char *tp) {
 
     char method[32];
     char url[512];
-    char *owned_request = NULL;
-    char *body = NULL;
+    char * owned_request = NULL;
+    char * body = NULL;
     size_t body_len = 0;
-    const char *headers[WASM_FETCH_MAX_HEADERS * 2 + 1];
+    const char * headers[WASM_FETCH_MAX_HEADERS * 2 + 1];
     int header_count = 0;
     int ok = request_line_to_fetch(parsed.request, parsed.request_len,
                                    method, sizeof(method), url, sizeof(url),
@@ -2091,7 +2074,7 @@ static void wasm_tcp_client_request_cmd(unsigned char *tp) {
     }
     if (header_count > 0) attr.requestHeaders = headers;
 
-    emscripten_fetch_t *fetch = emscripten_fetch(&attr, url);
+    emscripten_fetch_t * fetch = emscripten_fetch(&attr, url);
     if (!fetch || fetch->status == 0) {
         if (fetch) emscripten_fetch_close(fetch);
         free(owned_request);
@@ -2104,7 +2087,7 @@ static void wasm_tcp_client_request_cmd(unsigned char *tp) {
                         fetch->statusText);
     size_t headers_len = emscripten_fetch_get_response_headers_length(fetch);
     if (headers_len > 0) {
-        char *headers = (char *)malloc(headers_len + 1);
+        char * headers = (char *)malloc(headers_len + 1);
         if (!headers) {
             emscripten_fetch_close(fetch);
             free(owned_request);
@@ -2138,7 +2121,7 @@ static void wasm_tcp_client_request_cmd(unsigned char *tp) {
     free(owned_request);
 }
 
-static void wasm_tcp_client_stream_cmd(unsigned char *tp) {
+static void wasm_tcp_client_stream_cmd(unsigned char * tp) {
     if (!wasm_tcp_client_opened) error("No connection");
     if (!wasm_proxy_detected || !wasm_proxy_tcp_stream_capability ||
         wasm_proxy_tcp_stream_id <= 0)
@@ -2160,7 +2143,7 @@ static void wasm_tcp_client_stream_cmd(unsigned char *tp) {
 #ifdef __EMSCRIPTEN__
     int read_cap = parsed.payload_capacity;
     if (read_cap > 4096) read_cap = 4096;
-    uint8_t *buf = (uint8_t *)malloc((size_t)read_cap);
+    uint8_t * buf = (uint8_t *)malloc((size_t)read_cap);
     if (!buf) error("Out of memory");
     int got = wasm_proxy_tcp_stream_js(
         wasm_proxy_tcp_stream_id, parsed.request, (int)parsed.request_len,
@@ -2181,7 +2164,7 @@ static void wasm_tcp_client_stream_cmd(unsigned char *tp) {
 #endif
 }
 
-static int wasm_tcp_send_cb(void *ctx, const void *buf, size_t len) {
+static int wasm_tcp_send_cb(void * ctx, const void * buf, size_t len) {
     int pcb = *(int *)ctx;
     wasm_tcp_service_init();
     if (!mm_net_tcp_service_conn(&wasm_tcp_server, pcb)) return 0;
@@ -2196,7 +2179,7 @@ static void wasm_tcp_close_slot(int pcb) {
 
 static void wasm_tcp_transmit_status(int pcb, int status) {
     char body[64];
-    const char *reason = mm_net_http_status_reason(status);
+    const char * reason = mm_net_http_status_reason(status);
     int body_len = mm_net_http_format_status_body(body, sizeof(body), status,
                                                   reason);
     if (body_len < 0) error("Transmit failed");
@@ -2207,16 +2190,16 @@ static void wasm_tcp_transmit_status(int pcb, int status) {
     wasm_tcp_close_slot(pcb);
 }
 
-static void wasm_tcp_transmit_file(int pcb, const char *fname,
-                                   const char *content_type) {
+static void wasm_tcp_transmit_file(int pcb, const char * fname,
+                                   const char * content_type) {
     if (mm_net_http_send_file(fname, content_type, "MMBasic-WASM",
                               wasm_tcp_send_cb, &pcb) != 0)
         error("File not found");
     wasm_tcp_close_slot(pcb);
 }
 
-static void wasm_tcp_transmit_page(int pcb, const char *fname, int extra) {
-    char *rendered = NULL;
+static void wasm_tcp_transmit_page(int pcb, const char * fname, int extra) {
+    char * rendered = NULL;
     size_t rendered_len = 0;
     if (mm_net_http_render_page(fname, extra, &rendered, &rendered_len) != 0)
         error("File not found");
@@ -2228,7 +2211,7 @@ static void wasm_tcp_transmit_page(int pcb, const char *fname, int extra) {
     wasm_tcp_close_slot(pcb);
 }
 
-static int wasm_transmit_cmd(unsigned char *arg) {
+static int wasm_transmit_cmd(unsigned char * arg) {
     if (!wasm_proxy_detected || !wasm_proxy_tcp_server_capability)
         wasm_web_unsupported();
     wasm_tcp_service_init();
@@ -2237,29 +2220,29 @@ static int wasm_transmit_cmd(unsigned char *arg) {
     if (!mm_net_tcp_service_conn(&wasm_tcp_server, parsed.pcb))
         error("Not connected");
     switch (parsed.kind) {
-        case MM_NET_TRANSMIT_CODE:
-            wasm_tcp_transmit_status(parsed.pcb, parsed.status);
-            return 1;
-        case MM_NET_TRANSMIT_FILE:
-        case MM_NET_TRANSMIT_CSS:
-        case MM_NET_TRANSMIT_JS:
-        case MM_NET_TRANSMIT_IMAGE:
-            wasm_tcp_transmit_file(parsed.pcb, parsed.filename,
-                                   parsed.content_type);
-            return 1;
-        case MM_NET_TRANSMIT_PAGE:
-            wasm_tcp_transmit_page(parsed.pcb, parsed.filename, parsed.extra);
-            return 1;
-        default:
-            return 0;
+    case MM_NET_TRANSMIT_CODE:
+        wasm_tcp_transmit_status(parsed.pcb, parsed.status);
+        return 1;
+    case MM_NET_TRANSMIT_FILE:
+    case MM_NET_TRANSMIT_CSS:
+    case MM_NET_TRANSMIT_JS:
+    case MM_NET_TRANSMIT_IMAGE:
+        wasm_tcp_transmit_file(parsed.pcb, parsed.filename,
+                               parsed.content_type);
+        return 1;
+    case MM_NET_TRANSMIT_PAGE:
+        wasm_tcp_transmit_page(parsed.pcb, parsed.filename, parsed.extra);
+        return 1;
+    default:
+        return 0;
     }
 }
 
-static int wasm_tcp_server_cmd(unsigned char *arg) {
+static int wasm_tcp_server_cmd(unsigned char * arg) {
     if (!wasm_proxy_detected || !wasm_proxy_tcp_server_capability)
         wasm_web_unsupported();
     wasm_tcp_service_init();
-    unsigned char *tp;
+    unsigned char * tp;
     if ((tp = checkstring(arg, (unsigned char *)"INTERRUPT"))) {
         TCPreceiveInterrupt = mm_net_tcp_server_parse_interrupt(tp);
         InterruptUsed = true;
@@ -2298,10 +2281,10 @@ static int wasm_tcp_server_cmd(unsigned char *arg) {
     return 0;
 }
 
-static int wasm_udp_cmd(unsigned char *arg) {
+static int wasm_udp_cmd(unsigned char * arg) {
     if (!wasm_proxy_detected || !wasm_proxy_udp_capability)
         wasm_web_unsupported();
-    unsigned char *tp = checkstring(arg, (unsigned char *)"INTERRUPT");
+    unsigned char * tp = checkstring(arg, (unsigned char *)"INTERRUPT");
     if (tp) {
         UDPinterrupt = mm_net_udp_parse_interrupt(tp);
         InterruptUsed = true;
@@ -2323,7 +2306,7 @@ static void wasm_ntp_apply(uint32_t unix_seconds, MMFLOAT offset_hours) {
     time_t adjusted = (time_t)unix_seconds + (time_t)(offset_hours * 3600.0);
     struct tm utc_buf;
     hal_calendar_epoch_to_tm(adjusted, &utc_buf);
-    struct tm *utc = &utc_buf;
+    struct tm * utc = &utc_buf;
 
     day_of_week = utc->tm_wday;
     if (day_of_week == 0) day_of_week = 7;
@@ -2341,7 +2324,7 @@ static void wasm_ntp_apply(uint32_t unix_seconds, MMFLOAT offset_hours) {
     }
 }
 
-static void wasm_ntp_cmd(unsigned char *arg) {
+static void wasm_ntp_cmd(unsigned char * arg) {
     if (!wasm_proxy_detected || !wasm_proxy_udp_capability ||
         !wasm_proxy_ntp_capability)
         wasm_web_unsupported();
@@ -2350,7 +2333,7 @@ static void wasm_ntp_cmd(unsigned char *arg) {
     if (!(argc == 0 || argc == 1 || argc == 3 || argc == 5)) error("Syntax");
 
     MMFLOAT offset = 0.0;
-    const char *server = "pool.ntp.org";
+    const char * server = "pool.ntp.org";
     int timeout_ms = 5000;
     uint16_t port = 123;
 
@@ -2364,7 +2347,7 @@ static void wasm_ntp_cmd(unsigned char *arg) {
     char hostbuf[STRINGSIZE];
     strncpy(hostbuf, server, sizeof(hostbuf) - 1);
     hostbuf[sizeof(hostbuf) - 1] = 0;
-    char *colon = strrchr(hostbuf, ':');
+    char * colon = strrchr(hostbuf, ':');
     if (colon && colon[1]) {
         int parsed_port = atoi(colon + 1);
         if (parsed_port > 0 && parsed_port <= 65535) {
@@ -2388,7 +2371,7 @@ static void wasm_ntp_cmd(unsigned char *arg) {
     wasm_ntp_apply(unix_seconds, offset);
 }
 
-static int wasm_mqtt_cmd(unsigned char *line) {
+static int wasm_mqtt_cmd(unsigned char * line) {
     static mm_net_mqtt_hal_context_t ctx;
     ctx.client = &wasm_mqtt_client;
     ctx.connected = &wasm_mqtt_connected;
@@ -2399,7 +2382,7 @@ static int wasm_mqtt_cmd(unsigned char *line) {
 }
 
 void cmd_web(void) {
-    unsigned char *tp;
+    unsigned char * tp;
     if (wasm_mqtt_cmd(cmdline)) return;
     if ((tp = checkstring(cmdline, (unsigned char *)"OPEN TCP CLIENT"))) {
         wasm_tcp_client_open_cmd(tp);
@@ -2484,7 +2467,7 @@ void port_web_clear_runtime_state(void) {
 void port_web_print_options(void) {
 }
 
-int port_web_option_setter(unsigned char *cmdline) {
+int port_web_option_setter(unsigned char * cmdline) {
     if (checkstring(cmdline, (unsigned char *)"TELNET CONSOLE")) {
         if (!wasm_proxy_detected || !wasm_proxy_tcp_server_capability ||
             !wasm_proxy_telnet_capability)
@@ -2510,15 +2493,15 @@ int port_web_option_setter(unsigned char *cmdline) {
         &wasm_lifecycle_result_handler);
 }
 
-static int wasm_mminfo_string(unsigned char *out_sret, int *out_targ,
-                              const char *value) {
+static int wasm_mminfo_string(unsigned char * out_sret, int * out_targ,
+                              const char * value) {
     strcpy((char *)out_sret, value);
     CtoM(out_sret);
     *out_targ = T_STR;
     return 1;
 }
 
-static int wasm_info_empty_ip(char *out, size_t out_len) {
+static int wasm_info_empty_ip(char * out, size_t out_len) {
     if (out_len) out[0] = 0;
     return HAL_NET_OK;
 }
@@ -2531,16 +2514,15 @@ static int wasm_info_tcpip_status(void) {
     return wasm_proxy_detected ? 1 : HAL_NET_UNSUPPORTED;
 }
 
-int port_web_mminfo(unsigned char *ep, int64_t *out_iret,
-                    unsigned char *out_sret, int *out_targ) {
+int port_web_mminfo(unsigned char * ep, int64_t * out_iret,
+                    unsigned char * out_sret, int * out_targ) {
     if (checkstring(ep, (unsigned char *)"SSID"))
         return wasm_mminfo_string(out_sret, out_targ, "");
     const mm_net_info_hooks_t hooks = {
         .before_query = wasm_info_before_query,
         .tcp_path = wasm_info_tcp_path,
         .tcp_request_pending = wasm_info_tcp_request_pending,
-        .max_connections = wasm_proxy_tcp_server_capability ?
-                           WASM_WEB_MAX_PCB : 0,
+        .max_connections = wasm_proxy_tcp_server_capability ? WASM_WEB_MAX_PCB : 0,
         .tcp_port = Option.TCP_PORT,
         .udp_port = Option.UDP_PORT,
         .ip_address = wasm_info_empty_ip,
@@ -2550,7 +2532,7 @@ int port_web_mminfo(unsigned char *ep, int64_t *out_iret,
     return mm_net_mminfo(ep, out_iret, out_sret, out_targ, &hooks);
 }
 
-int port_web_get_ssid(unsigned char *out_sret, int *out_targ) {
+int port_web_get_ssid(unsigned char * out_sret, int * out_targ) {
     return wasm_mminfo_string(out_sret, out_targ, "");
 }
 

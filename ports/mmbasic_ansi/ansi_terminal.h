@@ -14,7 +14,7 @@
  * TIOCGWINSZ; returns 0 on success, -1 on failure.
  */
 int ansi_terminal_enter(void);
-int ansi_terminal_get_size(int *rows, int *cols);
+int ansi_terminal_get_size(int * rows, int * cols);
 
 /* Non-zero after a SIGWINCH fires. Cleared by ansi_terminal_get_size. */
 extern volatile int ansi_terminal_resized;

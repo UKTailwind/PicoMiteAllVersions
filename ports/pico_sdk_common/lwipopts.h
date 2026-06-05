@@ -1,4 +1,4 @@
-/* 
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */
@@ -17,22 +17,25 @@
 //#define LWIP_ALTCP               1
 //#define LWIP_ALTCP_TLS           1
 //#define LWIP_ALTCP_TLS_MBEDTLS   1
-#define DNS_TABLE_SIZE           1
+#define DNS_TABLE_SIZE 1
 /* Enable SO_REUSEADDR so a closed TCP listener can immediately rebind to
  * the same port without waiting for TIME_WAIT to drain. Matches ESP32's
  * setsockopt(SO_REUSEADDR) in hal_net_esp32.c::hal_net_tcp_server_open;
  * without it, the network conformance harness's back-to-back open/close
  * of port 18181 across runs intermittently fails with ConnectionRefused
  * because the second tcp_bind hits a stale pcb. */
-#define SO_REUSE                 1
+#define SO_REUSE 1
 //#define IP_SOF_BROADCAST         1
 //#define IP_SOF_BROADCAST_RECV    1
 #define LWIP_DEBUG 1
 //#define ALTCP_MBEDTLS_DEBUG  LWIP_DBG_ON
-#define MEMP_NUM_SYS_TIMEOUT   (LWIP_NUM_SYS_TIMEOUT_INTERNAL + 3) // <-------- +1 for MQTT
+#define MEMP_NUM_SYS_TIMEOUT (LWIP_NUM_SYS_TIMEOUT_INTERNAL + 3) // <-------- +1 for MQTT
 extern int MMerrno;
-extern char MMErrMsg[]; 
-#define LWIP_PLATFORM_DIAG(x) {MMerrno=17;}
+extern char MMErrMsg[];
+#define LWIP_PLATFORM_DIAG(x) \
+    {                         \
+        MMerrno = 17;         \
+    }
 #include <stdio.h>
 #include <stdlib.h>
 #endif

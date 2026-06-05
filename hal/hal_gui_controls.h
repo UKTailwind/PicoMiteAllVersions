@@ -37,12 +37,12 @@ void hal_gui_controls_post_irq_redraw(void);
 /* OPTION GUI CONTROLS <count> sub-form. Returns 1 if the cmdline
  * matched (and SoftReset() was triggered, so this never returns to
  * caller in practice); 0 if not matched (caller continues parsing). */
-int hal_gui_controls_option_set(unsigned char *cmdline);
+int hal_gui_controls_option_set(unsigned char * cmdline);
 
 /* If a pen-up/pen-down GUI BASIC interrupt is pending, return its
  * vector and clear the pending flag; otherwise return NULL. Called
  * from check_interrupt(). */
-char *hal_gui_controls_pending_interrupt(void);
+char * hal_gui_controls_pending_interrupt(void);
 
 /* Per-tick GUI service: ProcessTouch + CheckGui (LED-flash timer
  * etc.). No-op on stub ports. Called from check_interrupt(). */
@@ -54,7 +54,7 @@ void hal_gui_controls_periodic(void);
  * `*str` by 2), emits the glyph with swapped fc/bc, and returns 1.
  * Otherwise leaves `*str` untouched and returns 0. */
 int hal_gui_controls_print_char_escape(int fnt, int fc, int bc,
-                                       char **str_pp,
+                                       char ** str_pp,
                                        int orientation);
 
 /* Hide all GUI controls. Called at the start of cmd_cls(). No-op on
@@ -74,7 +74,7 @@ void hal_gui_controls_reset_interrupts(void);
  * matched one of the GUICONTROLS-only attribute names and stores the
  * value in *iret_out; returns 0 if not matched (caller continues
  * parsing). Stub returns 0 for every attribute. */
-int hal_gui_controls_get_touch_attr(unsigned char *p, int64_t *iret_out);
+int hal_gui_controls_get_touch_attr(unsigned char * p, int64_t * iret_out);
 
 /* GUI BEEP <ms> — start the click-pin pulse for `ms` milliseconds.
  * Real impl sets ClickTimer; stub errors with "Not supported on this

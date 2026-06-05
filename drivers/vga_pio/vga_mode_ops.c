@@ -30,93 +30,101 @@ extern int ScreenSize;
 
 /* VIRTUAL-mode mode-2 draw primitives — defined in Draw.c. */
 extern void DrawRectangle2(int x1, int y1, int x2, int y2, int c);
-extern void DrawBitmap2(int x1, int y1, int width, int height, int scale, int fc, int bc, unsigned char *bitmap);
+extern void DrawBitmap2(int x1, int y1, int width, int height, int scale, int fc, int bc, unsigned char * bitmap);
 extern void ScrollLCD2(int lines);
-extern void DrawBuffer2(int x1, int y1, int x2, int y2, unsigned char *p);
-extern void ReadBuffer2(int x1, int y1, int x2, int y2, unsigned char *p);
-extern void DrawBuffer2Fast(int x1, int y1, int x2, int y2, int blank, unsigned char *p);
-extern void ReadBuffer2Fast(int x1, int y1, int x2, int y2, unsigned char *p);
+extern void DrawBuffer2(int x1, int y1, int x2, int y2, unsigned char * p);
+extern void ReadBuffer2(int x1, int y1, int x2, int y2, unsigned char * p);
+extern void DrawBuffer2Fast(int x1, int y1, int x2, int y2, int blank, unsigned char * p);
+extern void ReadBuffer2Fast(int x1, int y1, int x2, int y2, unsigned char * p);
 extern void DrawPixel2(int x, int y, int c);
 
 /* FRAMEBUFFER 4-bit-mode draw primitives — defined in Draw.c. */
 extern void DrawRectangle16(int x1, int y1, int x2, int y2, int c);
-extern void DrawBitmap16(int x1, int y1, int width, int height, int scale, int fc, int bc, unsigned char *bitmap);
+extern void DrawBitmap16(int x1, int y1, int width, int height, int scale, int fc, int bc, unsigned char * bitmap);
 extern void ScrollLCD16(int lines);
-extern void DrawBuffer16(int x1, int y1, int x2, int y2, unsigned char *p);
-extern void ReadBuffer16(int x1, int y1, int x2, int y2, unsigned char *p);
-extern void DrawBuffer16Fast(int x1, int y1, int x2, int y2, int blank, unsigned char *p);
-extern void ReadBuffer16Fast(int x1, int y1, int x2, int y2, unsigned char *p);
+extern void DrawBuffer16(int x1, int y1, int x2, int y2, unsigned char * p);
+extern void ReadBuffer16(int x1, int y1, int x2, int y2, unsigned char * p);
+extern void DrawBuffer16Fast(int x1, int y1, int x2, int y2, int blank, unsigned char * p);
+extern void ReadBuffer16Fast(int x1, int y1, int x2, int y2, unsigned char * p);
 extern void DrawPixel16(int x, int y, int c);
 
 /* VGA ResetDisplay body — mode-specific HRes/VRes/function-pointer
  * setup. Real impl below; non-VGA gets a stub in vga_ops_stub.c. */
 void hal_vga_ops_reset_display_vga(void) {
 #ifdef rp2350
-    if(Option.CPU_Speed==Freq848)HRes=((DISPLAY_TYPE == SCREENMODE1 ||  DISPLAY_TYPE == SCREENMODE3) ? 848: 424);
-    else if(Option.CPU_Speed==Freq400)HRes=((DISPLAY_TYPE == SCREENMODE1 ||  DISPLAY_TYPE == SCREENMODE3) ? 720: 360);
-    else if(Option.CPU_Speed==FreqSVGA || Option.CPU_Speed==FreqY )HRes=((DISPLAY_TYPE == SCREENMODE1 ||  DISPLAY_TYPE == SCREENMODE3) ? 800: 400);
-    else HRes=((DISPLAY_TYPE == SCREENMODE1 ||  DISPLAY_TYPE == SCREENMODE3) ? 640: 320);
+    if (Option.CPU_Speed == Freq848)
+        HRes = ((DISPLAY_TYPE == SCREENMODE1 || DISPLAY_TYPE == SCREENMODE3) ? 848 : 424);
+    else if (Option.CPU_Speed == Freq400)
+        HRes = ((DISPLAY_TYPE == SCREENMODE1 || DISPLAY_TYPE == SCREENMODE3) ? 720 : 360);
+    else if (Option.CPU_Speed == FreqSVGA || Option.CPU_Speed == FreqY)
+        HRes = ((DISPLAY_TYPE == SCREENMODE1 || DISPLAY_TYPE == SCREENMODE3) ? 800 : 400);
+    else
+        HRes = ((DISPLAY_TYPE == SCREENMODE1 || DISPLAY_TYPE == SCREENMODE3) ? 640 : 320);
 #else
-    if(Option.CPU_Speed==Freq400)HRes=((DISPLAY_TYPE == SCREENMODE1 ||  DISPLAY_TYPE == SCREENMODE3) ? 720: 360);
-    else HRes=((DISPLAY_TYPE == SCREENMODE1 ||  DISPLAY_TYPE == SCREENMODE3) ? 640: 320);
+    if (Option.CPU_Speed == Freq400)
+        HRes = ((DISPLAY_TYPE == SCREENMODE1 || DISPLAY_TYPE == SCREENMODE3) ? 720 : 360);
+    else
+        HRes = ((DISPLAY_TYPE == SCREENMODE1 || DISPLAY_TYPE == SCREENMODE3) ? 640 : 320);
 #endif
-    if(Option.CPU_Speed==Freq400)VRes=((DISPLAY_TYPE == SCREENMODE1 ||  DISPLAY_TYPE == SCREENMODE3) ? 400: 200);
+    if (Option.CPU_Speed == Freq400) VRes = ((DISPLAY_TYPE == SCREENMODE1 || DISPLAY_TYPE == SCREENMODE3) ? 400 : 200);
 #ifdef rp2350
-    else if(Option.CPU_Speed==FreqSVGA)VRes=((DISPLAY_TYPE == SCREENMODE1 ||  DISPLAY_TYPE == SCREENMODE3) ? 600: 300);
+    else if (Option.CPU_Speed == FreqSVGA)
+        VRes = ((DISPLAY_TYPE == SCREENMODE1 || DISPLAY_TYPE == SCREENMODE3) ? 600 : 300);
 #endif
-    else VRes=((DISPLAY_TYPE == SCREENMODE1 ||  DISPLAY_TYPE == SCREENMODE3) ? 480: 240);
-        /* HDMI ports may further override HRes/VRes based on the
+    else
+        VRes = ((DISPLAY_TYPE == SCREENMODE1 || DISPLAY_TYPE == SCREENMODE3) ? 480 : 240);
+    /* HDMI ports may further override HRes/VRes based on the
          * HDMI-only CPU_Speed values (Freq720P/FreqXGA/FreqX); stub
          * no-op on pure-VGA. */
-        hal_vga_apply_hdmi_resolution(DISPLAY_TYPE);
+    hal_vga_apply_hdmi_resolution(DISPLAY_TYPE);
 
-        switch(DISPLAY_TYPE){
-            case SCREENMODE1:
-                ScreenSize= MODE1SIZE;
-                break;
-            case SCREENMODE2:
-                ScreenSize=MODE2SIZE;
-                break;
-            case SCREENMODE3:
-                ScreenSize=MODE3SIZE;
-                break;
-            case SCREENMODE4:
-                ScreenSize=MODE4SIZE;
-                break;
-            case SCREENMODE5:
-                ScreenSize=MODE5SIZE;
-                break;
-        }
-        if(DISPLAY_TYPE == SCREENMODE2 || DISPLAY_TYPE == SCREENMODE3){
-            DrawRectangle=DrawRectangle16;
-            DrawBitmap= DrawBitmap16;
-            ScrollLCD=ScrollLCD16;
-            DrawBuffer=DrawBuffer16;
-            ReadBuffer=ReadBuffer16;
-            DrawBufferFast=DrawBuffer16Fast;
-            ReadBufferFast=ReadBuffer16Fast;
-            DrawPixel=DrawPixel16;
+    switch (DISPLAY_TYPE) {
+    case SCREENMODE1:
+        ScreenSize = MODE1SIZE;
+        break;
+    case SCREENMODE2:
+        ScreenSize = MODE2SIZE;
+        break;
+    case SCREENMODE3:
+        ScreenSize = MODE3SIZE;
+        break;
+    case SCREENMODE4:
+        ScreenSize = MODE4SIZE;
+        break;
+    case SCREENMODE5:
+        ScreenSize = MODE5SIZE;
+        break;
+    }
+    if (DISPLAY_TYPE == SCREENMODE2 || DISPLAY_TYPE == SCREENMODE3) {
+        DrawRectangle = DrawRectangle16;
+        DrawBitmap = DrawBitmap16;
+        ScrollLCD = ScrollLCD16;
+        DrawBuffer = DrawBuffer16;
+        ReadBuffer = ReadBuffer16;
+        DrawBufferFast = DrawBuffer16Fast;
+        ReadBufferFast = ReadBuffer16Fast;
+        DrawPixel = DrawPixel16;
         /* HDMI-only SCREENMODE4 / SCREENMODE5 dispatch — real impl
          * in drivers/hdmi/hdmi_modes.c, stub returns 0 elsewhere.
          * Returns 1 if the function pointers were assigned. */
-        } else if(hal_vga_assign_hdmi_screenmode(DISPLAY_TYPE)) {
-            /* function pointers populated by the hook */
-        } else {
-            DrawRectangle=DrawRectangle2;
-            DrawBitmap= DrawBitmap2;
-            ScrollLCD=ScrollLCD2;
-            DrawBuffer=DrawBuffer2;
-            ReadBuffer=ReadBuffer2;
-            DrawBufferFast=DrawBuffer2Fast;
-            ReadBufferFast=ReadBuffer2Fast;
-            DrawPixel=DrawPixel2;
-            PromptFC = gui_fcolour= Option.DefaultFC;
-            PromptBC = gui_bcolour= Option.DefaultBC;
-        }
-        /* Mode-1 tile-buffer init: HDMI calls settiles(); pure-VGA
+    } else if (hal_vga_assign_hdmi_screenmode(DISPLAY_TYPE)) {
+        /* function pointers populated by the hook */
+    } else {
+        DrawRectangle = DrawRectangle2;
+        DrawBitmap = DrawBitmap2;
+        ScrollLCD = ScrollLCD2;
+        DrawBuffer = DrawBuffer2;
+        ReadBuffer = ReadBuffer2;
+        DrawBufferFast = DrawBuffer2Fast;
+        ReadBufferFast = ReadBuffer2Fast;
+        DrawPixel = DrawPixel2;
+        PromptFC = gui_fcolour = Option.DefaultFC;
+        PromptBC = gui_bcolour = Option.DefaultBC;
+    }
+    /* Mode-1 tile-buffer init: HDMI calls settiles(); pure-VGA
          * sets up tilefcols/tilebcols pointers + writes initial tile
          * colors. Per-port impl. */
-        hal_vga_init_screenmode_tiles();
+    hal_vga_init_screenmode_tiles();
 }
 
 /* VGA closeframebuffer — mode-aware teardown of the framebuffer /
@@ -125,113 +133,116 @@ void hal_vga_ops_reset_display_vga(void) {
  * && !MMBASIC_HOST` block — only one of the two reaches the linker
  * per target. */
 void closeframebuffer(char layer) {
-    if(layer=='A')WriteBuf=DisplayBuf;
-    if(FrameBuf!=DisplayBuf && (layer=='A' || layer=='F')){
-        if(WriteBuf==FrameBuf)WriteBuf=DisplayBuf;
-        switch(DISPLAY_TYPE){
-            case SCREENMODE1:
-            case SCREENMODE2:
+    if (layer == 'A') WriteBuf = DisplayBuf;
+    if (FrameBuf != DisplayBuf && (layer == 'A' || layer == 'F')) {
+        if (WriteBuf == FrameBuf) WriteBuf = DisplayBuf;
+        switch (DISPLAY_TYPE) {
+        case SCREENMODE1:
+        case SCREENMODE2:
 #ifdef rp2350
-                if(ScreenSize<framebuffersize/3)FrameBuf=DisplayBuf;
-                else FreeMemory((void *)FrameBuf);
+            if (ScreenSize < framebuffersize / 3)
+                FrameBuf = DisplayBuf;
+            else
+                FreeMemory((void *)FrameBuf);
 #else
-                FreeMemory((void *)FrameBuf);
+            FreeMemory((void *)FrameBuf);
 #endif
-                break;
+            break;
 #ifdef rp2350
-            case SCREENMODE3:
-                FreeMemory((void *)FrameBuf);
-                break;
-            /* SCREENMODE4 / SCREENMODE5 are HDMI-only DISPLAY_TYPE
+        case SCREENMODE3:
+            FreeMemory((void *)FrameBuf);
+            break;
+        /* SCREENMODE4 / SCREENMODE5 are HDMI-only DISPLAY_TYPE
              * values; non-HDMI ports never reach these case labels at
              * runtime. */
-            case SCREENMODE4:
-            case SCREENMODE5:
-                FreeMemory((void *)FrameBuf);
-                break;
+        case SCREENMODE4:
+        case SCREENMODE5:
+            FreeMemory((void *)FrameBuf);
+            break;
 #endif
         }
     }
-    if(LayerBuf!=DisplayBuf &&  (layer=='A' || layer=='L')){
-        if(WriteBuf==LayerBuf)WriteBuf=DisplayBuf;
-        volatile unsigned char *temp= LayerBuf;
-        switch(DISPLAY_TYPE){
-            case SCREENMODE2:
-                transparent=0;
-            case SCREENMODE1:
+    if (LayerBuf != DisplayBuf && (layer == 'A' || layer == 'L')) {
+        if (WriteBuf == LayerBuf) WriteBuf = DisplayBuf;
+        volatile unsigned char * temp = LayerBuf;
+        switch (DISPLAY_TYPE) {
+        case SCREENMODE2:
+            transparent = 0;
+        case SCREENMODE1:
 #ifdef rp2350
-                if(ScreenSize<framebuffersize/2)LayerBuf=DisplayBuf;
-                else {
-                    LayerBuf=DisplayBuf;
-                    FreeMemory((void *)temp);
-                }
+            if (ScreenSize < framebuffersize / 2)
+                LayerBuf = DisplayBuf;
+            else {
+                LayerBuf = DisplayBuf;
+                FreeMemory((void *)temp);
+            }
 #else
-                LayerBuf=DisplayBuf;
-                FreeMemory((void *)temp);
+            LayerBuf = DisplayBuf;
+            FreeMemory((void *)temp);
 #endif
-                break;
+            break;
 #ifdef rp2350
-            case SCREENMODE3:
-                LayerBuf=DisplayBuf;
-                FreeMemory((void *)temp);
-                break;
-            /* SCREENMODE4 / SCREENMODE5 are HDMI-only — never reached
+        case SCREENMODE3:
+            LayerBuf = DisplayBuf;
+            FreeMemory((void *)temp);
+            break;
+        /* SCREENMODE4 / SCREENMODE5 are HDMI-only — never reached
              * on non-HDMI ports. */
-            case SCREENMODE4:
-                LayerBuf=DisplayBuf;
-                FreeMemory((void *)temp);
-                break;
-            case SCREENMODE5:
-                LayerBuf=DisplayBuf;
-                transparent=0;
-                break;
+        case SCREENMODE4:
+            LayerBuf = DisplayBuf;
+            FreeMemory((void *)temp);
+            break;
+        case SCREENMODE5:
+            LayerBuf = DisplayBuf;
+            transparent = 0;
+            break;
 #endif
         }
     }
-    if(SecondFrame!=DisplayBuf &&  (layer=='A' || layer=='2')){
+    if (SecondFrame != DisplayBuf && (layer == 'A' || layer == '2')) {
         FreeMemory((void *)SecondFrame);
     }
-    if(SecondLayer!=DisplayBuf &&  (layer=='A' || layer=='T')){
-        if(WriteBuf==LayerBuf)WriteBuf=DisplayBuf;
-        volatile unsigned char *temp= SecondLayer;
-        switch(DISPLAY_TYPE){
-            case SCREENMODE2:
-                transparents=0;
-                SecondLayer=DisplayBuf;
-                break;
-            case SCREENMODE1:
-                SecondLayer=DisplayBuf;
-                FreeMemory((void *)temp);
-                break;
+    if (SecondLayer != DisplayBuf && (layer == 'A' || layer == 'T')) {
+        if (WriteBuf == LayerBuf) WriteBuf = DisplayBuf;
+        volatile unsigned char * temp = SecondLayer;
+        switch (DISPLAY_TYPE) {
+        case SCREENMODE2:
+            transparents = 0;
+            SecondLayer = DisplayBuf;
+            break;
+        case SCREENMODE1:
+            SecondLayer = DisplayBuf;
+            FreeMemory((void *)temp);
+            break;
 #ifdef rp2350
-            case SCREENMODE3:
-                SecondLayer=DisplayBuf;
-                FreeMemory((void *)temp);
-                break;
-            /* SCREENMODE4 / SCREENMODE5 are HDMI-only. */
-            case SCREENMODE4:
-                SecondLayer=DisplayBuf;
-                FreeMemory((void *)temp);
-                break;
-            case SCREENMODE5:
-                SecondLayer=DisplayBuf;
-                transparents=0;
-                break;
+        case SCREENMODE3:
+            SecondLayer = DisplayBuf;
+            FreeMemory((void *)temp);
+            break;
+        /* SCREENMODE4 / SCREENMODE5 are HDMI-only. */
+        case SCREENMODE4:
+            SecondLayer = DisplayBuf;
+            FreeMemory((void *)temp);
+            break;
+        case SCREENMODE5:
+            SecondLayer = DisplayBuf;
+            transparents = 0;
+            break;
 #endif
         }
     }
-	WriteBuf=(unsigned char *)FRAMEBUFFER;
-	DisplayBuf=(unsigned char *)FRAMEBUFFER;
-	LayerBuf=(unsigned char *)FRAMEBUFFER;
-	FrameBuf=(unsigned char *)FRAMEBUFFER;
-    SecondLayer=(unsigned char *)FRAMEBUFFER;
-    SecondFrame=(unsigned char *)FRAMEBUFFER;
-    transparent=0;
+    WriteBuf = (unsigned char *)FRAMEBUFFER;
+    DisplayBuf = (unsigned char *)FRAMEBUFFER;
+    LayerBuf = (unsigned char *)FRAMEBUFFER;
+    FrameBuf = (unsigned char *)FRAMEBUFFER;
+    SecondLayer = (unsigned char *)FRAMEBUFFER;
+    SecondFrame = (unsigned char *)FRAMEBUFFER;
+    transparent = 0;
 }
 /*  @endcond */
 
-void cmd_framebuffer(void){
-/*
+void cmd_framebuffer(void) {
+    /*
 RP2040 version support just modes 1 and 2
 RP2350 vversions support modes 1 to 5
 All modes can have a framebuffer and a layer buffer but only modes 2 and 5 automatically display the layer buffer over the top of the main display
@@ -262,231 +273,262 @@ XGA:
     #define MODE5SIZE_W  (1024/4) * (768/4)
 
 */
-    unsigned char *p;
+    unsigned char * p;
 #ifdef rp2350
-    if((p=checkstring(cmdline, (unsigned char *)"CREATE 2"))) {
-        int colour=0;
-        if(SecondFrame==DisplayBuf){
-            getargs(&p,1,(unsigned char *)",");
-            switch(DISPLAY_TYPE){
-                case SCREENMODE2:
-                case SCREENMODE1:
-                    SecondFrame=GetMemory(ScreenSize);
-                    break;
+    if ((p = checkstring(cmdline, (unsigned char *)"CREATE 2"))) {
+        int colour = 0;
+        if (SecondFrame == DisplayBuf) {
+            getargs(&p, 1, (unsigned char *)",");
+            switch (DISPLAY_TYPE) {
+            case SCREENMODE2:
+            case SCREENMODE1:
+                SecondFrame = GetMemory(ScreenSize);
+                break;
 #ifdef rp2350
-                case SCREENMODE3:
-                     SecondFrame=GetMemory(ScreenSize);
-                    break;
-                /* SCREENMODE4 / SCREENMODE5 — HDMI-only. */
-                case SCREENMODE4:
-                    SecondFrame=GetMemory(ScreenSize);
-                    break;
-                case SCREENMODE5:
-                    SecondFrame=GetMemory(ScreenSize);
-                    break;
+            case SCREENMODE3:
+                SecondFrame = GetMemory(ScreenSize);
+                break;
+            /* SCREENMODE4 / SCREENMODE5 — HDMI-only. */
+            case SCREENMODE4:
+                SecondFrame = GetMemory(ScreenSize);
+                break;
+            case SCREENMODE5:
+                SecondFrame = GetMemory(ScreenSize);
+                break;
 #endif
             }
-        } else error("Framebuffer 2 already exists");
-        memset((void *)SecondFrame,colour,ScreenSize);
+        } else
+            error("Framebuffer 2 already exists");
+        memset((void *)SecondFrame, colour, ScreenSize);
     } else
 #endif
-    if((p=checkstring(cmdline, (unsigned char *)"CREATE"))) {
-        if(FrameBuf==DisplayBuf){
-            switch(DISPLAY_TYPE){
-                case SCREENMODE1:
-                case SCREENMODE2:
+        if ((p = checkstring(cmdline, (unsigned char *)"CREATE"))) {
+        if (FrameBuf == DisplayBuf) {
+            switch (DISPLAY_TYPE) {
+            case SCREENMODE1:
+            case SCREENMODE2:
 #ifdef rp2350
-                    if(ScreenSize<framebuffersize/3)FrameBuf=DisplayBuf+2*ScreenSize;
-                    else FrameBuf=GetMemory(ScreenSize);
+                if (ScreenSize < framebuffersize / 3)
+                    FrameBuf = DisplayBuf + 2 * ScreenSize;
+                else
+                    FrameBuf = GetMemory(ScreenSize);
 #else
-                    FrameBuf=GetMemory(ScreenSize);
+                FrameBuf = GetMemory(ScreenSize);
 #endif
-                    break;
+                break;
 #ifdef rp2350
-                case SCREENMODE3:
-                    FrameBuf=GetMemory(ScreenSize);
-                    break;
-                /* HDMI-only modes. */
-                case SCREENMODE4:
-                case SCREENMODE5:
-                    FrameBuf=GetMemory(ScreenSize);
-                    break;
+            case SCREENMODE3:
+                FrameBuf = GetMemory(ScreenSize);
+                break;
+            /* HDMI-only modes. */
+            case SCREENMODE4:
+            case SCREENMODE5:
+                FrameBuf = GetMemory(ScreenSize);
+                break;
 #endif
             }
-        } else error("Framebuffer already exists");
-        memset((void *)FrameBuf,0,ScreenSize);
+        } else
+            error("Framebuffer already exists");
+        memset((void *)FrameBuf, 0, ScreenSize);
 
 #ifdef rp2350
-    } else if((p=checkstring(cmdline, (unsigned char *)"LAYER TOP"))) {
-        int colour=0;
-        if(SecondLayer==DisplayBuf){
-            getargs(&p,1,(unsigned char *)",");
-            switch(DISPLAY_TYPE){
-                case SCREENMODE2:
-                    if(argc==1)transparents=getint(argv[0],0,15);
-                    colour=transparents | (transparents<<4);
-                    if(ScreenSize<framebuffersize/4)SecondLayer=DisplayBuf+3*ScreenSize;
-                    else SecondLayer=GetMemory(ScreenSize);
-                    break;
-                case SCREENMODE1:
-                    SecondLayer=GetMemory(ScreenSize);
-                    break;
-                case SCREENMODE3:
-                    if(argc==1)transparents=getint(argv[0],0,15);
-                    SecondLayer=GetMemory(ScreenSize);
-                    if(SecondLayer>=(uint8_t *)PSRAMbase && SecondLayer< (uint8_t *)(PSRAMbase + 1024*1024*16)){
-                        FreeMemory((void *)SecondLayer);
-                        error("Second Layer must be in tightly coupled RAM, declare before other variables");
-                    }
-                    colour=transparents | (transparents<<4);
-                    break;
-                /* HDMI-only modes. */
-                case SCREENMODE4:
-                    SecondLayer=GetMemory(ScreenSize);
-                    break;
-                case SCREENMODE5:
-                    SecondLayer=GetMemory(ScreenSize);
-                    if(SecondLayer>=(uint8_t *)PSRAMbase && SecondLayer< (uint8_t *)(PSRAMbase + 1024*1024*16)){
-                        FreeMemory((void *)SecondLayer);
-                        error("Second Layer must be in tightly coupled RAM, declare before other variables");
-                    }
-                    if(argc==1)transparents=getint(argv[0],0,255);
-                    colour=transparents;
-                    break;
-            }
-        } else error("Framebuffer already exists");
-        memset((void *)SecondLayer,colour,ScreenSize);
-#endif
-    } else if((p=checkstring(cmdline, (unsigned char *)"LAYER"))) {
-        int colour=0;
-        if(LayerBuf==DisplayBuf){
-            getargs(&p,1,(unsigned char *)",");
-            switch(DISPLAY_TYPE){
-                case SCREENMODE2:
-                    if(argc==1)transparent=getint(argv[0],0,15);
-                    colour=transparent | (transparent<<4);
-                case SCREENMODE1:
-#ifdef rp2350
-                    if(ScreenSize<framebuffersize/2)LayerBuf=DisplayBuf+ScreenSize;
-                    else LayerBuf=GetMemory(ScreenSize);
-#else
-                    LayerBuf=GetMemory(ScreenSize);
-#endif
-                    break;
-#ifdef rp2350
-                case SCREENMODE3:
-                    if(argc==1)transparent=getint(argv[0],0,15);
-                    LayerBuf=GetMemory(ScreenSize);
-                    colour=transparent | (transparent<<4);
-                    break;
-                /* HDMI-only modes. */
-                case SCREENMODE4:
-                    LayerBuf=GetMemory(ScreenSize);
-                    if(argc==1)RGBtransparent=RGB555(getColour((char *)argv[0],0));
-                    else RGBtransparent=0;
-                    break;
-                case SCREENMODE5:
-                    if(ScreenSize<framebuffersize/2)LayerBuf=DisplayBuf+ScreenSize;
-                    else LayerBuf=GetMemory(ScreenSize);
-                    if(argc==1)transparent=getint(argv[0],0,255);
-                    colour=transparent;
-                    break;
-#endif
+    } else if ((p = checkstring(cmdline, (unsigned char *)"LAYER TOP"))) {
+        int colour = 0;
+        if (SecondLayer == DisplayBuf) {
+            getargs(&p, 1, (unsigned char *)",");
+            switch (DISPLAY_TYPE) {
+            case SCREENMODE2:
+                if (argc == 1) transparents = getint(argv[0], 0, 15);
+                colour = transparents | (transparents << 4);
+                if (ScreenSize < framebuffersize / 4)
+                    SecondLayer = DisplayBuf + 3 * ScreenSize;
+                else
+                    SecondLayer = GetMemory(ScreenSize);
+                break;
+            case SCREENMODE1:
+                SecondLayer = GetMemory(ScreenSize);
+                break;
+            case SCREENMODE3:
+                if (argc == 1) transparents = getint(argv[0], 0, 15);
+                SecondLayer = GetMemory(ScreenSize);
+                if (SecondLayer >= (uint8_t *)PSRAMbase && SecondLayer < (uint8_t *)(PSRAMbase + 1024 * 1024 * 16)) {
+                    FreeMemory((void *)SecondLayer);
+                    error("Second Layer must be in tightly coupled RAM, declare before other variables");
                 }
+                colour = transparents | (transparents << 4);
+                break;
+            /* HDMI-only modes. */
+            case SCREENMODE4:
+                SecondLayer = GetMemory(ScreenSize);
+                break;
+            case SCREENMODE5:
+                SecondLayer = GetMemory(ScreenSize);
+                if (SecondLayer >= (uint8_t *)PSRAMbase && SecondLayer < (uint8_t *)(PSRAMbase + 1024 * 1024 * 16)) {
+                    FreeMemory((void *)SecondLayer);
+                    error("Second Layer must be in tightly coupled RAM, declare before other variables");
+                }
+                if (argc == 1) transparents = getint(argv[0], 0, 255);
+                colour = transparents;
+                break;
+            }
+        } else
+            error("Framebuffer already exists");
+        memset((void *)SecondLayer, colour, ScreenSize);
+#endif
+    } else if ((p = checkstring(cmdline, (unsigned char *)"LAYER"))) {
+        int colour = 0;
+        if (LayerBuf == DisplayBuf) {
+            getargs(&p, 1, (unsigned char *)",");
+            switch (DISPLAY_TYPE) {
+            case SCREENMODE2:
+                if (argc == 1) transparent = getint(argv[0], 0, 15);
+                colour = transparent | (transparent << 4);
+            case SCREENMODE1:
 #ifdef rp2350
-            if(LayerBuf>(uint8_t *)PSRAMbase && LayerBuf< (uint8_t *)(PSRAMbase + 1024*1024*16)){
+                if (ScreenSize < framebuffersize / 2)
+                    LayerBuf = DisplayBuf + ScreenSize;
+                else
+                    LayerBuf = GetMemory(ScreenSize);
+#else
+                LayerBuf = GetMemory(ScreenSize);
+#endif
+                break;
+#ifdef rp2350
+            case SCREENMODE3:
+                if (argc == 1) transparent = getint(argv[0], 0, 15);
+                LayerBuf = GetMemory(ScreenSize);
+                colour = transparent | (transparent << 4);
+                break;
+            /* HDMI-only modes. */
+            case SCREENMODE4:
+                LayerBuf = GetMemory(ScreenSize);
+                if (argc == 1)
+                    RGBtransparent = RGB555(getColour((char *)argv[0], 0));
+                else
+                    RGBtransparent = 0;
+                break;
+            case SCREENMODE5:
+                if (ScreenSize < framebuffersize / 2)
+                    LayerBuf = DisplayBuf + ScreenSize;
+                else
+                    LayerBuf = GetMemory(ScreenSize);
+                if (argc == 1) transparent = getint(argv[0], 0, 255);
+                colour = transparent;
+                break;
+#endif
+            }
+#ifdef rp2350
+            if (LayerBuf > (uint8_t *)PSRAMbase && LayerBuf < (uint8_t *)(PSRAMbase + 1024 * 1024 * 16)) {
                 FreeMemory((void *)LayerBuf);
                 error("Layer Buffer must be in tightly coupled RAM, declare before other variables");
             }
 #endif
-        } else error("Framebuffer already exists");
-        if(DISPLAY_TYPE!=SCREENMODE4)memset((void *)LayerBuf,colour,ScreenSize);
+        } else
+            error("Framebuffer already exists");
+        if (DISPLAY_TYPE != SCREENMODE4)
+            memset((void *)LayerBuf, colour, ScreenSize);
         else {
-            uint16_t *p=(uint16_t *)LayerBuf;
-            for(int i=0;i<HRes*VRes;i++)*p++=RGBtransparent;
+            uint16_t * p = (uint16_t *)LayerBuf;
+            for (int i = 0; i < HRes * VRes; i++) *p++ = RGBtransparent;
         }
-    } else if((p=checkstring(cmdline, (unsigned char *)"CLOSE"))) {
-        if(checkstring(p, (unsigned char *)"F")){
+    } else if ((p = checkstring(cmdline, (unsigned char *)"CLOSE"))) {
+        if (checkstring(p, (unsigned char *)"F")) {
             closeframebuffer('F');
-        } else if(checkstring(p, (unsigned char *)"L")){
+        } else if (checkstring(p, (unsigned char *)"L")) {
             closeframebuffer('T');
 #ifdef rp2350
-        } else if(checkstring(p, (unsigned char *)"T")){
+        } else if (checkstring(p, (unsigned char *)"T")) {
             closeframebuffer('L');
-        } else if(checkstring(p, (unsigned char *)"2")){
+        } else if (checkstring(p, (unsigned char *)"2")) {
             closeframebuffer('2');
 #endif
-        } else  closeframebuffer('A');
-    } else if((p=checkstring(cmdline, (unsigned char *)"WRITE"))) {
-        if(checkstring(p, (unsigned char *)"N"))WriteBuf=DisplayBuf;
-        else if(checkstring(p, (unsigned char *)"L")){
-            if(LayerBuf==DisplayBuf)error("Layer not created");
-            WriteBuf=LayerBuf;
+        } else
+            closeframebuffer('A');
+    } else if ((p = checkstring(cmdline, (unsigned char *)"WRITE"))) {
+        if (checkstring(p, (unsigned char *)"N"))
+            WriteBuf = DisplayBuf;
+        else if (checkstring(p, (unsigned char *)"L")) {
+            if (LayerBuf == DisplayBuf) error("Layer not created");
+            WriteBuf = LayerBuf;
         }
 #ifdef rp2350
-        else if(checkstring(p, (unsigned char *)"T")){
-            if(SecondLayer==DisplayBuf)error("Layer 2 not created");
-            WriteBuf=SecondLayer;
-        }
-        else if(checkstring(p, (unsigned char *)"2")){
-            if(SecondFrame==DisplayBuf)error("Frame 2 not created");
-            WriteBuf=SecondFrame;
+        else if (checkstring(p, (unsigned char *)"T")) {
+            if (SecondLayer == DisplayBuf) error("Layer 2 not created");
+            WriteBuf = SecondLayer;
+        } else if (checkstring(p, (unsigned char *)"2")) {
+            if (SecondFrame == DisplayBuf) error("Frame 2 not created");
+            WriteBuf = SecondFrame;
         }
 #endif
-        else if(checkstring(p, (unsigned char *)"F")){
-            if(FrameBuf==DisplayBuf)error("Frame buffer not created");
-             WriteBuf=FrameBuf;
+        else if (checkstring(p, (unsigned char *)"F")) {
+            if (FrameBuf == DisplayBuf) error("Frame buffer not created");
+            WriteBuf = FrameBuf;
+        } else {
+            getargs(&p, 1, (unsigned char *)",");
+            char * q = (char *)getCstring(argv[0]);
+            if (strcasecmp(q, "N") == 0)
+                WriteBuf = DisplayBuf;
+            else if (strcasecmp(q, "L") == 0) {
+                if (LayerBuf == DisplayBuf) error("Layer not created");
+                WriteBuf = LayerBuf;
+            } else if (strcasecmp(q, "F") == 0) {
+                if (FrameBuf == DisplayBuf) error("Frame buffer not created");
+                WriteBuf = FrameBuf;
+            } else if (strcasecmp(q, "2") == 0) {
+                if (SecondFrame == DisplayBuf) error("Frame buffer 2 not created");
+                WriteBuf = SecondFrame;
+            } else if (strcasecmp(q, "T") == 0) {
+                if (SecondLayer == DisplayBuf) error("Layer Top not created");
+                WriteBuf = SecondLayer;
+            } else
+                error("Syntax");
         }
-        else {
-            getargs(&p,1,(unsigned char *)",");
-            char *q=(char *)getCstring(argv[0]);
-            if(strcasecmp(q,"N")==0)WriteBuf=DisplayBuf;
-            else if(strcasecmp(q,"L")==0){
-                if(LayerBuf==DisplayBuf)error("Layer not created");
-                WriteBuf=LayerBuf;
-            } else if(strcasecmp(q,"F")==0){
-                if(FrameBuf==DisplayBuf)error("Frame buffer not created");
-                WriteBuf=FrameBuf;
-            } else if(strcasecmp(q,"2")==0){
-                if(SecondFrame==DisplayBuf)error("Frame buffer 2 not created");
-                WriteBuf=SecondFrame;
-            } else if(strcasecmp(q,"T")==0){
-                if(SecondLayer==DisplayBuf)error("Layer Top not created");
-                WriteBuf=SecondLayer;
-            }
-            else error("Syntax");
-        }
-    } else if((p=checkstring(cmdline, (unsigned char *)"WAIT"))) {
-            hal_vga_ops_wait_scanline_zero();
-    } else if((p=checkstring(cmdline, (unsigned char *)"COPY"))) {
-        getargs(&p,5,(unsigned char *)",");
-        if(!(argc==3 || argc==5))error("Syntax");
-        volatile uint8_t *s=NULL,*d=NULL;
-        if(checkstring(argv[0],(unsigned char *)"N"))s=DisplayBuf;
-        else if(checkstring(argv[0],(unsigned char *)"L"))s=LayerBuf;
-        else if(checkstring(argv[0],(unsigned char *)"F"))s=FrameBuf;
-        else if(checkstring(argv[0],(unsigned char *)"2"))s=SecondFrame;
-        else if(checkstring(argv[0],(unsigned char *)"T"))s=SecondLayer;
-        else error("Syntax");
-        if(checkstring(argv[2],(unsigned char *)"N"))d=DisplayBuf;
-        else if(checkstring(argv[2],(unsigned char *)"L"))d=LayerBuf;
-        else if(checkstring(argv[2],(unsigned char *)"F"))d=FrameBuf;
-        else if(checkstring(argv[2],(unsigned char *)"2"))d=SecondFrame;
-        else if(checkstring(argv[2],(unsigned char *)"T"))d=SecondLayer;
-        else error("Syntax");
-        if(argc==5){
-            if(checkstring(argv[4],(unsigned char *)"B")){
+    } else if ((p = checkstring(cmdline, (unsigned char *)"WAIT"))) {
+        hal_vga_ops_wait_scanline_zero();
+    } else if ((p = checkstring(cmdline, (unsigned char *)"COPY"))) {
+        getargs(&p, 5, (unsigned char *)",");
+        if (!(argc == 3 || argc == 5)) error("Syntax");
+        volatile uint8_t *s = NULL, *d = NULL;
+        if (checkstring(argv[0], (unsigned char *)"N"))
+            s = DisplayBuf;
+        else if (checkstring(argv[0], (unsigned char *)"L"))
+            s = LayerBuf;
+        else if (checkstring(argv[0], (unsigned char *)"F"))
+            s = FrameBuf;
+        else if (checkstring(argv[0], (unsigned char *)"2"))
+            s = SecondFrame;
+        else if (checkstring(argv[0], (unsigned char *)"T"))
+            s = SecondLayer;
+        else
+            error("Syntax");
+        if (checkstring(argv[2], (unsigned char *)"N"))
+            d = DisplayBuf;
+        else if (checkstring(argv[2], (unsigned char *)"L"))
+            d = LayerBuf;
+        else if (checkstring(argv[2], (unsigned char *)"F"))
+            d = FrameBuf;
+        else if (checkstring(argv[2], (unsigned char *)"2"))
+            d = SecondFrame;
+        else if (checkstring(argv[2], (unsigned char *)"T"))
+            d = SecondLayer;
+        else
+            error("Syntax");
+        if (argc == 5) {
+            if (checkstring(argv[4], (unsigned char *)"B")) {
                 hal_vga_ops_wait_scanline_zero();
-            } else error("Syntax");
+            } else
+                error("Syntax");
         }
-        if(d!=s)
-//            #ifdef rp2350
-//                _Z10copy_wordsPKmPmm((uint32_t *)s, (uint32_t *)d, ScreenSize>>2);
-//            #else
-                memcpy((void *)d,(void *)s,ScreenSize);
-//            #endif
-        else error("Buffer not created");
-    } else error("Syntax");
+        if (d != s)
+            //            #ifdef rp2350
+            //                _Z10copy_wordsPKmPmm((uint32_t *)s, (uint32_t *)d, ScreenSize>>2);
+            //            #else
+            memcpy((void *)d, (void *)s, ScreenSize);
+        //            #endif
+        else
+            error("Buffer not created");
+    } else
+        error("Syntax");
 }
 
 /* fun_getscanline lives in the per-flavor scanout driver:
@@ -495,77 +537,79 @@ XGA:
 
 /* This file is linked only on VGA-family ports (where HAL_PORT_IS_VGA=1),
  * so the gate is always-true. Dropped. */
-void cmd_colourmap(void){
-    int64_t *cptr=NULL, *fptr=NULL;
-    MMFLOAT *cfptr=NULL, *ffptr=NULL;
-    int nf,n,i;
+void cmd_colourmap(void) {
+    int64_t *cptr = NULL, *fptr = NULL;
+    MMFLOAT *cfptr = NULL, *ffptr = NULL;
+    int nf, n, i;
     int map[16];
-    getargs(&cmdline,5,(unsigned char *)",");
-    memcpy((void *)map,(void *)RGB121map,16*sizeof(int));
-    if(!(argc==3 || argc==5))error("Argument count");
-    n=parsenumberarray(argv[0],&cfptr,&cptr,1,1,NULL,true);
-    if(argc==5){ //user defined mapping
-        MMFLOAT* a3float = NULL;
-        int64_t* a3int = NULL;
-        if(parsenumberarray(argv[4],&a3float,&a3int,3,1,NULL,true)!=16)error("Array size not 16 elements");
-        if(a3int!=NULL){
-            for(i=0;i<16;i++) {
-                map[i]=a3int[i];
-                if(map[i]<0 || map[i]>0xFFFFFF)error("Invalid colour");
+    getargs(&cmdline, 5, (unsigned char *)",");
+    memcpy((void *)map, (void *)RGB121map, 16 * sizeof(int));
+    if (!(argc == 3 || argc == 5)) error("Argument count");
+    n = parsenumberarray(argv[0], &cfptr, &cptr, 1, 1, NULL, true);
+    if (argc == 5) { //user defined mapping
+        MMFLOAT * a3float = NULL;
+        int64_t * a3int = NULL;
+        if (parsenumberarray(argv[4], &a3float, &a3int, 3, 1, NULL, true) != 16) error("Array size not 16 elements");
+        if (a3int != NULL) {
+            for (i = 0; i < 16; i++) {
+                map[i] = a3int[i];
+                if (map[i] < 0 || map[i] > 0xFFFFFF) error("Invalid colour");
             }
         } else {
-            for(i=0;i<16;i++) {
-                map[i]=a3float[i];
-                if(map[i]<0 || map[i]>0xFFFFFF)error("Invalid colour");
+            for (i = 0; i < 16; i++) {
+                map[i] = a3float[i];
+                if (map[i] < 0 || map[i] > 0xFFFFFF) error("Invalid colour");
             }
         }
     }
-    nf=parsenumberarray(argv[2],&ffptr,&fptr,1,1,NULL,false);
-    if(nf!=n)error("Array size mismatch %, %",n,nf);
-    for(int i=0;i<n;i++){
-        int in=(cptr == NULL ? (int)cfptr[i] : cptr[i]);
-        if(in>=16)error("Input range error on element %",i);
-        if(fptr==NULL)ffptr[i]=map[in];
-        else fptr[i]=map[in];
+    nf = parsenumberarray(argv[2], &ffptr, &fptr, 1, 1, NULL, false);
+    if (nf != n) error("Array size mismatch %, %", n, nf);
+    for (int i = 0; i < n; i++) {
+        int in = (cptr == NULL ? (int)cfptr[i] : cptr[i]);
+        if (in >= 16) error("Input range error on element %", i);
+        if (fptr == NULL)
+            ffptr[i] = map[in];
+        else
+            fptr[i] = map[in];
     }
 }
 
-void fun_map(void){
-	int cl=getint(ep,0,255);
-    switch(DISPLAY_TYPE){
-        case SCREENMODE1:
-        case SCREENMODE4:
-            error("Invalid for Mode");
+void fun_map(void) {
+    int cl = getint(ep, 0, 255);
+    switch (DISPLAY_TYPE) {
+    case SCREENMODE1:
+    case SCREENMODE4:
+        error("Invalid for Mode");
         break;
-        case SCREENMODE2:
-        case SCREENMODE3:
-            if(cl>15)error("Mode has 16 colours - 0 to 15");
-            targ=T_INT;
-            iret=((cl & 0b1000)<<20) | ((cl & 0b110)<<13) | ((cl & 0b1)<<7);
-            break;
-        case SCREENMODE5:
-            targ=T_INT;
-            iret=((cl & 0b11100000)<<16) | ((cl & 0b00011100)<<11) | ((cl & 0b11)<<6);
-            break;
+    case SCREENMODE2:
+    case SCREENMODE3:
+        if (cl > 15) error("Mode has 16 colours - 0 to 15");
+        targ = T_INT;
+        iret = ((cl & 0b1000) << 20) | ((cl & 0b110) << 13) | ((cl & 0b1) << 7);
+        break;
+    case SCREENMODE5:
+        targ = T_INT;
+        iret = ((cl & 0b11100000) << 16) | ((cl & 0b00011100) << 11) | ((cl & 0b11) << 6);
+        break;
     }
 }
-void setmode(int mode, bool clear){
+void setmode(int mode, bool clear) {
     closeframebuffer('A');
-    if(clear)memset((void *)FRAMEBUFFER,0,framebuffersize);
+    if (clear) memset((void *)FRAMEBUFFER, 0, framebuffersize);
     hal_vga_ops_wait_scanline_zero();
-    if(mode==5){
-        DISPLAY_TYPE=SCREENMODE5;
-        ScreenSize=MODE5SIZE;
-    } else if(mode==4){
-        if(!(FullColour))error("Mode not available in this resolution");
-        DISPLAY_TYPE=SCREENMODE4;
-        ScreenSize=MODE4SIZE;
-    } else if(mode==3){
-        DISPLAY_TYPE=SCREENMODE3;
-        ScreenSize=MODE3SIZE;
-    } else if(mode==2){
-        DISPLAY_TYPE=SCREENMODE2;
-        ScreenSize=MODE2SIZE;
+    if (mode == 5) {
+        DISPLAY_TYPE = SCREENMODE5;
+        ScreenSize = MODE5SIZE;
+    } else if (mode == 4) {
+        if (!(FullColour)) error("Mode not available in this resolution");
+        DISPLAY_TYPE = SCREENMODE4;
+        ScreenSize = MODE4SIZE;
+    } else if (mode == 3) {
+        DISPLAY_TYPE = SCREENMODE3;
+        ScreenSize = MODE3SIZE;
+    } else if (mode == 2) {
+        DISPLAY_TYPE = SCREENMODE2;
+        ScreenSize = MODE2SIZE;
     } else { //mode=1
 #ifdef rp2350
         /* HDMI: mapreset() for the buffered tile-color planes;
@@ -573,52 +617,51 @@ void setmode(int mode, bool clear){
          * RGB121-packed framebuffer trailer. */
         hal_vga_setmode_mode1_pre_reset();
 #endif
-        DISPLAY_TYPE=SCREENMODE1;
-        ScreenSize=MODE1SIZE;
+        DISPLAY_TYPE = SCREENMODE1;
+        ScreenSize = MODE1SIZE;
     }
-//    uSec(10000);
+    //    uSec(10000);
     ResetDisplay();
-    if(clear){
+    if (clear) {
         memset((void *)WriteBuf, 0, ScreenSize);
-        CurrentX = CurrentY =0;
+        CurrentX = CurrentY = 0;
         ClearScreen(Option.DefaultBC);
     }
     /* HDMI ports apply an alternate medium-res font lookup when
      * !FullColour && !MediumRes; the hook returns 1 if handled.
      * Pure-VGA ports always fall through to the common font logic. */
     if (!hal_vga_setmode_select_alt_font(DISPLAY_TYPE)) {
-        if(DISPLAY_TYPE==SCREENMODE2 || DISPLAY_TYPE==SCREENMODE4 || DISPLAY_TYPE==SCREENMODE5){
-            SetFont((6<<4) | 1) ;
-            PromptFont=(6<<4) | 1;
+        if (DISPLAY_TYPE == SCREENMODE2 || DISPLAY_TYPE == SCREENMODE4 || DISPLAY_TYPE == SCREENMODE5) {
+            SetFont((6 << 4) | 1);
+            PromptFont = (6 << 4) | 1;
         } else {
-            SetFont(1) ;
+            SetFont(1);
             PromptFont = 1;
         }
     }
-if(mode==Option.DISPLAY_TYPE-SCREENMODE1+1){
-    SetFont(Option.DefaultFont);
-    PromptFont=Option.DefaultFont;
-}
-if(DISPLAY_TYPE==SCREENMODE1){
-    ytileheight=gui_font_height;
-    Y_TILE=VRes/ytileheight;
-    if(VRes % ytileheight)Y_TILE++;
-    /* File is VGA-family-only; outer HAL_PORT_IS_VGA gate dropped.
+    if (mode == Option.DISPLAY_TYPE - SCREENMODE1 + 1) {
+        SetFont(Option.DefaultFont);
+        PromptFont = Option.DefaultFont;
+    }
+    if (DISPLAY_TYPE == SCREENMODE1) {
+        ytileheight = gui_font_height;
+        Y_TILE = VRes / ytileheight;
+        if (VRes % ytileheight) Y_TILE++;
+        /* File is VGA-family-only; outer HAL_PORT_IS_VGA gate dropped.
      * The HDMI vs non-HDMI tile-init split is handled by a HAL hook
      * — settiles() is real on HDMI ports (drivers/hdmi/) and a stub
      * on pure-VGA ports that does the RGB121-tile-color loop. */
-    if(DISPLAY_TYPE==SCREENMODE1) {
-        gui_fcolour=Option.DefaultFC;
-        gui_bcolour=Option.DefaultBC;
-        hal_vga_init_screenmode1_tiles();
+        if (DISPLAY_TYPE == SCREENMODE1) {
+            gui_fcolour = Option.DefaultFC;
+            gui_bcolour = Option.DefaultBC;
+            hal_vga_init_screenmode1_tiles();
+        }
     }
-}
 
     hal_keyboard_clear_repeat_state();
 }
 
-
-void cmd_mode(void){
-    int mode =getint(cmdline,1,MAXMODES);
+void cmd_mode(void) {
+    int mode = getint(cmdline, 1, MAXMODES);
     setmode(mode, true);
 }

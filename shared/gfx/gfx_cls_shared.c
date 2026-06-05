@@ -1,7 +1,7 @@
 #include "vm_device_support.h"
 #include "gfx_cls_shared.h"
 
-void gfx_cls_execute(int has_arg, const GfxClsArg *arg, const GfxClsOps *ops) {
+void gfx_cls_execute(int has_arg, const GfxClsArg * arg, const GfxClsOps * ops) {
     int use_default = 1;
     int colour = 0;
     const int max_colour = (int)WHITE;

@@ -14,16 +14,16 @@
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 
-extern int    pc386_boot_epoch_inited;
+extern int pc386_boot_epoch_inited;
 extern time_t pc386_boot_epoch;
 
 static void pc386_cmos_write(uint8_t reg, uint8_t val) {
-    __asm__ volatile("outb %0, $0x70" :: "a"(reg));
-    __asm__ volatile("outb %0, $0x71" :: "a"(val));
+    __asm__ volatile("outb %0, $0x70" ::"a"(reg));
+    __asm__ volatile("outb %0, $0x71" ::"a"(val));
 }
 
 static uint8_t pc386_cmos_rd(uint8_t reg) {
-    __asm__ volatile("outb %0, $0x70" :: "a"(reg));
+    __asm__ volatile("outb %0, $0x70" ::"a"(reg));
     uint8_t v;
     __asm__ volatile("inb $0x71, %0" : "=a"(v));
     return v;
@@ -34,26 +34,26 @@ static uint8_t pc386_bin_to_bcd(uint8_t v) {
 }
 
 void cmd_rtc(void) {
-    unsigned char *p;
+    unsigned char * p;
     if ((p = checkstring(cmdline, (unsigned char *)"SET"))) {
         getargs(&p, 11, (unsigned char *)",");
         if (argc != 11) error("Argument count");
-        int year = getint(argv[0],  1980, 2099);
-        int mon  = getint(argv[2],  1, 12);
-        int day  = getint(argv[4],  1, 31);
-        int hour = getint(argv[6],  0, 23);
-        int min  = getint(argv[8],  0, 59);
-        int sec  = getint(argv[10], 0, 59);
+        int year = getint(argv[0], 1980, 2099);
+        int mon = getint(argv[2], 1, 12);
+        int day = getint(argv[4], 1, 31);
+        int hour = getint(argv[6], 0, 23);
+        int min = getint(argv[8], 0, 59);
+        int sec = getint(argv[10], 0, 59);
         uint8_t statusB = pc386_cmos_rd(0x0B);
         uint8_t cent = (uint8_t)(year / 100);
-        uint8_t yy   = (uint8_t)(year % 100);
+        uint8_t yy = (uint8_t)(year % 100);
         if (!(statusB & 0x04)) {
-            sec  = pc386_bin_to_bcd((uint8_t)sec);
-            min  = pc386_bin_to_bcd((uint8_t)min);
+            sec = pc386_bin_to_bcd((uint8_t)sec);
+            min = pc386_bin_to_bcd((uint8_t)min);
             hour = pc386_bin_to_bcd((uint8_t)hour);
-            day  = pc386_bin_to_bcd((uint8_t)day);
-            mon  = pc386_bin_to_bcd((uint8_t)mon);
-            yy   = pc386_bin_to_bcd(yy);
+            day = pc386_bin_to_bcd((uint8_t)day);
+            mon = pc386_bin_to_bcd((uint8_t)mon);
+            yy = pc386_bin_to_bcd(yy);
             cent = pc386_bin_to_bcd(cent);
         }
         pc386_cmos_write(0x00, (uint8_t)sec);

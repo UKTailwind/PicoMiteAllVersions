@@ -66,8 +66,7 @@ void vm_sys_pin_setpin(int64_t pin, int mode, int option) {
         mode != VM_PIN_MODE_PWM8A && mode != VM_PIN_MODE_PWM8B &&
         mode != VM_PIN_MODE_PWM9A && mode != VM_PIN_MODE_PWM9B &&
         mode != VM_PIN_MODE_PWM10A && mode != VM_PIN_MODE_PWM10B &&
-        mode != VM_PIN_MODE_PWM11A && mode != VM_PIN_MODE_PWM11B
-    )
+        mode != VM_PIN_MODE_PWM11A && mode != VM_PIN_MODE_PWM11B)
         error("Unsupported SETPIN mode");
 
     if (mode == VM_PIN_MODE_OFF) {
@@ -119,13 +118,13 @@ void vm_sys_pin_setpin(int64_t pin, int mode, int option) {
 int64_t vm_sys_pin_read(int64_t pin) {
     int resolved = vm_pin_resolve_host(pin);
     switch (host_pin_mode[resolved]) {
-        case VM_PIN_MODE_DIN:
-        case VM_PIN_MODE_DOUT:
-        case VM_PIN_MODE_ARAW:
-            return host_pin_value[resolved];
-        default:
-            error("Pin not configured");
-            return 0;
+    case VM_PIN_MODE_DIN:
+    case VM_PIN_MODE_DOUT:
+    case VM_PIN_MODE_ARAW:
+        return host_pin_value[resolved];
+    default:
+        error("Pin not configured");
+        return 0;
     }
 }
 
@@ -159,7 +158,7 @@ void vm_sys_pwm_configure(int slice, MMFLOAT frequency,
     if (!delaystart) host_pwm_enabled[slice] = 1;
 }
 
-void vm_sys_pwm_sync(uint16_t present_mask, const MMFLOAT *counts) {
+void vm_sys_pwm_sync(uint16_t present_mask, const MMFLOAT * counts) {
     for (int slice = 0; slice < VM_PWM_SLICE_COUNT; slice++) {
         if (!(present_mask & (1u << slice)))
             continue;

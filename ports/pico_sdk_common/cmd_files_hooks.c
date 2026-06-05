@@ -39,24 +39,21 @@ extern volatile BYTE SDCardStat;
  * dance is no longer needed and would actively harm by wiping the
  * caller's BASIC variables across a `FILES` call from inside a
  * program. */
-void cmd_files_save_program_context(void)    {}
+void cmd_files_save_program_context(void) {}
 void cmd_files_restore_program_context(void) {}
 
-void cmd_files_pump_console_key(int *c)
-{
+void cmd_files_pump_console_key(int * c) {
     /* Device fills ConsoleRxBuf from the UART/USB ISR. The cmd_files loop
      * already drains it — no extra work here. */
     (void)c;
 }
 
-void cmd_load_post_cleanup(void)
-{
+void cmd_load_post_cleanup(void) {
     /* Device SaveProgramToFlash uses its own tokeniser buffer and doesn't
      * clobber the in-flight tknbuf; cmd_load returns normally. */
 }
 
-void port_drive_check(char drive)
-{
+void port_drive_check(char drive) {
     if (drive != 'A' && drive != 'B') error("Invalid disk");
     /* Both A: (LFS-on-flash) and B: (FatFS-on-SD) exist on device. A:
      * needs no validation — flash is always present. B: requires the
@@ -75,25 +72,36 @@ void port_drive_check(char drive)
 /* hal_ff_* directory + path ops on device just forward to the vendored
  * FatFS in ff.c. Host impls in host/host_fs_shims.c (host_f_*) handle
  * the vm_host_fat / POSIX dispatch. */
-FRESULT hal_ff_findfirst(DIR *dp, FILINFO *fi, const TCHAR *path,
-                         const TCHAR *pattern) { return f_findfirst(dp, fi, path, pattern); }
-FRESULT hal_ff_findnext (DIR *dp, FILINFO *fi)                  { return f_findnext(dp, fi); }
-FRESULT hal_ff_closedir (DIR *dp)                                { return f_closedir(dp); }
-FRESULT hal_ff_unlink   (const TCHAR *path)                      { return f_unlink(path); }
-FRESULT hal_ff_chdir    (const TCHAR *path)                      { return f_chdir(path); }
-FRESULT hal_ff_getcwd   (TCHAR *buf, UINT len)                   { return f_getcwd(buf, len); }
+FRESULT hal_ff_findfirst(DIR * dp, FILINFO * fi, const TCHAR * path,
+                         const TCHAR * pattern) {
+    return f_findfirst(dp, fi, path, pattern);
+}
+FRESULT hal_ff_findnext(DIR * dp, FILINFO * fi) {
+    return f_findnext(dp, fi);
+}
+FRESULT hal_ff_closedir(DIR * dp) {
+    return f_closedir(dp);
+}
+FRESULT hal_ff_unlink(const TCHAR * path) {
+    return f_unlink(path);
+}
+FRESULT hal_ff_chdir(const TCHAR * path) {
+    return f_chdir(path);
+}
+FRESULT hal_ff_getcwd(TCHAR * buf, UINT len) {
+    return f_getcwd(buf, len);
+}
 
-int port_mount_sd_drive(void)
-{
+int port_mount_sd_drive(void) {
     int i;
-    ErrorThrow(0, NONEFILE);  /* reset mm.errno */
+    ErrorThrow(0, NONEFILE); /* reset mm.errno */
     if ((IsInvalidPin(Option.SD_CS) && !Option.CombinedCS) ||
         (IsInvalidPin(Option.SYSTEM_MOSI) && IsInvalidPin(Option.SD_MOSI_PIN)) ||
         (IsInvalidPin(Option.SYSTEM_MISO) && IsInvalidPin(Option.SD_MISO_PIN)) ||
-        (IsInvalidPin(Option.SYSTEM_CLK)  && IsInvalidPin(Option.SD_CLK_PIN)))
+        (IsInvalidPin(Option.SYSTEM_CLK) && IsInvalidPin(Option.SD_CLK_PIN)))
         error("SDcard not configured");
     if (!(SDCardStat & STA_NOINIT))
-        return 1;  /* already mounted */
+        return 1; /* already mounted */
     for (i = 0; i < MAXOPENFILES; i++)
         if (FileTable[i].com > MAXCOMPORTS && hal_fds[i] != 0)
             ForceFileClose(i);
@@ -110,9 +118,8 @@ int port_mount_sd_drive(void)
  * arg lists and Option fields. Real impl lives here with #ifdef
  * HAL_PORT_KEYBOARD_USB_HOST inside (port impl files allow target gates).  Returns 1
  * if matched (call typically never returns — SoftReset). */
-int port_keyboard_option_setter(unsigned char *cmdline)
-{
-    unsigned char *tp = checkstring(cmdline, (unsigned char *)"KEYBOARD");
+int port_keyboard_option_setter(unsigned char * cmdline) {
+    unsigned char * tp = checkstring(cmdline, (unsigned char *)"KEYBOARD");
     if (!tp) return 0;
     if (CurrentLinePtr) error("Invalid in a program");
 #if !HAL_PORT_KEYBOARD_USB_HOST
@@ -132,32 +139,41 @@ int port_keyboard_option_setter(unsigned char *cmdline)
 #if !HAL_PORT_KEYBOARD_USB_HOST
     if (!Option.KEYBOARD_CLOCK) {
         Option.KEYBOARD_CLOCK = KEYBOARDCLOCK;
-        Option.KEYBOARD_DATA  = KEYBOARDDATA;
+        Option.KEYBOARD_DATA = KEYBOARDDATA;
     }
     if (ExtCurrentConfig[Option.KEYBOARD_CLOCK] != EXT_NOT_CONFIG && Option.KeyboardConfig == NO_KEYBOARD)
         error("Pin %/| is in use", Option.KEYBOARD_CLOCK, Option.KEYBOARD_CLOCK);
-    if (ExtCurrentConfig[Option.KEYBOARD_DATA]  != EXT_NOT_CONFIG && Option.KeyboardConfig == NO_KEYBOARD)
-        error("Pin %/| is in use", Option.KEYBOARD_DATA,  Option.KEYBOARD_DATA);
+    if (ExtCurrentConfig[Option.KEYBOARD_DATA] != EXT_NOT_CONFIG && Option.KeyboardConfig == NO_KEYBOARD)
+        error("Pin %/| is in use", Option.KEYBOARD_DATA, Option.KEYBOARD_DATA);
 #endif
     int hal_kbd_layout = -1;
-    if      (checkstring(argv[0], (unsigned char *)"US"))  hal_kbd_layout = HAL_KBD_LAYOUT_US;
-    else if (checkstring(argv[0], (unsigned char *)"FR"))  hal_kbd_layout = HAL_KBD_LAYOUT_FR;
-    else if (checkstring(argv[0], (unsigned char *)"GR"))  hal_kbd_layout = HAL_KBD_LAYOUT_GR;
-    else if (checkstring(argv[0], (unsigned char *)"IT"))  hal_kbd_layout = HAL_KBD_LAYOUT_IT;
-    else if (checkstring(argv[0], (unsigned char *)"UK"))  hal_kbd_layout = HAL_KBD_LAYOUT_UK;
-    else if (checkstring(argv[0], (unsigned char *)"ES"))  hal_kbd_layout = HAL_KBD_LAYOUT_ES;
-    else if (checkstring(argv[0], (unsigned char *)"BE"))  hal_kbd_layout = HAL_KBD_LAYOUT_BE;
-    else if (checkstring(argv[0], (unsigned char *)"BR"))  hal_kbd_layout = HAL_KBD_LAYOUT_BR;
-    else if (checkstring(argv[0], (unsigned char *)"I2C")) hal_kbd_layout = HAL_KBD_LAYOUT_I2C;
+    if (checkstring(argv[0], (unsigned char *)"US"))
+        hal_kbd_layout = HAL_KBD_LAYOUT_US;
+    else if (checkstring(argv[0], (unsigned char *)"FR"))
+        hal_kbd_layout = HAL_KBD_LAYOUT_FR;
+    else if (checkstring(argv[0], (unsigned char *)"GR"))
+        hal_kbd_layout = HAL_KBD_LAYOUT_GR;
+    else if (checkstring(argv[0], (unsigned char *)"IT"))
+        hal_kbd_layout = HAL_KBD_LAYOUT_IT;
+    else if (checkstring(argv[0], (unsigned char *)"UK"))
+        hal_kbd_layout = HAL_KBD_LAYOUT_UK;
+    else if (checkstring(argv[0], (unsigned char *)"ES"))
+        hal_kbd_layout = HAL_KBD_LAYOUT_ES;
+    else if (checkstring(argv[0], (unsigned char *)"BE"))
+        hal_kbd_layout = HAL_KBD_LAYOUT_BE;
+    else if (checkstring(argv[0], (unsigned char *)"BR"))
+        hal_kbd_layout = HAL_KBD_LAYOUT_BR;
+    else if (checkstring(argv[0], (unsigned char *)"I2C"))
+        hal_kbd_layout = HAL_KBD_LAYOUT_I2C;
     if (hal_kbd_layout < 0 || hal_keyboard_set_layout(hal_kbd_layout) != 0) error("Syntax");
     Option.capslock = 0;
-    Option.numlock  = 1;
+    Option.numlock = 1;
 #if !HAL_PORT_KEYBOARD_USB_HOST
     int rs = 0b00100000;
     int rr = 0b00001100;
     if (Option.KeyboardConfig != CONFIG_I2C) {
         if (argc >= 3 && *argv[2]) Option.capslock = getint(argv[2], 0, 1);
-        if (argc >= 5 && *argv[4]) Option.numlock  = getint(argv[4], 0, 1);
+        if (argc >= 5 && *argv[4]) Option.numlock = getint(argv[4], 0, 1);
         if (argc >= 7 && *argv[6]) rs = getint(argv[6], 0, 3) << 5;
         if (argc == 9 && *argv[8]) rr = getint(argv[8], 0, 31);
         Option.repeat = rs | rr;
@@ -165,10 +181,10 @@ int port_keyboard_option_setter(unsigned char *cmdline)
         if (!Option.SYSTEM_I2C_SCL) error("Option System I2C not set");
     }
 #else
-    if (argc >= 3 && *argv[2]) Option.capslock    = getint(argv[2], 0, 1);
-    if (argc >= 5 && *argv[4]) Option.numlock     = getint(argv[4], 0, 1);
+    if (argc >= 3 && *argv[2]) Option.capslock = getint(argv[2], 0, 1);
+    if (argc >= 5 && *argv[4]) Option.numlock = getint(argv[4], 0, 1);
     if (argc >= 7 && *argv[6]) Option.RepeatStart = getint(argv[6], 100, 2000);
-    if (argc >= 9 && *argv[8]) Option.RepeatRate  = getint(argv[8],  25, 2000);
+    if (argc >= 9 && *argv[8]) Option.RepeatRate = getint(argv[8], 25, 2000);
 #endif
     SaveOptions();
     _excep_code = RESET_COMMAND;
@@ -184,8 +200,7 @@ int port_keyboard_option_setter(unsigned char *cmdline)
 #include "pico/bootrom.h"
 #include "pico/stdio_usb.h"
 #include "pico/stdio_usb/reset_interface.h"
-void MIPS16 cmd_update(void)
-{
+void MIPS16 cmd_update(void) {
     uint gpio_mask = 0u;
     reset_usb_boot(gpio_mask, PICO_STDIO_USB_RESET_BOOTSEL_INTERFACE_DISABLE_MASK);
 }

@@ -20,11 +20,22 @@
 void cmd_fastgfx(void) {
     error("FASTGFX not supported on this platform");
 }
-void bc_fastgfx_create(void) { error("FASTGFX not supported on this platform"); }
-void bc_fastgfx_swap(void)   { error("FASTGFX not supported on this platform"); }
-void bc_fastgfx_sync(void)   { error("FASTGFX not supported on this platform"); }
-void bc_fastgfx_close(void)  { }
-void bc_fastgfx_reset(void)  { }
-void bc_fastgfx_set_fps(int fps) { (void)fps; error("FASTGFX not supported on this platform"); }
+void bc_fastgfx_create(void) {
+    error("FASTGFX not supported on this platform");
+}
+void bc_fastgfx_swap(void) {
+    error("FASTGFX not supported on this platform");
+}
+void bc_fastgfx_sync(void) {
+    error("FASTGFX not supported on this platform");
+}
+void bc_fastgfx_close(void) {}
+void bc_fastgfx_reset(void) {}
+void bc_fastgfx_set_fps(int fps) {
+    (void)fps;
+    error("FASTGFX not supported on this platform");
+}
 
-void merge_optimized(uint8_t colour) { (void)colour; }
+void merge_optimized(uint8_t colour) {
+    (void)colour;
+}

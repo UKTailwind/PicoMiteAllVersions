@@ -14,8 +14,7 @@
 
 #if !HAL_PORT_IS_VGA
 
-void MIPS16 ConfigDisplayUser(unsigned char *tp)
-{
+void MIPS16 ConfigDisplayUser(unsigned char * tp) {
     getargs(&tp, 13, (unsigned char *)",");
     if (str_equal(argv[0], (unsigned char *)"USER")) {
         if (Option.DISPLAY_TYPE) error("Display already configured");
@@ -29,8 +28,7 @@ void MIPS16 ConfigDisplayUser(unsigned char *tp)
     }
 }
 
-void MIPS16 clear320(void)
-{
+void MIPS16 clear320(void) {
     if (SPI480) {
         hal_i2c_keypad_apply_spi480_resolution();
         return;
@@ -48,18 +46,27 @@ void MIPS16 clear320(void)
         ReadBLITBuffer = ReadBufferSSD1963;
     }
     if (Option.DISPLAY_TYPE != SSD1963_4_16) {
-        if (Option.DISPLAY_ORIENTATION & 1) { HRes = 800; VRes = 480; }
-        else                                { HRes = 480; VRes = 800; }
+        if (Option.DISPLAY_ORIENTATION & 1) {
+            HRes = 800;
+            VRes = 480;
+        } else {
+            HRes = 480;
+            VRes = 800;
+        }
     } else {
-        if (Option.DISPLAY_ORIENTATION & 1) { HRes = 480; VRes = 272; }
-        else                                { HRes = 272; VRes = 480; }
+        if (Option.DISPLAY_ORIENTATION & 1) {
+            HRes = 480;
+            VRes = 272;
+        } else {
+            HRes = 272;
+            VRes = 480;
+        }
     }
     FreeMemorySafe((void **)&buff320);
 }
 
-int port_lcd320_option_setter(unsigned char *cmdline)
-{
-    unsigned char *tp = checkstring(cmdline, (unsigned char *)"LCD320");
+int port_lcd320_option_setter(unsigned char * cmdline) {
+    unsigned char * tp = checkstring(cmdline, (unsigned char *)"LCD320");
     if (!tp) return 0;
     if (!(SSD16TYPE && (Option.DISPLAY_ORIENTATION == LANDSCAPE || Option.DISPLAY_ORIENTATION == RLANDSCAPE)))
         error("Only available on 16-bit SSD1963 and IPS_4_16 displays in Landscape");
@@ -78,15 +85,22 @@ int port_lcd320_option_setter(unsigned char *cmdline)
             VRes = 240;
             buff320 = GetMemory(320 * 6);
             return 1;
-        } else error("Syntax");
-    } else error("Invalid display type");
+        } else
+            error("Syntax");
+    } else
+        error("Invalid display type");
     return 1;
 }
 
-#else  /* PICOMITEVGA — stubs */
+#else /* PICOMITEVGA — stubs */
 
-void MIPS16 ConfigDisplayUser(unsigned char *tp) { (void)tp; }
+void MIPS16 ConfigDisplayUser(unsigned char * tp) {
+    (void)tp;
+}
 void MIPS16 clear320(void) {}
-int  port_lcd320_option_setter(unsigned char *cmdline) { (void)cmdline; return 0; }
+int port_lcd320_option_setter(unsigned char * cmdline) {
+    (void)cmdline;
+    return 0;
+}
 
 #endif

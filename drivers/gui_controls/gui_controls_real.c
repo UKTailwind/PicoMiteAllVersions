@@ -17,7 +17,7 @@
 extern int InvokingCtrl;
 
 static struct s_ctrl CTRLS[MAXCONTROLS];
-struct s_ctrl *Ctrl = CTRLS;
+struct s_ctrl * Ctrl = CTRLS;
 
 void hal_gui_controls_alloc_array(void) {}
 
@@ -40,8 +40,8 @@ void hal_gui_controls_post_irq_redraw(void) {
     }
 }
 
-int hal_gui_controls_option_set(unsigned char *cmdline) {
-    unsigned char *tp = checkstring(cmdline, (unsigned char *)"GUI CONTROLS");
+int hal_gui_controls_option_set(unsigned char * cmdline) {
+    unsigned char * tp = checkstring(cmdline, (unsigned char *)"GUI CONTROLS");
     if (!tp) return 0;
     getargs(&tp, 1, (unsigned char *)",");
     if (CurrentLinePtr) error("Invalid in a program");
@@ -53,7 +53,7 @@ int hal_gui_controls_option_set(unsigned char *cmdline) {
     return 1;
 }
 
-char *hal_gui_controls_pending_interrupt(void) {
+char * hal_gui_controls_pending_interrupt(void) {
     if (Ctrl == NULL) return NULL;
     if (gui_int_down && GuiIntDownVector) {
         gui_int_down = false;
@@ -73,9 +73,9 @@ void hal_gui_controls_periodic(void) {
 }
 
 int hal_gui_controls_print_char_escape(int fnt, int fc, int bc,
-                                       char **str_pp,
+                                       char ** str_pp,
                                        int orientation) {
-    char *str = *str_pp;
+    char * str = *str_pp;
     if ((unsigned char)*str == 0xff && Ctrl[InvokingCtrl].type == 10) {
         str++;
         GUIPrintChar(fnt, bc, fc, *str++, orientation);
@@ -85,9 +85,13 @@ int hal_gui_controls_print_char_escape(int fnt, int fc, int bc,
     return 0;
 }
 
-void hal_gui_controls_hide_all(void) { HideAllControls(); }
+void hal_gui_controls_hide_all(void) {
+    HideAllControls();
+}
 
-void hal_gui_controls_reset(void) { ResetGUI(); }
+void hal_gui_controls_reset(void) {
+    ResetGUI();
+}
 
 void hal_gui_controls_reset_interrupts(void) {
     gui_int_down = false;
@@ -100,12 +104,17 @@ void hal_gui_controls_reset_interrupts(void) {
 extern int TOUCH_GETIRQTRIS;
 extern volatile bool TouchDown, TouchUp, TouchState;
 
-int hal_gui_controls_get_touch_attr(unsigned char *p, int64_t *iret_out) {
-    if      (checkstring(p, (unsigned char *)"REF"))      *iret_out = CurrentRef;
-    else if (checkstring(p, (unsigned char *)"LASTREF"))  *iret_out = LastRef;
-    else if (checkstring(p, (unsigned char *)"LASTX"))    *iret_out = LastX;
-    else if (checkstring(p, (unsigned char *)"LASTY"))    *iret_out = LastY;
-    else return 0;
+int hal_gui_controls_get_touch_attr(unsigned char * p, int64_t * iret_out) {
+    if (checkstring(p, (unsigned char *)"REF"))
+        *iret_out = CurrentRef;
+    else if (checkstring(p, (unsigned char *)"LASTREF"))
+        *iret_out = LastRef;
+    else if (checkstring(p, (unsigned char *)"LASTX"))
+        *iret_out = LastX;
+    else if (checkstring(p, (unsigned char *)"LASTY"))
+        *iret_out = LastY;
+    else
+        return 0;
     return 1;
 }
 
@@ -142,7 +151,7 @@ void hal_gui_controls_timer_tick(void) {
     }
 }
 
-extern void PO2Int(char *s1, int n);
+extern void PO2Int(char * s1, int n);
 
 void hal_gui_controls_print_options(void) {
     if (Option.MaxCtrls) PO2Int("GUI CONTROLS", Option.MaxCtrls - 1);

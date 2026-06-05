@@ -38,7 +38,7 @@ extern "C" {
 /* Snapshot the (foreground, background) tile colour at (xt, yt). The
  * returned uint16_t is opaque — pass it back to
  * hal_editor_tile_paint_saved() to restore. Stub returns 0/0. */
-void hal_editor_tile_save(int xt, int yt, uint16_t *fc_out, uint16_t *bc_out);
+void hal_editor_tile_save(int xt, int yt, uint16_t * fc_out, uint16_t * bc_out);
 
 /* Write a previously saved (fc, bc) pair across (xt_start..xt_end-1,
  * yt). Stub no-ops. */
@@ -80,16 +80,16 @@ void hal_editor_tile_putchar_bg(int x_pixel, int yt,
  * later restore. Non-VGA stubs leave everything zeroed.
  * ----------------------------------------------------------------- */
 typedef struct {
-    int  modmode;
-    int  oldmode;
-    int  oldfont;
-    int  Y_TILE_save;
-    int  ytileheight_save;
+    int modmode;
+    int oldmode;
+    int oldfont;
+    int Y_TILE_save;
+    int ytileheight_save;
     char RefreshSave;
 } hal_editor_display_state_t;
 
-void hal_editor_display_enter(hal_editor_display_state_t *st);
-void hal_editor_display_exit(const hal_editor_display_state_t *st);
+void hal_editor_display_enter(hal_editor_display_state_t * st);
+void hal_editor_display_exit(const hal_editor_display_state_t * st);
 
 /* Modmode font selection — HDMI dispatches between SetFont(1) and
  * SetFont((2<<4)|1) based on FullColour/MediumRes; pure-VGA always
@@ -105,8 +105,8 @@ void hal_editor_modmode_font_select(void);
  * (i.e. no mouse click was intercepted). On a right click the pump
  * sets *c_inout = F4; on middle, F5; MarkMode left click is 9999.
  * ----------------------------------------------------------------- */
-int  hal_editor_mouse_main_pump(int fontinc, int *c_inout);
-int  hal_editor_mouse_mark_pump(int fontinc, int *c_inout, unsigned char **mark_io);
+int hal_editor_mouse_main_pump(int fontinc, int * c_inout);
+int hal_editor_mouse_mark_pump(int fontinc, int * c_inout, unsigned char ** mark_io);
 
 /* Re-anchor the mouse to (curx, cury) after keyboard-driven cursor
  * moves (called from MarkMode's clipboard-yank and DEL paths). Stub

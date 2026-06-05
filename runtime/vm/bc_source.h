@@ -3,6 +3,6 @@
 
 #include "bytecode.h"
 
-int bc_compile_source(BCCompiler *cs, const char *source, const char *source_name);
+int bc_compile_source(BCCompiler * cs, const char * source, const char * source_name);
 
 #endif

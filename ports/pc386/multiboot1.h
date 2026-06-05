@@ -22,18 +22,18 @@
 /* Bits in mb1_info_t::flags. Each bit means "the corresponding field
  * group in this structure was filled in by the bootloader". The spec
  * (section 3.3) numbers bits 0..12. */
-#define MB1_INFO_MEMORY      (1u << 0)   /* mem_lower / mem_upper           */
-#define MB1_INFO_BOOTDEV     (1u << 1)   /* boot_device                     */
-#define MB1_INFO_CMDLINE     (1u << 2)   /* cmdline                         */
-#define MB1_INFO_MODS        (1u << 3)   /* mods_count / mods_addr          */
-#define MB1_INFO_AOUT_SYMS   (1u << 4)   /* a.out symbol table              */
-#define MB1_INFO_ELF_SHDR    (1u << 5)   /* ELF section header table        */
-#define MB1_INFO_MMAP        (1u << 6)   /* mmap_length / mmap_addr         */
-#define MB1_INFO_DRIVES      (1u << 7)
-#define MB1_INFO_CONFIG      (1u << 8)
-#define MB1_INFO_BOOTLDR     (1u << 9)
-#define MB1_INFO_APM_TABLE   (1u << 10)
-#define MB1_INFO_VBE         (1u << 11)
+#define MB1_INFO_MEMORY (1u << 0)    /* mem_lower / mem_upper           */
+#define MB1_INFO_BOOTDEV (1u << 1)   /* boot_device                     */
+#define MB1_INFO_CMDLINE (1u << 2)   /* cmdline                         */
+#define MB1_INFO_MODS (1u << 3)      /* mods_count / mods_addr          */
+#define MB1_INFO_AOUT_SYMS (1u << 4) /* a.out symbol table              */
+#define MB1_INFO_ELF_SHDR (1u << 5)  /* ELF section header table        */
+#define MB1_INFO_MMAP (1u << 6)      /* mmap_length / mmap_addr         */
+#define MB1_INFO_DRIVES (1u << 7)
+#define MB1_INFO_CONFIG (1u << 8)
+#define MB1_INFO_BOOTLDR (1u << 9)
+#define MB1_INFO_APM_TABLE (1u << 10)
+#define MB1_INFO_VBE (1u << 11)
 #define MB1_INFO_FRAMEBUFFER (1u << 12)
 
 /* Top-level info structure pointed to by EBX on entry. */
@@ -41,8 +41,8 @@ typedef struct __attribute__((packed)) {
     uint32_t flags;
 
     /* If MB1_INFO_MEMORY (bit 1): conventional + extended in KB. */
-    uint32_t mem_lower;          /* KB below 1 MB (max 640)          */
-    uint32_t mem_upper;          /* KB above 1 MB                    */
+    uint32_t mem_lower; /* KB below 1 MB (max 640)          */
+    uint32_t mem_upper; /* KB above 1 MB                    */
 
     /* If MB1_INFO_BOOTDEV (bit 2). */
     uint32_t boot_device;
@@ -77,9 +77,9 @@ typedef struct __attribute__((packed)) {
     uint32_t framebuffer_pitch;
     uint32_t framebuffer_width;
     uint32_t framebuffer_height;
-    uint8_t  framebuffer_bpp;
-    uint8_t  framebuffer_type;
-    uint8_t  color_info[6];
+    uint8_t framebuffer_bpp;
+    uint8_t framebuffer_type;
+    uint8_t color_info[6];
 } mb1_info_t;
 
 /* mmap entries are variable-size. The `size` field gives the size of
@@ -92,10 +92,10 @@ typedef struct __attribute__((packed)) {
     uint32_t type;
 } mb1_mmap_entry_t;
 
-#define MB1_MEM_AVAILABLE        1
-#define MB1_MEM_RESERVED         2
+#define MB1_MEM_AVAILABLE 1
+#define MB1_MEM_RESERVED 2
 #define MB1_MEM_ACPI_RECLAIMABLE 3
-#define MB1_MEM_NVS              4
-#define MB1_MEM_BADRAM           5
+#define MB1_MEM_NVS 4
+#define MB1_MEM_BADRAM 5
 
 #endif

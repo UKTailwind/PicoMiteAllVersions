@@ -38,32 +38,32 @@ typedef int64_t di_int;
 typedef uint64_t du_int;
 
 typedef union {
-  di_int all;
-  struct {
+    di_int all;
+    struct {
 #if _YUGA_LITTLE_ENDIAN
-    su_int low;
-    si_int high;
+        su_int low;
+        si_int high;
 #else
-    si_int high;
-    su_int low;
+        si_int high;
+        su_int low;
 #endif // _YUGA_LITTLE_ENDIAN
-  } s;
+    } s;
 } dwords;
 
 typedef union {
-  du_int all;
-  struct {
+    du_int all;
+    struct {
 #if _YUGA_LITTLE_ENDIAN
-    su_int low;
-    su_int high;
+        su_int low;
+        su_int high;
 #else
-    su_int high;
-    su_int low;
+        su_int high;
+        su_int low;
 #endif // _YUGA_LITTLE_ENDIAN
-  } s;
+    } s;
 } udwords;
 
-#if defined(__LP64__) || defined(__wasm__) || defined(__mips64) ||             \
+#if defined(__LP64__) || defined(__wasm__) || defined(__mips64) || \
     defined(__SIZEOF_INT128__) || defined(_WIN64)
 #define CRT_HAS_128BIT
 #endif
@@ -85,43 +85,43 @@ typedef int ti_int __attribute__((mode(TI)));
 typedef unsigned tu_int __attribute__((mode(TI)));
 
 typedef union {
-  ti_int all;
-  struct {
+    ti_int all;
+    struct {
 #if _YUGA_LITTLE_ENDIAN
-    du_int low;
-    di_int high;
+        du_int low;
+        di_int high;
 #else
-    di_int high;
-    du_int low;
+        di_int high;
+        du_int low;
 #endif // _YUGA_LITTLE_ENDIAN
-  } s;
+    } s;
 } twords;
 
 typedef union {
-  tu_int all;
-  struct {
+    tu_int all;
+    struct {
 #if _YUGA_LITTLE_ENDIAN
-    du_int low;
-    du_int high;
+        du_int low;
+        du_int high;
 #else
-    du_int high;
-    du_int low;
+        du_int high;
+        du_int low;
 #endif // _YUGA_LITTLE_ENDIAN
-  } s;
+    } s;
 } utwords;
 
 static __inline ti_int make_ti(di_int h, di_int l) {
-  twords r;
-  r.s.high = (du_int)h;
-  r.s.low = (du_int)l;
-  return r.all;
+    twords r;
+    r.s.high = (du_int)h;
+    r.s.low = (du_int)l;
+    return r.all;
 }
 
 static __inline tu_int make_tu(du_int h, du_int l) {
-  utwords r;
-  r.s.high = h;
-  r.s.low = l;
-  return r.all;
+    utwords r;
+    r.s.high = h;
+    r.s.low = l;
+    return r.all;
 }
 
 #endif // CRT_HAS_128BIT
@@ -136,22 +136,22 @@ static __inline tu_int make_tu(du_int h, du_int l) {
 
 #if CRT_HAS_FLOATING_POINT
 typedef union {
-  su_int u;
-  float f;
+    su_int u;
+    float f;
 } float_bits;
 
 typedef union {
-  udwords u;
-  double f;
+    udwords u;
+    double f;
 } double_bits;
 
 typedef struct {
 #if _YUGA_LITTLE_ENDIAN
-  udwords low;
-  udwords high;
+    udwords low;
+    udwords high;
 #else
-  udwords high;
-  udwords low;
+    udwords high;
+    udwords low;
 #endif // _YUGA_LITTLE_ENDIAN
 } uqwords;
 
@@ -160,7 +160,7 @@ typedef struct {
 // still makes it 80 bits. Clang will match whatever compiler it is trying to
 // be compatible with. On 32-bit x86 Android, long double is 64 bits, while on
 // x86_64 Android, long double is 128 bits.
-#if (defined(__i386__) || defined(__x86_64__)) &&                              \
+#if (defined(__i386__) || defined(__x86_64__)) && \
     !(defined(_MSC_VER) || defined(__ANDROID__))
 #define HAS_80_BIT_LONG_DOUBLE 1
 #elif defined(__m68k__) || defined(__ia64__)
@@ -172,8 +172,8 @@ typedef struct {
 #if HAS_80_BIT_LONG_DOUBLE
 typedef long double xf_float;
 typedef union {
-  uqwords u;
-  xf_float f;
+    uqwords u;
+    xf_float f;
 } xf_bits;
 #endif
 
@@ -194,7 +194,7 @@ typedef long double tf_float;
 #define CRT_LDBL_IEEE_F128
 #endif
 #define TF_C(x) x##L
-#elif __LDBL_MANT_DIG__ == 113 ||                                              \
+#elif __LDBL_MANT_DIG__ == 113 || \
     (__FLT_RADIX__ == 16 && __LDBL_MANT_DIG__ == 28)
 // Use long double instead of __float128 if it matches the IEEE 128-bit format
 // or the IBM hexadecimal format.
@@ -217,8 +217,8 @@ typedef __float128 tf_float;
 
 #ifdef CRT_HAS_F128
 typedef union {
-  uqwords u;
-  tf_float f;
+    uqwords u;
+    tf_float f;
 } tf_bits;
 #endif
 
@@ -251,15 +251,15 @@ typedef _Float128 _Complex Qcomplex;
 #define COMPLEX_IMAGINARY(x) __imag__(x)
 #else
 typedef struct {
-  float real, imaginary;
+    float real, imaginary;
 } Fcomplex;
 
 typedef struct {
-  double real, imaginary;
+    double real, imaginary;
 } Dcomplex;
 
 typedef struct {
-  long double real, imaginary;
+    long double real, imaginary;
 } Lcomplex;
 
 #define COMPLEX_REAL(x) (x).real
@@ -271,7 +271,7 @@ typedef struct {
 #define COMPLEXTF_IMAGINARY(x) __imag__(x)
 #elif defined(CRT_HAS_F128)
 typedef struct {
-  tf_float real, imaginary;
+    tf_float real, imaginary;
 } Qcomplex;
 #define COMPLEXTF_REAL(x) (x).real
 #define COMPLEXTF_IMAGINARY(x) (x).imaginary

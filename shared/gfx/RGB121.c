@@ -41,17 +41,15 @@ int VResS = 0;
  * — on host the global RGB121map is zero until the first error fires
  * LoadOptions, which used to leave TILEMAP DRAW painting black. */
 static const int rgb121_palette[16] = {
-    BLACK, BLUE,    MYRTLE,  COBALT,
-    MIDGREEN, CERULEAN, GREEN,  CYAN,
-    RED, MAGENTA, RUST,    FUCHSIA,
-    BROWN, LILAC,   YELLOW,  WHITE
-};
+    BLACK, BLUE, MYRTLE, COBALT,
+    MIDGREEN, CERULEAN, GREEN, CYAN,
+    RED, MAGENTA, RUST, FUCHSIA,
+    BROWN, LILAC, YELLOW, WHITE};
 
-void blit121(uint8_t *source, uint8_t *destination,
+void blit121(uint8_t * source, uint8_t * destination,
              int xsource, int ysource, int width, int height,
-             int xdestination, int ydestination, int missingcolour)
-{
-    (void)destination;  /* see header comment — DrawPixel selects plane */
+             int xdestination, int ydestination, int missingcolour) {
+    (void)destination; /* see header comment — DrawPixel selects plane */
 
     int has_transparency = (missingcolour >= 0 && missingcolour <= 15);
 
@@ -60,16 +58,16 @@ void blit121(uint8_t *source, uint8_t *destination,
     int start_y = 0;
     int end_x = width;
     int end_y = height;
-    if (xdestination < 0)            start_x = -xdestination;
-    if (ydestination < 0)            start_y = -ydestination;
-    if (xdestination + width  > HResD) end_x = HResD - xdestination;
+    if (xdestination < 0) start_x = -xdestination;
+    if (ydestination < 0) start_y = -ydestination;
+    if (xdestination + width > HResD) end_x = HResD - xdestination;
     if (ydestination + height > VResD) end_y = VResD - ydestination;
     if (start_x >= end_x || start_y >= end_y) return;
 
-    int src_stride = (HResS + 1) >> 1;  /* bytes per row in source */
+    int src_stride = (HResS + 1) >> 1; /* bytes per row in source */
 
     for (int y = start_y; y < end_y; y++) {
-        const uint8_t *src_row = source + (size_t)(ysource + y) * src_stride;
+        const uint8_t * src_row = source + (size_t)(ysource + y) * src_stride;
         int dst_y = ydestination + y;
         for (int x = start_x; x < end_x; x++) {
             int src_x = xsource + x;
@@ -91,11 +89,15 @@ void blit121(uint8_t *source, uint8_t *destination,
  * copy-self semantics on our targets, route through the existing
  * BLIT machinery instead.
  */
-void blit121_self(uint8_t *framebuffer, int xsource, int ysource,
+void blit121_self(uint8_t * framebuffer, int xsource, int ysource,
                   int width, int height,
-                  int xdestination, int ydestination)
-{
-    (void)framebuffer; (void)xsource; (void)ysource;
-    (void)width; (void)height; (void)xdestination; (void)ydestination;
+                  int xdestination, int ydestination) {
+    (void)framebuffer;
+    (void)xsource;
+    (void)ysource;
+    (void)width;
+    (void)height;
+    (void)xdestination;
+    (void)ydestination;
     /* Intentionally empty — see header comment. */
 }

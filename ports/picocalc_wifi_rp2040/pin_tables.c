@@ -17,13 +17,11 @@ const struct s_PinDef PinDef[] = {
 };
 
 const uint8_t PINMAP[30] = {
-    1,  2,  4,  5,  6,  7,  9, 10, 11, 12,
+    1, 2, 4, 5, 6, 7, 9, 10, 11, 12,
     14, 15, 16, 17, 19, 20, 21, 22, 24, 25,
-    26, 27, 29, 41, 42, 43, 31, 32, 34, 44
-};
+    26, 27, 29, 41, 42, 43, 31, 32, 34, 44};
 
-int codemap(int pin)
-{
+int codemap(int pin) {
     if (pin > 29 || pin < 0 ||
         pin == 23 || pin == 24 || pin == 25 || pin == 29)
         error("Invalid GPIO");

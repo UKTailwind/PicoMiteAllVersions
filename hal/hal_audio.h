@@ -58,7 +58,7 @@ int hal_audio_tone_interrupt_supported(void);
  *   freq:   1..20000 Hz (ignored for "O" = Off).
  *   volume: 0..25 (per-slot attenuation; per-channel master volume
  *           is a separate setting — see hal_audio_volume). */
-void hal_audio_sound(int slot, const char *ch, const char *type,
+void hal_audio_sound(int slot, const char * ch, const char * type,
                      double freq_hz, int volume);
 
 /* PLAY NOTE is implemented above the HAL as a small MIDI-note-number to
@@ -94,23 +94,23 @@ void hal_audio_resume(void);
  * `frame_count` stereo frames as the backend's queue can take and
  * returns that count (0 if full). The decode loop retries the remainder
  * on the next service tick, which paces decoding to playback. */
-int  hal_audio_sample_push(const int16_t *frames, int frame_count);
+int hal_audio_sample_push(const int16_t * frames, int frame_count);
 
 /* Optional zero-copy path for backends with discrete writable buffers.
  * Returns non-zero when a buffer is acquired; `*frames` receives writable
  * interleaved-stereo storage and `*frame_capacity` receives its capacity in
  * stereo frames. The caller must finish with hal_audio_sample_commit().
  * Backends that use rings/DMA queues can return 0 and rely on push(). */
-int  hal_audio_sample_acquire(int16_t **frames, int *frame_capacity);
+int hal_audio_sample_acquire(int16_t ** frames, int * frame_capacity);
 void hal_audio_sample_commit(int frame_count);
 
 /* Free space in the backend queue, in stereo frames — the decode loop
  * uses it to size each read. */
-int  hal_audio_sample_space(void);
+int hal_audio_sample_space(void);
 
 /* Queued stereo frames not yet played. End-of-stream is reached when the
  * decoder is exhausted AND this returns 0. */
-int  hal_audio_sample_queued(void);
+int hal_audio_sample_queued(void);
 
 /* The decoder has reached EOF and all decoded frames have been queued.
  * Backends that use "no next buffer yet" underrun recovery should switch
@@ -119,15 +119,15 @@ void hal_audio_sample_eof(void);
 
 /* Begin / end a streamed-sample session: configure the output sample
  * rate and reset the queue. hal_audio_sample_begin returns 0 on success. */
-int  hal_audio_sample_begin(int sample_rate_hz);
+int hal_audio_sample_begin(int sample_rate_hz);
 void hal_audio_sample_end(void);
 
 /* Working memory for the file decoders + MOD file buffer. On targets with
  * a small main heap (ESP32) this comes from PSRAM; elsewhere it is plain
  * malloc. NULL on failure. */
-void *hal_audio_workmem_alloc(unsigned long bytes);
-void *hal_audio_workmem_realloc(void *p, unsigned long bytes);
-void  hal_audio_workmem_free(void *p);
+void * hal_audio_workmem_alloc(unsigned long bytes);
+void * hal_audio_workmem_realloc(void * p, unsigned long bytes);
+void hal_audio_workmem_free(void * p);
 
 #ifdef __cplusplus
 }

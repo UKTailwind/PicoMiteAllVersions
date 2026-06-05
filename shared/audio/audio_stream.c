@@ -35,7 +35,7 @@
 #define DR_FLAC_NO_OGG
 #include "dr_flac.h"
 
-#define DR_MP3_NO_STDIO          /* implementation lives in audio_mp3_real.c */
+#define DR_MP3_NO_STDIO /* implementation lives in audio_mp3_real.c */
 #include "dr_mp3.h"
 
 #include "hxcmod.h"
@@ -43,35 +43,44 @@
 /* File HAL (core/mmbasic/FileIO.c) */
 extern hal_fs_fd_t hal_fds[];
 extern int FindFreeFileNbr(void);
-extern int BasicFileOpen(char *fname, int fnbr, int mode);
+extern int BasicFileOpen(char * fname, int fnbr, int mode);
 extern int ForceFileClose(int fnbr);
 
-#define DECODE_FRAMES   1024
+#define DECODE_FRAMES 1024
 #define MOD_RENDER_RATE 22050
 #define MOD_OUTPUT_RATE (MOD_RENDER_RATE * 2)
 
-static int        s_fnbr;
-static int        s_active;                  /* P_NOTHING / P_WAV / P_MP3 / P_FLAC / P_MOD */
-static int        s_channels;
+static int s_fnbr;
+static int s_active; /* P_NOTHING / P_WAV / P_MP3 / P_FLAC / P_MOD */
+static int s_channels;
 
 /* All large state lives in work memory (PSRAM on the ESP32), pointed to
  * from here so BSS stays tiny. */
-static int16_t   *s_stereo;                  /* DECODE_FRAMES * 2 */
-static int16_t   *s_mono;                    /* DECODE_FRAMES */
-static drwav     *s_wav;
-static drmp3     *s_mp3;
-static drflac    *s_flac;
-static modcontext *s_modctx;
-static void      *s_modbuf;
-static int        s_pending_offset;
-static int        s_pending_frames;
-static int        s_eof_pending;
-static int        s_mod_noloop;
+static int16_t * s_stereo; /* DECODE_FRAMES * 2 */
+static int16_t * s_mono;   /* DECODE_FRAMES */
+static drwav * s_wav;
+static drmp3 * s_mp3;
+static drflac * s_flac;
+static modcontext * s_modctx;
+static void * s_modbuf;
+static int s_pending_offset;
+static int s_pending_frames;
+static int s_eof_pending;
+static int s_mod_noloop;
 
 /* Decoder allocations route to PSRAM-capable working memory. */
-static void *dec_malloc(size_t sz, void *ud)             { (void)ud; return hal_audio_workmem_alloc(sz); }
-static void *dec_realloc(void *p, size_t sz, void *ud)   { (void)ud; return hal_audio_workmem_realloc(p, sz); }
-static void  dec_free(void *p, void *ud)                 { (void)ud; if (p) hal_audio_workmem_free(p); }
+static void * dec_malloc(size_t sz, void * ud) {
+    (void)ud;
+    return hal_audio_workmem_alloc(sz);
+}
+static void * dec_realloc(void * p, size_t sz, void * ud) {
+    (void)ud;
+    return hal_audio_workmem_realloc(p, sz);
+}
+static void dec_free(void * p, void * ud) {
+    (void)ud;
+    if (p) hal_audio_workmem_free(p);
+}
 
 static void stream_close_file(void) {
     if (s_fnbr > 0) ForceFileClose(s_fnbr);
@@ -79,15 +88,18 @@ static void stream_close_file(void) {
     s_fnbr = 0;
 }
 
-static size_t stream_read(void *ud, void *buf, size_t n) {
+static size_t stream_read(void * ud, void * buf, size_t n) {
     (void)ud;
     ssize_t r = hal_fs_read(hal_fds[s_fnbr], buf, n);
-    if (r < 0) { FSerror = FR_DISK_ERR; return 0; }
+    if (r < 0) {
+        FSerror = FR_DISK_ERR;
+        return 0;
+    }
     FSerror = 0;
     return (size_t)r;
 }
 
-static drwav_bool32 stream_seek(void *ud, int offset, drwav_seek_origin origin) {
+static drwav_bool32 stream_seek(void * ud, int offset, drwav_seek_origin origin) {
     (void)ud;
     int whence = (origin == drwav_seek_origin_start) ? HAL_FS_SEEK_SET : HAL_FS_SEEK_CUR;
     return hal_fs_seek(hal_fds[s_fnbr], offset, whence) < 0 ? 0 : 1;
@@ -96,16 +108,24 @@ static drwav_bool32 stream_seek(void *ud, int offset, drwav_seek_origin origin) 
 /* Decode scratch buffers, allocated per stream. */
 static int ensure_buffers(void) {
     if (!s_stereo) s_stereo = hal_audio_workmem_alloc(DECODE_FRAMES * 2 * sizeof(int16_t));
-    if (!s_mono)   s_mono   = hal_audio_workmem_alloc(DECODE_FRAMES * sizeof(int16_t));
+    if (!s_mono) s_mono = hal_audio_workmem_alloc(DECODE_FRAMES * sizeof(int16_t));
     return (s_stereo && s_mono) ? 0 : -1;
 }
 
 static void release_buffers(void) {
-    if (s_stereo) { hal_audio_workmem_free(s_stereo); s_stereo = NULL; }
-    if (s_mono)   { hal_audio_workmem_free(s_mono);   s_mono = NULL; }
+    if (s_stereo) {
+        hal_audio_workmem_free(s_stereo);
+        s_stereo = NULL;
+    }
+    if (s_mono) {
+        hal_audio_workmem_free(s_mono);
+        s_mono = NULL;
+    }
 }
 
-int audio_stream_active(void) { return s_active != P_NOTHING; }
+int audio_stream_active(void) {
+    return s_active != P_NOTHING;
+}
 
 void audio_stream_stop(void) {
     int active = s_active;
@@ -114,14 +134,34 @@ void audio_stream_stop(void) {
     s_eof_pending = 0;
     s_mod_noloop = 0;
     switch (active) {
-        case P_WAV:  drwav_uninit(s_wav);  hal_audio_workmem_free(s_wav); s_wav = NULL; break;
-        case P_MP3:  drmp3_uninit(s_mp3);  hal_audio_workmem_free(s_mp3); s_mp3 = NULL; break;
-        case P_FLAC: if (s_flac) { drflac_close(s_flac); s_flac = NULL; } break;
-        case P_MOD:  hal_audio_workmem_free(s_modctx); s_modctx = NULL;
-                     hal_audio_workmem_free(s_modbuf); s_modbuf = NULL; break;
-        default:     stream_close_file(); release_buffers(); return;
+    case P_WAV:
+        drwav_uninit(s_wav);
+        hal_audio_workmem_free(s_wav);
+        s_wav = NULL;
+        break;
+    case P_MP3:
+        drmp3_uninit(s_mp3);
+        hal_audio_workmem_free(s_mp3);
+        s_mp3 = NULL;
+        break;
+    case P_FLAC:
+        if (s_flac) {
+            drflac_close(s_flac);
+            s_flac = NULL;
+        }
+        break;
+    case P_MOD:
+        hal_audio_workmem_free(s_modctx);
+        s_modctx = NULL;
+        hal_audio_workmem_free(s_modbuf);
+        s_modbuf = NULL;
+        break;
+    default:
+        stream_close_file();
+        release_buffers();
+        return;
     }
-    if (active != P_MOD) stream_close_file();      /* MOD closes its file at load */
+    if (active != P_MOD) stream_close_file(); /* MOD closes its file at load */
     hal_audio_sample_end();
     release_buffers();
     s_active = P_NOTHING;
@@ -140,73 +180,108 @@ static void audio_stream_mark_eof(void) {
 }
 
 /* Common open for the dr_* stream decoders: append `ext`, open the file. */
-static int stream_open_file(char *fname, const char *ext) {
+static int stream_open_file(char * fname, const char * ext) {
     if (strchr(fname, '.') == NULL) strcat(fname, ext);
     audio_stream_stop();
     s_fnbr = FindFreeFileNbr();
-    if (!BasicFileOpen(fname, s_fnbr, FA_READ)) { s_fnbr = 0; return -1; }
+    if (!BasicFileOpen(fname, s_fnbr, FA_READ)) {
+        s_fnbr = 0;
+        return -1;
+    }
     WAV_fnbr = s_fnbr;
     return 0;
 }
 
-int audio_stream_play_wav(char *fname) {
+int audio_stream_play_wav(char * fname) {
     if (stream_open_file(fname, ".wav") != 0) return -1;
     s_wav = hal_audio_workmem_alloc(sizeof(drwav));
-    drwav_allocation_callbacks ac = { NULL, dec_malloc, dec_realloc, dec_free };
+    drwav_allocation_callbacks ac = {NULL, dec_malloc, dec_realloc, dec_free};
     if (!s_wav || !drwav_init(s_wav, stream_read, stream_seek, NULL, &ac)) {
-        hal_audio_workmem_free(s_wav); s_wav = NULL; stream_close_file(); release_buffers(); return -1;
+        hal_audio_workmem_free(s_wav);
+        s_wav = NULL;
+        stream_close_file();
+        release_buffers();
+        return -1;
     }
     s_channels = (int)s_wav->channels;
     if (s_channels < 1 || s_channels > 2 || hal_audio_sample_begin((int)s_wav->sampleRate) != 0) {
-        drwav_uninit(s_wav); hal_audio_workmem_free(s_wav); s_wav = NULL; stream_close_file(); release_buffers(); return -1;
+        drwav_uninit(s_wav);
+        hal_audio_workmem_free(s_wav);
+        s_wav = NULL;
+        stream_close_file();
+        release_buffers();
+        return -1;
     }
-    s_active = P_WAV; CurrentlyPlaying = P_WAV;
+    s_active = P_WAV;
+    CurrentlyPlaying = P_WAV;
     return 0;
 }
 
-int audio_stream_play_mp3(char *fname) {
+int audio_stream_play_mp3(char * fname) {
     if (stream_open_file(fname, ".mp3") != 0) return -1;
     s_mp3 = hal_audio_workmem_alloc(sizeof(drmp3));
-    drmp3_allocation_callbacks ac = { NULL, dec_malloc, dec_realloc, dec_free };
+    drmp3_allocation_callbacks ac = {NULL, dec_malloc, dec_realloc, dec_free};
     if (!s_mp3 || !drmp3_init(s_mp3, (drmp3_read_proc)stream_read,
                               (drmp3_seek_proc)stream_seek, NULL, &ac)) {
-        hal_audio_workmem_free(s_mp3); s_mp3 = NULL; stream_close_file(); release_buffers(); return -1;
+        hal_audio_workmem_free(s_mp3);
+        s_mp3 = NULL;
+        stream_close_file();
+        release_buffers();
+        return -1;
     }
     s_channels = (int)s_mp3->channels;
     if (s_channels < 1 || s_channels > 2 || hal_audio_sample_begin((int)s_mp3->sampleRate) != 0) {
-        drmp3_uninit(s_mp3); hal_audio_workmem_free(s_mp3); s_mp3 = NULL; stream_close_file(); release_buffers(); return -1;
+        drmp3_uninit(s_mp3);
+        hal_audio_workmem_free(s_mp3);
+        s_mp3 = NULL;
+        stream_close_file();
+        release_buffers();
+        return -1;
     }
-    s_active = P_MP3; CurrentlyPlaying = P_MP3;
+    s_active = P_MP3;
+    CurrentlyPlaying = P_MP3;
     return 0;
 }
 
-int audio_stream_play_flac(char *fname) {
+int audio_stream_play_flac(char * fname) {
     if (stream_open_file(fname, ".flac") != 0) return -1;
-    drflac_allocation_callbacks ac = { NULL, dec_malloc, dec_realloc, dec_free };
+    drflac_allocation_callbacks ac = {NULL, dec_malloc, dec_realloc, dec_free};
     s_flac = drflac_open((drflac_read_proc)stream_read, (drflac_seek_proc)stream_seek, NULL, &ac);
-    if (!s_flac) { stream_close_file(); release_buffers(); return -1; }
+    if (!s_flac) {
+        stream_close_file();
+        release_buffers();
+        return -1;
+    }
     s_channels = (int)s_flac->channels;
     if (s_channels < 1 || s_channels > 2 || hal_audio_sample_begin((int)s_flac->sampleRate) != 0) {
-        drflac_close(s_flac); s_flac = NULL; stream_close_file(); release_buffers(); return -1;
+        drflac_close(s_flac);
+        s_flac = NULL;
+        stream_close_file();
+        release_buffers();
+        return -1;
     }
-    s_active = P_FLAC; CurrentlyPlaying = P_FLAC;
+    s_active = P_FLAC;
+    CurrentlyPlaying = P_FLAC;
     return 0;
 }
 
-int audio_stream_play_mod(char *fname) {
+int audio_stream_play_mod(char * fname) {
     return audio_stream_play_mod_noloop(fname, 0);
 }
 
-int audio_stream_play_mod_noloop(char *fname, int noloop) {
+int audio_stream_play_mod_noloop(char * fname, int noloop) {
     if (stream_open_file(fname, ".mod") != 0) return -1;
     if (ensure_buffers() != 0) goto fail;
 
     long size = (long)hal_fs_seek(hal_fds[s_fnbr], 0, HAL_FS_SEEK_END);
     hal_fs_seek(hal_fds[s_fnbr], 0, HAL_FS_SEEK_SET);
-    if (size <= 0) { stream_close_file(); return -1; }
+    if (size <= 0) {
+        stream_close_file();
+        return -1;
+    }
 
-    s_modbuf  = hal_audio_workmem_alloc((unsigned long)size);
-    s_modctx  = hal_audio_workmem_alloc(sizeof(modcontext));
+    s_modbuf = hal_audio_workmem_alloc((unsigned long)size);
+    s_modctx = hal_audio_workmem_alloc(sizeof(modcontext));
     if (!s_modbuf || !s_modctx) goto fail;
 
     long off = 0;
@@ -225,13 +300,16 @@ int audio_stream_play_mod_noloop(char *fname, int noloop) {
 
     s_channels = 2;
     s_mod_noloop = noloop ? 1 : 0;
-    s_active = P_MOD; CurrentlyPlaying = P_MOD;
+    s_active = P_MOD;
+    CurrentlyPlaying = P_MOD;
     return 0;
 
 fail:
     stream_close_file();
-    hal_audio_workmem_free(s_modbuf); s_modbuf = NULL;
-    hal_audio_workmem_free(s_modctx); s_modctx = NULL;
+    hal_audio_workmem_free(s_modbuf);
+    s_modbuf = NULL;
+    hal_audio_workmem_free(s_modctx);
+    s_modctx = NULL;
     release_buffers();
     return -1;
 }
@@ -242,57 +320,60 @@ static int decode_chunk(int want) {
     int got;
     if (ensure_buffers() != 0) return 0;
     switch (s_active) {
-        case P_WAV:
-            if (s_channels >= 2) return (int)drwav_read_pcm_frames_s16(s_wav, want, s_stereo);
-            got = (int)drwav_read_pcm_frames_s16(s_wav, want, s_mono);
-            break;
-        case P_MP3:
-            if (s_channels >= 2) return (int)drmp3_read_pcm_frames_s16(s_mp3, want, s_stereo);
-            got = (int)drmp3_read_pcm_frames_s16(s_mp3, want, s_mono);
-            break;
-        case P_FLAC:
-            if (s_channels >= 2) return (int)drflac_read_pcm_frames_s16(s_flac, want, s_stereo);
-            got = (int)drflac_read_pcm_frames_s16(s_flac, want, s_mono);
-            break;
-        case P_MOD:
-            /* hxcmod renders at 22050 Hz; legacy device playback runs the
+    case P_WAV:
+        if (s_channels >= 2) return (int)drwav_read_pcm_frames_s16(s_wav, want, s_stereo);
+        got = (int)drwav_read_pcm_frames_s16(s_wav, want, s_mono);
+        break;
+    case P_MP3:
+        if (s_channels >= 2) return (int)drmp3_read_pcm_frames_s16(s_mp3, want, s_stereo);
+        got = (int)drmp3_read_pcm_frames_s16(s_mp3, want, s_mono);
+        break;
+    case P_FLAC:
+        if (s_channels >= 2) return (int)drflac_read_pcm_frames_s16(s_flac, want, s_stereo);
+        got = (int)drflac_read_pcm_frames_s16(s_flac, want, s_mono);
+        break;
+    case P_MOD:
+        /* hxcmod renders at 22050 Hz; legacy device playback runs the
              * sink at 44100 Hz and repeats each stereo frame. PDM DAC mode is
              * much happier with the 44.1 kHz sink clock as well. */
-            got = (want + 1) / 2;
-            if (hxcmod_fillbuffer(s_modctx, (msample *)s_stereo,
-                                  (unsigned long)got, NULL, s_mod_noloop)) {
-                s_eof_pending = 1;
+        got = (want + 1) / 2;
+        if (hxcmod_fillbuffer(s_modctx, (msample *)s_stereo,
+                              (unsigned long)got, NULL, s_mod_noloop)) {
+            s_eof_pending = 1;
+        }
+        for (int i = got - 1; i >= 0; i--) {
+            int16_t left = s_stereo[2 * i];
+            int16_t right = s_stereo[2 * i + 1];
+            int out = 2 * i;
+            s_stereo[2 * out] = left;
+            s_stereo[2 * out + 1] = right;
+            if (out + 1 < want) {
+                s_stereo[2 * (out + 1)] = left;
+                s_stereo[2 * (out + 1) + 1] = right;
             }
-            for (int i = got - 1; i >= 0; i--) {
-                int16_t left = s_stereo[2 * i];
-                int16_t right = s_stereo[2 * i + 1];
-                int out = 2 * i;
-                s_stereo[2 * out] = left;
-                s_stereo[2 * out + 1] = right;
-                if (out + 1 < want) {
-                    s_stereo[2 * (out + 1)] = left;
-                    s_stereo[2 * (out + 1) + 1] = right;
-                }
-            }
-            return want;
-        default:
-            return 0;
+        }
+        return want;
+    default:
+        return 0;
     }
-    for (int i = 0; i < got; i++) { s_stereo[2 * i] = s_mono[i]; s_stereo[2 * i + 1] = s_mono[i]; }
+    for (int i = 0; i < got; i++) {
+        s_stereo[2 * i] = s_mono[i];
+        s_stereo[2 * i + 1] = s_mono[i];
+    }
     return got;
 }
 
-static int decode_direct(int want, int16_t *dst) {
+static int decode_direct(int want, int16_t * dst) {
     if (!dst || s_channels < 2) return 0;
     switch (s_active) {
-        case P_WAV:
-            return (int)drwav_read_pcm_frames_s16(s_wav, want, dst);
-        case P_MP3:
-            return (int)drmp3_read_pcm_frames_s16(s_mp3, want, dst);
-        case P_FLAC:
-            return (int)drflac_read_pcm_frames_s16(s_flac, want, dst);
-        default:
-            return 0;
+    case P_WAV:
+        return (int)drwav_read_pcm_frames_s16(s_wav, want, dst);
+    case P_MP3:
+        return (int)drmp3_read_pcm_frames_s16(s_mp3, want, dst);
+    case P_FLAC:
+        return (int)drflac_read_pcm_frames_s16(s_flac, want, dst);
+    default:
+        return 0;
     }
 }
 
@@ -333,7 +414,7 @@ void audio_stream_service(void) {
     while (space >= 256) {
         int got = 0;
         int want = 0;
-        int16_t *direct = NULL;
+        int16_t * direct = NULL;
         int direct_capacity = 0;
 
         int have_direct = direct_decode_supported() &&
@@ -358,10 +439,13 @@ void audio_stream_service(void) {
             if (s_pending_frames <= 0) hal_audio_sample_eof();
             break;
         }
-        if (got < want) {                              /* decoder exhausted */
-            if (s_pending_frames > 0) audio_stream_mark_eof();
-            else if (hal_audio_sample_queued() == 0) audio_stream_finish();
-            else audio_stream_mark_eof();
+        if (got < want) { /* decoder exhausted */
+            if (s_pending_frames > 0)
+                audio_stream_mark_eof();
+            else if (hal_audio_sample_queued() == 0)
+                audio_stream_finish();
+            else
+                audio_stream_mark_eof();
             break;
         }
         if (s_pending_frames > 0) break;

@@ -55,9 +55,9 @@ ports/pc386/
   hal_watchdog_pc386.c        # (or compiles hal/generic/hal_watchdog_noop.c)
 
   pc386_runtime.c             # the host_runtime.c equivalent: provides
-                              # host_output_hook (→ serial_16550_putc), 
+                              # host_output_hook (→ serial_16550_putc),
                               # host_read_byte_*, host_runtime_begin,
-                              # MMputchar wiring. Replaces — does not 
+                              # MMputchar wiring. Replaces — does not
                               # override — host_runtime.c.
   pc386_qemu_exit.c           # writes to QEMU's isa-debug-exit port 0xf4
                               # for clean test-harness exits.
@@ -70,7 +70,7 @@ hal/generic/                  # NEW
   hal_watchdog_noop.c
   hal_pin_unsupported.c
 
-ports/host_native/Makefile    # drops hal_watchdog_host.c + most of 
+ports/host_native/Makefile    # drops hal_watchdog_host.c + most of
                               # hal_pin_host.c, picks up generic versions
 ports/mmbasic_stdio/Makefile  # same
 ports/esp32_s3_metro/main/    # same

@@ -11,16 +11,16 @@
 #include "MATHS.h"
 #include "shared/net/mm_net_http_page.h"
 
-static void page_append(char *out, size_t cap, size_t *pos,
-                        const void *src, size_t len) {
+static void page_append(char * out, size_t cap, size_t * pos,
+                        const void * src, size_t len) {
     if (*pos + len >= cap) error("Output buffer too small");
     memcpy(out + *pos, src, len);
     *pos += len;
     out[*pos] = 0;
 }
 
-int mm_net_http_render_page(const char *fname, int extra,
-                            char **out, size_t *out_len) {
+int mm_net_http_render_page(const char * fname, int extra,
+                            char ** out, size_t * out_len) {
     if (out) *out = NULL;
     if (out_len) *out_len = 0;
     if (!fname || !*fname || !out || !out_len || extra < 0) return -1;
@@ -32,7 +32,7 @@ int mm_net_http_render_page(const char *fname, int extra,
     if (hal_fs_open(fname, HAL_FS_O_RDONLY, &fd) < 0) return -1;
 
     size_t cap = (size_t)st.size + (size_t)extra + 16;
-    char *rendered = GetMemory((int)cap);
+    char * rendered = GetMemory((int)cap);
     size_t pos = 0;
     int ok = 1;
 
@@ -80,11 +80,11 @@ int mm_net_http_render_page(const char *fname, int extra,
         expr[exprp] = 0;
         MMFLOAT f;
         int64_t i64;
-        unsigned char *s;
+        unsigned char * s;
         int t = T_NOTYPE;
-        unsigned char *saved_tknbuf = GetMemory(STRINGSIZE);
-        unsigned char *eval_tkn = GetMemory(STRINGSIZE);
-        char *valbuf = GetTempMemory(STRINGSIZE);
+        unsigned char * saved_tknbuf = GetMemory(STRINGSIZE);
+        unsigned char * eval_tkn = GetMemory(STRINGSIZE);
+        char * valbuf = GetTempMemory(STRINGSIZE);
 
         strcpy((char *)saved_tknbuf, (char *)tknbuf);
         inpbuf[0] = 'r';

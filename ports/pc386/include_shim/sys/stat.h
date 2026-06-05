@@ -13,8 +13,8 @@ struct stat {
 };
 
 /* No symlinks on FAT — predicate always false. */
-#define S_ISLNK(m)   (0)
-#define S_ISDIR(m)   (((m) & 0170000) == 0040000)
-#define S_ISREG(m)   (((m) & 0170000) == 0100000)
+#define S_ISLNK(m) (0)
+#define S_ISDIR(m) (((m) & 0170000) == 0040000)
+#define S_ISREG(m) (((m) & 0170000) == 0100000)
 
 #endif

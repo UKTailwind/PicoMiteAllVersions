@@ -37,7 +37,7 @@ static void pico_ntp_apply(uint32_t unix_seconds, MMFLOAT adjust_hours) {
     time_t adjusted = (time_t)unix_seconds + (time_t)(adjust_hours * 3600.0);
     struct tm utc_buf;
     hal_calendar_epoch_to_tm(adjusted, &utc_buf);
-    struct tm *utc = &utc_buf;
+    struct tm * utc = &utc_buf;
 
     char buff[STRINGSIZE] = {0};
     snprintf(buff, sizeof buff,
@@ -54,12 +54,12 @@ static void pico_ntp_apply(uint32_t unix_seconds, MMFLOAT adjust_hours) {
                          time_us_64() / 1000000;
 }
 
-void cmd_ntp(unsigned char *tp) {
+void cmd_ntp(unsigned char * tp) {
     getargs(&tp, 5, (unsigned char *)",");
     if (!(argc == 0 || argc == 1 || argc == 3 || argc == 5)) error("Syntax");
 
     MMFLOAT adjust = 0.0;
-    const char *server = NTP_SERVER;
+    const char * server = NTP_SERVER;
     int timeout = 5000;
     uint16_t port = NTP_PORT;
 
@@ -73,7 +73,7 @@ void cmd_ntp(unsigned char *tp) {
     char hostbuf[STRINGSIZE];
     strncpy(hostbuf, server, sizeof(hostbuf) - 1);
     hostbuf[sizeof(hostbuf) - 1] = 0;
-    char *colon = strrchr(hostbuf, ':');
+    char * colon = strrchr(hostbuf, ':');
     if (colon && colon[1]) {
         int parsed_port = atoi(colon + 1);
         if (parsed_port > 0 && parsed_port <= 65535) {

@@ -21,18 +21,17 @@
 #endif
 
 void MMB_HOT_FUNC(mmbasic_runtime_interrupt_save_error_state)(
-    int *saved_option_error_skip,
-    char *saved_error_message,
+    int * saved_option_error_skip,
+    char * saved_error_message,
     size_t saved_error_message_size,
-    int *saved_errno,
-    int *option_error_skip,
-    char *error_message,
-    int *errno_value)
-{
+    int * saved_errno,
+    int * option_error_skip,
+    char * error_message,
+    int * errno_value) {
     if (saved_option_error_skip) {
         *saved_option_error_skip = option_error_skip && *option_error_skip > 0
-            ? *option_error_skip
-            : 0;
+                                       ? *option_error_skip
+                                       : 0;
     }
     if (option_error_skip) *option_error_skip = 0;
     if (saved_error_message && saved_error_message_size && error_message) {
@@ -46,29 +45,27 @@ void MMB_HOT_FUNC(mmbasic_runtime_interrupt_save_error_state)(
 
 void MMB_HOT_FUNC(mmbasic_runtime_interrupt_restore_error_state)(
     int saved_option_error_skip,
-    const char *saved_error_message,
+    const char * saved_error_message,
     int saved_errno,
-    int *option_error_skip,
-    char *error_message,
-    int *errno_value)
-{
+    int * option_error_skip,
+    char * error_message,
+    int * errno_value) {
     if (option_error_skip) {
         *option_error_skip = saved_option_error_skip > 0
-            ? saved_option_error_skip + 1
-            : saved_option_error_skip;
+                                 ? saved_option_error_skip + 1
+                                 : saved_option_error_skip;
     }
     if (error_message && saved_error_message) strcpy(error_message, saved_error_message);
     if (errno_value) *errno_value = saved_errno;
 }
 
 void MMB_HOT_FUNC(mmbasic_runtime_interrupt_leave_state)(
-    unsigned char **nextstmt_slot,
-    unsigned char **interrupt_return_slot,
-    int *local_index,
+    unsigned char ** nextstmt_slot,
+    unsigned char ** interrupt_return_slot,
+    int * local_index,
     mmbasic_runtime_clear_vars_fn clear_vars,
-    bool *temp_memory_changed,
-    char *current_interrupt_name)
-{
+    bool * temp_memory_changed,
+    char * current_interrupt_name) {
     if (nextstmt_slot && interrupt_return_slot) {
         *nextstmt_slot = *interrupt_return_slot;
         *interrupt_return_slot = NULL;
@@ -92,23 +89,22 @@ void MMB_HOT_FUNC(mmbasic_runtime_interrupt_leave_state)(
  * plumb a non-blocking pending check alongside the UDPreceive flag.
  */
 int MMB_HOT_FUNC(mmbasic_runtime_check_interrupt)(
-    const mmbasic_runtime_interrupt_dispatch_adapter *adapter)
-{
+    const mmbasic_runtime_interrupt_dispatch_adapter * adapter) {
     if (!adapter) return 0;
     if (adapter->service) adapter->service();
     if (!InterruptUsed) return 0;
     if (InterruptReturn != NULL) return 0;
 
-    unsigned char *intaddr = NULL;
+    unsigned char * intaddr = NULL;
     if (TCPreceiveInterrupt && (TCPreceived ||
-        (adapter->tcp_pending && adapter->tcp_pending()))) {
+                                (adapter->tcp_pending && adapter->tcp_pending()))) {
         intaddr = (unsigned char *)TCPreceiveInterrupt;
         TCPreceived = false;
     } else if (MQTTInterrupt && MQTTComplete) {
         intaddr = (unsigned char *)MQTTInterrupt;
         MQTTComplete = false;
     } else if (UDPinterrupt && (UDPreceive ||
-        (adapter->udp_pending && adapter->udp_pending()))) {
+                                (adapter->udp_pending && adapter->udp_pending()))) {
         intaddr = (unsigned char *)UDPinterrupt;
         UDPreceive = false;
     } else if (audio_interrupt_pending(&intaddr)) {
@@ -144,8 +140,7 @@ int MMB_HOT_FUNC(mmbasic_runtime_check_interrupt)(
 }
 
 void MMB_HOT_FUNC(mmbasic_runtime_cmd_ireturn)(
-    const mmbasic_runtime_interrupt_dispatch_adapter *adapter)
-{
+    const mmbasic_runtime_interrupt_dispatch_adapter * adapter) {
     if (InterruptReturn == NULL) error("Not in interrupt");
     checkend(cmdline);
     mmbasic_runtime_interrupt_leave_state(&nextstmt, &InterruptReturn,
@@ -154,7 +149,8 @@ void MMB_HOT_FUNC(mmbasic_runtime_cmd_ireturn)(
                                           CurrentInterruptName);
     if (!adapter) return;
     int saved_skip = adapter->save_option_error_skip
-                     ? *adapter->save_option_error_skip : 0;
+                         ? *adapter->save_option_error_skip
+                         : 0;
     int saved_errno = adapter->save_errno ? *adapter->save_errno : 0;
     mmbasic_runtime_interrupt_restore_error_state(
         saved_skip,
@@ -163,22 +159,21 @@ void MMB_HOT_FUNC(mmbasic_runtime_cmd_ireturn)(
         &OptionErrorSkip, MMErrMsg, &MMerrno);
 }
 
-unsigned char *MMB_HOT_FUNC(
+unsigned char * MMB_HOT_FUNC(
     mmbasic_runtime_interrupt_prepare_sub_return)(
     unsigned int ireturn_token,
     unsigned int token_base,
-    unsigned char *interrupt_addr,
-    char *current_interrupt_name,
+    unsigned char * interrupt_addr,
+    char * current_interrupt_name,
     size_t interrupt_name_copy_len,
     bool terminate_interrupt_name,
-    char *return_token,
+    char * return_token,
     size_t return_token_size,
-    int *gosub_index,
-    unsigned char **error_stack,
-    unsigned char **gosub_stack,
-    unsigned char *current_line_ptr,
-    int *local_index)
-{
+    int * gosub_index,
+    unsigned char ** error_stack,
+    unsigned char ** gosub_stack,
+    unsigned char * current_line_ptr,
+    int * local_index) {
     if (current_interrupt_name && interrupt_name_copy_len) {
         strncpy(current_interrupt_name, (const char *)interrupt_addr + 2,
                 interrupt_name_copy_len);

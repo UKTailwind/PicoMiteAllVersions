@@ -12,11 +12,11 @@ extern "C" {
 #endif
 
 extern volatile bool TCPreceived;
-extern char *TCPreceiveInterrupt;
+extern char * TCPreceiveInterrupt;
 extern volatile bool UDPreceive;
-extern char *UDPinterrupt;
+extern char * UDPinterrupt;
 extern volatile bool MQTTComplete;
-extern char *MQTTInterrupt;
+extern char * MQTTInterrupt;
 
 #ifdef __cplusplus
 }

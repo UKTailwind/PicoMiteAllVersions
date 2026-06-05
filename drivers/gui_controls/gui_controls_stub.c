@@ -13,29 +13,42 @@
 
 extern void cmd_guiMX170(void);
 
-struct s_ctrl *Ctrl = NULL;
+struct s_ctrl * Ctrl = NULL;
 
 void hal_gui_controls_alloc_array(void) {}
 void hal_gui_controls_clear_for_program(void) {}
 void hal_gui_controls_post_irq_redraw(void) {}
-int  hal_gui_controls_option_set(unsigned char *cmdline) { (void)cmdline; return 0; }
-char *hal_gui_controls_pending_interrupt(void) { return NULL; }
+int hal_gui_controls_option_set(unsigned char * cmdline) {
+    (void)cmdline;
+    return 0;
+}
+char * hal_gui_controls_pending_interrupt(void) {
+    return NULL;
+}
 void hal_gui_controls_periodic(void) {}
-int  hal_gui_controls_print_char_escape(int fnt, int fc, int bc,
-                                        char **str_pp,
-                                        int orientation) {
-    (void)fnt; (void)fc; (void)bc; (void)str_pp; (void)orientation;
+int hal_gui_controls_print_char_escape(int fnt, int fc, int bc,
+                                       char ** str_pp,
+                                       int orientation) {
+    (void)fnt;
+    (void)fc;
+    (void)bc;
+    (void)str_pp;
+    (void)orientation;
     return 0;
 }
 void hal_gui_controls_hide_all(void) {}
 void hal_gui_controls_reset(void) {}
 void hal_gui_controls_reset_interrupts(void) {}
 
-int hal_gui_controls_get_touch_attr(unsigned char *p, int64_t *iret_out) {
-    (void)p; (void)iret_out;
+int hal_gui_controls_get_touch_attr(unsigned char * p, int64_t * iret_out) {
+    (void)p;
+    (void)iret_out;
     return 0;
 }
-void hal_gui_controls_set_beep_timer(int ms) { (void)ms; error("Not supported on this board"); }
+void hal_gui_controls_set_beep_timer(int ms) {
+    (void)ms;
+    error("Not supported on this board");
+}
 void hal_gui_controls_routine_check_touch(void) {}
 void hal_gui_controls_timer_tick(void) {}
 void hal_gui_controls_print_options(void) {}
@@ -45,7 +58,15 @@ void hal_gui_controls_print_options(void) {}
  * cmd_gui falls through to cmd_guiMX170 (the legacy non-GUICONTROLS
  * GUI sub-command parser, which lives in Draw.c and is linked on
  * every port). */
-void cmd_gui(void) { cmd_guiMX170(); }
-void cmd_ctrlval(void) { error("Not supported on this board"); }
-void fun_msgbox(void) { error("Not supported on this board"); }
-void fun_ctrlval(void) { error("Not supported on this board"); }
+void cmd_gui(void) {
+    cmd_guiMX170();
+}
+void cmd_ctrlval(void) {
+    error("Not supported on this board");
+}
+void fun_msgbox(void) {
+    error("Not supported on this board");
+}
+void fun_ctrlval(void) {
+    error("Not supported on this board");
+}

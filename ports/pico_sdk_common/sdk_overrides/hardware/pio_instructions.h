@@ -1,4 +1,4 @@
-/* 
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */
@@ -35,16 +35,16 @@ enum pio_instr_bits {
 };
 
 #ifndef NDEBUG
-#define _PIO_INVALID_IN_SRC    0x08u
+#define _PIO_INVALID_IN_SRC 0x08u
 #define _PIO_INVALID_OUT_DEST 0x10u
 #define _PIO_INVALID_SET_DEST 0x20u
-#define _PIO_INVALID_MOV_SRC  0x40u
+#define _PIO_INVALID_MOV_SRC 0x40u
 #define _PIO_INVALID_MOV_DEST 0x80u
 #else
-#define _PIO_INVALID_IN_SRC    0u
+#define _PIO_INVALID_IN_SRC 0u
 #define _PIO_INVALID_OUT_DEST 0u
 #define _PIO_INVALID_SET_DEST 0u
-#define _PIO_INVALID_MOV_SRC  0u
+#define _PIO_INVALID_MOV_SRC 0u
 #define _PIO_INVALID_MOV_DEST 0u
 #endif
 

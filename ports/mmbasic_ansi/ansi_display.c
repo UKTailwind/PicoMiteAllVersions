@@ -39,7 +39,7 @@
 #include "ansi_terminal.h"
 
 /* From ports/host_native/host_fb.c. */
-extern uint32_t *host_framebuffer;
+extern uint32_t * host_framebuffer;
 extern int host_fb_width;
 extern int host_fb_height;
 extern volatile uint32_t host_fb_generation;
@@ -47,18 +47,18 @@ extern void host_fb_ensure(void);
 
 static pthread_t render_tid;
 static atomic_int render_stop = 0;
-static int       render_running = 0;
+static int render_running = 0;
 
 /* Shadow: one uint64 per cell, high 32 = top pixel, low 32 = bottom.
  * Uses 0xFF in the top byte of each half as an "invalid" sentinel so
  * the very first paint always emits every cell. */
-static uint64_t *shadow = NULL;
-static int       shadow_w = 0;
-static int       shadow_h_cells = 0;
+static uint64_t * shadow = NULL;
+static int shadow_w = 0;
+static int shadow_h_cells = 0;
 
 /* Output buffer — reusable across frames to avoid the per-frame
  * malloc. Grows as needed. */
-static char  *outbuf = NULL;
+static char * outbuf = NULL;
 static size_t outbuf_cap = 0;
 static size_t outbuf_len = 0;
 
@@ -81,7 +81,7 @@ static int term_cols = 0;
 static int truecolor_supported = 0;
 
 static int detect_truecolor(void) {
-    const char *ct = getenv("COLORTERM");
+    const char * ct = getenv("COLORTERM");
     if (!ct) return 0;
     return (strcmp(ct, "truecolor") == 0 || strcmp(ct, "24bit") == 0);
 }
@@ -94,14 +94,23 @@ static int detect_truecolor(void) {
  * the green-phosphor palette used by the REPL. */
 static inline unsigned int rgb_to_256(uint32_t rgb) {
     unsigned int r = (rgb >> 16) & 0xFF;
-    unsigned int g = (rgb >>  8) & 0xFF;
-    unsigned int b =  rgb        & 0xFF;
-    unsigned int r6 = (r < 48) ? 0 : (r < 115) ? 1 : (r < 155) ? 2
-                    : (r < 195) ? 3 : (r < 235) ? 4 : 5;
-    unsigned int g6 = (g < 48) ? 0 : (g < 115) ? 1 : (g < 155) ? 2
-                    : (g < 195) ? 3 : (g < 235) ? 4 : 5;
-    unsigned int b6 = (b < 48) ? 0 : (b < 115) ? 1 : (b < 155) ? 2
-                    : (b < 195) ? 3 : (b < 235) ? 4 : 5;
+    unsigned int g = (rgb >> 8) & 0xFF;
+    unsigned int b = rgb & 0xFF;
+    unsigned int r6 = (r < 48) ? 0 : (r < 115) ? 1
+                                 : (r < 155)   ? 2
+                                 : (r < 195)   ? 3
+                                 : (r < 235)   ? 4
+                                               : 5;
+    unsigned int g6 = (g < 48) ? 0 : (g < 115) ? 1
+                                 : (g < 155)   ? 2
+                                 : (g < 195)   ? 3
+                                 : (g < 235)   ? 4
+                                               : 5;
+    unsigned int b6 = (b < 48) ? 0 : (b < 115) ? 1
+                                 : (b < 155)   ? 2
+                                 : (b < 195)   ? 3
+                                 : (b < 235)   ? 4
+                                               : 5;
     return 16 + 36 * r6 + 6 * g6 + b6;
 }
 
@@ -115,20 +124,20 @@ static void outbuf_reserve(size_t extra) {
     if (outbuf_len + extra <= outbuf_cap) return;
     size_t new_cap = outbuf_cap ? outbuf_cap * 2 : 64 * 1024;
     while (new_cap < outbuf_len + extra) new_cap *= 2;
-    char *nb = realloc(outbuf, new_cap);
-    if (!nb) return;  /* drop this cell rather than crash */
+    char * nb = realloc(outbuf, new_cap);
+    if (!nb) return; /* drop this cell rather than crash */
     outbuf = nb;
     outbuf_cap = new_cap;
 }
 
-static inline void outbuf_puts_n(const char *s, size_t n) {
+static inline void outbuf_puts_n(const char * s, size_t n) {
     outbuf_reserve(n);
     if (!outbuf) return;
     memcpy(outbuf + outbuf_len, s, n);
     outbuf_len += n;
 }
 
-static inline void outbuf_append(const char *s) {
+static inline void outbuf_append(const char * s) {
     outbuf_puts_n(s, strlen(s));
 }
 
@@ -136,8 +145,14 @@ static inline void outbuf_append(const char *s) {
 static inline void outbuf_dec(unsigned int v) {
     char tmp[12];
     int i = 0;
-    if (v == 0) { outbuf_puts_n("0", 1); return; }
-    while (v) { tmp[i++] = (char)('0' + (v % 10)); v /= 10; }
+    if (v == 0) {
+        outbuf_puts_n("0", 1);
+        return;
+    }
+    while (v) {
+        tmp[i++] = (char)('0' + (v % 10));
+        v /= 10;
+    }
     outbuf_reserve((size_t)i);
     if (!outbuf) return;
     while (i-- > 0) outbuf[outbuf_len++] = tmp[i];
@@ -180,7 +195,7 @@ static void emit_sgr(uint32_t fg, uint32_t bg) {
 }
 
 /* UTF-8 encoding of ▀ (U+2580). */
-static const char HALF_BLOCK_UP[] = { (char)0xE2, (char)0x96, (char)0x80 };
+static const char HALF_BLOCK_UP[] = {(char)0xE2, (char)0x96, (char)0x80};
 
 static void render_frame(void) {
     int fb_w = host_fb_width;
@@ -217,7 +232,7 @@ static void render_frame(void) {
     if (clear_terminal) outbuf_append("\x1b[0m\x1b[2J\x1b[H");
 
     /* Cursor + SGR run-state across the whole frame. */
-    int cursor_row = -1, cursor_col = -1;  /* -1 = unknown, force move */
+    int cursor_row = -1, cursor_col = -1; /* -1 = unknown, force move */
     uint64_t last_sgr = INVALID_SGR;
 
     /* Row-major scan of cells. Rows are the only axis we can't
@@ -227,11 +242,11 @@ static void render_frame(void) {
     for (int cy = 0; cy < paint_rows; ++cy) {
         int y_top = cy * 2;
         int y_bot = y_top + 1;
-        const uint32_t *row_top = host_framebuffer + (size_t)y_top * (size_t)fb_w;
-        const uint32_t *row_bot = (y_bot < fb_h)
-                                    ? host_framebuffer + (size_t)y_bot * (size_t)fb_w
-                                    : row_top;
-        uint64_t *shadow_row = shadow + (size_t)cy * (size_t)shadow_w;
+        const uint32_t * row_top = host_framebuffer + (size_t)y_top * (size_t)fb_w;
+        const uint32_t * row_bot = (y_bot < fb_h)
+                                       ? host_framebuffer + (size_t)y_bot * (size_t)fb_w
+                                       : row_top;
+        uint64_t * shadow_row = shadow + (size_t)cy * (size_t)shadow_w;
 
         for (int cx = 0; cx < paint_cols; ++cx) {
             uint32_t top = row_top[cx] & 0x00FFFFFFu;
@@ -264,7 +279,7 @@ static void render_frame(void) {
         }
     }
 
-    if (outbuf_len == 0) return;  /* nothing changed */
+    if (outbuf_len == 0) return; /* nothing changed */
 
     /* Drain the whole frame. stdin was put in O_NONBLOCK by
      * host_raw_mode_enter, and on a pty stdin/stdout share the file
@@ -296,17 +311,17 @@ static void render_frame(void) {
 }
 
 static void sleep_ms(int ms) {
-    struct timespec ts = { ms / 1000, (long)(ms % 1000) * 1000000L };
+    struct timespec ts = {ms / 1000, (long)(ms % 1000) * 1000000L};
     nanosleep(&ts, NULL);
 }
 
-static void *render_main(void *arg) {
+static void * render_main(void * arg) {
     (void)arg;
 
     /* Get initial terminal size. */
     ansi_terminal_get_size(&term_rows, &term_cols);
 
-    uint32_t last_gen = 0xFFFFFFFFu;  /* force first paint */
+    uint32_t last_gen = 0xFFFFFFFFu; /* force first paint */
     while (!atomic_load(&render_stop)) {
         if (ansi_terminal_resized) {
             ansi_terminal_get_size(&term_rows, &term_cols);
@@ -318,7 +333,7 @@ static void *render_main(void *arg) {
             render_frame();
             last_gen = gen;
         }
-        sleep_ms(16);  /* ~60 Hz */
+        sleep_ms(16); /* ~60 Hz */
     }
     return NULL;
 }

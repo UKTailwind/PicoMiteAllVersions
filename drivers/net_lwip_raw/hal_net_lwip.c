@@ -34,7 +34,7 @@
 #define LWIP_HAL_MQTT_PAYLOAD_CAP 256
 
 typedef struct {
-    struct udp_pcb *pcb;
+    struct udp_pcb * pcb;
     uint8_t pending;
     ip_addr_t from;
     uint16_t from_port;
@@ -49,7 +49,7 @@ typedef struct {
 } lwip_hal_dns_state_t;
 
 typedef struct {
-    char *out;
+    char * out;
     size_t out_len;
     size_t used;
     int overflow;
@@ -58,41 +58,41 @@ typedef struct {
 } lwip_hal_wifi_scan_state_t;
 
 typedef struct lwip_hal_rx_node {
-    struct lwip_hal_rx_node *next;
+    struct lwip_hal_rx_node * next;
     size_t len;
     size_t off;
     uint8_t data[];
 } lwip_hal_rx_node_t;
 
 typedef struct {
-    struct tcp_pcb *pcb;
+    struct tcp_pcb * pcb;
     volatile int connected;
     volatile int failed;
     volatile int closed;
-    lwip_hal_rx_node_t *rx_head;
-    lwip_hal_rx_node_t *rx_tail;
+    lwip_hal_rx_node_t * rx_head;
+    lwip_hal_rx_node_t * rx_tail;
 } lwip_hal_tcp_client_slot_t;
 
 typedef struct {
-    struct tcp_pcb *pcb;
+    struct tcp_pcb * pcb;
     uint16_t port;
 } lwip_hal_tcp_server_slot_t;
 
 typedef struct {
-    struct tcp_pcb *pcb;
+    struct tcp_pcb * pcb;
     uint16_t server;
     volatile int closed;
     volatile int failed;
     volatile int accepted;
     volatile int pending;
     volatile int delivered;
-    uint8_t *rx;
+    uint8_t * rx;
     size_t rx_len;
     size_t rx_off;
 } lwip_hal_tcp_conn_slot_t;
 
 typedef struct {
-    mqtt_client_t *client;
+    mqtt_client_t * client;
     struct mqtt_connect_client_info_t info;
     volatile int connected;
     volatile int failed;
@@ -122,12 +122,12 @@ static char wifi_ip[16];
 static char wifi_mask[16];
 static char wifi_gw[16];
 
-static lwip_hal_tcp_server_slot_t *tcp_server_slot(hal_net_tcp_server_t server);
-static lwip_hal_tcp_conn_slot_t *tcp_conn_slot(hal_net_tcp_conn_t conn);
-static void tcp_conn_close_slot(lwip_hal_tcp_conn_slot_t *slot);
-static err_t tcp_server_accept_cb(void *arg, struct tcp_pcb *client_pcb,
+static lwip_hal_tcp_server_slot_t * tcp_server_slot(hal_net_tcp_server_t server);
+static lwip_hal_tcp_conn_slot_t * tcp_conn_slot(hal_net_tcp_conn_t conn);
+static void tcp_conn_close_slot(lwip_hal_tcp_conn_slot_t * slot);
+static err_t tcp_server_accept_cb(void * arg, struct tcp_pcb * client_pcb,
                                   err_t err);
-static int tcp_write_all(struct tcp_pcb *pcb, const void *buf, size_t len,
+static int tcp_write_all(struct tcp_pcb * pcb, const void * buf, size_t len,
                          uint32_t timeout_ms);
 
 uint32_t hal_net_capabilities(void) {
@@ -145,16 +145,16 @@ void hal_net_poll(void) {
     cyw43_arch_poll();
 }
 
-static lwip_hal_udp_slot_t *udp_slot(hal_net_udp_socket_t sock) {
+static lwip_hal_udp_slot_t * udp_slot(hal_net_udp_socket_t sock) {
     if (sock == 0 || sock > LWIP_HAL_MAX_UDP_SOCKS) return NULL;
-    lwip_hal_udp_slot_t *slot = &udp_slots[sock - 1];
+    lwip_hal_udp_slot_t * slot = &udp_slots[sock - 1];
     return slot->pcb ? slot : NULL;
 }
 
-static void udp_recv_cb(void *arg, struct udp_pcb *pcb, struct pbuf *p,
-                        const ip_addr_t *addr, u16_t port) {
+static void udp_recv_cb(void * arg, struct udp_pcb * pcb, struct pbuf * p,
+                        const ip_addr_t * addr, u16_t port) {
     (void)pcb;
-    lwip_hal_udp_slot_t *slot = (lwip_hal_udp_slot_t *)arg;
+    lwip_hal_udp_slot_t * slot = (lwip_hal_udp_slot_t *)arg;
     if (!slot || !p) return;
     size_t len = p->tot_len;
     if (len > sizeof(slot->data)) len = sizeof(slot->data);
@@ -165,7 +165,7 @@ static void udp_recv_cb(void *arg, struct udp_pcb *pcb, struct pbuf *p,
     pbuf_free(p);
 }
 
-int hal_net_udp_bind(uint16_t port, hal_net_udp_socket_t *out) {
+int hal_net_udp_bind(uint16_t port, hal_net_udp_socket_t * out) {
     if (out) *out = 0;
 
     int free_slot = -1;
@@ -177,7 +177,7 @@ int hal_net_udp_bind(uint16_t port, hal_net_udp_socket_t *out) {
     }
     if (free_slot < 0) return HAL_NET_ERR;
 
-    struct udp_pcb *pcb = udp_new();
+    struct udp_pcb * pcb = udp_new();
     if (!pcb) return HAL_NET_ERR;
     ip_set_option(pcb, SOF_BROADCAST);
     err_t err = udp_bind(pcb, IP_ADDR_ANY, port);
@@ -186,7 +186,7 @@ int hal_net_udp_bind(uint16_t port, hal_net_udp_socket_t *out) {
         return HAL_NET_ERR;
     }
 
-    lwip_hal_udp_slot_t *slot = &udp_slots[free_slot];
+    lwip_hal_udp_slot_t * slot = &udp_slots[free_slot];
     memset(slot, 0, sizeof(*slot));
     slot->pcb = pcb;
     udp_recv(pcb, udp_recv_cb, slot);
@@ -195,17 +195,17 @@ int hal_net_udp_bind(uint16_t port, hal_net_udp_socket_t *out) {
 }
 
 int hal_net_udp_close(hal_net_udp_socket_t sock) {
-    lwip_hal_udp_slot_t *slot = udp_slot(sock);
+    lwip_hal_udp_slot_t * slot = udp_slot(sock);
     if (!slot) return HAL_NET_ERR;
     udp_remove(slot->pcb);
     memset(slot, 0, sizeof(*slot));
     return HAL_NET_OK;
 }
 
-static void dns_found_cb(const char *hostname, const ip_addr_t *ipaddr,
-                         void *arg) {
+static void dns_found_cb(const char * hostname, const ip_addr_t * ipaddr,
+                         void * arg) {
     (void)hostname;
-    lwip_hal_dns_state_t *state = (lwip_hal_dns_state_t *)arg;
+    lwip_hal_dns_state_t * state = (lwip_hal_dns_state_t *)arg;
     if (ipaddr) {
         state->addr = *ipaddr;
         state->complete = 1;
@@ -214,7 +214,7 @@ static void dns_found_cb(const char *hostname, const ip_addr_t *ipaddr,
     }
 }
 
-static int resolve_host(const char *host, uint32_t timeout_ms, ip_addr_t *out) {
+static int resolve_host(const char * host, uint32_t timeout_ms, ip_addr_t * out) {
     if (!host || !*host || !out) return HAL_NET_ERR;
     ip4_addr_t ip4;
     if (!isalpha((unsigned char)host[0]) && strchr(host, '.') &&
@@ -240,17 +240,17 @@ static int resolve_host(const char *host, uint32_t timeout_ms, ip_addr_t *out) {
     return HAL_NET_OK;
 }
 
-int hal_net_udp_socket_send(hal_net_udp_socket_t sock, const char *host,
-                            uint16_t port, const void *buf, size_t len,
+int hal_net_udp_socket_send(hal_net_udp_socket_t sock, const char * host,
+                            uint16_t port, const void * buf, size_t len,
                             uint32_t timeout_ms) {
-    lwip_hal_udp_slot_t *slot = udp_slot(sock);
+    lwip_hal_udp_slot_t * slot = udp_slot(sock);
     if (!slot || !host || !buf || len > 0xffffu) return HAL_NET_ERR;
 
     ip_addr_t remote;
     int rc = resolve_host(host, timeout_ms, &remote);
     if (rc != HAL_NET_OK) return rc;
 
-    struct pbuf *p = pbuf_alloc(PBUF_TRANSPORT, (u16_t)len, PBUF_RAM);
+    struct pbuf * p = pbuf_alloc(PBUF_TRANSPORT, (u16_t)len, PBUF_RAM);
     if (!p) return HAL_NET_ERR;
     if (len) memcpy(p->payload, buf, len);
     err_t err = udp_sendto(slot->pcb, p, &remote, port);
@@ -258,20 +258,21 @@ int hal_net_udp_socket_send(hal_net_udp_socket_t sock, const char *host,
     return err == ERR_OK ? HAL_NET_OK : HAL_NET_ERR;
 }
 
-int hal_net_udp_send(const char *host, uint16_t port,
-                     const void *buf, size_t len, uint32_t timeout_ms) {
+int hal_net_udp_send(const char * host, uint16_t port,
+                     const void * buf, size_t len, uint32_t timeout_ms) {
     if (!host || !buf || len > 0xffffu) return HAL_NET_ERR;
     hal_net_udp_socket_t sock = 0;
     int rc = hal_net_udp_bind(0, &sock);
     if (rc != HAL_NET_OK) {
-        struct udp_pcb *pcb = udp_new();
+        struct udp_pcb * pcb = udp_new();
         if (!pcb) return HAL_NET_ERR;
         ip_set_option(pcb, SOF_BROADCAST);
         ip_addr_t remote;
         rc = resolve_host(host, timeout_ms, &remote);
         if (rc == HAL_NET_OK) {
-            struct pbuf *p = pbuf_alloc(PBUF_TRANSPORT, (u16_t)len, PBUF_RAM);
-            if (!p) rc = HAL_NET_ERR;
+            struct pbuf * p = pbuf_alloc(PBUF_TRANSPORT, (u16_t)len, PBUF_RAM);
+            if (!p)
+                rc = HAL_NET_ERR;
             else {
                 if (len) memcpy(p->payload, buf, len);
                 rc = udp_sendto(pcb, p, &remote, port) == ERR_OK
@@ -288,11 +289,11 @@ int hal_net_udp_send(const char *host, uint16_t port,
     return rc;
 }
 
-int hal_net_udp_recv_event(hal_net_udp_socket_t sock, hal_net_addr_t *from,
-                           void *buf, size_t cap, size_t *len) {
+int hal_net_udp_recv_event(hal_net_udp_socket_t sock, hal_net_addr_t * from,
+                           void * buf, size_t cap, size_t * len) {
     if (len) *len = 0;
     if (from) memset(from, 0, sizeof(*from));
-    lwip_hal_udp_slot_t *slot = udp_slot(sock);
+    lwip_hal_udp_slot_t * slot = udp_slot(sock);
     if (!slot || !buf || cap == 0) return HAL_NET_ERR;
     if (!slot->pending) return HAL_NET_WOULD_BLOCK;
 
@@ -311,22 +312,22 @@ int hal_net_udp_recv_event(hal_net_udp_socket_t sock, hal_net_addr_t *from,
     return HAL_NET_OK;
 }
 
-static lwip_hal_tcp_server_slot_t *tcp_server_slot(hal_net_tcp_server_t server) {
+static lwip_hal_tcp_server_slot_t * tcp_server_slot(hal_net_tcp_server_t server) {
     if (server == 0 || server > LWIP_HAL_MAX_TCP_SERVERS) return NULL;
-    lwip_hal_tcp_server_slot_t *slot = &tcp_server_slots[server - 1];
+    lwip_hal_tcp_server_slot_t * slot = &tcp_server_slots[server - 1];
     return slot->pcb ? slot : NULL;
 }
 
-static lwip_hal_tcp_conn_slot_t *tcp_conn_slot(hal_net_tcp_conn_t conn) {
+static lwip_hal_tcp_conn_slot_t * tcp_conn_slot(hal_net_tcp_conn_t conn) {
     if (conn == 0 || conn > LWIP_HAL_MAX_TCP_CONNS) return NULL;
-    lwip_hal_tcp_conn_slot_t *slot = &tcp_conn_slots[conn - 1];
+    lwip_hal_tcp_conn_slot_t * slot = &tcp_conn_slots[conn - 1];
     return (slot->pcb || slot->closed || slot->delivered || slot->pending ||
             slot->accepted)
                ? slot
                : NULL;
 }
 
-static int tcp_alloc_conn_slot(struct tcp_pcb *pcb, uint16_t server) {
+static int tcp_alloc_conn_slot(struct tcp_pcb * pcb, uint16_t server) {
     for (int i = 0; i < LWIP_HAL_MAX_TCP_CONNS; i++) {
         if (!tcp_conn_slots[i].pcb) {
             memset(&tcp_conn_slots[i], 0, sizeof(tcp_conn_slots[i]));
@@ -339,7 +340,7 @@ static int tcp_alloc_conn_slot(struct tcp_pcb *pcb, uint16_t server) {
     return -1;
 }
 
-static void tcp_conn_close_slot(lwip_hal_tcp_conn_slot_t *slot) {
+static void tcp_conn_close_slot(lwip_hal_tcp_conn_slot_t * slot) {
     if (!slot) return;
     if (slot->pcb) {
         tcp_arg(slot->pcb, NULL);
@@ -353,10 +354,10 @@ static void tcp_conn_close_slot(lwip_hal_tcp_conn_slot_t *slot) {
     memset(slot, 0, sizeof(*slot));
 }
 
-static err_t tcp_server_conn_recv_cb(void *arg, struct tcp_pcb *pcb,
-                                     struct pbuf *p, err_t err) {
+static err_t tcp_server_conn_recv_cb(void * arg, struct tcp_pcb * pcb,
+                                     struct pbuf * p, err_t err) {
     (void)err;
-    lwip_hal_tcp_conn_slot_t *slot = (lwip_hal_tcp_conn_slot_t *)arg;
+    lwip_hal_tcp_conn_slot_t * slot = (lwip_hal_tcp_conn_slot_t *)arg;
     if (!slot) {
         if (p) pbuf_free(p);
         return ERR_OK;
@@ -368,14 +369,14 @@ static err_t tcp_server_conn_recv_cb(void *arg, struct tcp_pcb *pcb,
     }
     if (p->tot_len > 0) {
         size_t old_len = slot->rx_len;
-        uint8_t *rx = (uint8_t *)realloc(slot->rx, old_len + p->tot_len);
+        uint8_t * rx = (uint8_t *)realloc(slot->rx, old_len + p->tot_len);
         if (!rx) {
             pbuf_free(p);
             return ERR_MEM;
         }
         slot->rx = rx;
         slot->rx_len = old_len +
-            pbuf_copy_partial(p, slot->rx + old_len, p->tot_len, 0);
+                       pbuf_copy_partial(p, slot->rx + old_len, p->tot_len, 0);
         slot->pending = 1;
         tcp_recved(pcb, p->tot_len);
     }
@@ -383,22 +384,24 @@ static err_t tcp_server_conn_recv_cb(void *arg, struct tcp_pcb *pcb,
     return ERR_OK;
 }
 
-static err_t tcp_server_conn_sent_cb(void *arg, struct tcp_pcb *pcb, u16_t len) {
-    (void)arg; (void)pcb; (void)len;
+static err_t tcp_server_conn_sent_cb(void * arg, struct tcp_pcb * pcb, u16_t len) {
+    (void)arg;
+    (void)pcb;
+    (void)len;
     return ERR_OK;
 }
 
-static void tcp_server_conn_err_cb(void *arg, err_t err) {
+static void tcp_server_conn_err_cb(void * arg, err_t err) {
     (void)err;
-    lwip_hal_tcp_conn_slot_t *slot = (lwip_hal_tcp_conn_slot_t *)arg;
+    lwip_hal_tcp_conn_slot_t * slot = (lwip_hal_tcp_conn_slot_t *)arg;
     if (!slot) return;
     slot->failed = 1;
     slot->pcb = NULL;
 }
 
-static err_t tcp_server_accept_cb(void *arg, struct tcp_pcb *client_pcb,
+static err_t tcp_server_accept_cb(void * arg, struct tcp_pcb * client_pcb,
                                   err_t err) {
-    lwip_hal_tcp_server_slot_t *server_slot =
+    lwip_hal_tcp_server_slot_t * server_slot =
         (lwip_hal_tcp_server_slot_t *)arg;
     if (err != ERR_OK || !client_pcb) return ERR_VAL;
     if (!server_slot) return ERR_VAL;
@@ -410,7 +413,7 @@ static err_t tcp_server_accept_cb(void *arg, struct tcp_pcb *client_pcb,
         tcp_abort(client_pcb);
         return ERR_ABRT;
     }
-    lwip_hal_tcp_conn_slot_t *slot = &tcp_conn_slots[idx];
+    lwip_hal_tcp_conn_slot_t * slot = &tcp_conn_slots[idx];
     tcp_arg(client_pcb, slot);
     tcp_recv(client_pcb, tcp_server_conn_recv_cb);
     tcp_sent(client_pcb, tcp_server_conn_sent_cb);
@@ -418,10 +421,10 @@ static err_t tcp_server_accept_cb(void *arg, struct tcp_pcb *client_pcb,
     return ERR_OK;
 }
 
-static int tcp_write_all(struct tcp_pcb *pcb, const void *buf, size_t len,
+static int tcp_write_all(struct tcp_pcb * pcb, const void * buf, size_t len,
                          uint32_t timeout_ms) {
     if (!pcb || !buf) return HAL_NET_ERR;
-    const uint8_t *src = (const uint8_t *)buf;
+    const uint8_t * src = (const uint8_t *)buf;
     size_t sent = 0;
     absolute_time_t deadline = make_timeout_time_ms(timeout_ms);
     while (sent < len) {
@@ -448,7 +451,7 @@ static int tcp_write_all(struct tcp_pcb *pcb, const void *buf, size_t len,
     return HAL_NET_OK;
 }
 
-static void copy_string(char *dst, size_t dst_len, const char *src) {
+static void copy_string(char * dst, size_t dst_len, const char * src) {
     if (!dst || dst_len == 0) return;
     if (!src) src = "";
     size_t len = strlen(src);
@@ -457,9 +460,9 @@ static void copy_string(char *dst, size_t dst_len, const char *src) {
     dst[len] = 0;
 }
 
-int hal_net_wifi_set_credentials(const char *ssid, const char *pass,
-                                 const char *host, const char *ip,
-                                 const char *mask, const char *gw) {
+int hal_net_wifi_set_credentials(const char * ssid, const char * pass,
+                                 const char * host, const char * ip,
+                                 const char * mask, const char * gw) {
     copy_string(wifi_ssid, sizeof(wifi_ssid), ssid);
     copy_string(wifi_pass, sizeof(wifi_pass), pass);
     copy_string(wifi_host, sizeof(wifi_host), host);
@@ -517,17 +520,17 @@ int hal_net_tcpip_status(void) {
     return cyw43_tcpip_link_status(&cyw43_state, CYW43_ITF_STA);
 }
 
-int hal_net_ip_address(char *out, size_t out_len) {
+int hal_net_ip_address(char * out, size_t out_len) {
     if (out && out_len) out[0] = 0;
     if (!out || out_len == 0) return HAL_NET_ERR;
-    struct netif *netif = &cyw43_state.netif[CYW43_ITF_STA];
+    struct netif * netif = &cyw43_state.netif[CYW43_ITF_STA];
     if (!netif) return HAL_NET_ERR;
     snprintf(out, out_len, "%s", ip4addr_ntoa(netif_ip4_addr(netif)));
     return HAL_NET_OK;
 }
 
-static int wifi_scan_result_cb(void *env, const cyw43_ev_scan_result_t *result) {
-    lwip_hal_wifi_scan_state_t *state = (lwip_hal_wifi_scan_state_t *)env;
+static int wifi_scan_result_cb(void * env, const cyw43_ev_scan_result_t * result) {
+    lwip_hal_wifi_scan_state_t * state = (lwip_hal_wifi_scan_state_t *)env;
     if (!state || !result || state->overflow) return 0;
 
     for (uint8_t i = 0; i < state->seen_count; i++) {
@@ -560,14 +563,14 @@ static int wifi_scan_result_cb(void *env, const cyw43_ev_scan_result_t *result) 
     return 0;
 }
 
-int hal_net_wifi_scan(char *out, size_t out_len, size_t *written,
+int hal_net_wifi_scan(char * out, size_t out_len, size_t * written,
                       int print_to_console) {
     (void)print_to_console;
     if (out && out_len) out[0] = 0;
     if (written) *written = 0;
     if (!out || out_len == 0) return HAL_NET_ERR;
 
-    lwip_hal_wifi_scan_state_t *state =
+    lwip_hal_wifi_scan_state_t * state =
         (lwip_hal_wifi_scan_state_t *)malloc(sizeof(*state));
     if (!state) return HAL_NET_ERR;
     memset(state, 0, sizeof(*state));
@@ -598,7 +601,7 @@ int hal_net_wifi_scan(char *out, size_t out_len, size_t *written,
 }
 
 int hal_net_tcp_server_open(uint16_t port, int backlog,
-                            hal_net_tcp_server_t *out) {
+                            hal_net_tcp_server_t * out) {
     if (out) *out = 0;
     if (!port) return HAL_NET_ERR;
     int free_slot = -1;
@@ -609,7 +612,7 @@ int hal_net_tcp_server_open(uint16_t port, int backlog,
         }
     }
     if (free_slot < 0) return HAL_NET_ERR;
-    struct tcp_pcb *pcb = tcp_new_ip_type(IPADDR_TYPE_ANY);
+    struct tcp_pcb * pcb = tcp_new_ip_type(IPADDR_TYPE_ANY);
     if (!pcb) return HAL_NET_ERR;
     /* Allow rebind to the same port immediately after a previous close,
      * even if the port is still in lwip's TIME_WAIT or has lingering pcb
@@ -621,7 +624,7 @@ int hal_net_tcp_server_open(uint16_t port, int backlog,
         tcp_close(pcb);
         return HAL_NET_ERR;
     }
-    struct tcp_pcb *listen_pcb = tcp_listen_with_backlog(pcb, backlog);
+    struct tcp_pcb * listen_pcb = tcp_listen_with_backlog(pcb, backlog);
     if (!listen_pcb) {
         tcp_close(pcb);
         return HAL_NET_ERR;
@@ -635,7 +638,7 @@ int hal_net_tcp_server_open(uint16_t port, int backlog,
 }
 
 int hal_net_tcp_server_close(hal_net_tcp_server_t server) {
-    lwip_hal_tcp_server_slot_t *slot = tcp_server_slot(server);
+    lwip_hal_tcp_server_slot_t * slot = tcp_server_slot(server);
     if (!slot) return HAL_NET_ERR;
     tcp_arg(slot->pcb, NULL);
     tcp_accept(slot->pcb, NULL);
@@ -645,12 +648,12 @@ int hal_net_tcp_server_close(hal_net_tcp_server_t server) {
 }
 
 int hal_net_tcp_accept_conn(hal_net_tcp_server_t server,
-                            hal_net_tcp_conn_t *conn) {
+                            hal_net_tcp_conn_t * conn) {
     if (conn) *conn = 0;
-    lwip_hal_tcp_server_slot_t *server_slot = tcp_server_slot(server);
+    lwip_hal_tcp_server_slot_t * server_slot = tcp_server_slot(server);
     if (!server_slot) return HAL_NET_ERR;
     for (int i = 0; i < LWIP_HAL_MAX_TCP_CONNS; i++) {
-        lwip_hal_tcp_conn_slot_t *slot = &tcp_conn_slots[i];
+        lwip_hal_tcp_conn_slot_t * slot = &tcp_conn_slots[i];
         if (!slot->pcb || slot->server != server || !slot->accepted)
             continue;
         slot->accepted = 0;
@@ -661,14 +664,14 @@ int hal_net_tcp_accept_conn(hal_net_tcp_server_t server,
 }
 
 int hal_net_tcp_accept_event(hal_net_tcp_server_t server,
-                             hal_net_tcp_conn_t *conn,
-                             uint8_t *buf, size_t cap, size_t *len) {
+                             hal_net_tcp_conn_t * conn,
+                             uint8_t * buf, size_t cap, size_t * len) {
     if (conn) *conn = 0;
     if (len) *len = 0;
-    lwip_hal_tcp_server_slot_t *server_slot = tcp_server_slot(server);
+    lwip_hal_tcp_server_slot_t * server_slot = tcp_server_slot(server);
     if (!server_slot || !buf || cap == 0) return HAL_NET_ERR;
     for (int i = 0; i < LWIP_HAL_MAX_TCP_CONNS; i++) {
-        lwip_hal_tcp_conn_slot_t *slot = &tcp_conn_slots[i];
+        lwip_hal_tcp_conn_slot_t * slot = &tcp_conn_slots[i];
         if (!slot->pcb || slot->server != server || !slot->pending ||
             slot->delivered)
             continue;
@@ -691,10 +694,10 @@ int hal_net_tcp_accept_event(hal_net_tcp_server_t server,
     return HAL_NET_WOULD_BLOCK;
 }
 
-int hal_net_tcp_conn_recv(hal_net_tcp_conn_t conn, void *buf, size_t cap,
-                          size_t *len) {
+int hal_net_tcp_conn_recv(hal_net_tcp_conn_t conn, void * buf, size_t cap,
+                          size_t * len) {
     if (len) *len = 0;
-    lwip_hal_tcp_conn_slot_t *slot = tcp_conn_slot(conn);
+    lwip_hal_tcp_conn_slot_t * slot = tcp_conn_slot(conn);
     if (!slot || !buf || cap == 0) return HAL_NET_ERR;
     if (slot->rx_off < slot->rx_len) {
         size_t copy = slot->rx_len - slot->rx_off;
@@ -715,17 +718,17 @@ int hal_net_tcp_conn_recv(hal_net_tcp_conn_t conn, void *buf, size_t cap,
     return HAL_NET_WOULD_BLOCK;
 }
 
-int hal_net_tcp_conn_send(hal_net_tcp_conn_t conn, const void *buf, size_t len,
+int hal_net_tcp_conn_send(hal_net_tcp_conn_t conn, const void * buf, size_t len,
                           uint32_t timeout_ms) {
-    lwip_hal_tcp_conn_slot_t *slot = tcp_conn_slot(conn);
+    lwip_hal_tcp_conn_slot_t * slot = tcp_conn_slot(conn);
     if (!slot || !buf) return HAL_NET_ERR;
     return tcp_write_all(slot->pcb, buf, len, timeout_ms);
 }
 
-int hal_net_tcp_conn_send_some(hal_net_tcp_conn_t conn, const void *buf,
-                               size_t cap, size_t *sent) {
+int hal_net_tcp_conn_send_some(hal_net_tcp_conn_t conn, const void * buf,
+                               size_t cap, size_t * sent) {
     if (sent) *sent = 0;
-    lwip_hal_tcp_conn_slot_t *slot = tcp_conn_slot(conn);
+    lwip_hal_tcp_conn_slot_t * slot = tcp_conn_slot(conn);
     if (!slot || (!buf && cap) || slot->closed || slot->failed || !slot->pcb)
         return HAL_NET_ERR;
     if (cap == 0) return HAL_NET_OK;
@@ -743,22 +746,22 @@ int hal_net_tcp_conn_send_some(hal_net_tcp_conn_t conn, const void *buf,
 }
 
 int hal_net_tcp_conn_close(hal_net_tcp_conn_t conn) {
-    lwip_hal_tcp_conn_slot_t *slot = tcp_conn_slot(conn);
+    lwip_hal_tcp_conn_slot_t * slot = tcp_conn_slot(conn);
     if (!slot) return HAL_NET_ERR;
     tcp_conn_close_slot(slot);
     return HAL_NET_OK;
 }
 
-static lwip_hal_tcp_client_slot_t *tcp_client_slot(hal_net_tcp_client_t client) {
+static lwip_hal_tcp_client_slot_t * tcp_client_slot(hal_net_tcp_client_t client) {
     if (client == 0 || client > LWIP_HAL_MAX_TCP_CLIENTS) return NULL;
-    lwip_hal_tcp_client_slot_t *slot = &tcp_client_slots[client - 1];
+    lwip_hal_tcp_client_slot_t * slot = &tcp_client_slots[client - 1];
     return slot->pcb || slot->closed ? slot : NULL;
 }
 
-static void tcp_client_free_rx(lwip_hal_tcp_client_slot_t *slot) {
-    lwip_hal_rx_node_t *node = slot->rx_head;
+static void tcp_client_free_rx(lwip_hal_tcp_client_slot_t * slot) {
+    lwip_hal_rx_node_t * node = slot->rx_head;
     while (node) {
-        lwip_hal_rx_node_t *next = node->next;
+        lwip_hal_rx_node_t * next = node->next;
         free(node);
         node = next;
     }
@@ -766,10 +769,10 @@ static void tcp_client_free_rx(lwip_hal_tcp_client_slot_t *slot) {
     slot->rx_tail = NULL;
 }
 
-static err_t tcp_client_recv_cb(void *arg, struct tcp_pcb *pcb,
-                                struct pbuf *p, err_t err) {
+static err_t tcp_client_recv_cb(void * arg, struct tcp_pcb * pcb,
+                                struct pbuf * p, err_t err) {
     (void)err;
-    lwip_hal_tcp_client_slot_t *slot = (lwip_hal_tcp_client_slot_t *)arg;
+    lwip_hal_tcp_client_slot_t * slot = (lwip_hal_tcp_client_slot_t *)arg;
     if (!slot) {
         if (p) pbuf_free(p);
         return ERR_OK;
@@ -780,7 +783,7 @@ static err_t tcp_client_recv_cb(void *arg, struct tcp_pcb *pcb,
         return ERR_OK;
     }
     if (p->tot_len > 0) {
-        lwip_hal_rx_node_t *node =
+        lwip_hal_rx_node_t * node =
             (lwip_hal_rx_node_t *)malloc(sizeof(*node) + p->tot_len);
         if (!node) {
             pbuf_free(p);
@@ -789,8 +792,10 @@ static err_t tcp_client_recv_cb(void *arg, struct tcp_pcb *pcb,
         node->next = NULL;
         node->len = pbuf_copy_partial(p, node->data, p->tot_len, 0);
         node->off = 0;
-        if (slot->rx_tail) slot->rx_tail->next = node;
-        else slot->rx_head = node;
+        if (slot->rx_tail)
+            slot->rx_tail->next = node;
+        else
+            slot->rx_head = node;
         slot->rx_tail = node;
         tcp_recved(pcb, p->tot_len);
     }
@@ -798,31 +803,35 @@ static err_t tcp_client_recv_cb(void *arg, struct tcp_pcb *pcb,
     return ERR_OK;
 }
 
-static err_t tcp_client_sent_cb(void *arg, struct tcp_pcb *pcb, u16_t len) {
-    (void)arg; (void)pcb; (void)len;
+static err_t tcp_client_sent_cb(void * arg, struct tcp_pcb * pcb, u16_t len) {
+    (void)arg;
+    (void)pcb;
+    (void)len;
     return ERR_OK;
 }
 
-static void tcp_client_err_cb(void *arg, err_t err) {
+static void tcp_client_err_cb(void * arg, err_t err) {
     (void)err;
-    lwip_hal_tcp_client_slot_t *slot = (lwip_hal_tcp_client_slot_t *)arg;
+    lwip_hal_tcp_client_slot_t * slot = (lwip_hal_tcp_client_slot_t *)arg;
     if (!slot) return;
     slot->failed = 1;
     slot->pcb = NULL;
 }
 
-static err_t tcp_client_connected_cb(void *arg, struct tcp_pcb *pcb,
+static err_t tcp_client_connected_cb(void * arg, struct tcp_pcb * pcb,
                                      err_t err) {
     (void)pcb;
-    lwip_hal_tcp_client_slot_t *slot = (lwip_hal_tcp_client_slot_t *)arg;
+    lwip_hal_tcp_client_slot_t * slot = (lwip_hal_tcp_client_slot_t *)arg;
     if (!slot) return ERR_ARG;
-    if (err == ERR_OK) slot->connected = 1;
-    else slot->failed = 1;
+    if (err == ERR_OK)
+        slot->connected = 1;
+    else
+        slot->failed = 1;
     return ERR_OK;
 }
 
-int hal_net_tcp_client_open(const char *host, uint16_t port,
-                            uint32_t timeout_ms, hal_net_tcp_client_t *out) {
+int hal_net_tcp_client_open(const char * host, uint16_t port,
+                            uint32_t timeout_ms, hal_net_tcp_client_t * out) {
     if (out) *out = 0;
     if (!host || !port) return HAL_NET_ERR;
 
@@ -839,7 +848,7 @@ int hal_net_tcp_client_open(const char *host, uint16_t port,
     int rc = resolve_host(host, timeout_ms, &remote);
     if (rc != HAL_NET_OK) return rc;
 
-    lwip_hal_tcp_client_slot_t *slot = &tcp_client_slots[free_slot];
+    lwip_hal_tcp_client_slot_t * slot = &tcp_client_slots[free_slot];
     memset(slot, 0, sizeof(*slot));
     slot->pcb = tcp_new_ip_type(IP_GET_TYPE(&remote));
     if (!slot->pcb) return HAL_NET_ERR;
@@ -871,11 +880,11 @@ int hal_net_tcp_client_open(const char *host, uint16_t port,
     return HAL_NET_OK;
 }
 
-int hal_net_tcp_client_send(hal_net_tcp_client_t client, const void *buf,
+int hal_net_tcp_client_send(hal_net_tcp_client_t client, const void * buf,
                             size_t len, uint32_t timeout_ms) {
-    lwip_hal_tcp_client_slot_t *slot = tcp_client_slot(client);
+    lwip_hal_tcp_client_slot_t * slot = tcp_client_slot(client);
     if (!slot || !buf) return HAL_NET_ERR;
-    const uint8_t *src = (const uint8_t *)buf;
+    const uint8_t * src = (const uint8_t *)buf;
     size_t sent = 0;
     absolute_time_t deadline = make_timeout_time_ms(timeout_ms);
     while (sent < len) {
@@ -903,10 +912,10 @@ int hal_net_tcp_client_send(hal_net_tcp_client_t client, const void *buf,
     return HAL_NET_OK;
 }
 
-int hal_net_tcp_client_recv(hal_net_tcp_client_t client, void *buf,
-                            size_t cap, size_t *len, uint32_t timeout_ms) {
+int hal_net_tcp_client_recv(hal_net_tcp_client_t client, void * buf,
+                            size_t cap, size_t * len, uint32_t timeout_ms) {
     if (len) *len = 0;
-    lwip_hal_tcp_client_slot_t *slot = tcp_client_slot(client);
+    lwip_hal_tcp_client_slot_t * slot = tcp_client_slot(client);
     if (!slot || !buf || cap == 0) return HAL_NET_ERR;
     absolute_time_t deadline = make_timeout_time_ms(timeout_ms);
     while (!slot->rx_head) {
@@ -919,9 +928,9 @@ int hal_net_tcp_client_recv(hal_net_tcp_client_t client, void *buf,
     }
 
     size_t copied = 0;
-    uint8_t *dst = (uint8_t *)buf;
+    uint8_t * dst = (uint8_t *)buf;
     while (slot->rx_head && copied < cap) {
-        lwip_hal_rx_node_t *node = slot->rx_head;
+        lwip_hal_rx_node_t * node = slot->rx_head;
         size_t avail = node->len - node->off;
         size_t take = cap - copied;
         if (take > avail) take = avail;
@@ -939,7 +948,7 @@ int hal_net_tcp_client_recv(hal_net_tcp_client_t client, void *buf,
 }
 
 int hal_net_tcp_client_close(hal_net_tcp_client_t client) {
-    lwip_hal_tcp_client_slot_t *slot = tcp_client_slot(client);
+    lwip_hal_tcp_client_slot_t * slot = tcp_client_slot(client);
     if (!slot) return HAL_NET_ERR;
     if (slot->pcb) {
         tcp_arg(slot->pcb, NULL);
@@ -954,9 +963,9 @@ int hal_net_tcp_client_close(hal_net_tcp_client_t client) {
     return HAL_NET_OK;
 }
 
-static lwip_hal_mqtt_slot_t *mqtt_slot(hal_net_mqtt_client_t client) {
+static lwip_hal_mqtt_slot_t * mqtt_slot(hal_net_mqtt_client_t client) {
     if (client == 0 || client > LWIP_HAL_MAX_MQTT_CLIENTS) return NULL;
-    lwip_hal_mqtt_slot_t *slot = &mqtt_slots[client - 1];
+    lwip_hal_mqtt_slot_t * slot = &mqtt_slots[client - 1];
     return slot->client ? slot : NULL;
 }
 
@@ -970,7 +979,7 @@ static hal_net_mqtt_client_t mqtt_alloc_slot(void) {
     return 0;
 }
 
-static int mqtt_wait_done(volatile int *done, volatile int *failed,
+static int mqtt_wait_done(volatile int * done, volatile int * failed,
                           uint32_t timeout_ms) {
     absolute_time_t deadline = make_timeout_time_ms(timeout_ms);
     while (!*done && !*failed) {
@@ -981,27 +990,29 @@ static int mqtt_wait_done(volatile int *done, volatile int *failed,
     return *failed ? HAL_NET_ERR : HAL_NET_OK;
 }
 
-static void mqtt_connection_cb(mqtt_client_t *client, void *arg,
+static void mqtt_connection_cb(mqtt_client_t * client, void * arg,
                                mqtt_connection_status_t status) {
     (void)client;
-    lwip_hal_mqtt_slot_t *slot = (lwip_hal_mqtt_slot_t *)arg;
+    lwip_hal_mqtt_slot_t * slot = (lwip_hal_mqtt_slot_t *)arg;
     if (!slot) return;
-    if (status == MQTT_CONNECT_ACCEPTED) slot->connected = 1;
-    else slot->failed = 1;
+    if (status == MQTT_CONNECT_ACCEPTED)
+        slot->connected = 1;
+    else
+        slot->failed = 1;
 }
 
-static void mqtt_incoming_publish_cb(void *arg, const char *topic,
+static void mqtt_incoming_publish_cb(void * arg, const char * topic,
                                      u32_t tot_len) {
     (void)tot_len;
-    lwip_hal_mqtt_slot_t *slot = (lwip_hal_mqtt_slot_t *)arg;
+    lwip_hal_mqtt_slot_t * slot = (lwip_hal_mqtt_slot_t *)arg;
     if (!slot) return;
     copy_string(slot->topic, sizeof(slot->topic), topic);
 }
 
-static void mqtt_incoming_data_cb(void *arg, const u8_t *data, u16_t len,
+static void mqtt_incoming_data_cb(void * arg, const u8_t * data, u16_t len,
                                   u8_t flags) {
     (void)flags;
-    lwip_hal_mqtt_slot_t *slot = (lwip_hal_mqtt_slot_t *)arg;
+    lwip_hal_mqtt_slot_t * slot = (lwip_hal_mqtt_slot_t *)arg;
     if (!slot || !data) return;
     size_t copy = len;
     if (copy > sizeof(slot->payload)) copy = sizeof(slot->payload);
@@ -1011,28 +1022,32 @@ static void mqtt_incoming_data_cb(void *arg, const u8_t *data, u16_t len,
     slot->pending = 1;
 }
 
-static void mqtt_sub_cb(void *arg, err_t err) {
-    lwip_hal_mqtt_slot_t *slot = (lwip_hal_mqtt_slot_t *)arg;
+static void mqtt_sub_cb(void * arg, err_t err) {
+    lwip_hal_mqtt_slot_t * slot = (lwip_hal_mqtt_slot_t *)arg;
     if (!slot) return;
-    if (err == ERR_OK) slot->sub_done = 1;
-    else slot->sub_failed = 1;
+    if (err == ERR_OK)
+        slot->sub_done = 1;
+    else
+        slot->sub_failed = 1;
 }
 
-static void mqtt_unsub_cb(void *arg, err_t err) {
-    lwip_hal_mqtt_slot_t *slot = (lwip_hal_mqtt_slot_t *)arg;
+static void mqtt_unsub_cb(void * arg, err_t err) {
+    lwip_hal_mqtt_slot_t * slot = (lwip_hal_mqtt_slot_t *)arg;
     if (!slot) return;
-    if (err == ERR_OK) slot->unsub_done = 1;
-    else slot->unsub_failed = 1;
+    if (err == ERR_OK)
+        slot->unsub_done = 1;
+    else
+        slot->unsub_failed = 1;
 }
 
-static void mqtt_request_cb(void *arg, err_t err) {
+static void mqtt_request_cb(void * arg, err_t err) {
     (void)arg;
     (void)err;
 }
 
-int hal_net_mqtt_connect(const char *host, uint16_t port, const char *user,
-                         const char *pass, const char *client_id,
-                         uint32_t timeout_ms, hal_net_mqtt_client_t *out) {
+int hal_net_mqtt_connect(const char * host, uint16_t port, const char * user,
+                         const char * pass, const char * client_id,
+                         uint32_t timeout_ms, hal_net_mqtt_client_t * out) {
     if (out) *out = 0;
     if (!host || !port) return HAL_NET_ERR;
 
@@ -1042,7 +1057,7 @@ int hal_net_mqtt_connect(const char *host, uint16_t port, const char *user,
 
     hal_net_mqtt_client_t handle = mqtt_alloc_slot();
     if (!handle) return HAL_NET_ERR;
-    lwip_hal_mqtt_slot_t *slot = &mqtt_slots[handle - 1];
+    lwip_hal_mqtt_slot_t * slot = &mqtt_slots[handle - 1];
     slot->client = mqtt_client_new();
     if (!slot->client) {
         memset(slot, 0, sizeof(*slot));
@@ -1085,10 +1100,10 @@ int hal_net_mqtt_connect(const char *host, uint16_t port, const char *user,
     return HAL_NET_OK;
 }
 
-int hal_net_mqtt_publish(hal_net_mqtt_client_t client, const char *topic,
-                         const void *payload, size_t len, int qos,
+int hal_net_mqtt_publish(hal_net_mqtt_client_t client, const char * topic,
+                         const void * payload, size_t len, int qos,
                          int retain) {
-    lwip_hal_mqtt_slot_t *slot = mqtt_slot(client);
+    lwip_hal_mqtt_slot_t * slot = mqtt_slot(client);
     if (!slot || !topic || (!payload && len)) return HAL_NET_ERR;
     if (len > 0xffffu) return HAL_NET_ERR;
     err_t err = mqtt_publish(slot->client, topic, payload, (u16_t)len,
@@ -1096,9 +1111,9 @@ int hal_net_mqtt_publish(hal_net_mqtt_client_t client, const char *topic,
     return err == ERR_OK ? HAL_NET_OK : HAL_NET_ERR;
 }
 
-int hal_net_mqtt_subscribe(hal_net_mqtt_client_t client, const char *topic,
+int hal_net_mqtt_subscribe(hal_net_mqtt_client_t client, const char * topic,
                            int qos, uint32_t timeout_ms) {
-    lwip_hal_mqtt_slot_t *slot = mqtt_slot(client);
+    lwip_hal_mqtt_slot_t * slot = mqtt_slot(client);
     if (!slot || !topic) return HAL_NET_ERR;
     slot->sub_done = 0;
     slot->sub_failed = 0;
@@ -1108,9 +1123,9 @@ int hal_net_mqtt_subscribe(hal_net_mqtt_client_t client, const char *topic,
     return mqtt_wait_done(&slot->sub_done, &slot->sub_failed, timeout_ms);
 }
 
-int hal_net_mqtt_unsubscribe(hal_net_mqtt_client_t client, const char *topic,
+int hal_net_mqtt_unsubscribe(hal_net_mqtt_client_t client, const char * topic,
                              uint32_t timeout_ms) {
-    lwip_hal_mqtt_slot_t *slot = mqtt_slot(client);
+    lwip_hal_mqtt_slot_t * slot = mqtt_slot(client);
     if (!slot || !topic) return HAL_NET_ERR;
     slot->unsub_done = 0;
     slot->unsub_failed = 0;
@@ -1119,12 +1134,12 @@ int hal_net_mqtt_unsubscribe(hal_net_mqtt_client_t client, const char *topic,
     return mqtt_wait_done(&slot->unsub_done, &slot->unsub_failed, timeout_ms);
 }
 
-int hal_net_mqtt_recv_event(hal_net_mqtt_client_t client, char *topic,
-                            size_t topic_cap, void *payload,
-                            size_t payload_cap, size_t *payload_len) {
+int hal_net_mqtt_recv_event(hal_net_mqtt_client_t client, char * topic,
+                            size_t topic_cap, void * payload,
+                            size_t payload_cap, size_t * payload_len) {
     if (topic && topic_cap) topic[0] = 0;
     if (payload_len) *payload_len = 0;
-    lwip_hal_mqtt_slot_t *slot = mqtt_slot(client);
+    lwip_hal_mqtt_slot_t * slot = mqtt_slot(client);
     if (!slot || !payload || payload_cap == 0) return HAL_NET_ERR;
     if (!slot->pending) return HAL_NET_WOULD_BLOCK;
 
@@ -1139,7 +1154,7 @@ int hal_net_mqtt_recv_event(hal_net_mqtt_client_t client, char *topic,
 }
 
 int hal_net_mqtt_close(hal_net_mqtt_client_t client) {
-    lwip_hal_mqtt_slot_t *slot = mqtt_slot(client);
+    lwip_hal_mqtt_slot_t * slot = mqtt_slot(client);
     if (!slot) return HAL_NET_ERR;
     mqtt_disconnect(slot->client);
     mqtt_client_free(slot->client);

@@ -14,7 +14,7 @@
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
-#include "SPI-LCD.h"   /* SCREENMODE3 */
+#include "SPI-LCD.h" /* SCREENMODE3 */
 
 void port_select_error_prompt_font(void) {
     if (((FullColour) || DISPLAY_TYPE == SCREENMODE3) && gui_font_width > 8) {

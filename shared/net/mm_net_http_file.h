@@ -13,9 +13,9 @@
 extern "C" {
 #endif
 
-int mm_net_http_send_file(const char *fname, const char *content_type,
-                          const char *server_name,
-                          mm_net_http_send_fn send_fn, void *send_ctx);
+int mm_net_http_send_file(const char * fname, const char * content_type,
+                          const char * server_name,
+                          mm_net_http_send_fn send_fn, void * send_ctx);
 
 #ifdef __cplusplus
 }

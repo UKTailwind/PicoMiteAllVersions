@@ -14,8 +14,8 @@
 typedef struct __attribute__((packed)) {
     uint16_t offset_low;
     uint16_t selector;
-    uint8_t  zero;
-    uint8_t  type_attr;
+    uint8_t zero;
+    uint8_t type_attr;
     uint16_t offset_high;
 } idt_entry_t;
 
@@ -25,16 +25,16 @@ typedef struct __attribute__((packed)) {
     uint32_t base;
 } idt_ptr_t;
 
-static idt_entry_t  idt[IDT_NUM_VECTORS];
-static idt_ptr_t    idtr;
+static idt_entry_t idt[IDT_NUM_VECTORS];
+static idt_ptr_t idtr;
 static idt_handler_t handlers[IDT_NUM_VECTORS];
 
-#define BSOD_COLS        80
-#define BSOD_ROWS        25
-#define BSOD_ATTR        0x1F  /* white on blue */
-#define BSOD_BUFFER      ((volatile uint16_t *)0xB8000)
-#define VGA_CRTC_INDEX   0x3D4
-#define VGA_CRTC_DATA    0x3D5
+#define BSOD_COLS 80
+#define BSOD_ROWS 25
+#define BSOD_ATTR 0x1F /* white on blue */
+#define BSOD_BUFFER ((volatile uint16_t *)0xB8000)
+#define VGA_CRTC_INDEX 0x3D4
+#define VGA_CRTC_DATA 0x3D5
 
 static uint8_t bsod_row;
 static uint8_t bsod_col;
@@ -77,7 +77,7 @@ static void bsod_putc(char c) {
     bsod_cursor();
 }
 
-static void bsod_puts(const char *s) {
+static void bsod_puts(const char * s) {
     if (!s) s = "(null)";
     while (*s) bsod_putc(*s++);
 }
@@ -104,27 +104,46 @@ static void bsod_u32(uint32_t v) {
     while (n) bsod_putc(buf[--n]);
 }
 
-static const char *exception_name(uint32_t vec) {
+static const char * exception_name(uint32_t vec) {
     switch (vec) {
-    case 0:  return "divide error";
-    case 1:  return "debug";
-    case 2:  return "non-maskable interrupt";
-    case 3:  return "breakpoint";
-    case 4:  return "overflow";
-    case 5:  return "bound range";
-    case 6:  return "invalid opcode";
-    case 7:  return "device not available";
-    case 8:  return "double fault";
-    case 10: return "invalid TSS";
-    case 11: return "segment not present";
-    case 12: return "stack fault";
-    case 13: return "general protection";
-    case 14: return "page fault";
-    case 16: return "x87 floating point";
-    case 17: return "alignment check";
-    case 18: return "machine check";
-    case 19: return "SIMD floating point";
-    default: return "CPU exception";
+    case 0:
+        return "divide error";
+    case 1:
+        return "debug";
+    case 2:
+        return "non-maskable interrupt";
+    case 3:
+        return "breakpoint";
+    case 4:
+        return "overflow";
+    case 5:
+        return "bound range";
+    case 6:
+        return "invalid opcode";
+    case 7:
+        return "device not available";
+    case 8:
+        return "double fault";
+    case 10:
+        return "invalid TSS";
+    case 11:
+        return "segment not present";
+    case 12:
+        return "stack fault";
+    case 13:
+        return "general protection";
+    case 14:
+        return "page fault";
+    case 16:
+        return "x87 floating point";
+    case 17:
+        return "alignment check";
+    case 18:
+        return "machine check";
+    case 19:
+        return "SIMD floating point";
+    default:
+        return "CPU exception";
     }
 }
 
@@ -134,7 +153,7 @@ static uint32_t read_cr2(void) {
     return v;
 }
 
-static void bsod_exception(idt_regs_t *r) {
+static void bsod_exception(idt_regs_t * r) {
     __asm__ volatile("cli");
     bsod_clear();
     bsod_puts("PC386 MMBasic crash\n\n");
@@ -191,17 +210,17 @@ static void bsod_exception(idt_regs_t *r) {
 
 /* Asm stubs in idt_asm.S — one per vector. Their address goes into
  * idt[vec].offset_*; the CPU jumps to them on the matching trap/IRQ. */
-extern void *isr_stub_table[IDT_NUM_VECTORS];
+extern void * isr_stub_table[IDT_NUM_VECTORS];
 
 /* Boot.S installed the GDT with the 32-bit code segment at selector 0x08. */
-#define KERNEL_CS_SELECTOR  0x08
+#define KERNEL_CS_SELECTOR 0x08
 
-static void idt_set(uint8_t vec, void *handler, uint8_t type) {
+static void idt_set(uint8_t vec, void * handler, uint8_t type) {
     uintptr_t addr = (uintptr_t)handler;
-    idt[vec].offset_low  = addr & 0xFFFF;
-    idt[vec].selector    = KERNEL_CS_SELECTOR;
-    idt[vec].zero        = 0;
-    idt[vec].type_attr   = type;
+    idt[vec].offset_low = addr & 0xFFFF;
+    idt[vec].selector = KERNEL_CS_SELECTOR;
+    idt[vec].zero = 0;
+    idt[vec].type_attr = type;
     idt[vec].offset_high = (addr >> 16) & 0xFFFF;
 }
 
@@ -219,7 +238,7 @@ void idt_init(void) {
     for (int v = 0; v < 32; v++) handlers[v] = exc_unhandled;
 
     idtr.limit = sizeof(idt) - 1;
-    idtr.base  = (uint32_t)(uintptr_t)idt;
+    idtr.base = (uint32_t)(uintptr_t)idt;
     __asm__ volatile("lidt %0" : : "m"(idtr));
 }
 
@@ -230,7 +249,7 @@ void idt_register_handler(uint8_t vector, idt_handler_t fn) {
 /* Common dispatch — called from the asm common stub after register save.
  * Looks up the registered C handler; runs it (or panics if NULL — that
  * means an unexpected vector fired). */
-void idt_dispatch(idt_regs_t *r) {
+void idt_dispatch(idt_regs_t * r) {
     idt_handler_t fn = handlers[r->int_no & 0xFF];
     if (fn) {
         fn(r);
@@ -244,6 +263,6 @@ void idt_dispatch(idt_regs_t *r) {
     pc386_panic("unhandled interrupt");
 }
 
-void exc_unhandled(idt_regs_t *r) {
+void exc_unhandled(idt_regs_t * r) {
     bsod_exception(r);
 }

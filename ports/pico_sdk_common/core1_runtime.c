@@ -16,4 +16,4 @@
 #include <stdint.h>
 #include "port_config.h"
 
-uint32_t core1stack[HAL_PORT_CORE1_STACK_WORDS] = { [0] = 0x12345678 };
+uint32_t core1stack[HAL_PORT_CORE1_STACK_WORDS] = {[0] = 0x12345678};

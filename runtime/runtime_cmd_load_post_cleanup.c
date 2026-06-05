@@ -36,7 +36,6 @@
 extern unsigned char inpbuf[];
 extern jmp_buf mark;
 
-void cmd_load_post_cleanup(void)
-{
+void cmd_load_post_cleanup(void) {
     mmbasic_runtime_post_load_longjmp(inpbuf, STRINGSIZE, mark);
 }

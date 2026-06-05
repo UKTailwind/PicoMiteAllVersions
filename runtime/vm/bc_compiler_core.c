@@ -11,7 +11,7 @@
 #include "bc_compiler_internal.h"
 #include "bc_alloc.h"
 
-int bc_compiler_alloc(BCCompiler *cs) {
+int bc_compiler_alloc(BCCompiler * cs) {
     memset(cs, 0, sizeof(*cs));
     /* Allocation order matters for post-compact heap fragmentation. The
      * MMBasic page allocator walks top-down, so the FIRST allocations
@@ -25,18 +25,18 @@ int bc_compiler_alloc(BCCompiler *cs) {
      * order (runtime first, compile-only last) the hole is in the
      * middle of the alive cluster and the post-compact heap is split
      * into ~50% contiguous + scattered fragments. */
-    cs->fixups     = (BCFixup *)BC_COMPILER_ALLOC(BC_MAX_FIXUPS * sizeof(BCFixup));
-    cs->linemap    = (BCLineMap *)BC_COMPILER_ALLOC(BC_MAX_LINEMAP * sizeof(BCLineMap));
-    cs->labelmap   = (BCLabelMap *)BC_COMPILER_ALLOC(BC_MAX_LABELS * sizeof(BCLabelMap));
+    cs->fixups = (BCFixup *)BC_COMPILER_ALLOC(BC_MAX_FIXUPS * sizeof(BCFixup));
+    cs->linemap = (BCLineMap *)BC_COMPILER_ALLOC(BC_MAX_LINEMAP * sizeof(BCLineMap));
+    cs->labelmap = (BCLabelMap *)BC_COMPILER_ALLOC(BC_MAX_LABELS * sizeof(BCLabelMap));
     cs->nest_stack = (BCNestEntry *)BC_COMPILER_ALLOC(BC_MAX_NEST * sizeof(BCNestEntry));
-    cs->locals     = (BCLocalVar *)BC_COMPILER_ALLOC(BC_MAX_LOCALS * sizeof(BCLocalVar));
-    cs->code       = (uint8_t *)BC_COMPILER_ALLOC(BC_MAX_CODE);
-    cs->constants  = (BCConstant *)BC_COMPILER_ALLOC(BC_MAX_CONSTANTS * sizeof(BCConstant));
-    cs->slots      = (BCSlot *)BC_COMPILER_ALLOC(BC_MAX_SLOTS * sizeof(BCSlot));
-    cs->subfuns    = (BCSubFun *)BC_COMPILER_ALLOC(BC_MAX_SUBFUNS * sizeof(BCSubFun));
+    cs->locals = (BCLocalVar *)BC_COMPILER_ALLOC(BC_MAX_LOCALS * sizeof(BCLocalVar));
+    cs->code = (uint8_t *)BC_COMPILER_ALLOC(BC_MAX_CODE);
+    cs->constants = (BCConstant *)BC_COMPILER_ALLOC(BC_MAX_CONSTANTS * sizeof(BCConstant));
+    cs->slots = (BCSlot *)BC_COMPILER_ALLOC(BC_MAX_SLOTS * sizeof(BCSlot));
+    cs->subfuns = (BCSubFun *)BC_COMPILER_ALLOC(BC_MAX_SUBFUNS * sizeof(BCSubFun));
     cs->subfun_locals_base = (uint16_t *)BC_COMPILER_ALLOC(BC_MAX_SUBFUNS * sizeof(uint16_t));
     cs->local_meta = (BCLocalMeta *)BC_COMPILER_ALLOC(BC_MAX_LOCAL_META * sizeof(BCLocalMeta));
-    cs->data_pool  = (BCDataItem *)BC_COMPILER_ALLOC(BC_MAX_DATA_ITEMS * sizeof(BCDataItem));
+    cs->data_pool = (BCDataItem *)BC_COMPILER_ALLOC(BC_MAX_DATA_ITEMS * sizeof(BCDataItem));
     if (!cs->code || !cs->constants || !cs->slots || !cs->subfuns ||
         !cs->subfun_locals_base ||
         !cs->fixups || !cs->linemap || !cs->labelmap || !cs->nest_stack || !cs->locals ||
@@ -49,19 +49,79 @@ int bc_compiler_alloc(BCCompiler *cs) {
     return 0;
 }
 
-void bc_compiler_free(BCCompiler *cs) {
-    if (cs->code)       { if (bc_compile_owns(cs->code)) BC_COMPILER_FREE(cs->code); else BC_FREE(cs->code); }
-    if (cs->constants)  { if (bc_compile_owns(cs->constants)) BC_COMPILER_FREE(cs->constants); else BC_FREE(cs->constants); }
-    if (cs->slots)      { if (bc_compile_owns(cs->slots)) BC_COMPILER_FREE(cs->slots); else BC_FREE(cs->slots); }
-    if (cs->subfuns)    { if (bc_compile_owns(cs->subfuns)) BC_COMPILER_FREE(cs->subfuns); else BC_FREE(cs->subfuns); }
-    if (cs->subfun_locals_base) { if (bc_compile_owns(cs->subfun_locals_base)) BC_COMPILER_FREE(cs->subfun_locals_base); else BC_FREE(cs->subfun_locals_base); }
-    if (cs->fixups)     { if (bc_compile_owns(cs->fixups)) BC_COMPILER_FREE(cs->fixups); else BC_FREE(cs->fixups); }
-    if (cs->linemap)    { if (bc_compile_owns(cs->linemap)) BC_COMPILER_FREE(cs->linemap); else BC_FREE(cs->linemap); }
-    if (cs->labelmap)   { if (bc_compile_owns(cs->labelmap)) BC_COMPILER_FREE(cs->labelmap); else BC_FREE(cs->labelmap); }
-    if (cs->nest_stack) { if (bc_compile_owns(cs->nest_stack)) BC_COMPILER_FREE(cs->nest_stack); else BC_FREE(cs->nest_stack); }
-    if (cs->locals)     { if (bc_compile_owns(cs->locals)) BC_COMPILER_FREE(cs->locals); else BC_FREE(cs->locals); }
-    if (cs->local_meta) { if (bc_compile_owns(cs->local_meta)) BC_COMPILER_FREE(cs->local_meta); else BC_FREE(cs->local_meta); }
-    if (cs->data_pool)  { if (bc_compile_owns(cs->data_pool)) BC_COMPILER_FREE(cs->data_pool); else BC_FREE(cs->data_pool); }
+void bc_compiler_free(BCCompiler * cs) {
+    if (cs->code) {
+        if (bc_compile_owns(cs->code))
+            BC_COMPILER_FREE(cs->code);
+        else
+            BC_FREE(cs->code);
+    }
+    if (cs->constants) {
+        if (bc_compile_owns(cs->constants))
+            BC_COMPILER_FREE(cs->constants);
+        else
+            BC_FREE(cs->constants);
+    }
+    if (cs->slots) {
+        if (bc_compile_owns(cs->slots))
+            BC_COMPILER_FREE(cs->slots);
+        else
+            BC_FREE(cs->slots);
+    }
+    if (cs->subfuns) {
+        if (bc_compile_owns(cs->subfuns))
+            BC_COMPILER_FREE(cs->subfuns);
+        else
+            BC_FREE(cs->subfuns);
+    }
+    if (cs->subfun_locals_base) {
+        if (bc_compile_owns(cs->subfun_locals_base))
+            BC_COMPILER_FREE(cs->subfun_locals_base);
+        else
+            BC_FREE(cs->subfun_locals_base);
+    }
+    if (cs->fixups) {
+        if (bc_compile_owns(cs->fixups))
+            BC_COMPILER_FREE(cs->fixups);
+        else
+            BC_FREE(cs->fixups);
+    }
+    if (cs->linemap) {
+        if (bc_compile_owns(cs->linemap))
+            BC_COMPILER_FREE(cs->linemap);
+        else
+            BC_FREE(cs->linemap);
+    }
+    if (cs->labelmap) {
+        if (bc_compile_owns(cs->labelmap))
+            BC_COMPILER_FREE(cs->labelmap);
+        else
+            BC_FREE(cs->labelmap);
+    }
+    if (cs->nest_stack) {
+        if (bc_compile_owns(cs->nest_stack))
+            BC_COMPILER_FREE(cs->nest_stack);
+        else
+            BC_FREE(cs->nest_stack);
+    }
+    if (cs->locals) {
+        if (bc_compile_owns(cs->locals))
+            BC_COMPILER_FREE(cs->locals);
+        else
+            BC_FREE(cs->locals);
+    }
+    if (cs->local_meta) {
+        if (bc_compile_owns(cs->local_meta))
+            BC_COMPILER_FREE(cs->local_meta);
+        else
+            BC_FREE(cs->local_meta);
+    }
+    if (cs->data_pool) {
+        if (bc_compile_owns(cs->data_pool))
+            BC_COMPILER_FREE(cs->data_pool);
+        else
+            BC_FREE(cs->data_pool);
+    }
     memset(cs, 0, sizeof(*cs));
 }
 
@@ -73,34 +133,61 @@ void bc_compiler_free(BCCompiler *cs) {
  *
  * Call after bc_compile() returns successfully, before bc_vm_execute().
  */
-int bc_compiler_compact(BCCompiler *cs) {
+int bc_compiler_compact(BCCompiler * cs) {
     int ok = 1;
     /* 1. Free arrays only needed during compilation */
-    if (cs->fixups)     { BC_COMPILER_FREE(cs->fixups);     cs->fixups = NULL; }
-    if (cs->linemap)    { BC_COMPILER_FREE(cs->linemap);    cs->linemap = NULL; }
-    if (cs->labelmap)   { BC_COMPILER_FREE(cs->labelmap);   cs->labelmap = NULL; }
-    if (cs->nest_stack) { BC_COMPILER_FREE(cs->nest_stack); cs->nest_stack = NULL; }
-    if (cs->locals)     { BC_COMPILER_FREE(cs->locals);     cs->locals = NULL; }
+    if (cs->fixups) {
+        BC_COMPILER_FREE(cs->fixups);
+        cs->fixups = NULL;
+    }
+    if (cs->linemap) {
+        BC_COMPILER_FREE(cs->linemap);
+        cs->linemap = NULL;
+    }
+    if (cs->labelmap) {
+        BC_COMPILER_FREE(cs->labelmap);
+        cs->labelmap = NULL;
+    }
+    if (cs->nest_stack) {
+        BC_COMPILER_FREE(cs->nest_stack);
+        cs->nest_stack = NULL;
+    }
+    if (cs->locals) {
+        BC_COMPILER_FREE(cs->locals);
+        cs->locals = NULL;
+    }
 
     /* 2. Shrink runtime arrays to actual size.
      *    Alloc new right-sized buffer, copy, free oversized original.
      *    If alloc fails, keep the original (still works, just wastes memory). */
-#define COMPACT(field, count, type) do { \
-    if (cs->field && (count) > 0) { \
-        size_t sz = (size_t)(count) * sizeof(type); \
-        type *p = (type *)BC_ALLOC(sz); \
-        if (p) { memcpy(p, cs->field, sz); BC_COMPILER_FREE(cs->field); cs->field = p; } \
-        else if (bc_compile_owns(cs->field)) { ok = 0; } \
-    } else if (cs->field && (count) == 0) { \
-        BC_COMPILER_FREE(cs->field); cs->field = NULL; \
-    } \
-} while(0)
+#define COMPACT(field, count, type)                     \
+    do {                                                \
+        if (cs->field && (count) > 0) {                 \
+            size_t sz = (size_t)(count) * sizeof(type); \
+            type * p = (type *)BC_ALLOC(sz);            \
+            if (p) {                                    \
+                memcpy(p, cs->field, sz);               \
+                BC_COMPILER_FREE(cs->field);            \
+                cs->field = p;                          \
+            } else if (bc_compile_owns(cs->field)) {    \
+                ok = 0;                                 \
+            }                                           \
+        } else if (cs->field && (count) == 0) {         \
+            BC_COMPILER_FREE(cs->field);                \
+            cs->field = NULL;                           \
+        }                                               \
+    } while (0)
 
     /* Shrink code buffer from BC_MAX_CODE to actual code_len */
     if (cs->code && cs->code_len > 0) {
-        uint8_t *p = (uint8_t *)BC_ALLOC(cs->code_len);
-        if (p) { memcpy(p, cs->code, cs->code_len); BC_COMPILER_FREE(cs->code); cs->code = p; }
-        else if (bc_compile_owns(cs->code)) { ok = 0; }
+        uint8_t * p = (uint8_t *)BC_ALLOC(cs->code_len);
+        if (p) {
+            memcpy(p, cs->code, cs->code_len);
+            BC_COMPILER_FREE(cs->code);
+            cs->code = p;
+        } else if (bc_compile_owns(cs->code)) {
+            ok = 0;
+        }
     }
 
     COMPACT(constants, cs->const_count, BCConstant);
@@ -118,32 +205,32 @@ int bc_compiler_compact(BCCompiler *cs) {
 /*  Compiler initialisation (reset state, arrays must be allocated)   */
 /* ------------------------------------------------------------------ */
 
-void bc_compiler_init(BCCompiler *cs) {
-    cs->code_len         = 0;
-    cs->const_count      = 0;
-    cs->slot_count       = 0;
+void bc_compiler_init(BCCompiler * cs) {
+    cs->code_len = 0;
+    cs->const_count = 0;
+    cs->slot_count = 0;
     cs->next_hidden_slot = 0;
-    cs->subfun_count     = 0;
+    cs->subfun_count = 0;
     if (cs->subfun_locals_base) memset(cs->subfun_locals_base, 0, BC_MAX_SUBFUNS * sizeof(uint16_t));
-    cs->fixup_count      = 0;
-    cs->linemap_count    = 0;
-    cs->labelmap_count   = 0;
-    cs->nest_depth       = 0;
-    cs->current_subfun   = -1;
-    cs->current_line     = 0;
-    cs->local_count      = 0;
+    cs->fixup_count = 0;
+    cs->linemap_count = 0;
+    cs->labelmap_count = 0;
+    cs->nest_depth = 0;
+    cs->current_subfun = -1;
+    cs->current_line = 0;
+    cs->local_count = 0;
     cs->local_meta_count = 0;
-    cs->data_count       = 0;
-    cs->error_line       = 0;
-    cs->error_msg[0]     = '\0';
-    cs->has_error        = 0;
+    cs->data_count = 0;
+    cs->error_line = 0;
+    cs->error_msg[0] = '\0';
+    cs->has_error = 0;
 }
 
 /* ------------------------------------------------------------------ */
 /*  Bytecode emission helpers                                         */
 /* ------------------------------------------------------------------ */
 
-void bc_emit_byte(BCCompiler *cs, uint8_t b) {
+void bc_emit_byte(BCCompiler * cs, uint8_t b) {
     if (cs->code_len >= BC_MAX_CODE) {
         bc_set_error(cs, "Bytecode overflow (%d bytes)", BC_MAX_CODE);
         return;
@@ -151,7 +238,7 @@ void bc_emit_byte(BCCompiler *cs, uint8_t b) {
     cs->code[cs->code_len++] = b;
 }
 
-void bc_emit_u16(BCCompiler *cs, uint16_t v) {
+void bc_emit_u16(BCCompiler * cs, uint16_t v) {
     if (cs->code_len + 2 > BC_MAX_CODE) {
         bc_set_error(cs, "Bytecode overflow (%d bytes)", BC_MAX_CODE);
         return;
@@ -160,7 +247,7 @@ void bc_emit_u16(BCCompiler *cs, uint16_t v) {
     cs->code_len += 2;
 }
 
-void bc_emit_i16(BCCompiler *cs, int16_t v) {
+void bc_emit_i16(BCCompiler * cs, int16_t v) {
     if (cs->code_len + 2 > BC_MAX_CODE) {
         bc_set_error(cs, "Bytecode overflow (%d bytes)", BC_MAX_CODE);
         return;
@@ -169,7 +256,7 @@ void bc_emit_i16(BCCompiler *cs, int16_t v) {
     cs->code_len += 2;
 }
 
-void bc_emit_u32(BCCompiler *cs, uint32_t v) {
+void bc_emit_u32(BCCompiler * cs, uint32_t v) {
     if (cs->code_len + 4 > BC_MAX_CODE) {
         bc_set_error(cs, "Bytecode overflow (%d bytes)", BC_MAX_CODE);
         return;
@@ -178,7 +265,7 @@ void bc_emit_u32(BCCompiler *cs, uint32_t v) {
     cs->code_len += 4;
 }
 
-void bc_emit_ptr(BCCompiler *cs, const void *ptr) {
+void bc_emit_ptr(BCCompiler * cs, const void * ptr) {
     uintptr_t v = (uintptr_t)ptr;
     if (cs->code_len + (uint32_t)sizeof(v) > BC_MAX_CODE) {
         bc_set_error(cs, "Bytecode overflow (%d bytes)", BC_MAX_CODE);
@@ -188,7 +275,7 @@ void bc_emit_ptr(BCCompiler *cs, const void *ptr) {
     cs->code_len += sizeof(v);
 }
 
-void bc_emit_i64(BCCompiler *cs, int64_t v) {
+void bc_emit_i64(BCCompiler * cs, int64_t v) {
     if (cs->code_len + 8 > BC_MAX_CODE) {
         bc_set_error(cs, "Bytecode overflow (%d bytes)", BC_MAX_CODE);
         return;
@@ -197,7 +284,7 @@ void bc_emit_i64(BCCompiler *cs, int64_t v) {
     cs->code_len += 8;
 }
 
-void bc_emit_f64(BCCompiler *cs, MMFLOAT v) {
+void bc_emit_f64(BCCompiler * cs, MMFLOAT v) {
     if (cs->code_len + (uint32_t)sizeof(MMFLOAT) > BC_MAX_CODE) {
         bc_set_error(cs, "Bytecode overflow (%d bytes)", BC_MAX_CODE);
         return;
@@ -210,7 +297,7 @@ void bc_emit_f64(BCCompiler *cs, MMFLOAT v) {
 /*  Bytecode patching helpers (write at an arbitrary address)          */
 /* ------------------------------------------------------------------ */
 
-void bc_patch_u16(BCCompiler *cs, uint32_t addr, uint16_t v) {
+void bc_patch_u16(BCCompiler * cs, uint32_t addr, uint16_t v) {
     if (addr + 2 > cs->code_len) {
         bc_set_error(cs, "Patch address %u out of range (code_len=%u)", addr, cs->code_len);
         return;
@@ -218,7 +305,7 @@ void bc_patch_u16(BCCompiler *cs, uint32_t addr, uint16_t v) {
     memcpy(&cs->code[addr], &v, 2);
 }
 
-void bc_patch_i16(BCCompiler *cs, uint32_t addr, int16_t v) {
+void bc_patch_i16(BCCompiler * cs, uint32_t addr, int16_t v) {
     if (addr + 2 > cs->code_len) {
         bc_set_error(cs, "Patch address %u out of range (code_len=%u)", addr, cs->code_len);
         return;
@@ -226,7 +313,7 @@ void bc_patch_i16(BCCompiler *cs, uint32_t addr, int16_t v) {
     memcpy(&cs->code[addr], &v, 2);
 }
 
-void bc_patch_u32(BCCompiler *cs, uint32_t addr, uint32_t v) {
+void bc_patch_u32(BCCompiler * cs, uint32_t addr, uint32_t v) {
     if (addr + 4 > cs->code_len) {
         bc_set_error(cs, "Patch address %u out of range (code_len=%u)", addr, cs->code_len);
         return;
@@ -238,7 +325,7 @@ void bc_patch_u32(BCCompiler *cs, uint32_t addr, uint32_t v) {
 /*  Variable slot management (global compile-time slots)              */
 /* ------------------------------------------------------------------ */
 
-uint16_t bc_find_slot(BCCompiler *cs, const char *name, int name_len) {
+uint16_t bc_find_slot(BCCompiler * cs, const char * name, int name_len) {
     for (uint16_t i = 0; i < cs->slot_count; i++) {
         if ((int)strlen(cs->slots[i].name) == name_len &&
             strncasecmp(cs->slots[i].name, name, name_len) == 0) {
@@ -248,7 +335,7 @@ uint16_t bc_find_slot(BCCompiler *cs, const char *name, int name_len) {
     return 0xFFFF;
 }
 
-uint16_t bc_add_slot(BCCompiler *cs, const char *name, int name_len, uint8_t type, int is_array) {
+uint16_t bc_add_slot(BCCompiler * cs, const char * name, int name_len, uint8_t type, int is_array) {
     if (cs->slot_count >= BC_MAX_SLOTS) {
         bc_set_error(cs, "Too many variable slots (max %d)", BC_MAX_SLOTS);
         return 0xFFFF;
@@ -258,9 +345,9 @@ uint16_t bc_add_slot(BCCompiler *cs, const char *name, int name_len, uint8_t typ
     if (copy_len > MAXVARLEN) copy_len = MAXVARLEN;
     memcpy(cs->slots[idx].name, name, copy_len);
     cs->slots[idx].name[copy_len] = '\0';
-    cs->slots[idx].type     = type;
+    cs->slots[idx].type = type;
     cs->slots[idx].is_array = (uint8_t)is_array;
-    cs->slots[idx].ndims    = 0;
+    cs->slots[idx].ndims = 0;
     memset(cs->slots[idx].dims, 0, sizeof(cs->slots[idx].dims));
     cs->slots[idx].struct_idx = -1;
     return idx;
@@ -270,7 +357,7 @@ uint16_t bc_add_slot(BCCompiler *cs, const char *name, int name_len, uint8_t typ
 /*  Local variable management (per SUB/FUNCTION scope)                */
 /* ------------------------------------------------------------------ */
 
-int bc_find_local(BCCompiler *cs, const char *name, int name_len) {
+int bc_find_local(BCCompiler * cs, const char * name, int name_len) {
     for (int i = 0; i < (int)cs->local_count; i++) {
         if ((int)strlen(cs->locals[i].name) == name_len &&
             strncasecmp(cs->locals[i].name, name, name_len) == 0) {
@@ -280,7 +367,7 @@ int bc_find_local(BCCompiler *cs, const char *name, int name_len) {
     return -1;
 }
 
-int bc_add_local(BCCompiler *cs, const char *name, int name_len, uint8_t type, int is_array) {
+int bc_add_local(BCCompiler * cs, const char * name, int name_len, uint8_t type, int is_array) {
     if (cs->local_count >= BC_MAX_LOCALS) {
         bc_set_error(cs, "Too many local variables (max %d)", BC_MAX_LOCALS);
         return -1;
@@ -290,12 +377,12 @@ int bc_add_local(BCCompiler *cs, const char *name, int name_len, uint8_t type, i
     if (copy_len > MAXVARLEN) copy_len = MAXVARLEN;
     memcpy(cs->locals[idx].name, name, copy_len);
     cs->locals[idx].name[copy_len] = '\0';
-    cs->locals[idx].type     = type;
+    cs->locals[idx].type = type;
     cs->locals[idx].is_array = (uint8_t)is_array;
     return idx;
 }
 
-int bc_commit_locals(BCCompiler *cs, int sf_idx) {
+int bc_commit_locals(BCCompiler * cs, int sf_idx) {
     if (sf_idx < 0 || sf_idx >= (int)cs->subfun_count) {
         bc_set_error(cs, "Invalid SUB/FUNCTION local metadata");
         return -1;
@@ -316,7 +403,7 @@ int bc_commit_locals(BCCompiler *cs, int sf_idx) {
 /*  Constant pool                                                     */
 /* ------------------------------------------------------------------ */
 
-uint16_t bc_add_constant_string(BCCompiler *cs, const uint8_t *data, int len) {
+uint16_t bc_add_constant_string(BCCompiler * cs, const uint8_t * data, int len) {
     /* Check for a duplicate first */
     for (uint16_t i = 0; i < cs->const_count; i++) {
         if (cs->constants[i].len == (uint16_t)len &&
@@ -343,7 +430,7 @@ uint16_t bc_add_constant_string(BCCompiler *cs, const uint8_t *data, int len) {
 /*  SUB/FUNCTION management                                           */
 /* ------------------------------------------------------------------ */
 
-int bc_find_subfun(BCCompiler *cs, const char *name, int name_len) {
+int bc_find_subfun(BCCompiler * cs, const char * name, int name_len) {
     for (int i = 0; i < (int)cs->subfun_count; i++) {
         if ((int)strlen(cs->subfuns[i].name) == name_len &&
             strncasecmp(cs->subfuns[i].name, name, name_len) == 0) {
@@ -357,7 +444,7 @@ int bc_find_subfun(BCCompiler *cs, const char *name, int name_len) {
 /*  Line map                                                          */
 /* ------------------------------------------------------------------ */
 
-int bc_add_linemap_entry(BCCompiler *cs, uint16_t lineno, uint32_t offset) {
+int bc_add_linemap_entry(BCCompiler * cs, uint16_t lineno, uint32_t offset) {
     if (cs->linemap_count >= BC_MAX_LINEMAP) {
         bc_set_error(cs, "Too many line map entries (max %d)", BC_MAX_LINEMAP);
         return -1;
@@ -368,7 +455,7 @@ int bc_add_linemap_entry(BCCompiler *cs, uint16_t lineno, uint32_t offset) {
     return 0;
 }
 
-uint32_t bc_linemap_lookup(BCCompiler *cs, uint16_t lineno) {
+uint32_t bc_linemap_lookup(BCCompiler * cs, uint16_t lineno) {
     /* Linear search — linemap is in program order, not sorted by line number
      * (user-provided line numbers can appear in any order). */
     for (int i = 0; i < (int)cs->linemap_count; i++) {
@@ -383,14 +470,14 @@ uint32_t bc_linemap_lookup(BCCompiler *cs, uint16_t lineno) {
 /*  Label map (BASIC labels: `name:` at line start, GOTO/GOSUB target)*/
 /* ------------------------------------------------------------------ */
 
-static int bc_labelmap_index(const BCCompiler *cs, const char *name) {
+static int bc_labelmap_index(const BCCompiler * cs, const char * name) {
     for (uint16_t i = 0; i < cs->labelmap_count; i++) {
         if (strcasecmp(cs->labelmap[i].name, name) == 0) return (int)i;
     }
     return -1;
 }
 
-int bc_add_labelmap_entry(BCCompiler *cs, const char *name, uint32_t offset) {
+int bc_add_labelmap_entry(BCCompiler * cs, const char * name, uint32_t offset) {
     if (bc_labelmap_index(cs, name) >= 0) {
         bc_set_error(cs, "Duplicate label '%s'", name);
         return -1;
@@ -399,18 +486,18 @@ int bc_add_labelmap_entry(BCCompiler *cs, const char *name, uint32_t offset) {
         bc_set_error(cs, "Too many labels (max %d)", BC_MAX_LABELS);
         return -1;
     }
-    BCLabelMap *L = &cs->labelmap[cs->labelmap_count];
+    BCLabelMap * L = &cs->labelmap[cs->labelmap_count];
     size_t n = strlen(name);
     if (n > BC_MAX_LABEL_NAME) n = BC_MAX_LABEL_NAME;
     memcpy(L->name, name, n);
     L->name[n] = '\0';
-    L->offset  = offset;
-    L->data_index = cs->data_count;  /* RESTORE <label> seeks here */
+    L->offset = offset;
+    L->data_index = cs->data_count; /* RESTORE <label> seeks here */
     cs->labelmap_count++;
     return 0;
 }
 
-uint32_t bc_labelmap_lookup(const BCCompiler *cs, const char *name) {
+uint32_t bc_labelmap_lookup(const BCCompiler * cs, const char * name) {
     int i = bc_labelmap_index(cs, name);
     return (i < 0) ? 0xFFFFFFFF : cs->labelmap[i].offset;
 }
@@ -419,23 +506,23 @@ uint32_t bc_labelmap_lookup(const BCCompiler *cs, const char *name) {
 /*  Nesting stack helpers                                             */
 /* ------------------------------------------------------------------ */
 
-void bc_nest_push(BCCompiler *cs, BCNestType type) {
+void bc_nest_push(BCCompiler * cs, BCNestType type) {
     if (cs->nest_depth >= BC_MAX_NEST) {
         bc_set_error(cs, "Nesting too deep (max %d)", BC_MAX_NEST);
         return;
     }
-    BCNestEntry *e = &cs->nest_stack[cs->nest_depth];
+    BCNestEntry * e = &cs->nest_stack[cs->nest_depth];
     memset(e, 0, sizeof(*e));
     e->type = type;
     cs->nest_depth++;
 }
 
-BCNestEntry *bc_nest_top(BCCompiler *cs) {
+BCNestEntry * bc_nest_top(BCCompiler * cs) {
     if (cs->nest_depth <= 0) return NULL;
     return &cs->nest_stack[cs->nest_depth - 1];
 }
 
-BCNestEntry *bc_nest_find(BCCompiler *cs, BCNestType type) {
+BCNestEntry * bc_nest_find(BCCompiler * cs, BCNestType type) {
     for (int i = cs->nest_depth - 1; i >= 0; i--) {
         if (cs->nest_stack[i].type == type) {
             return &cs->nest_stack[i];
@@ -444,7 +531,7 @@ BCNestEntry *bc_nest_find(BCCompiler *cs, BCNestType type) {
     return NULL;
 }
 
-void bc_nest_pop(BCCompiler *cs) {
+void bc_nest_pop(BCCompiler * cs) {
     if (cs->nest_depth <= 0) {
         bc_set_error(cs, "Nesting stack underflow");
         return;
@@ -456,22 +543,22 @@ void bc_nest_pop(BCCompiler *cs) {
 /*  Fixup management                                                  */
 /* ------------------------------------------------------------------ */
 
-void bc_add_fixup_line(BCCompiler *cs, uint32_t patch_addr, int target_line,
+void bc_add_fixup_line(BCCompiler * cs, uint32_t patch_addr, int target_line,
                        uint8_t size, uint8_t is_relative) {
     if (cs->fixup_count >= BC_MAX_FIXUPS) {
         bc_set_error(cs, "Too many fixups (max %d)", BC_MAX_FIXUPS);
         return;
     }
-    BCFixup *f = &cs->fixups[cs->fixup_count++];
-    f->patch_addr    = patch_addr;
-    f->target_line   = target_line;
-    f->target_label  = -1;
-    f->size          = size;
-    f->is_relative   = is_relative;
+    BCFixup * f = &cs->fixups[cs->fixup_count++];
+    f->patch_addr = patch_addr;
+    f->target_line = target_line;
+    f->target_label = -1;
+    f->size = size;
+    f->is_relative = is_relative;
     f->is_data_index = 0;
 }
 
-void bc_add_fixup_label(BCCompiler *cs, uint32_t patch_addr, const char *name,
+void bc_add_fixup_label(BCCompiler * cs, uint32_t patch_addr, const char * name,
                         uint8_t size, uint8_t is_relative) {
     if (cs->fixup_count >= BC_MAX_FIXUPS) {
         bc_set_error(cs, "Too many fixups (max %d)", BC_MAX_FIXUPS);
@@ -487,24 +574,24 @@ void bc_add_fixup_label(BCCompiler *cs, uint32_t patch_addr, const char *name,
             return;
         }
         idx = cs->labelmap_count++;
-        BCLabelMap *L = &cs->labelmap[idx];
+        BCLabelMap * L = &cs->labelmap[idx];
         size_t n = strlen(name);
         if (n > BC_MAX_LABEL_NAME) n = BC_MAX_LABEL_NAME;
         memcpy(L->name, name, n);
         L->name[n] = '\0';
-        L->offset  = 0xFFFFFFFF;  /* unresolved */
+        L->offset = 0xFFFFFFFF; /* unresolved */
         L->data_index = 0xFFFF;
     }
-    BCFixup *f = &cs->fixups[cs->fixup_count++];
-    f->patch_addr    = patch_addr;
-    f->target_line   = -1;
-    f->target_label  = idx;
-    f->size          = size;
-    f->is_relative   = is_relative;
+    BCFixup * f = &cs->fixups[cs->fixup_count++];
+    f->patch_addr = patch_addr;
+    f->target_line = -1;
+    f->target_label = idx;
+    f->size = size;
+    f->is_relative = is_relative;
     f->is_data_index = 0;
 }
 
-void bc_add_fixup_label_data_index(BCCompiler *cs, uint32_t patch_addr, const char *name) {
+void bc_add_fixup_label_data_index(BCCompiler * cs, uint32_t patch_addr, const char * name) {
     if (cs->fixup_count >= BC_MAX_FIXUPS) {
         bc_set_error(cs, "Too many fixups (max %d)", BC_MAX_FIXUPS);
         return;
@@ -516,26 +603,26 @@ void bc_add_fixup_label_data_index(BCCompiler *cs, uint32_t patch_addr, const ch
             return;
         }
         idx = cs->labelmap_count++;
-        BCLabelMap *L = &cs->labelmap[idx];
+        BCLabelMap * L = &cs->labelmap[idx];
         size_t n = strlen(name);
         if (n > BC_MAX_LABEL_NAME) n = BC_MAX_LABEL_NAME;
         memcpy(L->name, name, n);
         L->name[n] = '\0';
-        L->offset  = 0xFFFFFFFF;
+        L->offset = 0xFFFFFFFF;
         L->data_index = 0xFFFF;
     }
-    BCFixup *f = &cs->fixups[cs->fixup_count++];
-    f->patch_addr    = patch_addr;
-    f->target_line   = -1;
-    f->target_label  = idx;
-    f->size          = 2;
-    f->is_relative   = 0;
+    BCFixup * f = &cs->fixups[cs->fixup_count++];
+    f->patch_addr = patch_addr;
+    f->target_line = -1;
+    f->target_label = idx;
+    f->size = 2;
+    f->is_relative = 0;
     f->is_data_index = 1;
 }
 
-void bc_resolve_fixups(BCCompiler *cs) {
+void bc_resolve_fixups(BCCompiler * cs) {
     for (uint16_t i = 0; i < cs->fixup_count; i++) {
-        BCFixup *f = &cs->fixups[i];
+        BCFixup * f = &cs->fixups[i];
 
         if (f->is_data_index) {
             if (f->target_label < 0 || f->target_label >= cs->labelmap_count) {
@@ -596,47 +683,71 @@ void bc_resolve_fixups(BCCompiler *cs) {
 /*  Variable emit helpers                                             */
 /* ------------------------------------------------------------------ */
 
-void bc_emit_load_var(BCCompiler *cs, uint16_t slot, uint8_t type, int is_local) {
+void bc_emit_load_var(BCCompiler * cs, uint16_t slot, uint8_t type, int is_local) {
     if (is_local) {
         switch (type) {
-            case T_INT: bc_emit_byte(cs, OP_LOAD_LOCAL_I); break;
-            case T_NBR: bc_emit_byte(cs, OP_LOAD_LOCAL_F); break;
-            case T_STR: bc_emit_byte(cs, OP_LOAD_LOCAL_S); break;
-            default:
-                bc_set_error(cs, "Unknown type 0x%02X in load local", type);
-                return;
+        case T_INT:
+            bc_emit_byte(cs, OP_LOAD_LOCAL_I);
+            break;
+        case T_NBR:
+            bc_emit_byte(cs, OP_LOAD_LOCAL_F);
+            break;
+        case T_STR:
+            bc_emit_byte(cs, OP_LOAD_LOCAL_S);
+            break;
+        default:
+            bc_set_error(cs, "Unknown type 0x%02X in load local", type);
+            return;
         }
     } else {
         switch (type) {
-            case T_INT: bc_emit_byte(cs, OP_LOAD_I); break;
-            case T_NBR: bc_emit_byte(cs, OP_LOAD_F); break;
-            case T_STR: bc_emit_byte(cs, OP_LOAD_S); break;
-            default:
-                bc_set_error(cs, "Unknown type 0x%02X in load global", type);
-                return;
+        case T_INT:
+            bc_emit_byte(cs, OP_LOAD_I);
+            break;
+        case T_NBR:
+            bc_emit_byte(cs, OP_LOAD_F);
+            break;
+        case T_STR:
+            bc_emit_byte(cs, OP_LOAD_S);
+            break;
+        default:
+            bc_set_error(cs, "Unknown type 0x%02X in load global", type);
+            return;
         }
     }
     bc_emit_u16(cs, slot);
 }
 
-void bc_emit_store_var(BCCompiler *cs, uint16_t slot, uint8_t type, int is_local) {
+void bc_emit_store_var(BCCompiler * cs, uint16_t slot, uint8_t type, int is_local) {
     if (is_local) {
         switch (type) {
-            case T_INT: bc_emit_byte(cs, OP_STORE_LOCAL_I); break;
-            case T_NBR: bc_emit_byte(cs, OP_STORE_LOCAL_F); break;
-            case T_STR: bc_emit_byte(cs, OP_STORE_LOCAL_S); break;
-            default:
-                bc_set_error(cs, "Unknown type 0x%02X in store local", type);
-                return;
+        case T_INT:
+            bc_emit_byte(cs, OP_STORE_LOCAL_I);
+            break;
+        case T_NBR:
+            bc_emit_byte(cs, OP_STORE_LOCAL_F);
+            break;
+        case T_STR:
+            bc_emit_byte(cs, OP_STORE_LOCAL_S);
+            break;
+        default:
+            bc_set_error(cs, "Unknown type 0x%02X in store local", type);
+            return;
         }
     } else {
         switch (type) {
-            case T_INT: bc_emit_byte(cs, OP_STORE_I); break;
-            case T_NBR: bc_emit_byte(cs, OP_STORE_F); break;
-            case T_STR: bc_emit_byte(cs, OP_STORE_S); break;
-            default:
-                bc_set_error(cs, "Unknown type 0x%02X in store global", type);
-                return;
+        case T_INT:
+            bc_emit_byte(cs, OP_STORE_I);
+            break;
+        case T_NBR:
+            bc_emit_byte(cs, OP_STORE_F);
+            break;
+        case T_STR:
+            bc_emit_byte(cs, OP_STORE_S);
+            break;
+        default:
+            bc_set_error(cs, "Unknown type 0x%02X in store global", type);
+            return;
         }
     }
     bc_emit_u16(cs, slot);
@@ -646,7 +757,7 @@ void bc_emit_store_var(BCCompiler *cs, uint16_t slot, uint8_t type, int is_local
 /*  bc_skip_var — skip past a variable reference in tokenized stream  */
 /* ------------------------------------------------------------------ */
 
-unsigned char *bc_skip_var(unsigned char *p) {
+unsigned char * bc_skip_var(unsigned char * p) {
     /* Skip the name characters */
     if (!isnamestart(*p)) return p;
     while (isnamechar(*p)) p++;

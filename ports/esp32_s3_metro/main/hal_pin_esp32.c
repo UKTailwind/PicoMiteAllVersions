@@ -24,27 +24,54 @@
 /* ---- mode + direction ---- */
 
 void hal_pin_set_mode(uint32_t gpio, hal_pin_mode_t mode) {
-    gpio_config_t cfg = { .pin_bit_mask = 1ULL << gpio };
+    gpio_config_t cfg = {.pin_bit_mask = 1ULL << gpio};
     switch (mode) {
-        case HAL_PIN_MODE_DISABLED:
-            cfg.mode = GPIO_MODE_DISABLE;  cfg.pull_up_en = 0; cfg.pull_down_en = 0; break;
-        case HAL_PIN_MODE_INPUT:
-            cfg.mode = GPIO_MODE_INPUT;    cfg.pull_up_en = 0; cfg.pull_down_en = 0; break;
-        case HAL_PIN_MODE_INPUT_PULLUP:
-            cfg.mode = GPIO_MODE_INPUT;    cfg.pull_up_en = 1; cfg.pull_down_en = 0; break;
-        case HAL_PIN_MODE_INPUT_PULLDOWN:
-            cfg.mode = GPIO_MODE_INPUT;    cfg.pull_up_en = 0; cfg.pull_down_en = 1; break;
-        case HAL_PIN_MODE_OUTPUT:
-            cfg.mode = GPIO_MODE_OUTPUT;   cfg.pull_up_en = 0; cfg.pull_down_en = 0; break;
-        case HAL_PIN_MODE_OPEN_DRAIN:
-            cfg.mode = GPIO_MODE_OUTPUT_OD;cfg.pull_up_en = 0; cfg.pull_down_en = 0; break;
-        case HAL_PIN_MODE_ANALOG:
-            cfg.mode = GPIO_MODE_DISABLE;  cfg.pull_up_en = 0; cfg.pull_down_en = 0; break;
-        case HAL_PIN_MODE_PWM:
-            /* PWM via LEDC needs ledc_channel_config — caller side. */
-            cfg.mode = GPIO_MODE_OUTPUT;   cfg.pull_up_en = 0; cfg.pull_down_en = 0; break;
-        default:
-            cfg.mode = GPIO_MODE_DISABLE;  cfg.pull_up_en = 0; cfg.pull_down_en = 0; break;
+    case HAL_PIN_MODE_DISABLED:
+        cfg.mode = GPIO_MODE_DISABLE;
+        cfg.pull_up_en = 0;
+        cfg.pull_down_en = 0;
+        break;
+    case HAL_PIN_MODE_INPUT:
+        cfg.mode = GPIO_MODE_INPUT;
+        cfg.pull_up_en = 0;
+        cfg.pull_down_en = 0;
+        break;
+    case HAL_PIN_MODE_INPUT_PULLUP:
+        cfg.mode = GPIO_MODE_INPUT;
+        cfg.pull_up_en = 1;
+        cfg.pull_down_en = 0;
+        break;
+    case HAL_PIN_MODE_INPUT_PULLDOWN:
+        cfg.mode = GPIO_MODE_INPUT;
+        cfg.pull_up_en = 0;
+        cfg.pull_down_en = 1;
+        break;
+    case HAL_PIN_MODE_OUTPUT:
+        cfg.mode = GPIO_MODE_OUTPUT;
+        cfg.pull_up_en = 0;
+        cfg.pull_down_en = 0;
+        break;
+    case HAL_PIN_MODE_OPEN_DRAIN:
+        cfg.mode = GPIO_MODE_OUTPUT_OD;
+        cfg.pull_up_en = 0;
+        cfg.pull_down_en = 0;
+        break;
+    case HAL_PIN_MODE_ANALOG:
+        cfg.mode = GPIO_MODE_DISABLE;
+        cfg.pull_up_en = 0;
+        cfg.pull_down_en = 0;
+        break;
+    case HAL_PIN_MODE_PWM:
+        /* PWM via LEDC needs ledc_channel_config — caller side. */
+        cfg.mode = GPIO_MODE_OUTPUT;
+        cfg.pull_up_en = 0;
+        cfg.pull_down_en = 0;
+        break;
+    default:
+        cfg.mode = GPIO_MODE_DISABLE;
+        cfg.pull_up_en = 0;
+        cfg.pull_down_en = 0;
+        break;
     }
     cfg.intr_type = GPIO_INTR_DISABLE;
     gpio_config(&cfg);
@@ -52,12 +79,12 @@ void hal_pin_set_mode(uint32_t gpio, hal_pin_mode_t mode) {
 
 void hal_pin_set_dir(uint32_t gpio, hal_pin_dir_t dir) {
     gpio_set_direction((gpio_num_t)gpio,
-        dir == HAL_PIN_DIR_OUT ? GPIO_MODE_OUTPUT : GPIO_MODE_INPUT);
+                       dir == HAL_PIN_DIR_OUT ? GPIO_MODE_OUTPUT : GPIO_MODE_INPUT);
 }
 
 void hal_pin_set_pulls(uint32_t gpio, hal_pin_pull_t pull) {
     gpio_pull_mode_t m = GPIO_FLOATING;
-    if (pull == HAL_PIN_PULL_UP)   m = GPIO_PULLUP_ONLY;
+    if (pull == HAL_PIN_PULL_UP) m = GPIO_PULLUP_ONLY;
     if (pull == HAL_PIN_PULL_DOWN) m = GPIO_PULLDOWN_ONLY;
     gpio_set_pull_mode((gpio_num_t)gpio, m);
 }
@@ -69,7 +96,9 @@ void hal_pin_set_input_enabled(uint32_t gpio, bool enabled) {
     if (enabled) gpio_set_direction((gpio_num_t)gpio, GPIO_MODE_INPUT);
 }
 
-void hal_pin_pulldown_reset(int p) { (void)p; /* RP2040-specific dance */ }
+void hal_pin_pulldown_reset(int p) {
+    (void)p; /* RP2040-specific dance */
+}
 
 void hal_pin_select_digital(uint32_t gpio) {
     gpio_reset_pin((gpio_num_t)gpio);
@@ -80,23 +109,36 @@ void hal_pin_set_function(uint32_t gpio, hal_pin_func_t func) {
      * via gpio_iomux_in / gpio_matrix_out. Callers supply specific
      * peripheral-bound pins explicitly via the IDF driver they're
      * using (SPI, I2C, etc.), so this can be a near-no-op for now. */
-    (void)gpio; (void)func;
+    (void)gpio;
+    (void)func;
 }
 
 void hal_pin_set_drive_mA(uint32_t gpio, uint8_t mA) {
     /* ESP32-S3 supports 5 / 10 / 20 / 40 mA drive enums. Pick closest. */
-    gpio_drive_cap_t cap = GPIO_DRIVE_CAP_2;  /* 20 mA, default */
-    if (mA <= 5)       cap = GPIO_DRIVE_CAP_0;
-    else if (mA <= 10) cap = GPIO_DRIVE_CAP_1;
-    else if (mA <= 20) cap = GPIO_DRIVE_CAP_2;
-    else               cap = GPIO_DRIVE_CAP_3;
+    gpio_drive_cap_t cap = GPIO_DRIVE_CAP_2; /* 20 mA, default */
+    if (mA <= 5)
+        cap = GPIO_DRIVE_CAP_0;
+    else if (mA <= 10)
+        cap = GPIO_DRIVE_CAP_1;
+    else if (mA <= 20)
+        cap = GPIO_DRIVE_CAP_2;
+    else
+        cap = GPIO_DRIVE_CAP_3;
     gpio_set_drive_capability((gpio_num_t)gpio, cap);
 }
 
-void hal_pin_set_input_hysteresis(uint32_t gpio, bool enabled) { (void)gpio; (void)enabled; }
-void hal_pin_set_slew_fast(uint32_t gpio, bool fast) { (void)gpio; (void)fast; }
+void hal_pin_set_input_hysteresis(uint32_t gpio, bool enabled) {
+    (void)gpio;
+    (void)enabled;
+}
+void hal_pin_set_slew_fast(uint32_t gpio, bool fast) {
+    (void)gpio;
+    (void)fast;
+}
 void hal_pin_irq_set_edge(uint32_t gpio, uint32_t edge_mask, bool enabled) {
-    (void)gpio; (void)edge_mask; (void)enabled;  /* TODO: gpio_isr_handler */
+    (void)gpio;
+    (void)edge_mask;
+    (void)enabled; /* TODO: gpio_isr_handler */
 }
 
 void hal_pin_init_digital(uint32_t gpio) {
@@ -143,13 +185,13 @@ uint64_t hal_pin_bank_read_out_latch(void) {
 }
 
 void hal_pin_bank_set_mask(uint64_t mask) {
-    if (mask & 0xffffffffULL) GPIO.out_w1ts  = (uint32_t)(mask & 0xffffffffULL);
-    if (mask >> 32)           GPIO.out1_w1ts.val = (uint32_t)(mask >> 32);
+    if (mask & 0xffffffffULL) GPIO.out_w1ts = (uint32_t)(mask & 0xffffffffULL);
+    if (mask >> 32) GPIO.out1_w1ts.val = (uint32_t)(mask >> 32);
 }
 
 void hal_pin_bank_clr_mask(uint64_t mask) {
-    if (mask & 0xffffffffULL) GPIO.out_w1tc  = (uint32_t)(mask & 0xffffffffULL);
-    if (mask >> 32)           GPIO.out1_w1tc.val = (uint32_t)(mask >> 32);
+    if (mask & 0xffffffffULL) GPIO.out_w1tc = (uint32_t)(mask & 0xffffffffULL);
+    if (mask >> 32) GPIO.out1_w1tc.val = (uint32_t)(mask >> 32);
 }
 
 void hal_pin_bank_xor_mask(uint64_t mask) {
@@ -170,14 +212,14 @@ static adc_oneshot_unit_handle_t s_adc2 = NULL;
 static adc_unit_t s_current_unit = ADC_UNIT_1;
 static int s_current_channel = -1;
 
-static adc_oneshot_unit_handle_t *hal_pin_adc_unit_handle(adc_unit_t unit) {
+static adc_oneshot_unit_handle_t * hal_pin_adc_unit_handle(adc_unit_t unit) {
     return unit == ADC_UNIT_2 ? &s_adc2 : &s_adc1;
 }
 
 static adc_oneshot_unit_handle_t hal_pin_adc_ensure_unit(adc_unit_t unit) {
-    adc_oneshot_unit_handle_t *handle = hal_pin_adc_unit_handle(unit);
+    adc_oneshot_unit_handle_t * handle = hal_pin_adc_unit_handle(unit);
     if (!*handle) {
-        adc_oneshot_unit_init_cfg_t cfg = { .unit_id = unit };
+        adc_oneshot_unit_init_cfg_t cfg = {.unit_id = unit};
         adc_oneshot_new_unit(&cfg, handle);
     }
     return *handle;
@@ -195,7 +237,7 @@ void hal_pin_adc_select(uint32_t adc_channel) {
     }
     adc_oneshot_unit_handle_t handle = hal_pin_adc_ensure_unit(unit);
     adc_oneshot_chan_cfg_t cfg = {
-        .atten    = ADC_ATTEN_DB_12,    /* 0..3.3 V full scale */
+        .atten = ADC_ATTEN_DB_12, /* 0..3.3 V full scale */
         .bitwidth = ADC_BITWIDTH_DEFAULT,
     };
     adc_oneshot_config_channel(handle, (adc_channel_t)adc_channel, &cfg);
@@ -216,5 +258,5 @@ uint16_t hal_pin_adc_read(void) {
     if (!handle) return 0;
     int raw = 0;
     adc_oneshot_read(handle, (adc_channel_t)s_current_channel, &raw);
-    return (uint16_t)(raw & 0xfff);  /* 12-bit on ESP32-S3 */
+    return (uint16_t)(raw & 0xfff); /* 12-bit on ESP32-S3 */
 }

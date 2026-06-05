@@ -13,7 +13,7 @@
 #include_next <limits.h>
 
 #ifndef PATH_MAX
-#define PATH_MAX  256   /* FAT max-name path; MMBasic never goes deep */
+#define PATH_MAX 256 /* FAT max-name path; MMBasic never goes deep */
 #endif
 
 #endif

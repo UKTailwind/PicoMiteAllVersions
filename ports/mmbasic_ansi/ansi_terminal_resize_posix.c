@@ -29,7 +29,7 @@ void ansi_terminal_install_resize_handler(void) {
     sigaction(SIGWINCH, &sa, NULL);
 }
 
-int ansi_terminal_query_size(int *rows, int *cols) {
+int ansi_terminal_query_size(int * rows, int * cols) {
     struct winsize ws;
     if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) != 0) return -1;
     if (ws.ws_row == 0 || ws.ws_col == 0) return -1;

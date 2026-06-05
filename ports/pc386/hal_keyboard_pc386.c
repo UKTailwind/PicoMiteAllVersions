@@ -18,44 +18,58 @@
 #include "pc386_panic.h"
 #include "../../drivers/i8042_kbd/i8042_kbd.h"
 
-void hal_keyboard_service(void)
-{
+void hal_keyboard_service(void) {
     /* Pumped from check_interrupt; must not panic just because input
      * isn't wired yet. The real serial drain lands in 3e. */
 }
 
-void hal_keyboard_clear_repeat_state(void) { kbd_clear_repeat_state(); }
+void hal_keyboard_clear_repeat_state(void) {
+    kbd_clear_repeat_state();
+}
 
-void hal_keyboard_init(void)
-{
+void hal_keyboard_init(void) {
     /* serial_init() already happens in kmain; nothing to do until
      * stage 4 brings up PS/2. */
 }
 
-int      hal_keyboard_keydown_count(void) { return 0; }
-int      hal_keyboard_keydown_slot(int slot) { (void)slot; return 0; }
-uint32_t hal_keyboard_lock_state(void) { return 0; }
+int hal_keyboard_keydown_count(void) {
+    return 0;
+}
+int hal_keyboard_keydown_slot(int slot) {
+    (void)slot;
+    return 0;
+}
+uint32_t hal_keyboard_lock_state(void) {
+    return 0;
+}
 
-int hal_keyboard_set_layout(int layout)
-{
+int hal_keyboard_set_layout(int layout) {
     (void)layout;
-    return -1;  /* No reconfigurable layout on a serial-fed REPL. */
+    return -1; /* No reconfigurable layout on a serial-fed REPL. */
 }
 
 void hal_keyboard_quiesce_for_reset(void) {}
 
-int hal_keyboard_usb_raw_report(int slot, unsigned char *out, int max_len)
-{
-    (void)slot; (void)out; (void)max_len;
-    return 0;  /* No USB host. */
+int hal_keyboard_usb_raw_report(int slot, unsigned char * out, int max_len) {
+    (void)slot;
+    (void)out;
+    (void)max_len;
+    return 0; /* No USB host. */
 }
 
 void hal_keyboard_on_external_io_clear(void) {}
-void hal_keyboard_on_gpio_edge(uint32_t gpio) { (void)gpio; }
+void hal_keyboard_on_gpio_edge(uint32_t gpio) {
+    (void)gpio;
+}
 void hal_keyboard_routinechecks_pump(void) {}
-void hal_console_usb_cdc_putc(char c, int flush) { (void)c; (void)flush; }
+void hal_console_usb_cdc_putc(char c, int flush) {
+    (void)c;
+    (void)flush;
+}
 void hal_keyboard_timer_tick(void) {}
 void hal_keyboard_init_external_mouse(void) {}
 void hal_console_usb_cdc_boot_init(void) {}
 void hal_keyboard_i2c_probe_at_boot(void) {}
-int  hal_keyboard_external_mouse_active(void) { return 0; }
+int hal_keyboard_external_mouse_active(void) {
+    return 0;
+}

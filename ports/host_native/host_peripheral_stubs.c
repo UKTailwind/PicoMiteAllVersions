@@ -23,8 +23,8 @@
 
 /* host_parse_pin_arg converts a GPn textual pin argument (or a raw pin
  * number) to the VM's internal pin index. Used by cmd_setpin / fun_pin. */
-static int host_parse_pin_arg(unsigned char *arg) {
-    unsigned char *p = arg;
+static int host_parse_pin_arg(unsigned char * arg) {
+    unsigned char * p = arg;
     skipspace(p);
     if ((p[0] == 'G' || p[0] == 'g') && (p[1] == 'P' || p[1] == 'p'))
         return codemap(getinteger(p + 2));
@@ -73,7 +73,7 @@ void cmd_nop(void) {}
 void cmd_Nunchuck(void) {}
 void cmd_onewire(void) {}
 void cmd_option(void) {
-    extern int port_web_option_setter(unsigned char *cmdline);
+    extern int port_web_option_setter(unsigned char * cmdline);
     extern void printoptions(void);
     if (checkstring(cmdline, (unsigned char *)"LIST")) {
         printoptions();
@@ -95,7 +95,7 @@ void cmd_pulse(void) {}
 void cmd_push(void) {}
 
 void cmd_pwm(void) {
-    unsigned char *tp;
+    unsigned char * tp;
     if ((tp = checkstring(cmdline, (unsigned char *)"SYNC"))) {
         MMFLOAT counts[12];
         uint16_t present = 0;
@@ -292,33 +292,47 @@ void fun_GPS(void) {}
 void fun_info(void) {
     extern short gui_font_width, gui_font_height;
     extern int gui_fcolour, gui_bcolour;
-    extern const uint8_t *flash_target_contents;
-    extern int port_web_mminfo(unsigned char *ep, int64_t *out_iret,
-                               unsigned char *out_sret, int *out_targ);
-    unsigned char *tp;
+    extern const uint8_t * flash_target_contents;
+    extern int port_web_mminfo(unsigned char * ep, int64_t * out_iret,
+                               unsigned char * out_sret, int * out_targ);
+    unsigned char * tp;
     sret = GetTempMemory(STRINGSIZE);
     if (checkstring(ep, (unsigned char *)"HRES")) {
-        iret = HRes; targ = T_INT; return;
+        iret = HRes;
+        targ = T_INT;
+        return;
     }
     if (checkstring(ep, (unsigned char *)"VRES")) {
-        iret = VRes; targ = T_INT; return;
+        iret = VRes;
+        targ = T_INT;
+        return;
     }
     if (checkstring(ep, (unsigned char *)"FONTWIDTH")) {
-        iret = gui_font_width; targ = T_INT; return;
+        iret = gui_font_width;
+        targ = T_INT;
+        return;
     }
     if (checkstring(ep, (unsigned char *)"FONTHEIGHT")) {
-        iret = gui_font_height; targ = T_INT; return;
+        iret = gui_font_height;
+        targ = T_INT;
+        return;
     }
     if (checkstring(ep, (unsigned char *)"FONT")) {
-        iret = (gui_font >> 4) + 1; targ = T_INT; return;
+        iret = (gui_font >> 4) + 1;
+        targ = T_INT;
+        return;
     }
     if (checkstring(ep, (unsigned char *)"FCOLOUR") ||
         checkstring(ep, (unsigned char *)"FCOLOR")) {
-        iret = gui_fcolour; targ = T_INT; return;
+        iret = gui_fcolour;
+        targ = T_INT;
+        return;
     }
     if (checkstring(ep, (unsigned char *)"BCOLOUR") ||
         checkstring(ep, (unsigned char *)"BCOLOR")) {
-        iret = gui_bcolour; targ = T_INT; return;
+        iret = gui_bcolour;
+        targ = T_INT;
+        return;
     }
     if ((tp = checkstring(ep, (unsigned char *)"FLASH ADDRESS"))) {
         /* uintptr_t round-trip — `(unsigned int)` would truncate the
@@ -341,7 +355,7 @@ void fun_info(void) {
  * peripheral-bus subkeys (PIO, ADC, etc.); none of those are reachable
  * on host, so we keep this surface narrow. */
 void fun_peek(void) {
-    unsigned char *p;
+    unsigned char * p;
     getargs(&ep, 3, (unsigned char *)",");
     if ((p = checkstring(argv[0], (unsigned char *)"INT8")) ||
         (p = checkstring(argv[0], (unsigned char *)"BYTE"))) {
@@ -401,15 +415,18 @@ void fun_touch(void) {}
  * Drawing stubs — Draw.c still references these transitively for
  * legacy device code paths that never fire on host.
  * ======================================================================= */
-void UnloadFont(int f) { (void)f; }
+void UnloadFont(int f) {
+    (void)f;
+}
 
 /* Host stub for FileLoadCMM2Program — only the rp2350 non-WEB path
  * in ports/pico_sdk_common/defines_loader.c has a real body; host
  * doesn't link that file. Commands.c::do_run calls this from its
  * CMM2mode branch; returning 0 is the failure sentinel the caller
  * already handles. */
-int FileLoadCMM2Program(char *fname, bool message) {
-    (void)fname; (void)message;
+int FileLoadCMM2Program(char * fname, bool message) {
+    (void)fname;
+    (void)message;
     return 0;
 }
 /* setmode stub moved to drivers/vga_pio/vga_ops_stub.c (which host
@@ -418,30 +435,77 @@ int FileLoadCMM2Program(char *fname, bool message) {
 /* copyframetoscreen: host has no LCD to push to — this stub covers
  * Draw.c's docompressed / cmd_blitmemory fallback paths that run on
  * every target but are guarded at runtime by a NULL buffer check. */
-void copyframetoscreen(uint8_t *s, int xstart, int xend, int ystart, int yend, int odd) { (void)s; (void)xstart; (void)xend; (void)ystart; (void)yend; (void)odd; }
-void copybuffertoscreen(unsigned char *s, int lx, int ly, int hx, int hy) { (void)s; (void)lx; (void)ly; (void)hx; (void)hy; }
-void merge(uint8_t colour) { (void)colour; }
-void blitmerge(int x0, int y0, int w, int h, uint8_t colour) { (void)x0; (void)y0; (void)w; (void)h; (void)colour; }
+void copyframetoscreen(uint8_t * s, int xstart, int xend, int ystart, int yend, int odd) {
+    (void)s;
+    (void)xstart;
+    (void)xend;
+    (void)ystart;
+    (void)yend;
+    (void)odd;
+}
+void copybuffertoscreen(unsigned char * s, int lx, int ly, int hx, int hy) {
+    (void)s;
+    (void)lx;
+    (void)ly;
+    (void)hx;
+    (void)hy;
+}
+void merge(uint8_t colour) {
+    (void)colour;
+}
+void blitmerge(int x0, int y0, int w, int h, uint8_t colour) {
+    (void)x0;
+    (void)y0;
+    (void)w;
+    (void)h;
+    (void)colour;
+}
 /* cmd_blit MERGE calls setframebuffer + hal_display_merge_post_blit_bg;
  * host gets here via the dead branch after has_pipeline() returns 0. */
-void setframebuffer(void) { }
+void setframebuffer(void) {}
 
 /* =========================================================================
  * SPI / Serial / Audio stubs
  * ======================================================================= */
-void spi_write_command(unsigned char data) { (void)data; }
-void spi_write_data(unsigned char data) { (void)data; }
-unsigned char SerialPutchar(int comnbr, unsigned char c) { (void)comnbr; (void)c; return c; }
-void WriteComand(int cmd) { (void)cmd; }
-void WriteData(int data) { (void)data; }
+void spi_write_command(unsigned char data) {
+    (void)data;
+}
+void spi_write_data(unsigned char data) {
+    (void)data;
+}
+unsigned char SerialPutchar(int comnbr, unsigned char c) {
+    (void)comnbr;
+    (void)c;
+    return c;
+}
+void WriteComand(int cmd) {
+    (void)cmd;
+}
+void WriteData(int data) {
+    (void)data;
+}
 void SPIClose(void) {}
 void SPI2Close(void) {}
 
-void SerialOpen(unsigned char *spec) { (void)spec; error("COM: not supported on host"); }
-void SerialClose(int comnbr) { (void)comnbr; }
-int SerialGetchar(int comnbr) { (void)comnbr; return -1; }
-int SerialRxStatus(int comnbr) { (void)comnbr; return 0; }
-int SerialTxStatus(int comnbr) { (void)comnbr; return 0; }
+void SerialOpen(unsigned char * spec) {
+    (void)spec;
+    error("COM: not supported on host");
+}
+void SerialClose(int comnbr) {
+    (void)comnbr;
+}
+int SerialGetchar(int comnbr) {
+    (void)comnbr;
+    return -1;
+}
+int SerialRxStatus(int comnbr) {
+    (void)comnbr;
+    return 0;
+}
+int SerialTxStatus(int comnbr) {
+    (void)comnbr;
+    return 0;
+}
 void disable_audio(void) {}
 
 /* =========================================================================
@@ -462,9 +526,15 @@ char GPSdate[11] = {0};
 /* =========================================================================
  * Memory / regex / AES stubs
  * ======================================================================= */
-unsigned int GetPeekAddr(unsigned char *p) { (void)p; return 0; }
-unsigned int GetPokeAddr(unsigned char *p) { (void)p; return 0; }
-unsigned char *GetIntAddress(unsigned char *p) {
+unsigned int GetPeekAddr(unsigned char * p) {
+    (void)p;
+    return 0;
+}
+unsigned int GetPokeAddr(unsigned char * p) {
+    (void)p;
+    return 0;
+}
+unsigned char * GetIntAddress(unsigned char * p) {
     if (isnamestart((uint8_t)*p)) {
         int i = FindSubFun(p, 0);
         if (i == -1) return findlabel(p);
@@ -472,33 +542,99 @@ unsigned char *GetIntAddress(unsigned char *p) {
     }
     return findline(getinteger(p), true);
 }
-int64_t *GetReceiveDataBuffer(unsigned char *p, unsigned int *nbr) { (void)p; (void)nbr; return NULL; }
-uint32_t getFreeHeap(void) { return 0; }
+int64_t * GetReceiveDataBuffer(unsigned char * p, unsigned int * nbr) {
+    (void)p;
+    (void)nbr;
+    return NULL;
+}
+uint32_t getFreeHeap(void) {
+    return 0;
+}
 
-int xregcomp(void *preg, const char *pattern, int cflags) { (void)preg; (void)pattern; (void)cflags; return -1; }
-int xregexec(void *preg, const char *string, int nmatch, void *pmatch, int eflags) { (void)preg; (void)string; (void)nmatch; (void)pmatch; (void)eflags; return -1; }
-void xregfree(void *preg) { (void)preg; }
+int xregcomp(void * preg, const char * pattern, int cflags) {
+    (void)preg;
+    (void)pattern;
+    (void)cflags;
+    return -1;
+}
+int xregexec(void * preg, const char * string, int nmatch, void * pmatch, int eflags) {
+    (void)preg;
+    (void)string;
+    (void)nmatch;
+    (void)pmatch;
+    (void)eflags;
+    return -1;
+}
+void xregfree(void * preg) {
+    (void)preg;
+}
 
-void AES_init_ctx(void *ctx, const uint8_t *key) { (void)ctx; (void)key; }
-void AES_init_ctx_iv(void *ctx, const uint8_t *key, const uint8_t *iv) { (void)ctx; (void)key; (void)iv; }
-void AES_ECB_encrypt(void *ctx, uint8_t *buf) { (void)ctx; (void)buf; }
-void AES_ECB_decrypt(void *ctx, uint8_t *buf) { (void)ctx; (void)buf; }
-void AES_CBC_encrypt_buffer(void *ctx, uint8_t *buf, int len) { (void)ctx; (void)buf; (void)len; }
-void AES_CBC_decrypt_buffer(void *ctx, uint8_t *buf, int len) { (void)ctx; (void)buf; (void)len; }
-void AES_CTR_xcrypt_buffer(void *ctx, uint8_t *buf, int len) { (void)ctx; (void)buf; (void)len; }
+void AES_init_ctx(void * ctx, const uint8_t * key) {
+    (void)ctx;
+    (void)key;
+}
+void AES_init_ctx_iv(void * ctx, const uint8_t * key, const uint8_t * iv) {
+    (void)ctx;
+    (void)key;
+    (void)iv;
+}
+void AES_ECB_encrypt(void * ctx, uint8_t * buf) {
+    (void)ctx;
+    (void)buf;
+}
+void AES_ECB_decrypt(void * ctx, uint8_t * buf) {
+    (void)ctx;
+    (void)buf;
+}
+void AES_CBC_encrypt_buffer(void * ctx, uint8_t * buf, int len) {
+    (void)ctx;
+    (void)buf;
+    (void)len;
+}
+void AES_CBC_decrypt_buffer(void * ctx, uint8_t * buf, int len) {
+    (void)ctx;
+    (void)buf;
+    (void)len;
+}
+void AES_CTR_xcrypt_buffer(void * ctx, uint8_t * buf, int len) {
+    (void)ctx;
+    (void)buf;
+    (void)len;
+}
 
 /* =========================================================================
  * External.c / GPIO / interrupt stubs
  * ======================================================================= */
-void PinSetBit(int pin, unsigned int offset) { (void)pin; (void)offset; }
-volatile unsigned int GetPinStatus(int pin) { (void)pin; return 0; }
-int GetPinBit(int pin) { (void)pin; return 0; }
-void WriteCoreTimer(unsigned long timeset) { (void)timeset; }
-unsigned long ReadCoreTimer(void) { return 0; }
-uint64_t readusclock(void) { return host_time_us_64(); }
-void writeusclock(uint64_t timeset) { (void)timeset; }
-uint64_t readIRclock(void) { return 0; }
-void writeIRclock(uint64_t timeset) { (void)timeset; }
+void PinSetBit(int pin, unsigned int offset) {
+    (void)pin;
+    (void)offset;
+}
+volatile unsigned int GetPinStatus(int pin) {
+    (void)pin;
+    return 0;
+}
+int GetPinBit(int pin) {
+    (void)pin;
+    return 0;
+}
+void WriteCoreTimer(unsigned long timeset) {
+    (void)timeset;
+}
+unsigned long ReadCoreTimer(void) {
+    return 0;
+}
+uint64_t readusclock(void) {
+    return host_time_us_64();
+}
+void writeusclock(uint64_t timeset) {
+    (void)timeset;
+}
+uint64_t readIRclock(void) {
+    return 0;
+}
+void writeIRclock(uint64_t timeset) {
+    (void)timeset;
+}
 void initExtIO(void) {}
 
 void ExtCfg(int pin, int cfg, int option) {
@@ -506,8 +642,10 @@ void ExtCfg(int pin, int cfg, int option) {
         vm_sys_pin_setpin(pin, VM_PIN_MODE_OFF, VM_PIN_OPT_NONE);
     } else if (cfg == EXT_DIG_IN) {
         int vm_option = VM_PIN_OPT_NONE;
-        if (option == CNPUSET) vm_option = VM_PIN_OPT_PULLUP;
-        else if (option == CNPDSET) vm_option = VM_PIN_OPT_PULLDOWN;
+        if (option == CNPUSET)
+            vm_option = VM_PIN_OPT_PULLUP;
+        else if (option == CNPDSET)
+            vm_option = VM_PIN_OPT_PULLDOWN;
         vm_sys_pin_setpin(pin, VM_PIN_MODE_DIN, vm_option);
     } else if (cfg == EXT_DIG_OUT) {
         vm_sys_pin_setpin(pin, VM_PIN_MODE_DOUT, VM_PIN_OPT_NONE);
@@ -515,16 +653,32 @@ void ExtCfg(int pin, int cfg, int option) {
         vm_sys_pin_setpin(pin, VM_PIN_MODE_ARAW, VM_PIN_OPT_NONE);
     }
 }
-void ExtSet(int pin, int val) { vm_sys_pin_write(pin, val); }
-int64_t ExtInp(int pin) { return vm_sys_pin_read(pin); }
-int IsInvalidPin(int pin) { (void)pin; return 1; }
-unsigned long ReadCount5(void) { return 0; }
-void WriteCount5(unsigned long timeset) { (void)timeset; }
-void SetADCFreq(float frequency) { (void)frequency; }
+void ExtSet(int pin, int val) {
+    vm_sys_pin_write(pin, val);
+}
+int64_t ExtInp(int pin) {
+    return vm_sys_pin_read(pin);
+}
+int IsInvalidPin(int pin) {
+    (void)pin;
+    return 1;
+}
+unsigned long ReadCount5(void) {
+    return 0;
+}
+void WriteCount5(unsigned long timeset) {
+    (void)timeset;
+}
+void SetADCFreq(float frequency) {
+    (void)frequency;
+}
 /* Host has no backlight to drive; the stub just consumes the args.
  * The non-keypad signature is the canonical one — keypad ports
  * provide their own setBacklight via picocalc_features_real.c. */
-void setBacklight(int level, int frequency) { (void)level; (void)frequency; }
+void setBacklight(int level, int frequency) {
+    (void)level;
+    (void)frequency;
+}
 
 /* SPI byte-exchange function pointer — defined in mmc_stm32.c on
  * device ports, never assigned on host. The MEM332 stub's
@@ -532,37 +686,77 @@ void setBacklight(int level, int frequency) { (void)level; (void)frequency; }
  * default so the link succeeds. The function is never called on
  * host because the runtime never sets DISPLAY_TYPE to ILI9341. */
 typedef unsigned char BYTE;
-static BYTE host_xchg_byte_noop(BYTE data_out) { (void)data_out; return 0; }
+static BYTE host_xchg_byte_noop(BYTE data_out) {
+    (void)data_out;
+    return 0;
+}
 BYTE (*xchg_byte)(BYTE data_out) = host_xchg_byte_noop;
-void gpio_callback(uint gpio, uint32_t events) { (void)gpio; (void)events; }
-int CheckPin(int pin, int action) { (void)pin; (void)action; return 0; }
+void gpio_callback(uint gpio, uint32_t events) {
+    (void)gpio;
+    (void)events;
+}
+int CheckPin(int pin, int action) {
+    (void)pin;
+    (void)action;
+    return 0;
+}
 void CallCFuncInt1(void) {}
 void CallCFuncInt2(void) {}
 void CallCFuncInt3(void) {}
 void CallCFuncInt4(void) {}
 void IrInit(void) {}
 void IrReset(void) {}
-void IRSendSignal(int pin, int half_cycles) { (void)pin; (void)half_cycles; }
-void TM_EXTI_Handler_5(char *buf, uint32_t events) { (void)buf; (void)events; }
-int KeypadCheck(void) { return 0; }
-int codemap(int pin) { (void)pin; return 0; }
-int codecheck(unsigned char *line) { (void)line; return 0; }
-int getslice(int pin) { (void)pin; return 0; }
-void setpwm(int pin, int *PWMChannel, int *PWMSlice, MMFLOAT frequency, MMFLOAT duty) { (void)pin; (void)PWMChannel; (void)PWMSlice; (void)frequency; (void)duty; }
+void IRSendSignal(int pin, int half_cycles) {
+    (void)pin;
+    (void)half_cycles;
+}
+void TM_EXTI_Handler_5(char * buf, uint32_t events) {
+    (void)buf;
+    (void)events;
+}
+int KeypadCheck(void) {
+    return 0;
+}
+int codemap(int pin) {
+    (void)pin;
+    return 0;
+}
+int codecheck(unsigned char * line) {
+    (void)line;
+    return 0;
+}
+int getslice(int pin) {
+    (void)pin;
+    return 0;
+}
+void setpwm(int pin, int * PWMChannel, int * PWMSlice, MMFLOAT frequency, MMFLOAT duty) {
+    (void)pin;
+    (void)PWMChannel;
+    (void)PWMSlice;
+    (void)frequency;
+    (void)duty;
+}
 
 /* =========================================================================
  * Terminal / misc stubs
  * ======================================================================= */
-void setterminal(int height, int width) { (void)height; (void)width; }
+void setterminal(int height, int width) {
+    (void)height;
+    (void)width;
+}
 void OtherOptions(void) {}
 void disable_sd(void) {}
 void disable_systemspi(void) {}
 void disable_systemi2c(void) {}
-void mT4IntEnable(int status) { (void)status; }
+void mT4IntEnable(int status) {
+    (void)status;
+}
 void InitReservedIO(void) {}
 
 void DisplayNotSet(void) {}
-void ScrollLCDSPISCR(int lines) { (void)lines; }
+void ScrollLCDSPISCR(int lines) {
+    (void)lines;
+}
 void Display_Refresh(void) {}
 
 void cmd_guiBasic(void) {}
@@ -574,9 +768,7 @@ void cmd_guiBasic(void) {}
  * BDEC_bReadHeader) is now linked into the host build directly; the
  * earlier error-stubs were removed.
  * ======================================================================= */
-const struct Displays display_details[1] = {{ .ref = 0, .name = {0}, .speed = 0,
-    .horizontal = 0, .vertical = 0, .bits = 0, .buffered = 0,
-    .CPOL = 0, .CPHASE = 0 }};
+const struct Displays display_details[1] = {{.ref = 0, .name = {0}, .speed = 0, .horizontal = 0, .vertical = 0, .bits = 0, .buffered = 0, .CPOL = 0, .CPHASE = 0}};
 
 /* PSRAM-cache save/restore now lives behind hal_psram.h; the host build
  * pulls in drivers/psram_heap/hal_psram_stub.c which provides no-op
@@ -594,11 +786,10 @@ bool rp2350a = true;
  * (LCD_CS, AUDIO_L, …) because none of them mean anything. */
 void port_set_default_options(void) {}
 
-int  startupcomplete = 0;
+int startupcomplete = 0;
 
 void port_runtime_abort_dma(void) {}
 void port_runtime_disable_watchdog(void) {}
-
 
 /* PSRAMsize / PSRAMbase are extern'd unconditionally in
  * Hardware_Includes.h and read as runtime values by MMBasic.c (the
@@ -628,7 +819,7 @@ void port_print_kb_repeat(void) {}
 /* LoadPNG promoted to a universal symbol in batch 18 (FileIO.c calls
  * it unconditionally now); host has no upng-class decoder so the stub
  * matches the rp2040 "PNG not supported" behaviour. */
-void LoadPNG(unsigned char *p) {
+void LoadPNG(unsigned char * p) {
     (void)p;
     error("PNG not supported on this port");
 }
@@ -636,11 +827,31 @@ void LoadPNG(unsigned char *p) {
 /* MM_Misc.c batch-18 hooks — host. No physical bus, all stubs. */
 void port_print_system_spi(void) {}
 void port_disable_sd_release_system_spi(void) {}
-int  port_setter_sdcard_combined_cs(unsigned char *tp) { (void)tp; return 0; }
-void port_setter_sdcard_argc_check(int argc) { (void)argc; }
-int  port_setter_sdcard_via_system_spi(int p1, int p2, int p3) { (void)p1; (void)p2; (void)p3; return 0; }
-int  port_mminfo_lcdpanel(unsigned char *ep, unsigned char *sret, int *t) { (void)ep; (void)sret; (void)t; return 0; }
-int  port_mminfo_lcd320(unsigned char *ep, int64_t *iret, int *t) { (void)ep; (void)iret; (void)t; return 0; }
+int port_setter_sdcard_combined_cs(unsigned char * tp) {
+    (void)tp;
+    return 0;
+}
+void port_setter_sdcard_argc_check(int argc) {
+    (void)argc;
+}
+int port_setter_sdcard_via_system_spi(int p1, int p2, int p3) {
+    (void)p1;
+    (void)p2;
+    (void)p3;
+    return 0;
+}
+int port_mminfo_lcdpanel(unsigned char * ep, unsigned char * sret, int * t) {
+    (void)ep;
+    (void)sret;
+    (void)t;
+    return 0;
+}
+int port_mminfo_lcd320(unsigned char * ep, int64_t * iret, int * t) {
+    (void)ep;
+    (void)iret;
+    (void)t;
+    return 0;
+}
 
 /* Host doesn't have a port_audio_default_pwm_slice / port_chip_variant_suffix
  * caller (MM_Misc.c is gated to !MMBASIC_HOST). Stubs not needed. */

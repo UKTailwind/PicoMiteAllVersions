@@ -1,4 +1,4 @@
-/* 
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */
@@ -10,7 +10,7 @@
 #ifndef _INCLUDE_H
 #define _INCLUDE_H
 
-#include "port_config.h"   /* HAL_PORT_HAS_HDMI gates the PIO header
+#include "port_config.h" /* HAL_PORT_HAS_HDMI gates the PIO header
                               picks near the end of this file. */
 
 typedef unsigned char Bool;
@@ -22,12 +22,12 @@ typedef unsigned char Bool;
 #ifdef __cplusplus
 #define NULL 0
 #else
-#define NULL ((void*)0)
+#define NULL ((void *)0)
 #endif
 #endif
 
 // I/O port prefix
-#define __IO	volatile
+#define __IO volatile
 
 // request to use inline
 #define INLINE __attribute__((always_inline)) inline
@@ -56,9 +56,7 @@ typedef unsigned char Bool;
 //                               Constants
 // ----------------------------------------------------------------------------
 
-
-#define BIT(pos) (1UL<<(pos))
-
+#define BIT(pos) (1UL << (pos))
 
 // ----------------------------------------------------------------------------
 //                                   Includes
@@ -94,7 +92,6 @@ typedef unsigned char Bool;
 #include "PicoMiteVGA.pio.h"
 #include "PicoMiteI2S.pio.h"
 
-
 // ****************************************************************************
 //
 //                                    QVGA configuration
@@ -106,29 +103,27 @@ typedef unsigned char Bool;
 //	GP17 ... VSYNC
 
 // QVGA port pins
-#define QVGA_GPIO_FIRST	PinDef[Option.VGA_BLUE].GPno	// first QVGA GPIO
-#define QVGA_GPIO_NUM	4	// number of QVGA color GPIOs, without HSYNC and VSYNC
-#define QVGA_GPIO_LAST	(QVGA_GPIO_FIRST+QVGA_GPIO_NUM-1) // last QVGA GPIO
-#define QVGA_GPIO_HSYNC	PinDef[Option.VGA_HSYNC].GPno	// QVGA HSYNC/CSYNC GPIO
-#define QVGA_GPIO_VSYNC	(QVGA_GPIO_HSYNC+1) // QVGA VSYNC GPIO
-
+#define QVGA_GPIO_FIRST PinDef[Option.VGA_BLUE].GPno         // first QVGA GPIO
+#define QVGA_GPIO_NUM 4                                      // number of QVGA color GPIOs, without HSYNC and VSYNC
+#define QVGA_GPIO_LAST (QVGA_GPIO_FIRST + QVGA_GPIO_NUM - 1) // last QVGA GPIO
+#define QVGA_GPIO_HSYNC PinDef[Option.VGA_HSYNC].GPno        // QVGA HSYNC/CSYNC GPIO
+#define QVGA_GPIO_VSYNC (QVGA_GPIO_HSYNC + 1)                // QVGA VSYNC GPIO
 
 // QVGA display resolution
 //#define FRAMESIZE (38400) // display frame size in bytes (=38400)
 
 // 126 MHz timings
-#define QVGA_TOTAL_F	4000// total clock ticks (= QVGA_HSYNC + QVGA_BP + WIDTH*QVGA_CPP[1600] + QVGA_FP)
-#define QVGA_HSYNC_F	480	// horizontal sync clock ticks
-#define QVGA_BP_F	 240	// back porch clock ticks
-#define QVGA_FP_F	80	// front porch clock ticks
+#define QVGA_TOTAL_F 4000 // total clock ticks (= QVGA_HSYNC + QVGA_BP + WIDTH*QVGA_CPP[1600] + QVGA_FP)
+#define QVGA_HSYNC_F 480  // horizontal sync clock ticks
+#define QVGA_BP_F 240     // back porch clock ticks
+#define QVGA_FP_F 80      // front porch clock ticks
 
 // QVGA vertical timings
-#define QVGA_VTOT_F	525	// total scanlines (= QVGA_VSYNC + QVGA_VBACK + QVGA_VACT + QVGA_VFRONT)
-#define QVGA_VSYNC_F	2	// length of V sync (number of scanlines)
-#define QVGA_VBACK_F	33	// V back porch
-#define QVGA_VACT_F	480	// V active scanlines (= 2*HEIGHT)
-#define QVGA_VFRONT_F	10	// V front porch
-
+#define QVGA_VTOT_F 525  // total scanlines (= QVGA_VSYNC + QVGA_VBACK + QVGA_VACT + QVGA_VFRONT)
+#define QVGA_VSYNC_F 2   // length of V sync (number of scanlines)
+#define QVGA_VBACK_F 33  // V back porch
+#define QVGA_VACT_F 480  // V active scanlines (= 2*HEIGHT)
+#define QVGA_VFRONT_F 10 // V front porch
 
 #endif // _MAIN_H
 /*  @endcond */

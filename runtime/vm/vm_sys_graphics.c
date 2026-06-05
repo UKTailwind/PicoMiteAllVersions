@@ -21,7 +21,7 @@
 #include "hal/hal_display_pixel.h"
 
 typedef struct VMGfxScratchBuffer {
-    void *ptr;
+    void * ptr;
     size_t bytes;
 } VMGfxScratchBuffer;
 
@@ -37,8 +37,8 @@ static VMGfxScratchBuffer vm_gfx_int_d;
 static VMGfxScratchBuffer vm_gfx_mask_a;
 static VMGfxScratchBuffer vm_gfx_fb_line;
 
-static void *vm_sys_graphics_reserve_scratch(VMGfxScratchBuffer *buffer, size_t bytes) {
-    void *new_ptr;
+static void * vm_sys_graphics_reserve_scratch(VMGfxScratchBuffer * buffer, size_t bytes) {
+    void * new_ptr;
 
     if (bytes == 0) return NULL;
     if (buffer->ptr != NULL && buffer->bytes >= bytes) return buffer->ptr;
@@ -64,12 +64,11 @@ static uint8_t vm_sys_graphics_rgb121(uint32_t c) {
  * the error-stub at drivers/vm_framebuffer_unsupported/. */
 
 void vm_sys_graphics_reset(void) {
-    VMGfxScratchBuffer *buffers[] = {
+    VMGfxScratchBuffer * buffers[] = {
         &vm_gfx_short_a, &vm_gfx_short_b,
         &vm_gfx_float_a, &vm_gfx_float_b, &vm_gfx_float_c,
         &vm_gfx_int_a, &vm_gfx_int_b, &vm_gfx_int_c, &vm_gfx_int_d,
-        &vm_gfx_mask_a, &vm_gfx_fb_line
-    };
+        &vm_gfx_mask_a, &vm_gfx_fb_line};
     size_t i;
 
     hal_vm_framebuffer_shutdown_runtime();
@@ -81,41 +80,41 @@ void vm_sys_graphics_reset(void) {
     }
 }
 
-static int vm_sys_graphics_circle_arg_int(const GfxCircleArg *arg, int index) {
+static int vm_sys_graphics_circle_arg_int(const GfxCircleArg * arg, int index) {
     if (!arg->present || arg->count <= 0 || arg->get_int == NULL) return 0;
     return arg->get_int(arg->ctx, (arg->count > 1) ? index : 0);
 }
 
-static MMFLOAT vm_sys_graphics_circle_arg_float(const GfxCircleArg *arg, int index) {
+static MMFLOAT vm_sys_graphics_circle_arg_float(const GfxCircleArg * arg, int index) {
     if (!arg->present || arg->count <= 0) return 0;
     if (arg->get_float != NULL) return arg->get_float(arg->ctx, (arg->count > 1) ? index : 0);
     if (arg->get_int != NULL) return (MMFLOAT)arg->get_int(arg->ctx, (arg->count > 1) ? index : 0);
     return 0;
 }
 
-static void vm_sys_graphics_circle_fail_msg(const GfxCircleErrorSink *errors, const char *msg) {
+static void vm_sys_graphics_circle_fail_msg(const GfxCircleErrorSink * errors, const char * msg) {
     if (errors && errors->fail_msg) errors->fail_msg(errors->ctx, msg);
 }
 
-static void vm_sys_graphics_circle_fail_range(const GfxCircleErrorSink *errors, const char *label,
-                                     int value, int min, int max) {
+static void vm_sys_graphics_circle_fail_range(const GfxCircleErrorSink * errors, const char * label,
+                                              int value, int min, int max) {
     if (errors && errors->fail_range) errors->fail_range(errors->ctx, label, value, min, max);
 }
 
 static void vm_sys_graphics_arc_fill_circle_mask(int x, int y, int radius, int r, int fill,
-                                                 int ints_per_line, uint32_t *br,
+                                                 int ints_per_line, uint32_t * br,
                                                  MMFLOAT aspect, MMFLOAT aspect2);
 
-static int vm_sys_graphics_box_arg_value(const GfxBoxIntArg *arg, int index) {
+static int vm_sys_graphics_box_arg_value(const GfxBoxIntArg * arg, int index) {
     if (!arg->present || arg->count <= 0 || arg->get_int == NULL) return 0;
     return arg->get_int(arg->ctx, (arg->count > 1) ? index : 0);
 }
 
-static void vm_sys_graphics_box_fail_msg(const GfxBoxErrorSink *errors, const char *msg) {
+static void vm_sys_graphics_box_fail_msg(const GfxBoxErrorSink * errors, const char * msg) {
     if (errors && errors->fail_msg) errors->fail_msg(errors->ctx, msg);
 }
 
-static void vm_sys_graphics_box_fail_range(const GfxBoxErrorSink *errors, const char *label,
+static void vm_sys_graphics_box_fail_range(const GfxBoxErrorSink * errors, const char * label,
                                            int value, int min, int max) {
     if (errors && errors->fail_range) errors->fail_range(errors->ctx, label, value, min, max);
 }
@@ -191,7 +190,7 @@ static void vm_sys_graphics_draw_rbox(int x1, int y1, int x2, int y2, int radius
 }
 
 static void vm_sys_graphics_calc_triangle_edge(int x0, int y0, int x1, int y1,
-                                               short *xmin, short *xmax) {
+                                               short * xmin, short * xmax) {
     int absX, absY, offX, offY, err, x, y;
     x = x0;
     y = y0;
@@ -236,13 +235,34 @@ static void vm_sys_graphics_calc_triangle_edge(int x0, int y0, int x1, int y1,
 
 static void vm_sys_graphics_draw_triangle_pixels(int x0, int y0, int x1, int y1,
                                                  int x2, int y2, int c, int f) {
-    short *xmin;
-    short *xmax;
+    short * xmin;
+    short * xmax;
 
     if (x0 * (y1 - y2) + x1 * (y2 - y0) + x2 * (y0 - y1) == 0) {
-        if (y0 > y1) { int t = y0; y0 = y1; y1 = t; t = x0; x0 = x1; x1 = t; }
-        if (y1 > y2) { int t = y2; y2 = y1; y1 = t; t = x2; x2 = x1; x1 = t; }
-        if (y0 > y1) { int t = y0; y0 = y1; y1 = t; t = x0; x0 = x1; x1 = t; }
+        if (y0 > y1) {
+            int t = y0;
+            y0 = y1;
+            y1 = t;
+            t = x0;
+            x0 = x1;
+            x1 = t;
+        }
+        if (y1 > y2) {
+            int t = y2;
+            y2 = y1;
+            y1 = t;
+            t = x2;
+            x2 = x1;
+            x1 = t;
+        }
+        if (y0 > y1) {
+            int t = y0;
+            y0 = y1;
+            y1 = t;
+            t = x0;
+            x0 = x1;
+            x1 = t;
+        }
         DrawLine(x0, y0, x2, y2, 1, c);
         return;
     }
@@ -254,9 +274,30 @@ static void vm_sys_graphics_draw_triangle_pixels(int x0, int y0, int x1, int y1,
         return;
     }
 
-    if (y0 > y1) { int t = y0; y0 = y1; y1 = t; t = x0; x0 = x1; x1 = t; }
-    if (y1 > y2) { int t = y2; y2 = y1; y1 = t; t = x2; x2 = x1; x1 = t; }
-    if (y0 > y1) { int t = y0; y0 = y1; y1 = t; t = x0; x0 = x1; x1 = t; }
+    if (y0 > y1) {
+        int t = y0;
+        y0 = y1;
+        y1 = t;
+        t = x0;
+        x0 = x1;
+        x1 = t;
+    }
+    if (y1 > y2) {
+        int t = y2;
+        y2 = y1;
+        y1 = t;
+        t = x2;
+        x2 = x1;
+        x1 = t;
+    }
+    if (y0 > y1) {
+        int t = y0;
+        y0 = y1;
+        y1 = t;
+        t = x0;
+        x0 = x1;
+        x1 = t;
+    }
 
     if (VRes <= 0) return;
     xmin = (short *)vm_sys_graphics_reserve_scratch(&vm_gfx_short_a, (size_t)VRes * sizeof(short));
@@ -281,11 +322,11 @@ static void vm_sys_graphics_draw_triangle_pixels(int x0, int y0, int x1, int y1,
     DrawLine(x2, y2, x0, y0, 1, c);
 }
 
-static void vm_sys_graphics_fill_polygon_edges(const float *poly_x, const float *poly_y,
+static void vm_sys_graphics_fill_polygon_edges(const float * poly_x, const float * poly_y,
                                                int vertex_count, int count,
                                                int ystart, int yend,
                                                int c, int f) {
-    float *node_x;
+    float * node_x;
     int y, i, j;
 
     node_x = (float *)vm_sys_graphics_reserve_scratch(&vm_gfx_float_c, (size_t)count * sizeof(float));
@@ -329,13 +370,13 @@ static void vm_sys_graphics_fill_polygon_edges(const float *poly_x, const float 
     }
 }
 
-static void vm_sys_graphics_draw_polygon_points(const int *x_values, const int *y_values,
+static void vm_sys_graphics_draw_polygon_points(const int * x_values, const int * y_values,
                                                 int point_count, int c, int f, int close) {
     int ymax = 0;
     int ymin = 1000000;
     int vertex_count = 0;
-    float *poly_x;
-    float *poly_y;
+    float * poly_x;
+    float * poly_y;
 
     if (point_count <= 0) return;
     if (f < 0) {
@@ -382,21 +423,19 @@ static void vm_sys_graphics_draw_polygon_points(const int *x_values, const int *
     }
 }
 
-static void vm_sys_graphics_mask_hline(int x0, int x1, int y, int fill, int ints_per_line, uint32_t *br) {
+static void vm_sys_graphics_mask_hline(int x0, int x1, int y, int fill, int ints_per_line, uint32_t * br) {
     uint32_t x, xn;
     int w0, xx0, w1, xx1, i;
     const uint32_t a[] = {
         0xFFFFFFFF, 0x7FFFFFFF, 0x3FFFFFFF, 0x1FFFFFFF, 0x0FFFFFFF, 0x07FFFFFF, 0x03FFFFFF, 0x01FFFFFF,
         0x00FFFFFF, 0x007FFFFF, 0x003FFFFF, 0x001FFFFF, 0x000FFFFF, 0x0007FFFF, 0x0003FFFF, 0x0001FFFF,
         0x0000FFFF, 0x00007FFF, 0x00003FFF, 0x00001FFF, 0x00000FFF, 0x000007FF, 0x000003FF, 0x000001FF,
-        0x000000FF, 0x0000007F, 0x0000003F, 0x0000001F, 0x0000000F, 0x00000007, 0x00000003, 0x00000001
-    };
+        0x000000FF, 0x0000007F, 0x0000003F, 0x0000001F, 0x0000000F, 0x00000007, 0x00000003, 0x00000001};
     const uint32_t b[] = {
         0x80000000, 0xC0000000, 0xE0000000, 0xF0000000, 0xF8000000, 0xFC000000, 0xFE000000, 0xFF000000,
         0xFF800000, 0xFFC00000, 0xFFE00000, 0xFFF00000, 0xFFF80000, 0xFFFC0000, 0xFFFE0000, 0xFFFF0000,
         0xFFFF8000, 0xFFFFC000, 0xFFFFE000, 0xFFFFF000, 0xFFFFF800, 0xFFFFFC00, 0xFFFFFE00, 0xFFFFFF00,
-        0xFFFFFF80, 0xFFFFFFC0, 0xFFFFFFE0, 0xFFFFFFF0, 0xFFFFFFF8, 0xFFFFFFFC, 0xFFFFFFFE, 0xFFFFFFFF
-    };
+        0xFFFFFF80, 0xFFFFFFC0, 0xFFFFFFE0, 0xFFFFFFF0, 0xFFFFFFF8, 0xFFFFFFFC, 0xFFFFFFFE, 0xFFFFFFFF};
 
     w0 = y * ints_per_line + x0 / 32;
     xx0 = x0 & 0x1F;
@@ -406,8 +445,10 @@ static void vm_sys_graphics_mask_hline(int x0, int x1, int y, int fill, int ints
     if (w1 == w0) {
         x = a[xx0] & b[xx1];
         xn = ~x;
-        if (fill) br[w0] |= x;
-        else br[w0] &= xn;
+        if (fill)
+            br[w0] |= x;
+        else
+            br[w0] &= xn;
     } else {
         if (w1 - w0 > 1) {
             for (i = w0 + 1; i < w1; i++) br[i] = fill ? 0xFFFFFFFF : 0;
@@ -424,7 +465,7 @@ static void vm_sys_graphics_mask_hline(int x0, int x1, int y, int fill, int ints
 }
 
 static void vm_sys_graphics_arc_fill_circle_mask(int x, int y, int radius, int r, int fill,
-                                                 int ints_per_line, uint32_t *br,
+                                                 int ints_per_line, uint32_t * br,
                                                  MMFLOAT aspect, MMFLOAT aspect2) {
     int a, b, P;
     int A, B, asp;
@@ -442,24 +483,52 @@ static void vm_sys_graphics_arc_fill_circle_mask(int x, int y, int radius, int r
         vm_sys_graphics_mask_hline(x - A - radius, x + A - radius, y - b - radius, fill, ints_per_line, br);
         vm_sys_graphics_mask_hline(x - B - radius, x + B - radius, y + a - radius, fill, ints_per_line, br);
         vm_sys_graphics_mask_hline(x - B - radius, x + B - radius, y - a - radius, fill, ints_per_line, br);
-        if (P < 0) P += 3 + 2 * a++;
-        else P += 5 + 2 * (a++ - b--);
+        if (P < 0)
+            P += 3 + 2 * a++;
+        else
+            P += 5 + 2 * (a++ - b--);
     } while (a <= b);
 }
 
 static void vm_sys_graphics_clear_triangle(int x0, int y0, int x1, int y1, int x2, int y2,
-                                           int ints_per_line, uint32_t *br) {
+                                           int ints_per_line, uint32_t * br) {
     long a, b, y, last;
     long dx01, dy01, dx02, dy02, dx12, dy12, sa, sb;
     if (x0 * (y1 - y2) + x1 * (y2 - y0) + x2 * (y0 - y1) == 0) return;
 
-    if (y0 > y1) { int t = y0; y0 = y1; y1 = t; t = x0; x0 = x1; x1 = t; }
-    if (y1 > y2) { int t = y2; y2 = y1; y1 = t; t = x2; x2 = x1; x1 = t; }
-    if (y0 > y1) { int t = y0; y0 = y1; y1 = t; t = x0; x0 = x1; x1 = t; }
+    if (y0 > y1) {
+        int t = y0;
+        y0 = y1;
+        y1 = t;
+        t = x0;
+        x0 = x1;
+        x1 = t;
+    }
+    if (y1 > y2) {
+        int t = y2;
+        y2 = y1;
+        y1 = t;
+        t = x2;
+        x2 = x1;
+        x1 = t;
+    }
+    if (y0 > y1) {
+        int t = y0;
+        y0 = y1;
+        y1 = t;
+        t = x0;
+        x0 = x1;
+        x1 = t;
+    }
 
-    dx01 = x1 - x0; dy01 = y1 - y0; dx02 = x2 - x0;
-    dy02 = y2 - y0; dx12 = x2 - x1; dy12 = y2 - y1;
-    sa = 0; sb = 0;
+    dx01 = x1 - x0;
+    dy01 = y1 - y0;
+    dx02 = x2 - x0;
+    dy02 = y2 - y0;
+    dx12 = x2 - x1;
+    dy12 = y2 - y1;
+    sa = 0;
+    sb = 0;
     last = (y1 == y2) ? y1 : (y1 - 1);
     for (y = y0; y <= last; y++) {
         a = x0 + sa / dy01;
@@ -468,7 +537,11 @@ static void vm_sys_graphics_clear_triangle(int x0, int y0, int x1, int y1, int x
         sb += dx02;
         a = x0 + (x1 - x0) * (y - y0) / (y1 - y0);
         b = x0 + (x2 - x0) * (y - y0) / (y2 - y0);
-        if (a > b) { long t = a; a = b; b = t; }
+        if (a > b) {
+            long t = a;
+            a = b;
+            b = t;
+        }
         vm_sys_graphics_mask_hline((int)a, (int)b, (int)y, 0, ints_per_line, br);
     }
     sa = dx12 * (y - y1);
@@ -480,40 +553,83 @@ static void vm_sys_graphics_clear_triangle(int x0, int y0, int x1, int y1, int x
         sb += dx02;
         a = x1 + (x2 - x1) * (y - y1) / (y2 - y1);
         b = x0 + (x2 - x0) * (y - y0) / (y2 - y0);
-        if (a > b) { long t = a; a = b; b = t; }
+        if (a > b) {
+            long t = a;
+            a = b;
+            b = t;
+        }
         vm_sys_graphics_mask_hline((int)a, (int)b, (int)y, 0, ints_per_line, br);
         y++;
     }
 }
 
-static void vm_sys_graphics_arc_pointcalc(int angle, int x, int y, int r2, int *x0, int *y0) {
+static void vm_sys_graphics_arc_pointcalc(int angle, int x, int y, int r2, int * x0, int * y0) {
     MMFLOAT c1, s1;
     int quad;
     angle %= 360;
     switch (angle) {
-        case 0:   *x0 = x;       *y0 = y - r2; break;
-        case 45:  *x0 = x + r2 + 1; *y0 = y - r2; break;
-        case 90:  *x0 = x + r2 + 1; *y0 = y; break;
-        case 135: *x0 = x + r2 + 1; *y0 = y + r2; break;
-        case 180: *x0 = x;       *y0 = y + r2; break;
-        case 225: *x0 = x - r2;  *y0 = y + r2; break;
-        case 270: *x0 = x - r2;  *y0 = y; break;
-        case 315: *x0 = x - r2;  *y0 = y - r2; break;
-        default:
-            c1 = cos(Rad(angle));
-            s1 = sin(Rad(angle));
-            quad = (angle / 45) % 8;
-            switch (quad) {
-                case 0: *y0 = y - r2;     *x0 = x + s1 * r2 / c1; break;
-                case 1:
-                case 2: *x0 = x + r2 + 1; *y0 = y - c1 * r2 / s1; break;
-                case 3:
-                case 4: *y0 = y + r2;     *x0 = x - s1 * r2 / c1; break;
-                case 5:
-                case 6: *x0 = x - r2;     *y0 = y + c1 * r2 / s1; break;
-                case 7: *y0 = y - r2;     *x0 = x + s1 * r2 / c1; break;
-            }
+    case 0:
+        *x0 = x;
+        *y0 = y - r2;
+        break;
+    case 45:
+        *x0 = x + r2 + 1;
+        *y0 = y - r2;
+        break;
+    case 90:
+        *x0 = x + r2 + 1;
+        *y0 = y;
+        break;
+    case 135:
+        *x0 = x + r2 + 1;
+        *y0 = y + r2;
+        break;
+    case 180:
+        *x0 = x;
+        *y0 = y + r2;
+        break;
+    case 225:
+        *x0 = x - r2;
+        *y0 = y + r2;
+        break;
+    case 270:
+        *x0 = x - r2;
+        *y0 = y;
+        break;
+    case 315:
+        *x0 = x - r2;
+        *y0 = y - r2;
+        break;
+    default:
+        c1 = cos(Rad(angle));
+        s1 = sin(Rad(angle));
+        quad = (angle / 45) % 8;
+        switch (quad) {
+        case 0:
+            *y0 = y - r2;
+            *x0 = x + s1 * r2 / c1;
             break;
+        case 1:
+        case 2:
+            *x0 = x + r2 + 1;
+            *y0 = y - c1 * r2 / s1;
+            break;
+        case 3:
+        case 4:
+            *y0 = y + r2;
+            *x0 = x - s1 * r2 / c1;
+            break;
+        case 5:
+        case 6:
+            *x0 = x - r2;
+            *y0 = y + c1 * r2 / s1;
+            break;
+        case 7:
+            *y0 = y - r2;
+            *x0 = x + s1 * r2 / c1;
+            break;
+        }
+        break;
     }
 }
 
@@ -525,7 +641,7 @@ void vm_sys_graphics_arc_execute(int x, int y, int r1, int has_r2, int r2,
     int quad1;
     int ints_per_line;
     int save_refresh;
-    uint32_t *br;
+    uint32_t * br;
     size_t words;
 
     if (!has_r2) {
@@ -545,7 +661,8 @@ void vm_sys_graphics_arc_execute(int x, int y, int r1, int has_r2, int r2,
     rad3 = rad1 + 360;
     rstart = rad2;
     quad1 = (rad1 / 45) % 8;
-    x2 = x; y2 = y;
+    x2 = x;
+    y2 = y;
     ints_per_line = RoundUptoInt((r2 * 2) + 1) / 32;
     words = (size_t)(ints_per_line + 1) * (size_t)((r2 * 2) + 1);
     br = (uint32_t *)vm_sys_graphics_reserve_scratch(&vm_gfx_mask_a, words * sizeof(uint32_t));
@@ -595,8 +712,8 @@ void vm_sys_graphics_arc_execute(int x, int y, int r1, int has_r2, int r2,
     Option.Refresh = save_refresh;
 }
 
-void vm_sys_graphics_triangle_execute(GfxBoxMode mode, const GfxBoxIntArg *args, int field_count,
-                                      const GfxBoxErrorSink *errors) {
+void vm_sys_graphics_triangle_execute(GfxBoxMode mode, const GfxBoxIntArg * args, int field_count,
+                                      const GfxBoxErrorSink * errors) {
     int x1, y1, x2, y2, x3, y3, c = gui_fcolour, f = -1;
     int n, nc = 0, nf = 0;
     int max_colour = WHITE;
@@ -707,8 +824,8 @@ void vm_sys_graphics_triangle_execute(GfxBoxMode mode, const GfxBoxIntArg *args,
     }
 }
 
-void vm_sys_graphics_polygon_execute(const GfxBoxIntArg *args, int field_count,
-                                     const GfxBoxErrorSink *errors) {
+void vm_sys_graphics_polygon_execute(const GfxBoxIntArg * args, int field_count,
+                                     const GfxBoxErrorSink * errors) {
     int c = gui_fcolour;
     int f = -1;
     const int max_colour = (int)WHITE;
@@ -731,8 +848,8 @@ void vm_sys_graphics_polygon_execute(const GfxBoxIntArg *args, int field_count,
         int xtot = xcount;
         int nx = args[1].count;
         int ny = args[2].count;
-        int *x_values;
-        int *y_values;
+        int * x_values;
+        int * y_values;
 
         if ((xcount < 3 || xcount > 9999) && xcount != 0) {
             vm_sys_graphics_box_fail_msg(errors, "Invalid number of vertices");
@@ -786,8 +903,8 @@ void vm_sys_graphics_polygon_execute(const GfxBoxIntArg *args, int field_count,
         int actual_n = 0;
         int nx = args[1].count;
         int ny = args[2].count;
-        int *cc = NULL;
-        int *ff = NULL;
+        int * cc = NULL;
+        int * ff = NULL;
 
         for (int i = 0; i < n; i++) {
             int value = vm_sys_graphics_box_arg_value(&args[0], i);
@@ -863,8 +980,8 @@ void vm_sys_graphics_polygon_execute(const GfxBoxIntArg *args, int field_count,
 
         for (int i = 0, xstart = 0; i < n; i++) {
             int xcount = vm_sys_graphics_box_arg_value(&args[0], i);
-            int *x_values = (int *)vm_sys_graphics_reserve_scratch(&vm_gfx_int_a, (size_t)xcount * sizeof(int));
-            int *y_values = (int *)vm_sys_graphics_reserve_scratch(&vm_gfx_int_b, (size_t)xcount * sizeof(int));
+            int * x_values = (int *)vm_sys_graphics_reserve_scratch(&vm_gfx_int_a, (size_t)xcount * sizeof(int));
+            int * y_values = (int *)vm_sys_graphics_reserve_scratch(&vm_gfx_int_b, (size_t)xcount * sizeof(int));
             int fill_colour = (field_count > 4 && args[4].present) ? ff[i] : -1;
 
             for (int j = 0; j < xcount; j++) {
@@ -877,39 +994,39 @@ void vm_sys_graphics_polygon_execute(const GfxBoxIntArg *args, int field_count,
     }
 }
 
-static int vm_sys_graphics_line_arg_value(const GfxLineArg *arg, int index) {
+static int vm_sys_graphics_line_arg_value(const GfxLineArg * arg, int index) {
     if (!arg->present || arg->count <= 0 || arg->get_int == NULL) return 0;
     return arg->get_int(arg->ctx, (arg->count > 1) ? index : 0);
 }
 
-static void vm_sys_graphics_line_fail_msg(const GfxLineErrorSink *errors, const char *msg) {
+static void vm_sys_graphics_line_fail_msg(const GfxLineErrorSink * errors, const char * msg) {
     if (errors && errors->fail_msg) errors->fail_msg(errors->ctx, msg);
 }
 
-static void vm_sys_graphics_line_fail_range(const GfxLineErrorSink *errors, const char *label,
+static void vm_sys_graphics_line_fail_range(const GfxLineErrorSink * errors, const char * label,
                                             int value, int min, int max) {
     if (errors && errors->fail_range) errors->fail_range(errors->ctx, label, value, min, max);
 }
 
-static int vm_sys_graphics_pixel_arg_value(const GfxPixelArg *arg, int index) {
+static int vm_sys_graphics_pixel_arg_value(const GfxPixelArg * arg, int index) {
     if (!arg->present || arg->count <= 0 || arg->get_int == NULL) return 0;
     return arg->get_int(arg->ctx, (arg->count > 1) ? index : 0);
 }
 
-static void vm_sys_graphics_pixel_fail_msg(const GfxPixelErrorSink *errors, const char *msg) {
+static void vm_sys_graphics_pixel_fail_msg(const GfxPixelErrorSink * errors, const char * msg) {
     if (errors && errors->fail_msg) errors->fail_msg(errors->ctx, msg);
 }
 
-static void vm_sys_graphics_pixel_fail_range(const GfxPixelErrorSink *errors, const char *label,
+static void vm_sys_graphics_pixel_fail_range(const GfxPixelErrorSink * errors, const char * label,
                                              int value, int min, int max) {
     if (errors && errors->fail_range) errors->fail_range(errors->ctx, label, value, min, max);
 }
 
-static void vm_sys_graphics_text_fail_msg(const GfxTextOps *ops, const char *msg) {
+static void vm_sys_graphics_text_fail_msg(const GfxTextOps * ops, const char * msg) {
     if (ops && ops->fail_msg) ops->fail_msg(ops->ctx, msg);
 }
 
-static void vm_sys_graphics_text_fail_range(const GfxTextOps *ops, int value, int min, int max) {
+static void vm_sys_graphics_text_fail_range(const GfxTextOps * ops, int value, int min, int max) {
     if (ops && ops->fail_range) ops->fail_range(ops->ctx, value, min, max);
 }
 
@@ -920,24 +1037,24 @@ static void vm_sys_graphics_plot_scaled_text_pixel(int x, int y, int width, int 
     int py = y;
 
     switch (orientation) {
-        case ORIENT_INVERTED:
-            px = x - (width * scale - 1) + (width - col - 1) * scale + sx;
-            py = y - (height * scale - 1) + (height - row - 1) * scale + sy;
-            break;
-        case ORIENT_CCW90DEG:
-            px = x + row * scale + sy;
-            py = y - width * scale + (width - col - 1) * scale + sx;
-            break;
-        case ORIENT_CW90DEG:
-            px = x - (height * scale - 1) + (height - row - 1) * scale + sy;
-            py = y + col * scale + sx;
-            break;
-        case ORIENT_VERT:
-        case ORIENT_NORMAL:
-        default:
-            px = x + col * scale + sx;
-            py = y + row * scale + sy;
-            break;
+    case ORIENT_INVERTED:
+        px = x - (width * scale - 1) + (width - col - 1) * scale + sx;
+        py = y - (height * scale - 1) + (height - row - 1) * scale + sy;
+        break;
+    case ORIENT_CCW90DEG:
+        px = x + row * scale + sy;
+        py = y - width * scale + (width - col - 1) * scale + sx;
+        break;
+    case ORIENT_CW90DEG:
+        px = x - (height * scale - 1) + (height - row - 1) * scale + sy;
+        py = y + col * scale + sx;
+        break;
+    case ORIENT_VERT:
+    case ORIENT_NORMAL:
+    default:
+        px = x + col * scale + sx;
+        py = y + row * scale + sy;
+        break;
     }
 
     DrawPixel(px, py, colour);
@@ -957,17 +1074,17 @@ static void vm_sys_graphics_fill_text_cell(int x, int y, int width, int height,
     }
 }
 
-static int vm_sys_graphics_font_has_char(const unsigned char *font, int ch) {
+static int vm_sys_graphics_font_has_char(const unsigned char * font, int ch) {
     return font && ch >= font[2] && ch < font[2] + font[3];
 }
 
-static const unsigned char *vm_sys_graphics_font_glyph(const unsigned char *font, int ch) {
+static const unsigned char * vm_sys_graphics_font_glyph(const unsigned char * font, int ch) {
     int width = font[0];
     int height = font[1];
     return font + 4 + (int)(((ch - font[2]) * height * width) / 8);
 }
 
-static int vm_sys_graphics_glyph_bit(const unsigned char *glyph, int width, int height,
+static int vm_sys_graphics_glyph_bit(const unsigned char * glyph, int width, int height,
                                      int col, int row) {
     int bit_number = row * width + col;
     return (glyph[bit_number / 8] >> (((height * width) - bit_number - 1) % 8)) & 1;
@@ -975,11 +1092,11 @@ static int vm_sys_graphics_glyph_bit(const unsigned char *glyph, int width, int 
 
 static void vm_sys_graphics_draw_text_char(int x, int y, int font, int scale,
                                            int orientation, int fc, int bc, int ch) {
-    unsigned char *fp = FontTable[font - 1];
+    unsigned char * fp = FontTable[font - 1];
     int width;
     int height;
     int draw_scale = scale;
-    const unsigned char *glyph;
+    const unsigned char * glyph;
 
     if (font == 6 && (ch == '-' || ch == '+' || ch == '=')) {
         fp = FontTable[0];
@@ -1010,8 +1127,8 @@ static void vm_sys_graphics_draw_text_char(int x, int y, int font, int scale,
 }
 
 static void vm_sys_graphics_render_text(int x, int y, int font, int scale,
-                                        int jh, int jv, int jo, int fc, int bc, char *text) {
-    unsigned char *fp = FontTable[font - 1];
+                                        int jh, int jv, int jo, int fc, int bc, char * text) {
+    unsigned char * fp = FontTable[font - 1];
     int width = fp[0] * scale;
     int height = fp[1] * scale;
     int len = (int)strlen(text);
@@ -1045,16 +1162,21 @@ static void vm_sys_graphics_render_text(int x, int y, int font, int scale,
 
     while (*text) {
         vm_sys_graphics_draw_text_char(x, y, font, scale, jo, fc, bc, (unsigned char)*text++);
-        if (jo == ORIENT_NORMAL) x += width;
-        else if (jo == ORIENT_VERT) y += height;
-        else if (jo == ORIENT_INVERTED) x -= width;
-        else if (jo == ORIENT_CCW90DEG) y -= width;
-        else if (jo == ORIENT_CW90DEG) y += width;
+        if (jo == ORIENT_NORMAL)
+            x += width;
+        else if (jo == ORIENT_VERT)
+            y += height;
+        else if (jo == ORIENT_INVERTED)
+            x -= width;
+        else if (jo == ORIENT_CCW90DEG)
+            y -= width;
+        else if (jo == ORIENT_CW90DEG)
+            y += width;
     }
 }
 
-void vm_sys_graphics_box_execute(GfxBoxMode mode, const GfxBoxIntArg *args, int field_count,
-                                 const GfxBoxErrorSink *errors) {
+void vm_sys_graphics_box_execute(GfxBoxMode mode, const GfxBoxIntArg * args, int field_count,
+                                 const GfxBoxErrorSink * errors) {
     int x1 = 0, y1 = 0, width = 0, height = 0, w = 1, c = gui_fcolour, f = -1;
     int wmod = 0, hmod = 0;
     const int max_colour = (int)WHITE;
@@ -1262,8 +1384,8 @@ void vm_sys_graphics_box_execute(GfxBoxMode mode, const GfxBoxIntArg *args, int 
     }
 }
 
-void vm_sys_graphics_rbox_execute(GfxBoxMode mode, const GfxBoxIntArg *args, int field_count,
-                                  const GfxBoxErrorSink *errors) {
+void vm_sys_graphics_rbox_execute(GfxBoxMode mode, const GfxBoxIntArg * args, int field_count,
+                                  const GfxBoxErrorSink * errors) {
     int x1 = 0, y1 = 0, width = 0, height = 0, r = 10, c = gui_fcolour, f = -1;
     int wmod = 0, hmod = 0;
     const int max_colour = (int)WHITE;
@@ -1428,7 +1550,7 @@ void vm_sys_graphics_rbox_execute(GfxBoxMode mode, const GfxBoxIntArg *args, int
     }
 }
 
-void vm_sys_graphics_cls_execute(int has_arg, const GfxClsArg *arg, const GfxClsOps *ops) {
+void vm_sys_graphics_cls_execute(int has_arg, const GfxClsArg * arg, const GfxClsOps * ops) {
     int use_default = 1;
     int colour = 0;
     const int max_colour = (int)WHITE;
@@ -1451,8 +1573,8 @@ void vm_sys_graphics_cls_execute(int has_arg, const GfxClsArg *arg, const GfxCls
     CurrentY = 0;
 }
 
-void vm_sys_graphics_line_execute(GfxLineMode mode, const GfxLineArg *args, int field_count,
-                                  const GfxLineErrorSink *errors) {
+void vm_sys_graphics_line_execute(GfxLineMode mode, const GfxLineArg * args, int field_count,
+                                  const GfxLineErrorSink * errors) {
     int x1 = 0, y1 = 0, x2 = 0, y2 = 0, w = 1, c = gui_fcolour;
     const int max_colour = (int)WHITE;
 
@@ -1596,8 +1718,8 @@ void vm_sys_graphics_line_execute(GfxLineMode mode, const GfxLineArg *args, int 
     }
 }
 
-void vm_sys_graphics_pixel_execute(GfxPixelMode mode, const GfxPixelArg *args, int field_count,
-                                   const GfxPixelErrorSink *errors) {
+void vm_sys_graphics_pixel_execute(GfxPixelMode mode, const GfxPixelArg * args, int field_count,
+                                   const GfxPixelErrorSink * errors) {
     int x = 0, y = 0, c = gui_fcolour;
     const int max_colour = (int)WHITE;
 
@@ -1626,7 +1748,8 @@ void vm_sys_graphics_pixel_execute(GfxPixelMode mode, const GfxPixelArg *args, i
             }
         }
 
-        if (c != -1) DrawPixel(x, y, c);
+        if (c != -1)
+            DrawPixel(x, y, c);
         else {
             CurrentX = x;
             CurrentY = y;
@@ -1686,27 +1809,37 @@ void vm_sys_graphics_service(void) {
     hal_vm_framebuffer_service();
 }
 
-void vm_sys_graphics_framebuffer_create(int fast) { hal_vm_framebuffer_create(fast); }
+void vm_sys_graphics_framebuffer_create(int fast) {
+    hal_vm_framebuffer_create(fast);
+}
 void vm_sys_graphics_framebuffer_layer(int has_colour, int colour) {
     hal_vm_framebuffer_layer(has_colour, colour);
 }
-void vm_sys_graphics_framebuffer_write(char which) { hal_vm_framebuffer_write(which); }
-void vm_sys_graphics_framebuffer_close(char which) { hal_vm_framebuffer_close(which); }
+void vm_sys_graphics_framebuffer_write(char which) {
+    hal_vm_framebuffer_write(which);
+}
+void vm_sys_graphics_framebuffer_close(char which) {
+    hal_vm_framebuffer_close(which);
+}
 void vm_sys_graphics_framebuffer_merge(int has_colour, int colour, int mode, int has_rate, int rate_ms) {
     hal_vm_framebuffer_merge(has_colour, colour, mode, has_rate, rate_ms);
 }
-void vm_sys_graphics_framebuffer_sync(void) { hal_vm_framebuffer_sync(); }
-void vm_sys_graphics_framebuffer_wait(void) { hal_vm_framebuffer_wait(); }
+void vm_sys_graphics_framebuffer_sync(void) {
+    hal_vm_framebuffer_sync();
+}
+void vm_sys_graphics_framebuffer_wait(void) {
+    hal_vm_framebuffer_wait();
+}
 void vm_sys_graphics_framebuffer_copy(char from, char to, int background) {
     hal_vm_framebuffer_copy(from, to, background);
 }
 
-void vm_sys_graphics_text_execute(const GfxTextArg *args, int field_count, const GfxTextOps *ops) {
+void vm_sys_graphics_text_execute(const GfxTextArg * args, int field_count, const GfxTextOps * ops) {
     int x, y, font, scale, fc, bc;
     int jh = 0, jv = 0, jo = 0;
     const int max_colour = (int)WHITE;
-    char *text;
-    char *just;
+    char * text;
+    char * just;
 
     if (field_count < 3 || field_count > GFX_TEXT_ARG_COUNT) {
         vm_sys_graphics_text_fail_msg(ops, "Argument count");
@@ -1734,7 +1867,8 @@ void vm_sys_graphics_text_execute(const GfxTextArg *args, int field_count, const
         }
     }
 
-    if (ops && ops->get_defaults) ops->get_defaults(ops->ctx, &font, &scale, &fc, &bc);
+    if (ops && ops->get_defaults)
+        ops->get_defaults(ops->ctx, &font, &scale, &fc, &bc);
     else {
         font = (gui_font >> 4) + 1;
         scale = gui_font & 0x0F;
@@ -1796,20 +1930,18 @@ void vm_sys_graphics_text_execute(const GfxTextArg *args, int field_count, const
     vm_sys_graphics_render_text(x, y, font, scale, jh, jv, jo, fc, bc, text);
 }
 
-static void vm_sys_graphics_hline(int x0, int x1, int y, int f, int ints_per_line, uint32_t *br) {
+static void vm_sys_graphics_hline(int x0, int x1, int y, int f, int ints_per_line, uint32_t * br) {
     uint32_t w1, xx1, w0, xx0, x, xn, i;
     const uint32_t a[] = {
         0xFFFFFFFF, 0x7FFFFFFF, 0x3FFFFFFF, 0x1FFFFFFF, 0x0FFFFFFF, 0x07FFFFFF, 0x03FFFFFF, 0x01FFFFFF,
         0x00FFFFFF, 0x007FFFFF, 0x003FFFFF, 0x001FFFFF, 0x000FFFFF, 0x0007FFFF, 0x0003FFFF, 0x0001FFFF,
         0x0000FFFF, 0x00007FFF, 0x00003FFF, 0x00001FFF, 0x00000FFF, 0x000007FF, 0x000003FF, 0x000001FF,
-        0x000000FF, 0x0000007F, 0x0000003F, 0x0000001F, 0x0000000F, 0x00000007, 0x00000003, 0x00000001
-    };
+        0x000000FF, 0x0000007F, 0x0000003F, 0x0000001F, 0x0000000F, 0x00000007, 0x00000003, 0x00000001};
     const uint32_t b[] = {
         0x80000000, 0xC0000000, 0xE0000000, 0xF0000000, 0xF8000000, 0xFC000000, 0xFE000000, 0xFF000000,
         0xFF800000, 0xFFC00000, 0xFFE00000, 0xFFF00000, 0xFFF80000, 0xFFFC0000, 0xFFFE0000, 0xFFFF0000,
         0xFFFF8000, 0xFFFFC000, 0xFFFFE000, 0xFFFFF000, 0xFFFFF800, 0xFFFFFC00, 0xFFFFFE00, 0xFFFFFF00,
-        0xFFFFFF80, 0xFFFFFFC0, 0xFFFFFFE0, 0xFFFFFFF0, 0xFFFFFFF8, 0xFFFFFFFC, 0xFFFFFFFE, 0xFFFFFFFF
-    };
+        0xFFFFFF80, 0xFFFFFFC0, 0xFFFFFFE0, 0xFFFFFFF0, 0xFFFFFFF8, 0xFFFFFFFC, 0xFFFFFFFE, 0xFFFFFFFF};
 
     w0 = y * ints_per_line;
     xx0 = 0;
@@ -1823,8 +1955,10 @@ static void vm_sys_graphics_hline(int x0, int x1, int y, int f, int ints_per_lin
     if (w1 == w0) {
         x = a[xx0] & b[xx1];
         xn = ~x;
-        if (f) br[w0] |= x;
-        else br[w0] &= xn;
+        if (f)
+            br[w0] |= x;
+        else
+            br[w0] &= xn;
     } else {
         if (w1 - w0 > 1) {
             for (i = w0 + 1; i < w1; i++) {
@@ -1843,8 +1977,8 @@ static void vm_sys_graphics_hline(int x0, int x1, int y, int f, int ints_per_lin
 }
 
 static void vm_sys_graphics_fill_circle_mask(int x, int y, int radius, int r, int fill,
-                                    int ints_per_line, uint32_t *br,
-                                    MMFLOAT aspect, MMFLOAT aspect2) {
+                                             int ints_per_line, uint32_t * br,
+                                             MMFLOAT aspect, MMFLOAT aspect2) {
     int a, b, P;
     int A, B, asp;
 
@@ -1861,8 +1995,10 @@ static void vm_sys_graphics_fill_circle_mask(int x, int y, int radius, int r, in
         vm_sys_graphics_hline(x - A - radius, x + A - radius, y - b - radius, fill, ints_per_line, br);
         vm_sys_graphics_hline(x - B - radius, x + B - radius, y + a - radius, fill, ints_per_line, br);
         vm_sys_graphics_hline(x - B - radius, x + B - radius, y - a - radius, fill, ints_per_line, br);
-        if (P < 0) P += 3 + 2 * a++;
-        else P += 5 + 2 * (a++ - b--);
+        if (P < 0)
+            P += 3 + 2 * a++;
+        else
+            P += 5 + 2 * (a++ - b--);
     } while (a <= b);
 }
 
@@ -1882,7 +2018,7 @@ static void vm_sys_graphics_draw_circle(int x, int y, int radius, int w, int c, 
             size_t words;
             if (aspect > 1.0) ll = (int)((MMFLOAT)radius * aspect);
             int ints_per_line = RoundUptoInt((ll * 2) + 1) / 32;
-            uint32_t *br;
+            uint32_t * br;
 
             words = (size_t)(ints_per_line + 1) * (size_t)((r2 * 2) + 1);
             br = (uint32_t *)vm_sys_graphics_reserve_scratch(&vm_gfx_mask_a, words * sizeof(uint32_t));
@@ -1928,8 +2064,10 @@ static void vm_sys_graphics_draw_circle(int x, int y, int radius, int w, int c, 
                     DrawRectangle(x - A, y - b, x + A, y - b, fill);
                     DrawRectangle(x - B, y + a, x + B, y + a, fill);
                     DrawRectangle(x - B, y - a, x + B, y - a, fill);
-                    if (P < 0) P += 3 + 2 * a++;
-                    else P += 5 + 2 * (a++ - b--);
+                    if (P < 0)
+                        P += 3 + 2 * a++;
+                    else
+                        P += 5 + 2 * (a++ - b--);
                 } while (a <= b);
                 w--;
                 radius--;
@@ -1956,8 +2094,10 @@ static void vm_sys_graphics_draw_circle(int x, int y, int radius, int w, int c, 
                         DrawPixel(x - A, y - b, c);
                         DrawPixel(x - B, y - a, c);
                     }
-                    if (P < 0) P += 3 + 2 * a++;
-                    else P += 5 + 2 * (a++ - b--);
+                    if (P < 0)
+                        P += 3 + 2 * a++;
+                    else
+                        P += 5 + 2 * (a++ - b--);
                 } while (a <= b);
                 w--;
                 radius--;
@@ -1967,8 +2107,8 @@ static void vm_sys_graphics_draw_circle(int x, int y, int radius, int w, int c, 
     if (Option.Refresh) Display_Refresh();
 }
 
-void vm_sys_graphics_circle_execute(GfxCircleMode mode, const GfxCircleArg *args, int field_count,
-                           const GfxCircleErrorSink *errors) {
+void vm_sys_graphics_circle_execute(GfxCircleMode mode, const GfxCircleArg * args, int field_count,
+                                    const GfxCircleErrorSink * errors) {
     int x = 0, y = 0, r = 0, w = 1, c = gui_fcolour, f = -1;
     MMFLOAT a = 1;
     const int max_colour = (int)WHITE;

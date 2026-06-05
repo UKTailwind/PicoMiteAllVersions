@@ -28,17 +28,18 @@
  * 0xff as "end of program / start of CFunction area", and the
  * CFunction-walk loop expects 0xffffffff-aligned terminator. Stale
  * bytes here corrupt the walk and crash with LoadProhibited. */
-#define FLASH_PROG_TRAILER  4096
+#define FLASH_PROG_TRAILER 4096
 unsigned char flash_prog_buf[MAX_PROG_SIZE + FLASH_PROG_TRAILER];
 
-__attribute__((constructor))
-static void flash_prog_buf_init(void) {
+__attribute__((constructor)) static void flash_prog_buf_init(void) {
     memset(flash_prog_buf, 0xff, sizeof flash_prog_buf);
 }
 
 /* ---- BASIC commands that require a framebuffer this port doesn't have ---- */
 
-void cmd_framebuffer(void) { error("FRAMEBUFFER not supported on this port"); }
+void cmd_framebuffer(void) {
+    error("FRAMEBUFFER not supported on this port");
+}
 
 /* ---- microsecond clock ----
  * External.c's canonical readusclock is gated to non-host builds; on
@@ -60,7 +61,9 @@ void uSec(int us) {
  * Memory.c's TestStackOverflow. ESP32 has FreeRTOS task stacks; the
  * MMBasic check doesn't apply, so return ALL-ONES so the comparison
  * always passes. */
-uint32_t __get_MSP(void) { return 0xFFFFFFFFu; }
+uint32_t __get_MSP(void) {
+    return 0xFFFFFFFFu;
+}
 
 /* Pico-SDK hardware-register window stubs. Core code includes
  * hardware/structs/{dma,watchdog}.h and dereferences these on rp2040
@@ -70,10 +73,10 @@ uint32_t __get_MSP(void) { return 0xFFFFFFFFu; }
  * never matter on this port. */
 #include "hardware/structs/dma.h"
 #include "hardware/structs/watchdog.h"
-static dma_hw_t      _dma_hw_store     = {0};
+static dma_hw_t _dma_hw_store = {0};
 static watchdog_hw_t _watchdog_hw_store = {0};
-dma_hw_t      *dma_hw      = &_dma_hw_store;
-watchdog_hw_t *watchdog_hw = &_watchdog_hw_store;
+dma_hw_t * dma_hw = &_dma_hw_store;
+watchdog_hw_t * watchdog_hw = &_watchdog_hw_store;
 
 /* PSRAMsize / PSRAMbase / hal_psram_* live in hal_psram_esp32.c — the
  * ESP32 HAL implementation reserves a slab via heap_caps_aligned_alloc()

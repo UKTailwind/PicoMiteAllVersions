@@ -16,12 +16,16 @@
  * the flash_prog_buf in host_main.c, so NEW / SAVE / program-memory edits
  * actually take effect. Implementations live in the host flash shim. */
 void flash_range_erase(uint32_t off, uint32_t count);
-void flash_range_program(uint32_t off, const uint8_t *data, uint32_t count);
+void flash_range_program(uint32_t off, const uint8_t * data, uint32_t count);
 /* flash_do_cmd: device-only SPI command to the flash chip (used by
  * ResetOptions to query FlashSize). No host equivalent — stub returns and
  * leaves the rxbuf alone; Option.FlashSize is set from a default elsewhere. */
-static inline void flash_do_cmd(const uint8_t *tx, uint8_t *rx, uint32_t n) {
-    (void)tx; (void)n;
-    if (rx && n >= 4) { rx[0] = rx[1] = rx[2] = 0; rx[3] = 23; /* 8 MB */ }
+static inline void flash_do_cmd(const uint8_t * tx, uint8_t * rx, uint32_t n) {
+    (void)tx;
+    (void)n;
+    if (rx && n >= 4) {
+        rx[0] = rx[1] = rx[2] = 0;
+        rx[3] = 23; /* 8 MB */
+    }
 }
 #endif

@@ -8,19 +8,16 @@
 
 #include <math.h>
 
-static inline double audio_play_midi_note_frequency(int note)
-{
+static inline double audio_play_midi_note_frequency(int note) {
     return 440.0 * pow(2.0, ((double)note - 69.0) / 12.0);
 }
 
-static inline int audio_play_note_velocity_volume(int velocity)
-{
+static inline int audio_play_note_velocity_volume(int velocity) {
     if (velocity <= 0) return 0;
     return (velocity * 25 + 126) / 127;
 }
 
-static inline int audio_play_volume_to_synth(int volume)
-{
+static inline int audio_play_volume_to_synth(int volume) {
     return volume * 41 / 25;
 }
 

@@ -22,11 +22,11 @@
 /* Front (visible) framebuffer — the pixel plane broadcast by the sim
  * server and captured by test-harness pixel asserts. Non-static so the
  * FASTGFX swap / screenshot helpers can memcpy into/out of it. */
-extern uint32_t *host_framebuffer;
+extern uint32_t * host_framebuffer;
 
 /* FASTGFX back buffer — non-static so drawing primitives and cmd_fastgfx
  * helpers can recognize it as a valid WriteBuf target. */
-extern uint32_t *host_fastgfx_back;
+extern uint32_t * host_fastgfx_back;
 
 /* Framebuffer geometry. host_fb_width / host_fb_height are the live
  * dimensions and also mirrored into HRes/VRes by host_sim_set_framebuffer_size. */
@@ -41,7 +41,9 @@ extern int host_fb_height;
  * code paths (FASTGFX back-plane draws) deliberately don't bump it; the
  * SWAP is the event the browser actually needs to repaint. */
 extern volatile uint32_t host_fb_generation;
-static inline void host_fb_bump_generation(void) { host_fb_generation++; }
+static inline void host_fb_bump_generation(void) {
+    host_fb_generation++;
+}
 
 /* Bumped whenever the framebuffer dimensions change (host_fb_resize).
  * Separate from host_fb_generation so the JS render loop can distinguish
@@ -58,7 +60,7 @@ void host_fb_ensure(void);
  * through the WriteBuf dispatch and records a SIM event on the front
  * framebuffer only. */
 uint32_t host_fb_colour24(int c);
-uint32_t *host_fb_current_target(void);
+uint32_t * host_fb_current_target(void);
 void host_fb_put_pixel(int x, int y, int c);
 
 /* Rectangle fill (axis-aligned). Records one sim RECT event when the
@@ -92,16 +94,16 @@ void host_framebuffer_service(void);
  * the device's uint32_t layout. */
 void host_fb_draw_rectangle(int x1, int y1, int x2, int y2, int c);
 void host_fb_draw_bitmap(int x1, int y1, int width, int height, int scale,
-                         int fc, int bc, unsigned char *bitmap);
+                         int fc, int bc, unsigned char * bitmap);
 void host_fb_scroll_lcd(int lines);
-void host_fb_read_buffer(int x1, int y1, int x2, int y2, unsigned char *c);
+void host_fb_read_buffer(int x1, int y1, int x2, int y2, unsigned char * c);
 
 /* Test harness pixel assert + sim server snapshot. */
 uint32_t host_runtime_get_pixel(int x, int y);
-int  host_runtime_width(void);
-int  host_runtime_height(void);
-size_t host_sim_framebuffer_copy(uint32_t *dst, size_t dst_pixels);
-void host_sim_framebuffer_dims(int *w, int *h);
+int host_runtime_width(void);
+int host_runtime_height(void);
+size_t host_sim_framebuffer_copy(uint32_t * dst, size_t dst_pixels);
+void host_sim_framebuffer_dims(int * w, int * h);
 void host_sim_set_framebuffer_size(int w, int h);
 
 /* Reallocate the framebuffer at a new size after the runtime has
@@ -114,6 +116,6 @@ void host_fb_resize(int w, int h);
 
 /* PPM screenshot dump — test harness --screenshot hook. No-op if path
  * is NULL/empty. Writes at most once per mmbasic_runtime_port_begin call. */
-void host_fb_write_screenshot(const char *path);
+void host_fb_write_screenshot(const char * path);
 
 #endif

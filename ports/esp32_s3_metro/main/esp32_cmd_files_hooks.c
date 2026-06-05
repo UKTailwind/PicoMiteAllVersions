@@ -36,9 +36,9 @@ void port_drive_check(char drive) {
  * pc386 (FatFs on every volume, no LFS) overrides both. */
 
 int port_mount_sd_drive(void) {
-    ErrorThrow(0, NONEFILE);  /* reset mm.errno */
+    ErrorThrow(0, NONEFILE); /* reset mm.errno */
     if (!(SDCardStat & STA_NOINIT))
-        return 1;  /* already mounted */
+        return 1; /* already mounted */
     for (int i = 0; i < MAXOPENFILES; i++)
         if (FileTable[i].com > MAXCOMPORTS && hal_fds[i] != 0)
             ForceFileClose(i);

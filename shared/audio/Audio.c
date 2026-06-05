@@ -32,8 +32,8 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * The following section will be excluded from the documentation.
  */
 #include <stdio.h>
-#include <stdbool.h>                                // Pascal
-#include <stdint.h>                                 // Pascal
+#include <stdbool.h> // Pascal
+#include <stdint.h>  // Pascal
 #include <math.h>
 #include "ffconf.h"
 #include "MMBasic_Includes.h"
@@ -44,7 +44,6 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "audio_stream.h"
 #include "audio_play_common.h"
 
-
 #include "hal/hal_audio.h"
 
 /* CurrentlyPlaying, WAVInterrupt, WAVcomplete are defined in
@@ -52,7 +51,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 volatile int vol_left = 100, vol_right = 100;
 int WAV_fnbr = 0;
 int PWM_FREQ = 0;
-extern unsigned short *usertable;   /* PLAY LOAD SOUND target (audio_state.c) */
+extern unsigned short * usertable; /* PLAY LOAD SOUND target (audio_state.c) */
 volatile uint64_t SoundPlay = 0;
 volatile float PhaseM_left = 0.0f, PhaseM_right = 0.0f;
 volatile float PhaseAC_left = 0.0f, PhaseAC_right = 0.0f;
@@ -69,11 +68,12 @@ static int audio_file_mode(int mode) {
 }
 
 static int sound_all_off(void) {
-    for (int i = 0; i < 4; i++) if (s_sound_slot_mask[i]) return 0;
+    for (int i = 0; i < 4; i++)
+        if (s_sound_slot_mask[i]) return 0;
     return 1;
 }
 
-static void sound_mark_slot(int slot, int left, int right, const char *type) {
+static void sound_mark_slot(int slot, int left, int right, const char * type) {
     uint8_t mask = s_sound_slot_mask[slot - 1];
     if (strcasecmp(type, "O") == 0) {
         if (left) mask &= (uint8_t)~1u;
@@ -112,19 +112,38 @@ int __attribute__((weak)) hal_audio_tone_interrupt_supported(void) {
     return 0;
 }
 
-static int play_parse_channel(unsigned char *arg, int *left, int *right) {
-    *left = 0; *right = 0;
-    if (checkstring(arg, (unsigned char *)"L")) { *left = 1; return 1; }
-    if (checkstring(arg, (unsigned char *)"R")) { *right = 1; return 1; }
-    if (checkstring(arg, (unsigned char *)"B")) { *left = *right = 1; return 1; }
-    char *p = (char *)getCstring(arg);
-    if (!strcasecmp(p, "L")) { *left = 1; return 1; }
-    if (!strcasecmp(p, "R")) { *right = 1; return 1; }
-    if (!strcasecmp(p, "B") || !strcasecmp(p, "M")) { *left = *right = 1; return 1; }
+static int play_parse_channel(unsigned char * arg, int * left, int * right) {
+    *left = 0;
+    *right = 0;
+    if (checkstring(arg, (unsigned char *)"L")) {
+        *left = 1;
+        return 1;
+    }
+    if (checkstring(arg, (unsigned char *)"R")) {
+        *right = 1;
+        return 1;
+    }
+    if (checkstring(arg, (unsigned char *)"B")) {
+        *left = *right = 1;
+        return 1;
+    }
+    char * p = (char *)getCstring(arg);
+    if (!strcasecmp(p, "L")) {
+        *left = 1;
+        return 1;
+    }
+    if (!strcasecmp(p, "R")) {
+        *right = 1;
+        return 1;
+    }
+    if (!strcasecmp(p, "B") || !strcasecmp(p, "M")) {
+        *left = *right = 1;
+        return 1;
+    }
     return 0;
 }
 
-static const char *play_parse_type(unsigned char *arg) {
+static const char * play_parse_type(unsigned char * arg) {
     if (checkstring(arg, (unsigned char *)"O")) return "O";
     if (checkstring(arg, (unsigned char *)"Q")) return "Q";
     if (checkstring(arg, (unsigned char *)"T")) return "T";
@@ -133,7 +152,7 @@ static const char *play_parse_type(unsigned char *arg) {
     if (checkstring(arg, (unsigned char *)"P")) return "P";
     if (checkstring(arg, (unsigned char *)"N")) return "N";
     if (checkstring(arg, (unsigned char *)"U")) return "U";
-    char *p = (char *)getCstring(arg);
+    char * p = (char *)getCstring(arg);
     if (!strcasecmp(p, "O")) return "O";
     if (!strcasecmp(p, "Q")) return "Q";
     if (!strcasecmp(p, "T")) return "T";
@@ -147,31 +166,47 @@ static const char *play_parse_type(unsigned char *arg) {
 
 static void play_pause(void) {
     if (CurrentlyPlaying < P_STOP) return; /* already paused */
-    if (CurrentlyPlaying == P_TONE) CurrentlyPlaying = P_PAUSE_TONE;
-    else if (CurrentlyPlaying == P_SOUND) CurrentlyPlaying = P_PAUSE_SOUND;
-    else if (CurrentlyPlaying == P_WAV) CurrentlyPlaying = P_PAUSE_WAV;
-    else if (CurrentlyPlaying == P_FLAC) CurrentlyPlaying = P_PAUSE_FLAC;
-    else if (CurrentlyPlaying == P_MP3) CurrentlyPlaying = P_PAUSE_MP3;
-    else if (CurrentlyPlaying == P_MOD) CurrentlyPlaying = P_PAUSE_MOD;
-    else if (CurrentlyPlaying == P_ARRAY) CurrentlyPlaying = P_PAUSE_ARRAY;
-    else error("Nothing playing");
+    if (CurrentlyPlaying == P_TONE)
+        CurrentlyPlaying = P_PAUSE_TONE;
+    else if (CurrentlyPlaying == P_SOUND)
+        CurrentlyPlaying = P_PAUSE_SOUND;
+    else if (CurrentlyPlaying == P_WAV)
+        CurrentlyPlaying = P_PAUSE_WAV;
+    else if (CurrentlyPlaying == P_FLAC)
+        CurrentlyPlaying = P_PAUSE_FLAC;
+    else if (CurrentlyPlaying == P_MP3)
+        CurrentlyPlaying = P_PAUSE_MP3;
+    else if (CurrentlyPlaying == P_MOD)
+        CurrentlyPlaying = P_PAUSE_MOD;
+    else if (CurrentlyPlaying == P_ARRAY)
+        CurrentlyPlaying = P_PAUSE_ARRAY;
+    else
+        error("Nothing playing");
     hal_audio_pause();
 }
 
 static void play_resume(void) {
-    if (CurrentlyPlaying == P_PAUSE_TONE) CurrentlyPlaying = P_TONE;
-    else if (CurrentlyPlaying == P_PAUSE_SOUND) CurrentlyPlaying = P_SOUND;
-    else if (CurrentlyPlaying == P_PAUSE_WAV) CurrentlyPlaying = P_WAV;
-    else if (CurrentlyPlaying == P_PAUSE_FLAC) CurrentlyPlaying = P_FLAC;
-    else if (CurrentlyPlaying == P_PAUSE_MP3) CurrentlyPlaying = P_MP3;
-    else if (CurrentlyPlaying == P_PAUSE_MOD) CurrentlyPlaying = P_MOD;
-    else if (CurrentlyPlaying == P_PAUSE_ARRAY) CurrentlyPlaying = P_ARRAY;
-    else error("Nothing to resume");
+    if (CurrentlyPlaying == P_PAUSE_TONE)
+        CurrentlyPlaying = P_TONE;
+    else if (CurrentlyPlaying == P_PAUSE_SOUND)
+        CurrentlyPlaying = P_SOUND;
+    else if (CurrentlyPlaying == P_PAUSE_WAV)
+        CurrentlyPlaying = P_WAV;
+    else if (CurrentlyPlaying == P_PAUSE_FLAC)
+        CurrentlyPlaying = P_FLAC;
+    else if (CurrentlyPlaying == P_PAUSE_MP3)
+        CurrentlyPlaying = P_MP3;
+    else if (CurrentlyPlaying == P_PAUSE_MOD)
+        CurrentlyPlaying = P_MOD;
+    else if (CurrentlyPlaying == P_PAUSE_ARRAY)
+        CurrentlyPlaying = P_ARRAY;
+    else
+        error("Nothing to resume");
     hal_audio_resume();
 }
 
 void MIPS16 cmd_play(void) {
-    unsigned char *tp;
+    unsigned char * tp;
 
     if (checkstring(cmdline, (unsigned char *)"STOP")) {
         if (CurrentlyPlaying == P_NOTHING) {
@@ -232,7 +267,7 @@ void MIPS16 cmd_play(void) {
             has_dur = 1;
         }
         if (dur_ms == 0 && has_dur) return;
-        char *tone_interrupt = NULL;
+        char * tone_interrupt = NULL;
         if (argc == 7) {
             if (!CurrentLinePtr) error("No program running");
             if (!hal_audio_tone_interrupt_supported())
@@ -259,7 +294,7 @@ void MIPS16 cmd_play(void) {
         int left = 0, right = 0;
         if (!play_parse_channel(argv[2], &left, &right))
             error("Position must be L, R, or B");
-        const char *type = play_parse_type(argv[4]);
+        const char * type = play_parse_type(argv[4]);
         if (!type) error("Invalid type");
         if (!left && !right) error("Position must be L, R, or B");
         if (strcasecmp(type, "U") == 0 && usertable == NULL) error("Not loaded");
@@ -269,7 +304,7 @@ void MIPS16 cmd_play(void) {
         if (f_in < 1.0 || f_in > 20000.0) error("Valid is 1Hz to 20KHz");
         int vol = 25;
         if (argc == 9) vol = getint(argv[8], 0, 25);
-        const char *ch = (left && right) ? "B" : (left ? "L" : "R");
+        const char * ch = (left && right) ? "B" : (left ? "L" : "R");
         if (strcasecmp(type, "O") == 0) {
             if (!sound_owns_backend()) return;
             hal_audio_sound(slot, ch, type, (double)f_in, vol);
@@ -284,7 +319,7 @@ void MIPS16 cmd_play(void) {
         return;
     }
     if ((tp = checkstring(cmdline, (unsigned char *)"LOAD SOUND"))) {
-        int64_t *aint;
+        int64_t * aint;
         skipspace(tp);
         int size = parseintegerarray(tp, &aint, 1, 1, NULL, false);
         if (size != 1024) error("Array size");
@@ -292,7 +327,7 @@ void MIPS16 cmd_play(void) {
         return;
     }
     if ((tp = checkstring(cmdline, (unsigned char *)"NOTE"))) {
-        unsigned char *xp;
+        unsigned char * xp;
         if ((xp = checkstring(tp, (unsigned char *)"ON"))) {
             getargs(&xp, 5, (unsigned char *)",");
             if (argc != 5) error("Syntax");
@@ -333,7 +368,7 @@ void MIPS16 cmd_play(void) {
     if ((tp = checkstring(cmdline, (unsigned char *)"WAV"))) {
         getargs(&tp, 3, (unsigned char *)",");
         if (argc < 1) error("Argument count");
-        char *fname = (char *)getFstring(argv[0]);
+        char * fname = (char *)getFstring(argv[0]);
         StopAudio();
         WAVInterrupt = NULL;
         WAVcomplete = 0;
@@ -349,34 +384,46 @@ void MIPS16 cmd_play(void) {
     if ((tp = checkstring(cmdline, (unsigned char *)"MP3"))) {
         getargs(&tp, 3, (unsigned char *)",");
         if (argc < 1) error("Argument count");
-        char *fname = (char *)getFstring(argv[0]);
+        char * fname = (char *)getFstring(argv[0]);
         StopAudio();
         WAVInterrupt = NULL;
         WAVcomplete = 0;
         if (audio_stream_play_mp3(fname) != 0) error("Cannot play file");
-        if (argc == 3) { WAVInterrupt = (char *)GetIntAddress(argv[2]); WAVcomplete = false; InterruptUsed = true; }
+        if (argc == 3) {
+            WAVInterrupt = (char *)GetIntAddress(argv[2]);
+            WAVcomplete = false;
+            InterruptUsed = true;
+        }
         return;
     }
     if ((tp = checkstring(cmdline, (unsigned char *)"FLAC"))) {
         getargs(&tp, 3, (unsigned char *)",");
         if (argc < 1) error("Argument count");
-        char *fname = (char *)getFstring(argv[0]);
+        char * fname = (char *)getFstring(argv[0]);
         StopAudio();
         WAVInterrupt = NULL;
         WAVcomplete = 0;
         if (audio_stream_play_flac(fname) != 0) error("Cannot play file");
-        if (argc == 3) { WAVInterrupt = (char *)GetIntAddress(argv[2]); WAVcomplete = false; InterruptUsed = true; }
+        if (argc == 3) {
+            WAVInterrupt = (char *)GetIntAddress(argv[2]);
+            WAVcomplete = false;
+            InterruptUsed = true;
+        }
         return;
     }
     if ((tp = checkstring(cmdline, (unsigned char *)"MODFILE"))) {
         getargs(&tp, 3, (unsigned char *)",");
         if (argc < 1) error("Argument count");
-        char *fname = (char *)getFstring(argv[0]);
+        char * fname = (char *)getFstring(argv[0]);
         StopAudio();
         WAVInterrupt = NULL;
         WAVcomplete = 0;
         if (audio_stream_play_mod(fname) != 0) error("Cannot play file");
-        if (argc == 3) { WAVInterrupt = (char *)GetIntAddress(argv[2]); WAVcomplete = false; InterruptUsed = true; }
+        if (argc == 3) {
+            WAVInterrupt = (char *)GetIntAddress(argv[2]);
+            WAVcomplete = false;
+            InterruptUsed = true;
+        }
         return;
     }
     if (checkstring(cmdline, (unsigned char *)"NEXT") ||
@@ -410,9 +457,13 @@ void StopAudio(void) {
     WAVcomplete = 0;
 }
 
-void audio_runtime_service(void) { audio_stream_service(); }
-void checkWAVinput(void) { audio_runtime_service(); }
-int audio_interrupt_pending(unsigned char **target) {
+void audio_runtime_service(void) {
+    audio_stream_service();
+}
+void checkWAVinput(void) {
+    audio_runtime_service();
+}
+int audio_interrupt_pending(unsigned char ** target) {
     if (WAVInterrupt == NULL || !WAVcomplete) return 0;
     if (target) *target = (unsigned char *)WAVInterrupt;
     WAVcomplete = false;

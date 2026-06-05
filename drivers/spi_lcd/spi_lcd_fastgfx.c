@@ -26,43 +26,43 @@
 /* File-scope globals defined in Draw.c; we need them here too. */
 extern int map[16];
 extern int RGB121map[16];
-extern unsigned char *ShadowBuf;
+extern unsigned char * ShadowBuf;
 extern int fb_dma_chan;
 extern mutex_t frameBufferMutex;
 
 /* Host builds provide FASTGFX in the host port; they present/copy the host
  * framebuffer directly instead of DMA-ing dirty scanlines to an LCD controller. */
 
-static uint8_t *FastGFXBackBuf = NULL;
-static uint8_t *FastGFXFrontBuf = NULL;
+static uint8_t * FastGFXBackBuf = NULL;
+static uint8_t * FastGFXFrontBuf = NULL;
 static volatile bool fastgfx_done = true;
 static bool fastgfx_active = false;
 static int fastgfx_dma_chan = -1;
-static uint32_t fastgfx_frame_us = 0;       // target frame time in microseconds (0 = unlimited)
-static uint64_t fastgfx_last_swap_us = 0;   // timestamp of last swap
+static uint32_t fastgfx_frame_us = 0;     // target frame time in microseconds (0 = unlimited)
+static uint64_t fastgfx_last_swap_us = 0; // timestamp of last swap
 
 // Shared ping-pong line buffers for RGB565 conversion (max 320 pixels * 2 bytes)
 // Used by both FASTGFX and FRAMEBUFFER FAST merge paths.
 static uint16_t fastgfx_linebuf[2][320];
 
 // Determine which SPI instance the LCD is on
-static inline spi_inst_t *fastgfx_get_spi(void) {
+static inline spi_inst_t * fastgfx_get_spi(void) {
     return (PinDef[HAL_PORT_LCD_SPI_CLK_PIN].mode & SPI0SCK) ? spi0 : spi1;
 }
 
 // Core1 swap: diff back vs front, DMA changed scanlines to SPI, copy back->front
 void __not_in_flash_func(fastgfx_swap_core1)(void) {
-    spi_inst_t *spi = fastgfx_get_spi();
-    int stride = HRes / 2;  // bytes per scanline in 4-bit framebuffer
-    uint8_t *back = FastGFXBackBuf;
-    uint8_t *front = FastGFXFrontBuf;
-    int buf_idx = 0;  // ping-pong index
+    spi_inst_t * spi = fastgfx_get_spi();
+    int stride = HRes / 2; // bytes per scanline in 4-bit framebuffer
+    uint8_t * back = FastGFXBackBuf;
+    uint8_t * front = FastGFXFrontBuf;
+    int buf_idx = 0; // ping-pong index
 
     // Ensure map[] is populated using same encoding as copyframetoscreen
     if (map[15] == 0) {
         for (int i = 0; i < 16; i++) {
             uint8_t col0 = ((RGB121map[i] >> 16) & 0xF8) | ((RGB121map[i] >> 13) & 0x07);
-            uint8_t col1 = ((RGB121map[i] >>  5) & 0xE0) | ((RGB121map[i] >>  3) & 0x1F);
+            uint8_t col1 = ((RGB121map[i] >> 5) & 0xE0) | ((RGB121map[i] >> 3) & 0x1F);
             map[i] = col0 | (col1 << 8);
         }
     }
@@ -72,13 +72,14 @@ void __not_in_flash_func(fastgfx_swap_core1)(void) {
     channel_config_set_transfer_data_size(&dma_cfg, DMA_SIZE_8);
     channel_config_set_read_increment(&dma_cfg, true);
     channel_config_set_write_increment(&dma_cfg, false);
-    channel_config_set_dreq(&dma_cfg, spi_get_dreq(spi, true));  // TX DREQ
+    channel_config_set_dreq(&dma_cfg, spi_get_dreq(spi, true)); // TX DREQ
 
     // Tear sync
     if (Option.DISPLAY_TYPE == ILI9341 || Option.DISPLAY_TYPE == ST7796SP ||
         Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE == ST7789B ||
         Option.DISPLAY_TYPE == ILI9488 || Option.DISPLAY_TYPE == ILI9488P) {
-        while (GetLineILI9341() != 0) {}
+        while (GetLineILI9341() != 0) {
+        }
     }
 
     // Scan for dirty regions: batch consecutive dirty scanlines
@@ -92,12 +93,12 @@ void __not_in_flash_func(fastgfx_swap_core1)(void) {
 
         // Found a dirty scanline — find the extent of the dirty region
         int y_start = y;
-        int x_min = stride;  // in bytes
+        int x_min = stride; // in bytes
         int x_max = 0;
 
         while (y < VRes && memcmp(back + y * stride, front + y * stride, stride) != 0) {
-            uint8_t *b = back + y * stride;
-            uint8_t *f = front + y * stride;
+            uint8_t * b = back + y * stride;
+            uint8_t * f = front + y * stride;
             // Find leftmost and rightmost dirty byte in this scanline
             for (int x = 0; x < stride; x++) {
                 if (b[x] != f[x]) {
@@ -107,18 +108,18 @@ void __not_in_flash_func(fastgfx_swap_core1)(void) {
             }
             y++;
         }
-        int y_end = y;  // exclusive
+        int y_end = y; // exclusive
 
         // Convert byte range to pixel range (each byte = 2 pixels)
         int px_start = x_min * 2;
-        int px_end = x_max * 2 + 1;  // inclusive
+        int px_end = x_max * 2 + 1; // inclusive
 
         // Set display window for this dirty rectangle
         DefineRegionSPI(px_start, y_start, px_end, y_end - 1, 1);
 
         // Send each scanline in the dirty region
         for (int sy = y_start; sy < y_end; sy++) {
-            uint16_t *lb = fastgfx_linebuf[buf_idx];
+            uint16_t * lb = fastgfx_linebuf[buf_idx];
             int pixel_count = px_end - px_start + 1;
 
             // Convert 4-bit indexed -> RGB565 into line buffer
@@ -136,10 +137,10 @@ void __not_in_flash_func(fastgfx_swap_core1)(void) {
             dma_channel_configure(
                 fastgfx_dma_chan,
                 &dma_cfg,
-                &spi_get_hw(spi)->dr,    // write to SPI data register
-                (uint8_t *)lb,            // read from line buffer
-                pixel_count * 2,          // byte count (RGB565 = 2 bytes/pixel)
-                true                      // start immediately
+                &spi_get_hw(spi)->dr, // write to SPI data register
+                (uint8_t *)lb,        // read from line buffer
+                pixel_count * 2,      // byte count (RGB565 = 2 bytes/pixel)
+                true                  // start immediately
             );
 
             // Copy this scanline's dirty bytes from back to front
@@ -170,9 +171,9 @@ void merge_optimized(uint8_t colour) {
 
     int stride = HRes / 2;
     uint8_t highcolour = colour << 4;
-    uint8_t *s = LayerBuf;
-    uint8_t *d = FrameBuf;
-    uint8_t *shadow = ShadowBuf;
+    uint8_t * s = LayerBuf;
+    uint8_t * d = FrameBuf;
+    uint8_t * shadow = ShadowBuf;
 
     mutex_enter_blocking(&frameBufferMutex);
 
@@ -180,12 +181,13 @@ void merge_optimized(uint8_t colour) {
     if (Option.DISPLAY_TYPE == ILI9341 || Option.DISPLAY_TYPE == ST7796SP ||
         Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE == ST7789B ||
         Option.DISPLAY_TYPE == ILI9488 || Option.DISPLAY_TYPE == ILI9488P) {
-        while (GetLineILI9341() != 0) {}
+        while (GetLineILI9341() != 0) {
+        }
     }
 
     // Single-pass: composite, diff against shadow, batch+send dirty regions
     // Same flow as fastgfx_swap_core1 but with frame+layer compositing
-    spi_inst_t *spi = fastgfx_get_spi();
+    spi_inst_t * spi = fastgfx_get_spi();
     int dma_chan = fb_dma_chan;
     int buf_idx = 0;
     uint8_t LineBuf[stride];
@@ -194,7 +196,7 @@ void merge_optimized(uint8_t colour) {
     if (map[15] == 0) {
         for (int i = 0; i < 16; i++) {
             uint8_t col0 = ((RGB121map[i] >> 16) & 0xF8) | ((RGB121map[i] >> 13) & 0x07);
-            uint8_t col1 = ((RGB121map[i] >>  5) & 0xE0) | ((RGB121map[i] >>  3) & 0x1F);
+            uint8_t col1 = ((RGB121map[i] >> 5) & 0xE0) | ((RGB121map[i] >> 3) & 0x1F);
             map[i] = col0 | (col1 << 8);
         }
     }
@@ -209,12 +211,13 @@ void merge_optimized(uint8_t colour) {
     while (y < VRes) {
         // Composite this scanline
         memcpy(LineBuf, d + y * stride, stride);
-        uint8_t *ss = s + y * stride;
+        uint8_t * ss = s + y * stride;
         for (int x = 0; x < stride; x++) {
             uint8_t top = *ss & 0xF0;
             uint8_t bottom = *ss++ & 0x0f;
             if (top == highcolour && bottom == colour) continue;
-            if (top != highcolour && bottom != colour) LineBuf[x] = (top | bottom);
+            if (top != highcolour && bottom != colour)
+                LineBuf[x] = (top | bottom);
             else if (top != highcolour) {
                 LineBuf[x] &= 0x0F;
                 LineBuf[x] |= top;
@@ -240,12 +243,13 @@ void merge_optimized(uint8_t colour) {
             // Composite (already done for first line of batch)
             if (y != y_start) {
                 memcpy(LineBuf, d + y * stride, stride);
-                uint8_t *ss2 = s + y * stride;
+                uint8_t * ss2 = s + y * stride;
                 for (int x = 0; x < stride; x++) {
                     uint8_t top = *ss2 & 0xF0;
                     uint8_t bottom = *ss2++ & 0x0f;
                     if (top == highcolour && bottom == colour) continue;
-                    if (top != highcolour && bottom != colour) LineBuf[x] = (top | bottom);
+                    if (top != highcolour && bottom != colour)
+                        LineBuf[x] = (top | bottom);
                     else if (top != highcolour) {
                         LineBuf[x] &= 0x0F;
                         LineBuf[x] |= top;
@@ -258,7 +262,7 @@ void merge_optimized(uint8_t colour) {
             }
 
             // Track dirty byte range, update only changed bytes in shadow
-            uint8_t *sh = shadow + y * stride;
+            uint8_t * sh = shadow + y * stride;
             for (int x = 0; x < stride; x++) {
                 if (LineBuf[x] != sh[x]) {
                     if (x < x_min) x_min = x;
@@ -278,7 +282,7 @@ void merge_optimized(uint8_t colour) {
         DefineRegionSPI(px_start, y_start, px_end, y_end - 1, 1);
 
         for (int sy = y_start; sy < y_end; sy++) {
-            uint16_t *lb = fastgfx_linebuf[buf_idx];
+            uint16_t * lb = fastgfx_linebuf[buf_idx];
             int out = 0;
             for (int bx = x_min; bx <= x_max; bx++) {
                 uint8_t byte = shadow[sy * stride + bx];
@@ -293,8 +297,7 @@ void merge_optimized(uint8_t colour) {
                 &spi_get_hw(spi)->dr,
                 (uint8_t *)lb,
                 pixel_count * 2,
-                true
-            );
+                true);
             buf_idx ^= 1;
         }
 
@@ -306,12 +309,17 @@ void merge_optimized(uint8_t colour) {
     mutex_exit(&frameBufferMutex);
     mergedone = true;
     __dmb();
-    low_x = 0; low_y = 0; high_x = HRes - 1; high_y = VRes - 1;
+    low_x = 0;
+    low_y = 0;
+    high_x = HRes - 1;
+    high_y = VRes - 1;
 }
 
 void bc_fastgfx_swap(void) {
     if (!fastgfx_active) error("FASTGFX not active");
-    while (!fastgfx_done) { __dmb(); }
+    while (!fastgfx_done) {
+        __dmb();
+    }
     if (fastgfx_frame_us > 0) {
         while (hal_time_us_64() - fastgfx_last_swap_us < fastgfx_frame_us) {
             tight_loop_contents();
@@ -325,12 +333,16 @@ void bc_fastgfx_swap(void) {
 
 void bc_fastgfx_sync(void) {
     if (!fastgfx_active) error("FASTGFX not active");
-    while (!fastgfx_done) { __dmb(); }
+    while (!fastgfx_done) {
+        __dmb();
+    }
 }
 
 void bc_fastgfx_create(void) {
     if (fastgfx_active) {
-        while (!fastgfx_done) { __dmb(); }
+        while (!fastgfx_done) {
+            __dmb();
+        }
         if (fastgfx_dma_chan >= 0) {
             dma_channel_unclaim(fastgfx_dma_chan);
             fastgfx_dma_chan = -1;
@@ -346,10 +358,10 @@ void bc_fastgfx_create(void) {
     FastGFXBackBuf = BC_ALLOC(HRes * VRes / 2);
     FastGFXFrontBuf = BC_ALLOC(HRes * VRes / 2);
     if (!FastGFXBackBuf || !FastGFXFrontBuf) {
-        unsigned int _u=0,_f=0,_r=0,_t=0;
-        heap_scan_stats(&_u,&_f,&_r,&_t);
+        unsigned int _u = 0, _f = 0, _r = 0, _t = 0;
+        heap_scan_stats(&_u, &_f, &_r, &_t);
         error("NEM[fastgfx:bufs] want=%x2 used=%/% free=% run=%",
-              (int)(HRes*VRes/2),
+              (int)(HRes * VRes / 2),
               (int)_u, (int)_t, (int)_f, (int)_r);
     }
     memset(FastGFXBackBuf, 0, HRes * VRes / 2);
@@ -365,7 +377,9 @@ void bc_fastgfx_create(void) {
 
 void bc_fastgfx_close(void) {
     if (!fastgfx_active) error("FASTGFX not active");
-    while (!fastgfx_done) { __dmb(); }
+    while (!fastgfx_done) {
+        __dmb();
+    }
     if (fastgfx_dma_chan >= 0) {
         dma_channel_unclaim(fastgfx_dma_chan);
         fastgfx_dma_chan = -1;
@@ -380,7 +394,9 @@ void bc_fastgfx_close(void) {
 
 void bc_fastgfx_reset(void) {
     if (!fastgfx_active) return;
-    while (!fastgfx_done) { __dmb(); }
+    while (!fastgfx_done) {
+        __dmb();
+    }
     if (fastgfx_dma_chan >= 0) {
         dma_channel_unclaim(fastgfx_dma_chan);
         fastgfx_dma_chan = -1;
@@ -402,7 +418,7 @@ void bc_fastgfx_set_fps(int fps) {
 }
 
 void cmd_fastgfx(void) {
-    unsigned char *p = NULL;
+    unsigned char * p = NULL;
     if ((p = checkstring(cmdline, (unsigned char *)"CREATE"))) {
         checkend(p);
         bc_fastgfx_create();

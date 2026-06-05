@@ -101,9 +101,9 @@ static void host_raw_mode_install_signal_handlers(void) {
     /* SA_RESTART isn't necessary — we don't return to the syscall
      * that was interrupted, we re-raise to die. Use signal() instead
      * of sigaction() to keep the footprint small. */
-    signal(SIGINT,  host_raw_mode_signal);
+    signal(SIGINT, host_raw_mode_signal);
     signal(SIGTERM, host_raw_mode_signal);
-    signal(SIGHUP,  host_raw_mode_signal);
+    signal(SIGHUP, host_raw_mode_signal);
     signal(SIGQUIT, host_raw_mode_signal);
     signal(SIGPIPE, host_raw_mode_signal);
     signal(SIGABRT, host_raw_mode_signal);
@@ -194,7 +194,7 @@ void host_push_back_byte(int c) {
     host_pending_push_front(c);
 }
 
-int host_terminal_get_size(int *rows, int *cols) {
+int host_terminal_get_size(int * rows, int * cols) {
     struct winsize ws;
     if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) != 0) return -1;
     if (ws.ws_row == 0 || ws.ws_col == 0) return -1;

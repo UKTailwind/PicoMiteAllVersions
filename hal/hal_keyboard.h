@@ -77,8 +77,8 @@ void hal_keyboard_init(void);
  * hal_keyboard_lock_state() — returns a bitmap, bit0 = caps lock,
  *   bit1 = num lock, bit2 = scroll lock. Corresponds to
  *   fun_keydown(8). */
-int      hal_keyboard_keydown_count(void);
-int      hal_keyboard_keydown_slot(int slot);
+int hal_keyboard_keydown_count(void);
+int hal_keyboard_keydown_slot(int slot);
 uint32_t hal_keyboard_lock_state(void);
 
 /* OPTION KEYBOARD layout select. Codes mirror the legacy CONFIG_*
@@ -91,14 +91,14 @@ uint32_t hal_keyboard_lock_state(void);
  * responsible for SaveOptions() + reboot. On unsupported input the
  * HAL returns -1 without touching Option. */
 enum {
-    HAL_KBD_LAYOUT_US  = 1,
-    HAL_KBD_LAYOUT_FR  = 2,
-    HAL_KBD_LAYOUT_GR  = 3,
-    HAL_KBD_LAYOUT_IT  = 4,
-    HAL_KBD_LAYOUT_BE  = 5,
-    HAL_KBD_LAYOUT_UK  = 6,
-    HAL_KBD_LAYOUT_ES  = 7,
-    HAL_KBD_LAYOUT_BR  = 8,
+    HAL_KBD_LAYOUT_US = 1,
+    HAL_KBD_LAYOUT_FR = 2,
+    HAL_KBD_LAYOUT_GR = 3,
+    HAL_KBD_LAYOUT_IT = 4,
+    HAL_KBD_LAYOUT_BE = 5,
+    HAL_KBD_LAYOUT_UK = 6,
+    HAL_KBD_LAYOUT_ES = 7,
+    HAL_KBD_LAYOUT_BR = 8,
     HAL_KBD_LAYOUT_I2C = 128,
 };
 
@@ -115,7 +115,7 @@ void hal_keyboard_quiesce_for_reset(void);
  * bytes written. On non-USB backends returns 0 and leaves `out`
  * untouched. Exists so fun_nunchuck's "RAW" query can reach the USB HID
  * report buffer without core touching HID[] directly. */
-int hal_keyboard_usb_raw_report(int slot, unsigned char *out, int max_len);
+int hal_keyboard_usb_raw_report(int slot, unsigned char * out, int max_len);
 
 /* Invoked from ClearExternalIO / gpio_callback teardown paths. PS/2
  * backends clear their GOSUB / code / int globals and shut down the

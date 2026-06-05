@@ -17,12 +17,12 @@
 #include "pico/stdlib.h"
 #include "hardware/flash.h"
 #include "hardware/sync.h"
-#include "hardware/regs/addressmap.h"  /* XIP_BASE */
+#include "hardware/regs/addressmap.h" /* XIP_BASE */
 #ifdef rp2350
 #include "hardware/structs/qmi.h"
 #endif
 
-#include "configuration.h"             /* FLASH_TARGET_OFFSET, PROGSTART, MAX_PROG_SIZE, FLASH_ERASE_SIZE */
+#include "configuration.h" /* FLASH_TARGET_OFFSET, PROGSTART, MAX_PROG_SIZE, FLASH_ERASE_SIZE */
 #include "hal/hal_flash.h"
 #include "hal/hal_psram.h"
 
@@ -35,8 +35,7 @@ static int s_flash_write_depth;
  * Pico SDK flash_range_* reruns boot2 and can leave M0 timing/rfmt changed.
  * Restore M0 from RAM before returning to XIP flash code.
  */
-static void __not_in_flash_func(hal_flash_range_erase_preserving_m0)(uint32_t offset, size_t len)
-{
+static void __not_in_flash_func(hal_flash_range_erase_preserving_m0)(uint32_t offset, size_t len) {
     uint32_t saved_timing = qmi_hw->m[0].timing;
     uint32_t saved_rfmt = qmi_hw->m[0].rfmt;
     flash_range_erase(offset, len);
@@ -44,8 +43,7 @@ static void __not_in_flash_func(hal_flash_range_erase_preserving_m0)(uint32_t of
     qmi_hw->m[0].rfmt = saved_rfmt;
 }
 
-static void __not_in_flash_func(hal_flash_range_program_preserving_m0)(uint32_t offset, const uint8_t *buf, size_t len)
-{
+static void __not_in_flash_func(hal_flash_range_program_preserving_m0)(uint32_t offset, const uint8_t * buf, size_t len) {
     uint32_t saved_timing = qmi_hw->m[0].timing;
     uint32_t saved_rfmt = qmi_hw->m[0].rfmt;
     flash_range_program(offset, buf, len);
@@ -53,27 +51,23 @@ static void __not_in_flash_func(hal_flash_range_program_preserving_m0)(uint32_t 
     qmi_hw->m[0].rfmt = saved_rfmt;
 }
 #else
-static void hal_flash_range_erase_preserving_m0(uint32_t offset, size_t len)
-{
+static void hal_flash_range_erase_preserving_m0(uint32_t offset, size_t len) {
     flash_range_erase(offset, len);
 }
 
-static void hal_flash_range_program_preserving_m0(uint32_t offset, const uint8_t *buf, size_t len)
-{
+static void hal_flash_range_program_preserving_m0(uint32_t offset, const uint8_t * buf, size_t len) {
     flash_range_program(offset, buf, len);
 }
 #endif
 
-void hal_flash_write_begin(void)
-{
+void hal_flash_write_begin(void) {
     if (s_flash_write_depth++ == 0) {
         hal_psram_save_settings();
         s_flash_irq_state = save_and_disable_interrupts();
     }
 }
 
-void hal_flash_write_end(void)
-{
+void hal_flash_write_end(void) {
     if (s_flash_write_depth <= 0) return;
     if (--s_flash_write_depth == 0) {
         hal_psram_restore_settings();
@@ -82,16 +76,14 @@ void hal_flash_write_end(void)
     }
 }
 
-int hal_flash_write_active(void)
-{
+int hal_flash_write_active(void) {
     return s_flash_write_depth > 0;
 }
 
-int hal_flash_erase(uint32_t offset, size_t len)
-{
+int hal_flash_erase(uint32_t offset, size_t len) {
     if (len == 0) return 0;
     if ((offset % FLASH_SECTOR_SIZE) != 0) return -EINVAL;
-    if ((len    % FLASH_SECTOR_SIZE) != 0) return -EINVAL;
+    if ((len % FLASH_SECTOR_SIZE) != 0) return -EINVAL;
 
     int local_psram_save = !hal_flash_write_active();
     if (local_psram_save) hal_psram_save_settings();
@@ -102,12 +94,11 @@ int hal_flash_erase(uint32_t offset, size_t len)
     return 0;
 }
 
-int hal_flash_program(uint32_t offset, const void *buf, size_t len)
-{
+int hal_flash_program(uint32_t offset, const void * buf, size_t len) {
     if (len == 0) return 0;
-    if (buf == NULL)                    return -EINVAL;
+    if (buf == NULL) return -EINVAL;
     if ((offset % FLASH_PAGE_SIZE) != 0) return -EINVAL;
-    if ((len    % FLASH_PAGE_SIZE) != 0) return -EINVAL;
+    if ((len % FLASH_PAGE_SIZE) != 0) return -EINVAL;
 
     int local_psram_save = !hal_flash_write_active();
     if (local_psram_save) hal_psram_save_settings();
@@ -118,32 +109,28 @@ int hal_flash_program(uint32_t offset, const void *buf, size_t len)
     return 0;
 }
 
-int hal_flash_unique_id(uint8_t out[8])
-{
+int hal_flash_unique_id(uint8_t out[8]) {
     if (out == NULL) return -EINVAL;
     flash_get_unique_id(out);
     return 0;
 }
 
-int hal_flash_read_jedec_id(uint8_t out[4])
-{
+int hal_flash_read_jedec_id(uint8_t out[4]) {
     if (out == NULL) return -EINVAL;
-    const uint8_t txbuf[4] = { 0x9f, 0, 0, 0 };
+    const uint8_t txbuf[4] = {0x9f, 0, 0, 0};
     uint32_t irqs = save_and_disable_interrupts();
     flash_do_cmd(txbuf, out, 4);
     restore_interrupts(irqs);
     return 0;
 }
 
-int hal_flash_read_options(void *buf, size_t len)
-{
+int hal_flash_read_options(void * buf, size_t len) {
     if (buf == NULL) return -EINVAL;
     memcpy(buf, (const void *)(XIP_BASE + FLASH_TARGET_OFFSET), len);
     return 0;
 }
 
-int hal_flash_write_options(const void *buf, size_t len)
-{
+int hal_flash_write_options(const void * buf, size_t len) {
     if (buf == NULL) return -EINVAL;
     if (len == 0 || len > FLASH_ERASE_SIZE) return -EINVAL;
 
@@ -161,7 +148,6 @@ int hal_flash_write_options(const void *buf, size_t len)
     return hal_flash_program(FLASH_TARGET_OFFSET, staging, pad_len);
 }
 
-int hal_flash_erase_program_area(void)
-{
+int hal_flash_erase_program_area(void) {
     return hal_flash_erase(PROGSTART, MAX_PROG_SIZE);
 }

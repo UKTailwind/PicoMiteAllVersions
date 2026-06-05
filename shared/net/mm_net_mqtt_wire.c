@@ -17,7 +17,7 @@ size_t mm_net_mqtt_encode_remaining_length(uint8_t out[4], size_t value) {
     return n;
 }
 
-uint8_t *mm_net_mqtt_write_utf8(uint8_t *p, const char *text) {
+uint8_t * mm_net_mqtt_write_utf8(uint8_t * p, const char * text) {
     size_t len = text ? strlen(text) : 0;
     *p++ = (uint8_t)(len >> 8);
     *p++ = (uint8_t)len;
@@ -28,8 +28,8 @@ uint8_t *mm_net_mqtt_write_utf8(uint8_t *p, const char *text) {
     return p;
 }
 
-int mm_net_mqtt_read_utf8(const uint8_t *body, size_t body_len, size_t *pos,
-                          char *out, size_t out_len) {
+int mm_net_mqtt_read_utf8(const uint8_t * body, size_t body_len, size_t * pos,
+                          char * out, size_t out_len) {
     if (!body || !pos || !out || out_len == 0 || *pos + 2 > body_len)
         return 0;
     size_t len = ((size_t)body[*pos] << 8) | body[*pos + 1];
@@ -42,11 +42,11 @@ int mm_net_mqtt_read_utf8(const uint8_t *body, size_t body_len, size_t *pos,
     return 1;
 }
 
-int mm_net_mqtt_decode_publish(uint8_t header, const uint8_t *body,
-                               size_t body_len, char *topic,
+int mm_net_mqtt_decode_publish(uint8_t header, const uint8_t * body,
+                               size_t body_len, char * topic,
                                size_t topic_len,
-                               const uint8_t **payload,
-                               size_t *payload_len) {
+                               const uint8_t ** payload,
+                               size_t * payload_len) {
     if (!body || !topic || topic_len == 0 || !payload || !payload_len)
         return 0;
     size_t pos = 0;

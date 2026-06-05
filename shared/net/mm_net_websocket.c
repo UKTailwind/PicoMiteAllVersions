@@ -16,7 +16,7 @@ static int ascii_isspace(int c) {
     return c == ' ' || c == '\t' || c == '\r' || c == '\n';
 }
 
-static int ascii_strncasecmp(const char *a, const char *b, size_t n) {
+static int ascii_strncasecmp(const char * a, const char * b, size_t n) {
     for (size_t i = 0; i < n; i++) {
         int ca = ascii_tolower((unsigned char)a[i]);
         int cb = ascii_tolower((unsigned char)b[i]);
@@ -26,7 +26,7 @@ static int ascii_strncasecmp(const char *a, const char *b, size_t n) {
     return 0;
 }
 
-static int ascii_strcasecmp(const char *a, const char *b) {
+static int ascii_strcasecmp(const char * a, const char * b) {
     while (*a && *b) {
         int ca = ascii_tolower((unsigned char)*a++);
         int cb = ascii_tolower((unsigned char)*b++);
@@ -35,7 +35,7 @@ static int ascii_strcasecmp(const char *a, const char *b) {
     return ascii_tolower((unsigned char)*a) - ascii_tolower((unsigned char)*b);
 }
 
-static size_t trim_span(const char **p, size_t len) {
+static size_t trim_span(const char ** p, size_t len) {
     while (len && ascii_isspace((unsigned char)(*p)[0])) {
         (*p)++;
         len--;
@@ -103,7 +103,7 @@ static void sha1_transform(uint32_t state[5], const uint8_t block[64]) {
     state[4] += e;
 }
 
-static void sha1_init(sha1_ctx_t *ctx) {
+static void sha1_init(sha1_ctx_t * ctx) {
     ctx->state[0] = 0x67452301u;
     ctx->state[1] = 0xefcdab89u;
     ctx->state[2] = 0x98badcfeu;
@@ -113,7 +113,7 @@ static void sha1_init(sha1_ctx_t *ctx) {
     memset(ctx->buffer, 0, sizeof(ctx->buffer));
 }
 
-static void sha1_update(sha1_ctx_t *ctx, const uint8_t *data, size_t len) {
+static void sha1_update(sha1_ctx_t * ctx, const uint8_t * data, size_t len) {
     size_t offset = (size_t)((ctx->bit_count / 8) & 63u);
     ctx->bit_count += (uint64_t)len * 8u;
 
@@ -132,7 +132,7 @@ static void sha1_update(sha1_ctx_t *ctx, const uint8_t *data, size_t len) {
     if (i < len) memcpy(ctx->buffer, data + i, len - i);
 }
 
-static void sha1_final(sha1_ctx_t *ctx, uint8_t digest[20]) {
+static void sha1_final(sha1_ctx_t * ctx, uint8_t digest[20]) {
     uint8_t pad = 0x80;
     uint8_t zero = 0;
     uint8_t len_be[8];
@@ -160,7 +160,7 @@ static int base64_value(int c) {
     return -1;
 }
 
-static int base64_decode_len(const char *src, size_t len, size_t *decoded_len) {
+static int base64_decode_len(const char * src, size_t len, size_t * decoded_len) {
     if (!src || !decoded_len || len == 0 || (len & 3u) != 0) return 0;
     size_t pad = 0;
     if (len && src[len - 1] == '=') pad++;
@@ -178,7 +178,7 @@ static int base64_decode_len(const char *src, size_t len, size_t *decoded_len) {
     return 1;
 }
 
-static int base64_encode(const uint8_t *src, size_t len, char *out,
+static int base64_encode(const uint8_t * src, size_t len, char * out,
                          size_t out_len) {
     static const char tab[] =
         "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -201,7 +201,7 @@ static int base64_encode(const uint8_t *src, size_t len, char *out,
     return 1;
 }
 
-int mm_net_ws_compute_accept(const char *key,
+int mm_net_ws_compute_accept(const char * key,
                              char out[MM_NET_WS_ACCEPT_LEN]) {
     if (!key || !out) return MM_NET_WS_ERR;
     sha1_ctx_t sha;
@@ -217,12 +217,12 @@ int mm_net_ws_compute_accept(const char *key,
     return MM_NET_WS_OK;
 }
 
-static int connection_has_upgrade(const char *value, size_t len) {
+static int connection_has_upgrade(const char * value, size_t len) {
     while (len) {
-        const char *token = value;
+        const char * token = value;
         size_t token_len = 0;
         while (token_len < len && value[token_len] != ',') token_len++;
-        const char *trimmed = token;
+        const char * trimmed = token;
         size_t trimmed_len = trim_span(&trimmed, token_len);
         if (trimmed_len == 7 &&
             ascii_strncasecmp(trimmed, "upgrade", 7) == 0) {
@@ -235,18 +235,18 @@ static int connection_has_upgrade(const char *value, size_t len) {
     return 0;
 }
 
-int mm_net_ws_validate_upgrade_request(const void *request, size_t request_len,
-                                       const char *expected_path,
+int mm_net_ws_validate_upgrade_request(const void * request, size_t request_len,
+                                       const char * expected_path,
                                        char key_out[MM_NET_WS_MAX_KEY_LEN]) {
     if (!request || request_len == 0 || !expected_path) {
         return MM_NET_WS_ERR_BAD_REQUEST;
     }
     if (key_out) key_out[0] = 0;
 
-    const char *buf = (const char *)request;
-    const char *end = buf + request_len;
-    const char *line_end = NULL;
-    for (const char *p = buf; p + 1 < end; p++) {
+    const char * buf = (const char *)request;
+    const char * end = buf + request_len;
+    const char * line_end = NULL;
+    for (const char * p = buf; p + 1 < end; p++) {
         if (p[0] == '\r' && p[1] == '\n') {
             line_end = p;
             break;
@@ -254,9 +254,9 @@ int mm_net_ws_validate_upgrade_request(const void *request, size_t request_len,
     }
     if (!line_end) return MM_NET_WS_NEED_MORE;
 
-    const char *sp1 = memchr(buf, ' ', (size_t)(line_end - buf));
+    const char * sp1 = memchr(buf, ' ', (size_t)(line_end - buf));
     if (!sp1 || sp1 == buf) return MM_NET_WS_ERR_BAD_REQUEST;
-    const char *sp2 = memchr(sp1 + 1, ' ', (size_t)(line_end - sp1 - 1));
+    const char * sp2 = memchr(sp1 + 1, ' ', (size_t)(line_end - sp1 - 1));
     if (!sp2 || sp2 == sp1 + 1) return MM_NET_WS_ERR_BAD_REQUEST;
     if ((size_t)(sp1 - buf) != 3 || memcmp(buf, "GET", 3) != 0) {
         return MM_NET_WS_ERR_BAD_REQUEST;
@@ -274,10 +274,10 @@ int mm_net_ws_validate_upgrade_request(const void *request, size_t request_len,
     char key[MM_NET_WS_MAX_KEY_LEN];
     key[0] = 0;
 
-    const char *line = line_end + 2;
+    const char * line = line_end + 2;
     while (line < end) {
-        const char *next = NULL;
-        for (const char *p = line; p + 1 < end; p++) {
+        const char * next = NULL;
+        for (const char * p = line; p + 1 < end; p++) {
             if (p[0] == '\r' && p[1] == '\n') {
                 next = p;
                 break;
@@ -286,11 +286,11 @@ int mm_net_ws_validate_upgrade_request(const void *request, size_t request_len,
         if (!next) return MM_NET_WS_NEED_MORE;
         if (next == line) break;
 
-        const char *colon = memchr(line, ':', (size_t)(next - line));
+        const char * colon = memchr(line, ':', (size_t)(next - line));
         if (!colon) return MM_NET_WS_ERR_BAD_REQUEST;
-        const char *name = line;
+        const char * name = line;
         size_t name_len = (size_t)(colon - line);
-        const char *value = colon + 1;
+        const char * value = colon + 1;
         size_t value_len = (size_t)(next - value);
         value_len = trim_span(&value, value_len);
 
@@ -325,8 +325,8 @@ int mm_net_ws_validate_upgrade_request(const void *request, size_t request_len,
     return MM_NET_WS_OK;
 }
 
-int mm_net_ws_format_upgrade_response(char *out, size_t out_len,
-                                      const char *accept) {
+int mm_net_ws_format_upgrade_response(char * out, size_t out_len,
+                                      const char * accept) {
     if (!out || !accept) return MM_NET_WS_ERR_BUFFER;
     int n = snprintf(out, out_len,
                      "HTTP/1.1 101 Switching Protocols\r\n"
@@ -346,9 +346,9 @@ static int opcode_supported(uint8_t opcode) {
            opcode == MM_NET_WS_OPCODE_PONG;
 }
 
-int mm_net_ws_encode_frame(uint8_t opcode, const void *payload,
-                           size_t payload_len, uint8_t *out, size_t out_len,
-                           size_t *written) {
+int mm_net_ws_encode_frame(uint8_t opcode, const void * payload,
+                           size_t payload_len, uint8_t * out, size_t out_len,
+                           size_t * written) {
     if (written) *written = 0;
     if (!out || (payload_len && !payload) || !opcode_supported(opcode)) {
         return MM_NET_WS_ERR;
@@ -372,10 +372,10 @@ int mm_net_ws_encode_frame(uint8_t opcode, const void *payload,
     return MM_NET_WS_OK;
 }
 
-int mm_net_ws_decode_frame(const uint8_t *in, size_t in_len,
-                           size_t payload_limit, uint8_t *payload_out,
-                           size_t payload_out_len, mm_net_ws_frame_t *frame,
-                           size_t *consumed) {
+int mm_net_ws_decode_frame(const uint8_t * in, size_t in_len,
+                           size_t payload_limit, uint8_t * payload_out,
+                           size_t payload_out_len, mm_net_ws_frame_t * frame,
+                           size_t * consumed) {
     if (consumed) *consumed = 0;
     if (frame) memset(frame, 0, sizeof(*frame));
     if (!in) return MM_NET_WS_ERR_BAD_FRAME;

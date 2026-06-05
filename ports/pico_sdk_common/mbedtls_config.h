@@ -1,4 +1,4 @@
-/* 
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */
@@ -8,7 +8,7 @@
 #define MBEDTLS_NO_PLATFORM_ENTROPY
 #define MBEDTLS_ENTROPY_HARDWARE_ALT
 
-#define MBEDTLS_SSL_OUT_CONTENT_LEN    2048
+#define MBEDTLS_SSL_OUT_CONTENT_LEN 2048
 
 #define MBEDTLS_ALLOW_PRIVATE_ACCESS
 #define MBEDTLS_HAVE_TIME
@@ -65,4 +65,3 @@
 #define MBEDTLS_ECDSA_C
 #define MBEDTLS_ASN1_WRITE_C
 /*  @endcond */
-

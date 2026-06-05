@@ -18,11 +18,11 @@ extern char SerialConsolePutC(char c, int flush);
  * is no longer in the link, so we no longer need --wrap to override it. */
 
 void cmd_cpu(void) {
-    unsigned char *p;
+    unsigned char * p;
     if ((p = checkstring(cmdline, (unsigned char *)"RESTART"))) {
-        const char *msg = "\r\nRestarting...\r\n";
+        const char * msg = "\r\nRestarting...\r\n";
         while (*msg) SerialConsolePutC(*msg++, 0);
-        vTaskDelay(pdMS_TO_TICKS(50));   /* drain output */
+        vTaskDelay(pdMS_TO_TICKS(50)); /* drain output */
         esp_restart();
     }
     if ((p = checkstring(cmdline, (unsigned char *)"SLEEP"))) {

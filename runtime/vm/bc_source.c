@@ -21,17 +21,17 @@
 
 typedef struct {
     int line_no;
-    int fast_next_loop;   /* set by '!FAST directive, consumed by next loop */
+    int fast_next_loop; /* set by '!FAST directive, consumed by next loop */
 
     /* '!ASM block accumulation state.  The line buffers are ~33 KB, which is
      * far larger than the RP2040 core0 stack (2 KB), so they are heap-allocated
      * on first use inside an '!ASM block and freed at '!ENDASM.  Keeping the
      * frontend struct small keeps bc_compile_source stack-safe on rp2040. */
-    int asm_active;                                /* 1 while inside '!ASM...'!ENDASM */
+    int asm_active; /* 1 while inside '!ASM...'!ENDASM */
     int asm_line_count;
-    int asm_start_line;                            /* source line of '!ASM directive */
-    char (*asm_lines)[ASM_MAX_LINE_LEN];           /* [ASM_MAX_LINES] — alloc on demand */
-    int  *asm_line_nos;                            /* [ASM_MAX_LINES] — alloc on demand */
+    int asm_start_line;                  /* source line of '!ASM directive */
+    char (*asm_lines)[ASM_MAX_LINE_LEN]; /* [ASM_MAX_LINES] — alloc on demand */
+    int * asm_line_nos;                  /* [ASM_MAX_LINES] — alloc on demand */
 
     /* TYPE…END TYPE state.  In --vm mode PrepareProgramExt doesn't run (the
      * source is compiled straight into bytecode), so the compiler has to
@@ -40,15 +40,15 @@ typedef struct {
      * into g_structtbl[g_structcnt++].  In --interp + compare modes the
      * entries may already exist from PrepareProgramExt — InitBasic resets
      * g_structtbl, and compile-time duplicates are an upstream error. */
-    int                  in_type_block;
-    struct s_structdef  *struct_def_inprogress;    /* NULL outside TYPE blocks */
+    int in_type_block;
+    struct s_structdef * struct_def_inprogress; /* NULL outside TYPE blocks */
 
     /* FUNCTION foo(...) AS <struct>  (Phase 6) OR
      * SUB/FUNCTION foo(... As <struct>, ...)  (Phase 7)
      * Both cases bridge every call to the interpreter so the VM never
      * executes the body.  The flag is set when we see the opening header
      * and cleared on the matching END SUB / END FUNCTION. */
-    int                  in_struct_fn;
+    int in_struct_fn;
 
     /* Phase 11: set during prescan if the program uses STRUCT SAVE or
      * STRUCT LOAD.  Those commands bridge to the interpreter, which has
@@ -56,7 +56,7 @@ typedef struct {
      * the file state coherent, OPEN / CLOSE / SEEK also route through the
      * bridge when this flag is set, so a single table owns all I/O for
      * the program. */
-    int                  uses_struct_file_io;
+    int uses_struct_file_io;
 
     /* Phase 13: set during prescan if the program uses STRUCT EXTRACT or
      * STRUCT INSERT.  Those commands memcpy into/from a flat array
@@ -68,45 +68,57 @@ typedef struct {
      * memory.  When this flag is set, DIMs that allocate non-struct
      * string arrays also bridge, so the array lives in g_vartbl with
      * the contiguous layout the bridged EXTRACT/INSERT expects. */
-    int                  uses_struct_extract_insert;
+    int uses_struct_extract_insert;
 } BCSourceFrontend;
 
-static int source_asm_buf_alloc(BCSourceFrontend *fe) {
+static int source_asm_buf_alloc(BCSourceFrontend * fe) {
     if (fe->asm_lines && fe->asm_line_nos) return 0;
-    fe->asm_lines    = (char (*)[ASM_MAX_LINE_LEN])BC_ALLOC(sizeof(char) * ASM_MAX_LINES * ASM_MAX_LINE_LEN);
+    fe->asm_lines = (char (*)[ASM_MAX_LINE_LEN])BC_ALLOC(sizeof(char) * ASM_MAX_LINES * ASM_MAX_LINE_LEN);
     fe->asm_line_nos = (int *)BC_ALLOC(sizeof(int) * ASM_MAX_LINES);
     if (!fe->asm_lines || !fe->asm_line_nos) {
-        if (fe->asm_lines)    { BC_FREE(fe->asm_lines);    fe->asm_lines    = NULL; }
-        if (fe->asm_line_nos) { BC_FREE(fe->asm_line_nos); fe->asm_line_nos = NULL; }
+        if (fe->asm_lines) {
+            BC_FREE(fe->asm_lines);
+            fe->asm_lines = NULL;
+        }
+        if (fe->asm_line_nos) {
+            BC_FREE(fe->asm_line_nos);
+            fe->asm_line_nos = NULL;
+        }
         return -1;
     }
     return 0;
 }
 
-static void source_asm_buf_free(BCSourceFrontend *fe) {
-    if (fe->asm_lines)    { BC_FREE(fe->asm_lines);    fe->asm_lines    = NULL; }
-    if (fe->asm_line_nos) { BC_FREE(fe->asm_line_nos); fe->asm_line_nos = NULL; }
+static void source_asm_buf_free(BCSourceFrontend * fe) {
+    if (fe->asm_lines) {
+        BC_FREE(fe->asm_lines);
+        fe->asm_lines = NULL;
+    }
+    if (fe->asm_line_nos) {
+        BC_FREE(fe->asm_line_nos);
+        fe->asm_line_nos = NULL;
+    }
 }
 
 int bc_opt_level = 1;
 
-static uint8_t source_parse_expression(BCSourceFrontend *fe, BCCompiler *cs, const char **pp);
-static void source_compile_statement(BCSourceFrontend *fe, BCCompiler *cs, const char *stmt);
-static int source_compile_call_args(BCSourceFrontend *fe, BCCompiler *cs, const char **pp,
+static uint8_t source_parse_expression(BCSourceFrontend * fe, BCCompiler * cs, const char ** pp);
+static void source_compile_statement(BCSourceFrontend * fe, BCCompiler * cs, const char * stmt);
+static int source_compile_call_args(BCSourceFrontend * fe, BCCompiler * cs, const char ** pp,
                                     int require_parens);
-static int source_parse_array_indices(BCSourceFrontend *fe, BCCompiler *cs, const char **pp);
-static void source_emit_bridge_for_stmt(BCCompiler *cs, const char *stmt);
-static void source_emit_int_conversion(BCCompiler *cs, uint8_t type);
-static void source_emit_syscall(BCCompiler *cs, uint16_t sysid, uint8_t argc,
-                                const uint8_t *aux, uint8_t auxlen);
-static void source_emit_syscall_noaux(BCCompiler *cs, uint16_t sysid, uint8_t argc);
+static int source_parse_array_indices(BCSourceFrontend * fe, BCCompiler * cs, const char ** pp);
+static void source_emit_bridge_for_stmt(BCCompiler * cs, const char * stmt);
+static void source_emit_int_conversion(BCCompiler * cs, uint8_t type);
+static void source_emit_syscall(BCCompiler * cs, uint16_t sysid, uint8_t argc,
+                                const uint8_t * aux, uint8_t auxlen);
+static void source_emit_syscall_noaux(BCCompiler * cs, uint16_t sysid, uint8_t argc);
 
-static void source_skip_space(const char **pp) {
+static void source_skip_space(const char ** pp) {
     while (**pp == ' ' || **pp == '\t') (*pp)++;
 }
 
-static int source_keyword(const char **pp, const char *kw) {
-    const char *p = *pp;
+static int source_keyword(const char ** pp, const char * kw) {
+    const char * p = *pp;
     unsigned char next;
     size_t len = strlen(kw);
     if (strncasecmp(p, kw, len) != 0) return 0;
@@ -116,19 +128,19 @@ static int source_keyword(const char **pp, const char *kw) {
     return 1;
 }
 
-static int source_line_empty_or_comment(const char *p) {
+static int source_line_empty_or_comment(const char * p) {
     source_skip_space(&p);
     return *p == '\0' || *p == '\'' ||
            (strncasecmp(p, "REM", 3) == 0 && !isnamechar((unsigned char)p[3]));
 }
 
-static void source_statement_end(BCCompiler *cs, const char *p) {
+static void source_statement_end(BCCompiler * cs, const char * p) {
     source_skip_space(&p);
     if (*p != '\0' && *p != '\'')
         bc_set_error(cs, "Unsupported source syntax near: %.24s", p);
 }
 
-static void source_insert_byte(BCCompiler *cs, uint32_t pos, uint8_t b) {
+static void source_insert_byte(BCCompiler * cs, uint32_t pos, uint8_t b) {
     if (cs->code_len >= BC_MAX_CODE) {
         bc_set_error(cs, "Bytecode overflow (%d bytes)", BC_MAX_CODE);
         return;
@@ -142,7 +154,7 @@ static void source_insert_byte(BCCompiler *cs, uint32_t pos, uint8_t b) {
     cs->code_len++;
 }
 
-static void source_delete_bytes(BCCompiler *cs, uint32_t pos, uint32_t count) {
+static void source_delete_bytes(BCCompiler * cs, uint32_t pos, uint32_t count) {
     if (count == 0) return;
     if (pos + count > cs->code_len) {
         bc_set_error(cs, "Internal source compiler error");
@@ -162,7 +174,7 @@ static int source_power_of_two_bits_i64(int64_t v) {
     return (v == 1) ? bits : -1;
 }
 
-static int source_try_fuse_mulshr(BCCompiler *cs, uint8_t left, uint8_t right,
+static int source_try_fuse_mulshr(BCCompiler * cs, uint8_t left, uint8_t right,
                                   uint32_t expr_start, uint32_t right_start) {
     uint32_t mul_pos;
     uint32_t mul_len;
@@ -209,7 +221,7 @@ static int source_try_fuse_mulshr(BCCompiler *cs, uint8_t left, uint8_t right,
     return 1;
 }
 
-static int source_is_same_simple_int_load(BCCompiler *cs,
+static int source_is_same_simple_int_load(BCCompiler * cs,
                                           uint32_t start_a, uint32_t end_a,
                                           uint32_t start_b, uint32_t end_b) {
     uint32_t len_a = end_a - start_a;
@@ -229,7 +241,7 @@ static int source_is_same_simple_int_load(BCCompiler *cs,
     return 0;
 }
 
-static int source_try_fuse_mulshradd(BCCompiler *cs, uint8_t left, uint8_t right,
+static int source_try_fuse_mulshradd(BCCompiler * cs, uint8_t left, uint8_t right,
                                      uint32_t right_start, char op) {
     if (bc_opt_level < 1) return 0;
     if (op != '+') return 0;
@@ -243,7 +255,7 @@ static int source_try_fuse_mulshradd(BCCompiler *cs, uint8_t left, uint8_t right
     return 1;
 }
 
-static int source_try_fuse_mov_assignment(BCCompiler *cs, uint32_t expr_start,
+static int source_try_fuse_mov_assignment(BCCompiler * cs, uint32_t expr_start,
                                           uint16_t dst_slot, int dst_is_local,
                                           uint8_t vtype, uint8_t etype) {
     uint32_t expr_len = cs->code_len - expr_start;
@@ -259,19 +271,28 @@ static int source_try_fuse_mov_assignment(BCCompiler *cs, uint32_t expr_start,
 
     if (vtype == T_INT) {
         mov_kind = BC_MOV_INT;
-        if (cs->code[expr_start] == OP_LOAD_LOCAL_I) src_is_local = 1;
-        else if (cs->code[expr_start] == OP_LOAD_I) src_is_local = 0;
-        else return 0;
+        if (cs->code[expr_start] == OP_LOAD_LOCAL_I)
+            src_is_local = 1;
+        else if (cs->code[expr_start] == OP_LOAD_I)
+            src_is_local = 0;
+        else
+            return 0;
     } else if (vtype == T_NBR) {
         mov_kind = BC_MOV_FLT;
-        if (cs->code[expr_start] == OP_LOAD_LOCAL_F) src_is_local = 1;
-        else if (cs->code[expr_start] == OP_LOAD_F) src_is_local = 0;
-        else return 0;
+        if (cs->code[expr_start] == OP_LOAD_LOCAL_F)
+            src_is_local = 1;
+        else if (cs->code[expr_start] == OP_LOAD_F)
+            src_is_local = 0;
+        else
+            return 0;
     } else if (vtype == T_STR) {
         mov_kind = BC_MOV_STR;
-        if (cs->code[expr_start] == OP_LOAD_LOCAL_S) src_is_local = 1;
-        else if (cs->code[expr_start] == OP_LOAD_S) src_is_local = 0;
-        else return 0;
+        if (cs->code[expr_start] == OP_LOAD_LOCAL_S)
+            src_is_local = 1;
+        else if (cs->code[expr_start] == OP_LOAD_S)
+            src_is_local = 0;
+        else
+            return 0;
     } else {
         return 0;
     }
@@ -288,26 +309,51 @@ static int source_try_fuse_mov_assignment(BCCompiler *cs, uint32_t expr_start,
     return 1;
 }
 
-static uint8_t source_jcmp_relation(uint8_t compare_op, uint8_t branch_op, uint8_t *jcmp_op) {
+static uint8_t source_jcmp_relation(uint8_t compare_op, uint8_t branch_op, uint8_t * jcmp_op) {
     if (branch_op != OP_JZ && branch_op != OP_JNZ) return 0;
     switch (compare_op) {
-        case OP_EQ_I: *jcmp_op = OP_JCMP_I; return (branch_op == OP_JNZ) ? BC_JCMP_EQ : BC_JCMP_NE;
-        case OP_NE_I: *jcmp_op = OP_JCMP_I; return (branch_op == OP_JNZ) ? BC_JCMP_NE : BC_JCMP_EQ;
-        case OP_LT_I: *jcmp_op = OP_JCMP_I; return (branch_op == OP_JNZ) ? BC_JCMP_LT : BC_JCMP_GE;
-        case OP_GT_I: *jcmp_op = OP_JCMP_I; return (branch_op == OP_JNZ) ? BC_JCMP_GT : BC_JCMP_LE;
-        case OP_LE_I: *jcmp_op = OP_JCMP_I; return (branch_op == OP_JNZ) ? BC_JCMP_LE : BC_JCMP_GT;
-        case OP_GE_I: *jcmp_op = OP_JCMP_I; return (branch_op == OP_JNZ) ? BC_JCMP_GE : BC_JCMP_LT;
-        case OP_EQ_F: *jcmp_op = OP_JCMP_F; return (branch_op == OP_JNZ) ? BC_JCMP_EQ : BC_JCMP_NE;
-        case OP_NE_F: *jcmp_op = OP_JCMP_F; return (branch_op == OP_JNZ) ? BC_JCMP_NE : BC_JCMP_EQ;
-        case OP_LT_F: *jcmp_op = OP_JCMP_F; return (branch_op == OP_JNZ) ? BC_JCMP_LT : BC_JCMP_GE;
-        case OP_GT_F: *jcmp_op = OP_JCMP_F; return (branch_op == OP_JNZ) ? BC_JCMP_GT : BC_JCMP_LE;
-        case OP_LE_F: *jcmp_op = OP_JCMP_F; return (branch_op == OP_JNZ) ? BC_JCMP_LE : BC_JCMP_GT;
-        case OP_GE_F: *jcmp_op = OP_JCMP_F; return (branch_op == OP_JNZ) ? BC_JCMP_GE : BC_JCMP_LT;
-        default:      return 0;
+    case OP_EQ_I:
+        *jcmp_op = OP_JCMP_I;
+        return (branch_op == OP_JNZ) ? BC_JCMP_EQ : BC_JCMP_NE;
+    case OP_NE_I:
+        *jcmp_op = OP_JCMP_I;
+        return (branch_op == OP_JNZ) ? BC_JCMP_NE : BC_JCMP_EQ;
+    case OP_LT_I:
+        *jcmp_op = OP_JCMP_I;
+        return (branch_op == OP_JNZ) ? BC_JCMP_LT : BC_JCMP_GE;
+    case OP_GT_I:
+        *jcmp_op = OP_JCMP_I;
+        return (branch_op == OP_JNZ) ? BC_JCMP_GT : BC_JCMP_LE;
+    case OP_LE_I:
+        *jcmp_op = OP_JCMP_I;
+        return (branch_op == OP_JNZ) ? BC_JCMP_LE : BC_JCMP_GT;
+    case OP_GE_I:
+        *jcmp_op = OP_JCMP_I;
+        return (branch_op == OP_JNZ) ? BC_JCMP_GE : BC_JCMP_LT;
+    case OP_EQ_F:
+        *jcmp_op = OP_JCMP_F;
+        return (branch_op == OP_JNZ) ? BC_JCMP_EQ : BC_JCMP_NE;
+    case OP_NE_F:
+        *jcmp_op = OP_JCMP_F;
+        return (branch_op == OP_JNZ) ? BC_JCMP_NE : BC_JCMP_EQ;
+    case OP_LT_F:
+        *jcmp_op = OP_JCMP_F;
+        return (branch_op == OP_JNZ) ? BC_JCMP_LT : BC_JCMP_GE;
+    case OP_GT_F:
+        *jcmp_op = OP_JCMP_F;
+        return (branch_op == OP_JNZ) ? BC_JCMP_GT : BC_JCMP_LE;
+    case OP_LE_F:
+        *jcmp_op = OP_JCMP_F;
+        return (branch_op == OP_JNZ) ? BC_JCMP_LE : BC_JCMP_GT;
+    case OP_GE_F:
+        *jcmp_op = OP_JCMP_F;
+        return (branch_op == OP_JNZ) ? BC_JCMP_GE : BC_JCMP_LT;
+    default:
+        return 0;
     }
 }
 
-static uint32_t source_emit_jmp_placeholder(BCCompiler *cs, uint8_t opcode) {
+static uint32_t source_emit_jmp_placeholder(BCCompiler * cs, uint8_t opcode) {
     uint8_t rel;
     uint8_t jcmp_op;
     if (bc_opt_level >= 1 && cs->code_len > 0 &&
@@ -326,11 +372,11 @@ static uint32_t source_emit_jmp_placeholder(BCCompiler *cs, uint8_t opcode) {
     return patch;
 }
 
-static void source_patch_jmp_here(BCCompiler *cs, uint32_t patch_addr) {
+static void source_patch_jmp_here(BCCompiler * cs, uint32_t patch_addr) {
     bc_patch_i16(cs, patch_addr, (int16_t)(cs->code_len - (patch_addr + 2)));
 }
 
-static void source_emit_rel_jump(BCCompiler *cs, uint8_t opcode, uint32_t target_addr) {
+static void source_emit_rel_jump(BCCompiler * cs, uint8_t opcode, uint32_t target_addr) {
     uint8_t rel;
     uint8_t jcmp_op;
     if (bc_opt_level >= 1 && cs->code_len > 0 &&
@@ -346,8 +392,8 @@ static void source_emit_rel_jump(BCCompiler *cs, uint8_t opcode, uint32_t target
     bc_emit_i16(cs, (int16_t)(target_addr - (cs->code_len + 2)));
 }
 
-static int source_parse_line_number(const char **pp) {
-    const char *p = *pp;
+static int source_parse_line_number(const char ** pp) {
+    const char * p = *pp;
     source_skip_space(&p);
     if (!isdigit((unsigned char)*p)) return -1;
     int num = 0;
@@ -359,7 +405,7 @@ static int source_parse_line_number(const char **pp) {
     return num;
 }
 
-static void source_emit_abs_jump(BCCompiler *cs, uint8_t opcode, int lineno) {
+static void source_emit_abs_jump(BCCompiler * cs, uint8_t opcode, int lineno) {
     bc_emit_byte(cs, opcode);
     uint32_t patch = cs->code_len;
     bc_emit_u32(cs, 0);
@@ -370,7 +416,7 @@ static void source_emit_abs_jump(BCCompiler *cs, uint8_t opcode, int lineno) {
         bc_add_fixup_line(cs, patch, lineno, 4, 0);
 }
 
-static int source_get_or_create_subfun(BCCompiler *cs, const char *name,
+static int source_get_or_create_subfun(BCCompiler * cs, const char * name,
                                        int name_len, uint8_t return_type) {
     int idx = bc_find_subfun(cs, name, name_len);
     if (idx >= 0) {
@@ -389,8 +435,8 @@ static int source_get_or_create_subfun(BCCompiler *cs, const char *name,
     return idx;
 }
 
-static int source_parse_varname(const char **pp, char *name, int *name_len, uint8_t *type) {
-    const char *p = *pp;
+static int source_parse_varname(const char ** pp, char * name, int * name_len, uint8_t * type) {
+    const char * p = *pp;
     source_skip_space(&p);
     if (!isnamestart((unsigned char)*p)) return 0;
 
@@ -420,16 +466,16 @@ static int source_parse_varname(const char **pp, char *name, int *name_len, uint
 // array element of struct, or chain terminating at a T_STRUCT member).  Does
 // not advance the caller's parse state.  Used by the assignment dispatcher
 // to bridge struct-to-struct stores to the interpreter.
-static int source_lhs_is_whole_struct(BCCompiler *cs, const char *stmt_line) {
-    const char *p = stmt_line;
+static int source_lhs_is_whole_struct(BCCompiler * cs, const char * stmt_line) {
+    const char * p = stmt_line;
     source_skip_space(&p);
     char name[MAXVARLEN + 1];
     int name_len = 0;
     uint8_t stype = 0;
-    const char *probe = p;
+    const char * probe = p;
     if (!source_parse_varname(&probe, name, &name_len, &stype)) return 0;
 
-    const char *dot = memchr(name, '.', name_len);
+    const char * dot = memchr(name, '.', name_len);
     int baselen = dot ? (int)(dot - name) : name_len;
     if (baselen == 0) return 0;
     uint16_t slot = bc_find_slot(cs, name, baselen);
@@ -440,19 +486,22 @@ static int source_lhs_is_whole_struct(BCCompiler *cs, const char *stmt_line) {
     if (current_idx < 0 || current_idx >= g_structcnt ||
         g_structtbl[current_idx] == NULL) return 0;
 
-    int terminal_m_type = T_STRUCT;                 // slot-level access is whole-struct
-    const char *dtp = dot ? (dot + 1) : NULL;
+    int terminal_m_type = T_STRUCT; // slot-level access is whole-struct
+    const char * dtp = dot ? (dot + 1) : NULL;
     int dtp_rem = dot ? (name_len - baselen - 1) : 0;
-    const char *q = probe;                          // parse tail position
+    const char * q = probe; // parse tail position
 
     // Optional outer `(…)` subscript after slot name (when slot is array-of-struct).
     source_skip_space(&q);
     if (*q == '(' && dtp_rem == 0) {
         int depth = 0;
         do {
-            if (*q == '(') depth++;
-            else if (*q == ')') depth--;
-            else if (*q == 0) return 0;
+            if (*q == '(')
+                depth++;
+            else if (*q == ')')
+                depth--;
+            else if (*q == 0)
+                return 0;
             q++;
         } while (depth > 0);
         // Terminal is still whole-struct (array element).
@@ -466,18 +515,22 @@ static int source_lhs_is_whole_struct(BCCompiler *cs, const char *stmt_line) {
         unsigned char mname[MAXVARLEN + 1];
         int mlen = 0;
         if (dtp_rem > 0) {
-            if (*dtp == '.') { dtp++; dtp_rem--; }
+            if (*dtp == '.') {
+                dtp++;
+                dtp_rem--;
+            }
             while (dtp_rem > 0 && mlen < MAXVARLEN) {
                 char c = *dtp;
                 if (c == '.' || c == '(') break;
                 mname[mlen++] = (unsigned char)mytoupper(c);
-                dtp++; dtp_rem--;
+                dtp++;
+                dtp_rem--;
             }
-            if (mlen > 0 && (mname[mlen-1] == '$' || mname[mlen-1] == '%' || mname[mlen-1] == '!'))
+            if (mlen > 0 && (mname[mlen - 1] == '$' || mname[mlen - 1] == '%' || mname[mlen - 1] == '!'))
                 mlen--;
         } else {
             source_skip_space(&q);
-            if (*q != '.') break;                   // no more segments
+            if (*q != '.') break; // no more segments
             q++;
             source_skip_space(&q);
             while (isnamechar((unsigned char)*q) && *q != '.' && mlen < MAXVARLEN) {
@@ -500,9 +553,12 @@ static int source_lhs_is_whole_struct(BCCompiler *cs, const char *stmt_line) {
         if (*q == '(' && m_dims[0] != 0) {
             int d = 0;
             do {
-                if (*q == '(') d++;
-                else if (*q == ')') d--;
-                else if (*q == 0) return 0;
+                if (*q == '(')
+                    d++;
+                else if (*q == ')')
+                    d--;
+                else if (*q == 0)
+                    return 0;
                 q++;
             } while (d > 0);
         }
@@ -532,11 +588,11 @@ static int source_lhs_is_whole_struct(BCCompiler *cs, const char *stmt_line) {
 #define CHAIN_MAX_NESTED 8
 
 typedef struct {
-    int    is_indexed;          /* 1 if `(idx)` followed this member */
-    int    const_off;            /* offset added to base before indexing */
-    int    stride;               /* sizeof(elem) when indexed */
-    int    m_type;               /* T_INT/T_NBR/T_STR/T_STRUCT */
-    int    m_size;               /* member size (struct-idx for T_STRUCT, len for T_STR) */
+    int is_indexed; /* 1 if `(idx)` followed this member */
+    int const_off;  /* offset added to base before indexing */
+    int stride;     /* sizeof(elem) when indexed */
+    int m_type;     /* T_INT/T_NBR/T_STR/T_STRUCT */
+    int m_size;     /* member size (struct-idx for T_STRUCT, len for T_STR) */
 } ChainSeg;
 
 // Walk the `.member[(idx)]…` tail starting from `current_struct_idx`.
@@ -550,20 +606,20 @@ typedef struct {
 //      (only meaningful when *nested_nseg == 0, else caller uses nested segs + final_offset)
 //   *final_offset = trailing scalar offset after the last indexed segment
 //      (only meaningful when *nested_nseg > 0)
-static int source_walk_struct_tail(BCSourceFrontend *fe, BCCompiler *cs,
+static int source_walk_struct_tail(BCSourceFrontend * fe, BCCompiler * cs,
                                    int current_struct_idx,
-                                   const char *dotted_tail, int dotted_tail_len,
-                                   const char **pp,
-                                   int *leaf_type, int *leaf_size,
-                                   int *nested_nseg,
+                                   const char * dotted_tail, int dotted_tail_len,
+                                   const char ** pp,
+                                   int * leaf_type, int * leaf_size,
+                                   int * nested_nseg,
                                    int nested_off[CHAIN_MAX_NESTED],
                                    int nested_stride[CHAIN_MAX_NESTED],
-                                   int *scalar_total_offset,
-                                   int *final_offset) {
-    const char *dtp = dotted_tail;
+                                   int * scalar_total_offset,
+                                   int * final_offset) {
+    const char * dtp = dotted_tail;
     int dtp_rem = dotted_tail_len;
-    const char *p = *pp;
-    int accum_off = 0;     // accumulating const offset for the current (pre-index) run
+    const char * p = *pp;
+    int accum_off = 0; // accumulating const offset for the current (pre-index) run
     int nseg = 0;
     int depth = 0;
     int term_type = 0;
@@ -583,14 +639,18 @@ static int source_walk_struct_tail(BCSourceFrontend *fe, BCCompiler *cs,
         unsigned char mname[MAXVARLEN + 1];
         int mlen = 0;
         if (dtp_rem > 0) {
-            if (*dtp == '.') { dtp++; dtp_rem--; }      // eat any leading dot
+            if (*dtp == '.') {
+                dtp++;
+                dtp_rem--;
+            } // eat any leading dot
             while (dtp_rem > 0 && mlen < MAXVARLEN) {
                 char c = *dtp;
                 if (c == '.' || c == '(') break;
                 mname[mlen++] = (unsigned char)mytoupper(c);
-                dtp++; dtp_rem--;
+                dtp++;
+                dtp_rem--;
             }
-            if (mlen > 0 && (mname[mlen-1] == '$' || mname[mlen-1] == '%' || mname[mlen-1] == '!')) {
+            if (mlen > 0 && (mname[mlen - 1] == '$' || mname[mlen - 1] == '%' || mname[mlen - 1] == '!')) {
                 mlen--;
             }
         } else {
@@ -623,7 +683,7 @@ static int source_walk_struct_tail(BCSourceFrontend *fe, BCCompiler *cs,
         // tail now has `(`.
         int indexed = 0;
         {
-            const char *q;
+            const char * q;
             if (dtp_rem > 0 && *dtp == '(') {
                 // Shouldn't happen — tokenizer would have stopped before `(`.
                 // Guard anyway.
@@ -678,7 +738,7 @@ static int source_walk_struct_tail(BCSourceFrontend *fe, BCCompiler *cs,
             } else {
                 elem_sz = m_size;
             }
-            nested_off[nseg]    = accum_off + m_offset;
+            nested_off[nseg] = accum_off + m_offset;
             nested_stride[nseg] = elem_sz;
             nseg++;
             accum_off = 0;
@@ -696,7 +756,7 @@ static int source_walk_struct_tail(BCSourceFrontend *fe, BCCompiler *cs,
         if (dtp_rem > 0 && *dtp == '.') {
             more = 1;
         } else {
-            const char *q = p;
+            const char * q = p;
             source_skip_space(&q);
             if (*q == '.') {
                 p = q;
@@ -740,10 +800,10 @@ static int source_walk_struct_tail(BCSourceFrontend *fe, BCCompiler *cs,
 // Emit the right load opcode for a struct chain.  `slot` is the base slot,
 // outer_ndim is the number of outer-array indices already on the stack (0 if
 // outer is a scalar struct).  Returns the terminal member type on success.
-static uint8_t source_emit_struct_chain_load(BCSourceFrontend *fe, BCCompiler *cs,
+static uint8_t source_emit_struct_chain_load(BCSourceFrontend * fe, BCCompiler * cs,
                                              uint16_t slot, int outer_ndim,
-                                             const char *dotted_tail, int dotted_tail_len,
-                                             const char **pp) {
+                                             const char * dotted_tail, int dotted_tail_len,
+                                             const char ** pp) {
     int sidx = cs->slots[slot].struct_idx;
     if (sidx < 0 || sidx >= g_structcnt || g_structtbl[sidx] == NULL) {
         bc_set_error(cs, "Invalid struct type on slot");
@@ -760,9 +820,8 @@ static uint8_t source_emit_struct_chain_load(BCSourceFrontend *fe, BCCompiler *c
         return 0;
 
     if (nseg == 0 && outer_ndim == 0) {
-        uint8_t op = (leaf_type == T_INT) ? OP_LOAD_STRUCT_FIELD_I :
-                     (leaf_type == T_NBR) ? OP_LOAD_STRUCT_FIELD_F :
-                                            OP_LOAD_STRUCT_FIELD_S;
+        uint8_t op = (leaf_type == T_INT) ? OP_LOAD_STRUCT_FIELD_I : (leaf_type == T_NBR) ? OP_LOAD_STRUCT_FIELD_F
+                                                                                          : OP_LOAD_STRUCT_FIELD_S;
         bc_emit_byte(cs, op);
         bc_emit_u16(cs, slot);
         bc_emit_u16(cs, (uint16_t)scalar_off);
@@ -772,9 +831,8 @@ static uint8_t source_emit_struct_chain_load(BCSourceFrontend *fe, BCCompiler *c
     if (nseg == 0) {
         // Outer indexing only — ELEM opcode.
         int elem_size = g_structtbl[sidx]->total_size;
-        uint8_t op = (leaf_type == T_INT) ? OP_LOAD_STRUCT_ELEM_I :
-                     (leaf_type == T_NBR) ? OP_LOAD_STRUCT_ELEM_F :
-                                            OP_LOAD_STRUCT_ELEM_S;
+        uint8_t op = (leaf_type == T_INT) ? OP_LOAD_STRUCT_ELEM_I : (leaf_type == T_NBR) ? OP_LOAD_STRUCT_ELEM_F
+                                                                                         : OP_LOAD_STRUCT_ELEM_S;
         bc_emit_byte(cs, op);
         bc_emit_u16(cs, slot);
         bc_emit_u16(cs, (uint16_t)scalar_off);
@@ -785,9 +843,8 @@ static uint8_t source_emit_struct_chain_load(BCSourceFrontend *fe, BCCompiler *c
 
     // Nested: NESTED opcode.
     int outer_stride = g_structtbl[sidx]->total_size;
-    uint8_t op = (leaf_type == T_INT) ? OP_LOAD_STRUCT_NESTED_I :
-                 (leaf_type == T_NBR) ? OP_LOAD_STRUCT_NESTED_F :
-                                        OP_LOAD_STRUCT_NESTED_S;
+    uint8_t op = (leaf_type == T_INT) ? OP_LOAD_STRUCT_NESTED_I : (leaf_type == T_NBR) ? OP_LOAD_STRUCT_NESTED_F
+                                                                                       : OP_LOAD_STRUCT_NESTED_S;
     bc_emit_byte(cs, op);
     bc_emit_u16(cs, slot);
     bc_emit_byte(cs, (uint8_t)outer_ndim);
@@ -805,13 +862,13 @@ static uint8_t source_emit_struct_chain_load(BCSourceFrontend *fe, BCCompiler *c
 // indices so the value is on the top of stack (nested/outer indices below it).
 // NOTE: the walker emits index expressions while executing; callers must
 // therefore invoke this walker BEFORE evaluating the RHS.
-static int source_emit_struct_chain_store(BCSourceFrontend *fe, BCCompiler *cs,
+static int source_emit_struct_chain_store(BCSourceFrontend * fe, BCCompiler * cs,
                                           uint16_t slot, int outer_ndim,
-                                          const char *dotted_tail, int dotted_tail_len,
-                                          const char **pp,
-                                          int *leaf_type_out, int *leaf_size_out,
-                                          int *scalar_off_out, int *final_off_out,
-                                          int *nseg_out,
+                                          const char * dotted_tail, int dotted_tail_len,
+                                          const char ** pp,
+                                          int * leaf_type_out, int * leaf_size_out,
+                                          int * scalar_off_out, int * final_off_out,
+                                          int * nseg_out,
                                           int nested_off_out[CHAIN_MAX_NESTED],
                                           int nested_stride_out[CHAIN_MAX_NESTED]) {
     int sidx = cs->slots[slot].struct_idx;
@@ -826,28 +883,27 @@ static int source_emit_struct_chain_store(BCSourceFrontend *fe, BCCompiler *cs,
                                  nested_off_out, nested_stride_out,
                                  &scalar_off, &final_off))
         return 0;
-    *leaf_type_out   = leaf_type;
-    *leaf_size_out   = leaf_size;
-    *scalar_off_out  = scalar_off;
-    *final_off_out   = final_off;
-    *nseg_out        = nseg;
-    (void)outer_ndim;  // stored by caller when emitting opcode
+    *leaf_type_out = leaf_type;
+    *leaf_size_out = leaf_size;
+    *scalar_off_out = scalar_off;
+    *final_off_out = final_off;
+    *nseg_out = nseg;
+    (void)outer_ndim; // stored by caller when emitting opcode
     (void)slot;
     return 1;
 }
 
 // Finalise the store opcode emission after the RHS expression has been parsed
 // and pushed to the stack.
-static void source_emit_struct_chain_store_finish(BCCompiler *cs, uint16_t slot,
+static void source_emit_struct_chain_store_finish(BCCompiler * cs, uint16_t slot,
                                                   int outer_ndim, int leaf_type,
                                                   int leaf_size, int scalar_off,
                                                   int final_off, int nseg,
-                                                  const int *nested_off,
-                                                  const int *nested_stride) {
+                                                  const int * nested_off,
+                                                  const int * nested_stride) {
     if (nseg == 0 && outer_ndim == 0) {
-        uint8_t op = (leaf_type == T_INT) ? OP_STORE_STRUCT_FIELD_I :
-                     (leaf_type == T_NBR) ? OP_STORE_STRUCT_FIELD_F :
-                                            OP_STORE_STRUCT_FIELD_S;
+        uint8_t op = (leaf_type == T_INT) ? OP_STORE_STRUCT_FIELD_I : (leaf_type == T_NBR) ? OP_STORE_STRUCT_FIELD_F
+                                                                                           : OP_STORE_STRUCT_FIELD_S;
         bc_emit_byte(cs, op);
         bc_emit_u16(cs, slot);
         bc_emit_u16(cs, (uint16_t)scalar_off);
@@ -857,9 +913,8 @@ static void source_emit_struct_chain_store_finish(BCCompiler *cs, uint16_t slot,
     int sidx = cs->slots[slot].struct_idx;
     int outer_stride = g_structtbl[sidx]->total_size;
     if (nseg == 0) {
-        uint8_t op = (leaf_type == T_INT) ? OP_STORE_STRUCT_ELEM_I :
-                     (leaf_type == T_NBR) ? OP_STORE_STRUCT_ELEM_F :
-                                            OP_STORE_STRUCT_ELEM_S;
+        uint8_t op = (leaf_type == T_INT) ? OP_STORE_STRUCT_ELEM_I : (leaf_type == T_NBR) ? OP_STORE_STRUCT_ELEM_F
+                                                                                          : OP_STORE_STRUCT_ELEM_S;
         bc_emit_byte(cs, op);
         bc_emit_u16(cs, slot);
         bc_emit_u16(cs, (uint16_t)scalar_off);
@@ -868,9 +923,8 @@ static void source_emit_struct_chain_store_finish(BCCompiler *cs, uint16_t slot,
         if (op == OP_STORE_STRUCT_ELEM_S) bc_emit_u16(cs, (uint16_t)leaf_size);
         return;
     }
-    uint8_t op = (leaf_type == T_INT) ? OP_STORE_STRUCT_NESTED_I :
-                 (leaf_type == T_NBR) ? OP_STORE_STRUCT_NESTED_F :
-                                        OP_STORE_STRUCT_NESTED_S;
+    uint8_t op = (leaf_type == T_INT) ? OP_STORE_STRUCT_NESTED_I : (leaf_type == T_NBR) ? OP_STORE_STRUCT_NESTED_F
+                                                                                        : OP_STORE_STRUCT_NESTED_S;
     bc_emit_byte(cs, op);
     bc_emit_u16(cs, slot);
     bc_emit_byte(cs, (uint8_t)outer_ndim);
@@ -885,12 +939,12 @@ static void source_emit_struct_chain_store_finish(BCCompiler *cs, uint16_t slot,
 }
 
 // Load-side entry for the scalar-dot path: name contains `.`, no outer indices.
-static int source_try_emit_struct_field_load(BCSourceFrontend *fe, BCCompiler *cs,
-                                             const char *name, int name_len,
-                                             const char **pp, uint8_t *type_out) {
-    const char *dot = memchr(name, '.', name_len);
+static int source_try_emit_struct_field_load(BCSourceFrontend * fe, BCCompiler * cs,
+                                             const char * name, int name_len,
+                                             const char ** pp, uint8_t * type_out) {
+    const char * dot = memchr(name, '.', name_len);
     if (!dot) return 0;
-    int baselen  = (int)(dot - name);
+    int baselen = (int)(dot - name);
     if (baselen == 0) return 0;
     uint16_t slot = bc_find_slot(cs, name, baselen);
     if (slot == 0xFFFF) return 0;
@@ -908,16 +962,16 @@ static int source_try_emit_struct_field_load(BCSourceFrontend *fe, BCCompiler *c
 // this walker emits index expressions first, then caller parses RHS, then the
 // caller calls the _finish helper.  Returns 2 on walker success, 1 on error
 // already reported, 0 if not a struct reference.
-static int source_try_begin_struct_field_store(BCSourceFrontend *fe, BCCompiler *cs,
-                                               const char *name, int name_len,
-                                               const char **pp,
-                                               uint16_t *slot_out,
-                                               int *leaf_type_out, int *leaf_size_out,
-                                               int *scalar_off_out, int *final_off_out,
-                                               int *nseg_out,
+static int source_try_begin_struct_field_store(BCSourceFrontend * fe, BCCompiler * cs,
+                                               const char * name, int name_len,
+                                               const char ** pp,
+                                               uint16_t * slot_out,
+                                               int * leaf_type_out, int * leaf_size_out,
+                                               int * scalar_off_out, int * final_off_out,
+                                               int * nseg_out,
                                                int nested_off_out[CHAIN_MAX_NESTED],
                                                int nested_stride_out[CHAIN_MAX_NESTED]) {
-    const char *dot = memchr(name, '.', name_len);
+    const char * dot = memchr(name, '.', name_len);
     if (!dot) return 0;
     int baselen = (int)(dot - name);
     if (baselen == 0) return 0;
@@ -936,7 +990,7 @@ static int source_try_begin_struct_field_store(BCSourceFrontend *fe, BCCompiler 
     return 2;
 }
 
-static uint16_t source_resolve_global(BCCompiler *cs, const char *name, int name_len,
+static uint16_t source_resolve_global(BCCompiler * cs, const char * name, int name_len,
                                       uint8_t type, int create) {
     uint16_t slot = bc_find_slot(cs, name, name_len);
     if (slot != 0xFFFF) return slot;
@@ -944,8 +998,8 @@ static uint16_t source_resolve_global(BCCompiler *cs, const char *name, int name
     return bc_add_slot(cs, name, name_len, type, 0);
 }
 
-static uint16_t source_resolve_var(BCCompiler *cs, const char *name, int name_len,
-                                   uint8_t type, int create, int *is_local) {
+static uint16_t source_resolve_var(BCCompiler * cs, const char * name, int name_len,
+                                   uint8_t type, int create, int * is_local) {
     *is_local = 0;
     if (cs->current_subfun >= 0) {
         int loc = bc_find_local(cs, name, name_len);
@@ -957,7 +1011,7 @@ static uint16_t source_resolve_var(BCCompiler *cs, const char *name, int name_le
     return source_resolve_global(cs, name, name_len, type, create);
 }
 
-static uint8_t source_default_var_type(BCCompiler *cs, const char *name, int name_len) {
+static uint8_t source_default_var_type(BCCompiler * cs, const char * name, int name_len) {
     if (cs->current_subfun >= 0) {
         int loc = bc_find_local(cs, name, name_len);
         if (loc >= 0) return cs->locals[loc].type;
@@ -966,14 +1020,14 @@ static uint8_t source_default_var_type(BCCompiler *cs, const char *name, int nam
     return slot == 0xFFFF ? T_NBR : cs->slots[slot].type;
 }
 
-static uint16_t source_alloc_hidden_slot(BCCompiler *cs, uint8_t type) {
+static uint16_t source_alloc_hidden_slot(BCCompiler * cs, uint8_t type) {
     char buf[MAXVARLEN + 1];
     snprintf(buf, sizeof(buf), "#SRC_%u", (unsigned)cs->next_hidden_slot++);
     return bc_add_slot(cs, buf, (int)strlen(buf), type, 0);
 }
 
 /* Allocate a hidden local slot (for FOR limit/step inside SUB/FUNCTION) */
-static uint16_t source_alloc_hidden_local(BCCompiler *cs, uint8_t type) {
+static uint16_t source_alloc_hidden_local(BCCompiler * cs, uint8_t type) {
     char buf[MAXVARLEN + 1];
     snprintf(buf, sizeof(buf), "#SRC_%u", (unsigned)cs->next_hidden_slot++);
     int idx = bc_add_local(cs, buf, (int)strlen(buf), type, 0);
@@ -981,13 +1035,13 @@ static uint16_t source_alloc_hidden_local(BCCompiler *cs, uint8_t type) {
     return (uint16_t)idx;
 }
 
-static int source_color_name(const char *start, const char *end, int *color) {
+static int source_color_name(const char * start, const char * end, int * color) {
     while (start < end && (*start == ' ' || *start == '\t')) start++;
     while (end > start && (end[-1] == ' ' || end[-1] == '\t')) end--;
-#define SOURCE_RGB_NAME(name, value) \
+#define SOURCE_RGB_NAME(name, value)                                                       \
     if (end - start == (int)strlen(name) && strncasecmp(start, name, strlen(name)) == 0) { \
-        *color = (int)(value); \
-        return 1; \
+        *color = (int)(value);                                                             \
+        return 1;                                                                          \
     }
     SOURCE_RGB_NAME("WHITE", WHITE)
     SOURCE_RGB_NAME("YELLOW", YELLOW)
@@ -1018,8 +1072,8 @@ static int source_color_name(const char *start, const char *end, int *color) {
     return 0;
 }
 
-static int source_parse_setpin_mode(const char **pp, int *mode) {
-    const char *p = *pp;
+static int source_parse_setpin_mode(const char ** pp, int * mode) {
+    const char * p = *pp;
     source_skip_space(&p);
     if (source_keyword(&p, "OFF")) {
         *mode = VM_PIN_MODE_OFF;
@@ -1061,7 +1115,7 @@ static int source_parse_setpin_mode(const char **pp, int *mode) {
         *mode = VM_PIN_MODE_PWM7A;
     } else if (source_keyword(&p, "PWM7B")) {
         *mode = VM_PIN_MODE_PWM7B;
-    /* PWM8A..PWM11B are rp2350-only hardware slices; the keywords are
+        /* PWM8A..PWM11B are rp2350-only hardware slices; the keywords are
      * always accepted so parser / FRUN are portable, but VM setpin
      * errors on rp2040 if the program actually drives them. */
     } else if (source_keyword(&p, "PWM8A")) {
@@ -1092,14 +1146,14 @@ static int source_parse_setpin_mode(const char **pp, int *mode) {
     return 1;
 }
 
-static int source_try_emit_gp_pin(BCCompiler *cs, const char **pp) {
-    const char *p = *pp;
+static int source_try_emit_gp_pin(BCCompiler * cs, const char ** pp) {
+    const char * p = *pp;
     source_skip_space(&p);
     if (strncasecmp(p, "GP", 2) != 0 || !isdigit((unsigned char)p[2]))
         return 0;
 
-    const char *digits = p + 2;
-    char *end = NULL;
+    const char * digits = p + 2;
+    char * end = NULL;
     long gpio = strtol(digits, &end, 10);
     if (end == digits || isnamechar((unsigned char)*end))
         return 0;
@@ -1110,22 +1164,24 @@ static int source_try_emit_gp_pin(BCCompiler *cs, const char **pp) {
     return 1;
 }
 
-static void source_compile_pin_operand(BCSourceFrontend *fe, BCCompiler *cs, const char **pp) {
+static void source_compile_pin_operand(BCSourceFrontend * fe, BCCompiler * cs, const char ** pp) {
     if (source_try_emit_gp_pin(cs, pp))
         return;
     uint8_t type = source_parse_expression(fe, cs, pp);
     source_emit_int_conversion(cs, type);
 }
 
-static void source_emit_store_converted(BCCompiler *cs, uint16_t slot,
+static void source_emit_store_converted(BCCompiler * cs, uint16_t slot,
                                         uint8_t vtype, uint8_t etype,
                                         int is_local) {
-    if ((vtype & T_INT) && (etype & T_NBR)) bc_emit_byte(cs, OP_CVT_F2I);
-    else if ((vtype & T_NBR) && (etype & T_INT)) bc_emit_byte(cs, OP_CVT_I2F);
+    if ((vtype & T_INT) && (etype & T_NBR))
+        bc_emit_byte(cs, OP_CVT_F2I);
+    else if ((vtype & T_NBR) && (etype & T_INT))
+        bc_emit_byte(cs, OP_CVT_I2F);
     bc_emit_store_var(cs, slot, vtype, is_local);
 }
 
-static void source_emit_default_store(BCCompiler *cs, uint16_t slot, uint8_t vtype,
+static void source_emit_default_store(BCCompiler * cs, uint16_t slot, uint8_t vtype,
                                       int is_local) {
     if (vtype == T_STR) {
         uint16_t idx = bc_add_constant_string(cs, (const uint8_t *)"", 0);
@@ -1138,18 +1194,22 @@ static void source_emit_default_store(BCCompiler *cs, uint16_t slot, uint8_t vty
     }
 }
 
-static void source_emit_int_conversion(BCCompiler *cs, uint8_t type) {
-    if (type == T_NBR) bc_emit_byte(cs, OP_CVT_F2I);
-    else if (type != T_INT) bc_set_error(cs, "Expected numeric expression");
+static void source_emit_int_conversion(BCCompiler * cs, uint8_t type) {
+    if (type == T_NBR)
+        bc_emit_byte(cs, OP_CVT_F2I);
+    else if (type != T_INT)
+        bc_set_error(cs, "Expected numeric expression");
 }
 
-static void source_emit_float_conversion(BCCompiler *cs, uint8_t type) {
-    if (type == T_INT) bc_emit_byte(cs, OP_CVT_I2F);
-    else if (type != T_NBR) bc_set_error(cs, "Expected numeric expression");
+static void source_emit_float_conversion(BCCompiler * cs, uint8_t type) {
+    if (type == T_INT)
+        bc_emit_byte(cs, OP_CVT_I2F);
+    else if (type != T_NBR)
+        bc_set_error(cs, "Expected numeric expression");
 }
 
-static int source_expect_char(BCCompiler *cs, const char **pp, char ch, const char *msg) {
-    const char *p = *pp;
+static int source_expect_char(BCCompiler * cs, const char ** pp, char ch, const char * msg) {
+    const char * p = *pp;
     source_skip_space(&p);
     if (*p != ch) {
         bc_set_error(cs, "%s", msg);
@@ -1160,7 +1220,7 @@ static int source_expect_char(BCCompiler *cs, const char **pp, char ch, const ch
     return 1;
 }
 
-static int source_name_eq(const char *name, int name_len, const char *want) {
+static int source_name_eq(const char * name, int name_len, const char * want) {
     int want_len = (int)strlen(want);
     return name_len == want_len && strncasecmp(name, want, want_len) == 0;
 }
@@ -1171,8 +1231,8 @@ static int source_name_eq(const char *name, int name_len, const char *want) {
 // then falls back to the slot's default.  Struct names come from g_structtbl,
 // populated by PrepareProgramExt before the compiler runs, so a recognized
 // type name here is guaranteed stable at runtime.
-static uint8_t source_parse_as_type_clause_ex(const char **pp, int *struct_idx_out) {
-    const char *p = *pp;
+static uint8_t source_parse_as_type_clause_ex(const char ** pp, int * struct_idx_out) {
+    const char * p = *pp;
     *struct_idx_out = -1;
     source_skip_space(&p);
     if (!source_keyword(&p, "AS")) return 0;
@@ -1202,13 +1262,13 @@ static uint8_t source_parse_as_type_clause_ex(const char **pp, int *struct_idx_o
     return type;
 }
 
-static uint8_t source_parse_as_type_clause(const char **pp) {
+static uint8_t source_parse_as_type_clause(const char ** pp) {
     int ignored;
     return source_parse_as_type_clause_ex(pp, &ignored);
 }
 
-static uint8_t source_compile_rgb_call(BCSourceFrontend *fe, BCCompiler *cs, const char **pp) {
-    const char *p = *pp;
+static uint8_t source_compile_rgb_call(BCSourceFrontend * fe, BCCompiler * cs, const char ** pp) {
+    const char * p = *pp;
     source_skip_space(&p);
     if (*p != '(') {
         bc_set_error(cs, "Expected '(' after RGB");
@@ -1217,11 +1277,11 @@ static uint8_t source_compile_rgb_call(BCSourceFrontend *fe, BCCompiler *cs, con
     }
     p++;
 
-    const char *arg_start = p;
+    const char * arg_start = p;
     int depth = 1;
     int comma_count = 0;
-    const char *arg_end = NULL;
-    const char *scan = p;
+    const char * arg_end = NULL;
+    const char * scan = p;
     while (*scan && depth > 0) {
         if (*scan == '"') {
             scan++;
@@ -1300,8 +1360,8 @@ static uint8_t source_compile_rgb_call(BCSourceFrontend *fe, BCCompiler *cs, con
     return T_INT;
 }
 
-static int source_parse_array_indices(BCSourceFrontend *fe, BCCompiler *cs, const char **pp) {
-    const char *p = *pp;
+static int source_parse_array_indices(BCSourceFrontend * fe, BCCompiler * cs, const char ** pp) {
+    const char * p = *pp;
     source_skip_space(&p);
     if (*p != '(') {
         bc_set_error(cs, "Expected '(' for array access");
@@ -1337,47 +1397,43 @@ static int source_parse_array_indices(BCSourceFrontend *fe, BCCompiler *cs, cons
     return ndim;
 }
 
-static void source_emit_load_array(BCCompiler *cs, uint16_t slot, uint8_t type,
+static void source_emit_load_array(BCCompiler * cs, uint16_t slot, uint8_t type,
                                    int is_local, int ndim) {
     uint8_t op;
     if (is_local) {
-        op = (type == T_INT) ? OP_LOAD_LOCAL_ARR_I :
-             (type == T_STR) ? OP_LOAD_LOCAL_ARR_S :
-                               OP_LOAD_LOCAL_ARR_F;
+        op = (type == T_INT) ? OP_LOAD_LOCAL_ARR_I : (type == T_STR) ? OP_LOAD_LOCAL_ARR_S
+                                                                     : OP_LOAD_LOCAL_ARR_F;
     } else {
-        op = (type == T_INT) ? OP_LOAD_ARR_I :
-             (type == T_STR) ? OP_LOAD_ARR_S :
-                               OP_LOAD_ARR_F;
+        op = (type == T_INT) ? OP_LOAD_ARR_I : (type == T_STR) ? OP_LOAD_ARR_S
+                                                               : OP_LOAD_ARR_F;
     }
     bc_emit_byte(cs, op);
     bc_emit_u16(cs, slot);
     bc_emit_byte(cs, (uint8_t)ndim);
 }
 
-static void source_emit_store_array(BCCompiler *cs, uint16_t slot, uint8_t type,
+static void source_emit_store_array(BCCompiler * cs, uint16_t slot, uint8_t type,
                                     int is_local, int ndim) {
     uint8_t op;
     if (is_local) {
-        op = (type == T_INT) ? OP_STORE_LOCAL_ARR_I :
-             (type == T_STR) ? OP_STORE_LOCAL_ARR_S :
-                               OP_STORE_LOCAL_ARR_F;
+        op = (type == T_INT) ? OP_STORE_LOCAL_ARR_I : (type == T_STR) ? OP_STORE_LOCAL_ARR_S
+                                                                      : OP_STORE_LOCAL_ARR_F;
     } else {
-        op = (type == T_INT) ? OP_STORE_ARR_I :
-             (type == T_STR) ? OP_STORE_ARR_S :
-                               OP_STORE_ARR_F;
+        op = (type == T_INT) ? OP_STORE_ARR_I : (type == T_STR) ? OP_STORE_ARR_S
+                                                                : OP_STORE_ARR_F;
     }
     bc_emit_byte(cs, op);
     bc_emit_u16(cs, slot);
     bc_emit_byte(cs, (uint8_t)ndim);
 }
 
-static uint8_t source_parse_primary(BCSourceFrontend *fe, BCCompiler *cs, const char **pp) {
-    const char *p = *pp;
+static uint8_t source_parse_primary(BCSourceFrontend * fe, BCCompiler * cs, const char ** pp) {
+    const char * p = *pp;
     source_skip_space(&p);
 
     if (*p == '"') {
         p++;
-        const char *start = p;
+        const char * start = p;
         while (*p && *p != '"') p++;
         if (*p != '"') {
             bc_set_error(cs, "Unterminated string literal");
@@ -1405,7 +1461,7 @@ static uint8_t source_parse_primary(BCSourceFrontend *fe, BCCompiler *cs, const 
     }
 
     {
-        const char *q = p;
+        const char * q = p;
         if (source_keyword(&q, "MM.HRES")) {
             source_emit_syscall_noaux(cs, BC_SYS_MM_HRES, 0);
             *pp = q;
@@ -1420,7 +1476,7 @@ static uint8_t source_parse_primary(BCSourceFrontend *fe, BCCompiler *cs, const 
     }
 
     if (strncasecmp(p, "MM.INFO", 7) == 0) {
-        const char *q = p + 7;
+        const char * q = p + 7;
         source_skip_space(&q);
         if (*q != '(') {
             bc_set_error(cs, "Expected '(' after MM.INFO");
@@ -1486,7 +1542,7 @@ static uint8_t source_parse_primary(BCSourceFrontend *fe, BCCompiler *cs, const 
     }
 
     if (isdigit((unsigned char)*p) || *p == '.') {
-        char *end = NULL;
+        char * end = NULL;
         double v = strtod(p, &end);
         if (end == p) {
             bc_set_error(cs, "Invalid number");
@@ -1495,7 +1551,7 @@ static uint8_t source_parse_primary(BCSourceFrontend *fe, BCCompiler *cs, const 
         }
 
         int is_float = 0;
-        for (const char *q = p; q < end; q++) {
+        for (const char * q = p; q < end; q++) {
             if (*q == '.' || *q == 'e' || *q == 'E') {
                 is_float = 1;
                 break;
@@ -1540,7 +1596,7 @@ static uint8_t source_parse_primary(BCSourceFrontend *fe, BCCompiler *cs, const 
             }
         }
 
-        const char *after_name = p;
+        const char * after_name = p;
         source_skip_space(&after_name);
         if (source_name_eq(name, name_len, "INKEY$")) {
             bc_emit_byte(cs, OP_STR_INKEY);
@@ -1604,7 +1660,8 @@ static uint8_t source_parse_primary(BCSourceFrontend *fe, BCCompiler *cs, const 
         }
 
         if ((source_name_eq(name, name_len, "LEFT$") ||
-             source_name_eq(name, name_len, "RIGHT$")) && *after_name == '(') {
+             source_name_eq(name, name_len, "RIGHT$")) &&
+            *after_name == '(') {
             int is_left = source_name_eq(name, name_len, "LEFT$");
             p = after_name + 1;
             uint8_t str_type = source_parse_expression(fe, cs, &p);
@@ -1687,10 +1744,10 @@ static uint8_t source_parse_primary(BCSourceFrontend *fe, BCCompiler *cs, const 
 
         if ((source_name_eq(name, name_len, "HEX$") ||
              source_name_eq(name, name_len, "OCT$") ||
-             source_name_eq(name, name_len, "BIN$")) && *after_name == '(') {
-            uint8_t op = source_name_eq(name, name_len, "HEX$") ? OP_STR_HEX :
-                         source_name_eq(name, name_len, "OCT$") ? OP_STR_OCT :
-                                                                   OP_STR_BIN;
+             source_name_eq(name, name_len, "BIN$")) &&
+            *after_name == '(') {
+            uint8_t op = source_name_eq(name, name_len, "HEX$") ? OP_STR_HEX : source_name_eq(name, name_len, "OCT$") ? OP_STR_OCT
+                                                                                                                      : OP_STR_BIN;
             p = after_name + 1;
             uint8_t arg_type = source_parse_expression(fe, cs, &p);
             source_emit_int_conversion(cs, arg_type);
@@ -1716,8 +1773,10 @@ static uint8_t source_parse_primary(BCSourceFrontend *fe, BCCompiler *cs, const 
             source_emit_int_conversion(cs, count_type);
             if (!source_expect_char(cs, &p, ',', "Expected ',' in STRING$")) return 0;
             uint8_t char_type = source_parse_expression(fe, cs, &p);
-            if (char_type == T_STR) bc_emit_byte(cs, OP_STR_ASC);
-            else source_emit_int_conversion(cs, char_type);
+            if (char_type == T_STR)
+                bc_emit_byte(cs, OP_STR_ASC);
+            else
+                source_emit_int_conversion(cs, char_type);
             if (!source_expect_char(cs, &p, ')', "Expected ')' after STRING$")) return 0;
             bc_emit_byte(cs, OP_STR_STRING);
             *pp = p;
@@ -1752,8 +1811,10 @@ static uint8_t source_parse_primary(BCSourceFrontend *fe, BCCompiler *cs, const 
             uint8_t arg_type = source_parse_expression(fe, cs, &p);
             source_emit_int_conversion(cs, arg_type);
             source_skip_space(&p);
-            if (*p != ')') bc_set_error(cs, "Expected ')' after KEYDOWN");
-            else p++;
+            if (*p != ')')
+                bc_set_error(cs, "Expected ')' after KEYDOWN");
+            else
+                p++;
             source_emit_syscall_noaux(cs, BC_SYS_KEYDOWN, 1);
             *pp = p;
             return T_INT;
@@ -1813,8 +1874,10 @@ static uint8_t source_parse_primary(BCSourceFrontend *fe, BCCompiler *cs, const 
             uint8_t arg_type = source_parse_expression(fe, cs, &p);
             if (arg_type != T_STR) bc_set_error(cs, "ASC requires a string argument");
             source_skip_space(&p);
-            if (*p != ')') bc_set_error(cs, "Expected ')' after ASC");
-            else p++;
+            if (*p != ')')
+                bc_set_error(cs, "Expected ')' after ASC");
+            else
+                p++;
             bc_emit_byte(cs, OP_STR_ASC);
             *pp = p;
             return T_INT;
@@ -1825,22 +1888,27 @@ static uint8_t source_parse_primary(BCSourceFrontend *fe, BCCompiler *cs, const 
             uint8_t arg_type = source_parse_expression(fe, cs, &p);
             source_emit_int_conversion(cs, arg_type);
             source_skip_space(&p);
-            if (*p != ')') bc_set_error(cs, "Expected ')' after CHR$");
-            else p++;
+            if (*p != ')')
+                bc_set_error(cs, "Expected ')' after CHR$");
+            else
+                p++;
             bc_emit_byte(cs, OP_STR_CHR);
             *pp = p;
             return T_STR;
         }
 
         if ((source_name_eq(name, name_len, "LCASE$") ||
-             source_name_eq(name, name_len, "UCASE$")) && *after_name == '(') {
+             source_name_eq(name, name_len, "UCASE$")) &&
+            *after_name == '(') {
             int is_lcase = source_name_eq(name, name_len, "LCASE$");
             p = after_name + 1;
             uint8_t arg_type = source_parse_expression(fe, cs, &p);
             if (arg_type != T_STR) bc_set_error(cs, "Case conversion requires a string argument");
             source_skip_space(&p);
-            if (*p != ')') bc_set_error(cs, "Expected ')' after string function");
-            else p++;
+            if (*p != ')')
+                bc_set_error(cs, "Expected ')' after string function");
+            else
+                p++;
             bc_emit_byte(cs, is_lcase ? OP_STR_LCASE : OP_STR_UCASE);
             *pp = p;
             return T_STR;
@@ -1856,19 +1924,19 @@ static uint8_t source_parse_primary(BCSourceFrontend *fe, BCCompiler *cs, const 
              source_name_eq(name, name_len, "LOG") ||
              source_name_eq(name, name_len, "EXP") ||
              source_name_eq(name, name_len, "RAD") ||
-             source_name_eq(name, name_len, "DEG")) && *after_name == '(') {
+             source_name_eq(name, name_len, "DEG")) &&
+            *after_name == '(') {
             uint8_t op =
-                source_name_eq(name, name_len, "SIN")  ? OP_MATH_SIN :
-                source_name_eq(name, name_len, "COS")  ? OP_MATH_COS :
-                source_name_eq(name, name_len, "TAN")  ? OP_MATH_TAN :
-                source_name_eq(name, name_len, "ATN")  ? OP_MATH_ATN :
-                source_name_eq(name, name_len, "ASIN") ? OP_MATH_ASIN :
-                source_name_eq(name, name_len, "ACOS") ? OP_MATH_ACOS :
-                source_name_eq(name, name_len, "SQR")  ? OP_MATH_SQR :
-                source_name_eq(name, name_len, "LOG")  ? OP_MATH_LOG :
-                source_name_eq(name, name_len, "EXP")  ? OP_MATH_EXP :
-                source_name_eq(name, name_len, "RAD")  ? OP_MATH_RAD :
-                                                        OP_MATH_DEG;
+                source_name_eq(name, name_len, "SIN") ? OP_MATH_SIN : source_name_eq(name, name_len, "COS") ? OP_MATH_COS
+                                                                  : source_name_eq(name, name_len, "TAN")   ? OP_MATH_TAN
+                                                                  : source_name_eq(name, name_len, "ATN")   ? OP_MATH_ATN
+                                                                  : source_name_eq(name, name_len, "ASIN")  ? OP_MATH_ASIN
+                                                                  : source_name_eq(name, name_len, "ACOS")  ? OP_MATH_ACOS
+                                                                  : source_name_eq(name, name_len, "SQR")   ? OP_MATH_SQR
+                                                                  : source_name_eq(name, name_len, "LOG")   ? OP_MATH_LOG
+                                                                  : source_name_eq(name, name_len, "EXP")   ? OP_MATH_EXP
+                                                                  : source_name_eq(name, name_len, "RAD")   ? OP_MATH_RAD
+                                                                                                            : OP_MATH_DEG;
             p = after_name + 1;
             uint8_t arg_type = source_parse_expression(fe, cs, &p);
             source_emit_float_conversion(cs, arg_type);
@@ -1892,22 +1960,26 @@ static uint8_t source_parse_primary(BCSourceFrontend *fe, BCCompiler *cs, const 
         }
 
         if ((source_name_eq(name, name_len, "INT") ||
-             source_name_eq(name, name_len, "ABS")) && *after_name == '(') {
+             source_name_eq(name, name_len, "ABS")) &&
+            *after_name == '(') {
             int is_int = source_name_eq(name, name_len, "INT");
             p = after_name + 1;
             uint8_t arg_type = source_parse_expression(fe, cs, &p);
             if (arg_type == T_STR) bc_set_error(cs, "Math function requires a numeric argument");
             if (is_int && arg_type == T_INT) bc_emit_byte(cs, OP_CVT_I2F);
             source_skip_space(&p);
-            if (*p != ')') bc_set_error(cs, "Expected ')' after math function");
-            else p++;
+            if (*p != ')')
+                bc_set_error(cs, "Expected ')' after math function");
+            else
+                p++;
             bc_emit_byte(cs, is_int ? OP_MATH_INT : OP_MATH_ABS);
             *pp = p;
             return is_int ? T_NBR : arg_type;
         }
 
         if ((source_name_eq(name, name_len, "FIX") ||
-             source_name_eq(name, name_len, "CINT")) && *after_name == '(') {
+             source_name_eq(name, name_len, "CINT")) &&
+            *after_name == '(') {
             int is_fix = source_name_eq(name, name_len, "FIX");
             p = after_name + 1;
             uint8_t arg_type = source_parse_expression(fe, cs, &p);
@@ -1929,7 +2001,8 @@ static uint8_t source_parse_primary(BCSourceFrontend *fe, BCCompiler *cs, const 
         }
 
         if ((source_name_eq(name, name_len, "MIN") ||
-             source_name_eq(name, name_len, "MAX")) && *after_name == '(') {
+             source_name_eq(name, name_len, "MAX")) &&
+            *after_name == '(') {
             int is_min = source_name_eq(name, name_len, "MIN");
             p = after_name + 1;
             uint8_t arg1_type = source_parse_expression(fe, cs, &p);
@@ -2003,9 +2076,16 @@ static uint8_t source_parse_primary(BCSourceFrontend *fe, BCCompiler *cs, const 
                 /* Determine return type and bridge opcode */
                 uint8_t ret_type;
                 uint8_t bridge_op;
-                if (tok_flags & T_STR) { ret_type = T_STR; bridge_op = OP_BRIDGE_FUN_S; }
-                else if (tok_flags & T_INT) { ret_type = T_INT; bridge_op = OP_BRIDGE_FUN_I; }
-                else { ret_type = T_NBR; bridge_op = OP_BRIDGE_FUN_F; }
+                if (tok_flags & T_STR) {
+                    ret_type = T_STR;
+                    bridge_op = OP_BRIDGE_FUN_S;
+                } else if (tok_flags & T_INT) {
+                    ret_type = T_INT;
+                    bridge_op = OP_BRIDGE_FUN_I;
+                } else {
+                    ret_type = T_NBR;
+                    bridge_op = OP_BRIDGE_FUN_F;
+                }
 
                 uint16_t tok_len = 0;
                 unsigned char saved_inpbuf[STRINGSIZE];
@@ -2013,12 +2093,14 @@ static uint8_t source_parse_primary(BCSourceFrontend *fe, BCCompiler *cs, const 
 
                 if (tok_flags & T_FUN) {
                     /* Function with arguments: scan to matching ')' in source */
-                    const char *paren = after_name; /* points to '(' */
+                    const char * paren = after_name; /* points to '(' */
                     int depth = 1;
-                    const char *scan = paren + 1;
+                    const char * scan = paren + 1;
                     while (*scan && depth > 0) {
-                        if (*scan == '(') depth++;
-                        else if (*scan == ')') depth--;
+                        if (*scan == '(')
+                            depth++;
+                        else if (*scan == ')')
+                            depth--;
                         scan++;
                     }
                     if (depth != 0) {
@@ -2045,10 +2127,13 @@ static uint8_t source_parse_primary(BCSourceFrontend *fe, BCCompiler *cs, const 
 
                     /* tknbuf: PRINT_cmd(2 bytes) + tokenized_args + 0x00
                      * Skip the 2-byte PRINT command prefix. */
-                    unsigned char *tp = tknbuf + 2;
-                    unsigned char *tp_start = tp;
+                    unsigned char * tp = tknbuf + 2;
+                    unsigned char * tp_start = tp;
                     while (*tp) {
-                        if (*tp == T_LINENBR) { tp += 3; continue; }
+                        if (*tp == T_LINENBR) {
+                            tp += 3;
+                            continue;
+                        }
                         tp++;
                     }
                     tok_len = (uint16_t)(tp - tp_start);
@@ -2092,12 +2177,15 @@ static uint8_t source_parse_primary(BCSourceFrontend *fe, BCCompiler *cs, const 
              * NESTED based on chain shape.  Outer indices are already on the
              * stack from source_parse_array_indices above. */
             if (!is_local && slot != 0xFFFF && cs->slots[slot].type == T_STRUCT) {
-                const char *after_idx = p;
+                const char * after_idx = p;
                 source_skip_space(&after_idx);
                 if (*after_idx == '.') {
                     uint8_t t = source_emit_struct_chain_load(fe, cs, slot, ndim,
                                                               NULL, 0, &after_idx);
-                    if (cs->has_error) { *pp = after_idx; return 0; }
+                    if (cs->has_error) {
+                        *pp = after_idx;
+                        return 0;
+                    }
                     *pp = after_idx;
                     return t;
                 }
@@ -2142,8 +2230,8 @@ static uint8_t source_parse_primary(BCSourceFrontend *fe, BCCompiler *cs, const 
     return 0;
 }
 
-static uint8_t source_parse_unary(BCSourceFrontend *fe, BCCompiler *cs, const char **pp) {
-    const char *p = *pp;
+static uint8_t source_parse_unary(BCSourceFrontend * fe, BCCompiler * cs, const char ** pp) {
+    const char * p = *pp;
     source_skip_space(&p);
     if (source_keyword(&p, "NOT")) {
         *pp = p;
@@ -2169,20 +2257,23 @@ static uint8_t source_parse_unary(BCSourceFrontend *fe, BCCompiler *cs, const ch
         *pp = p;
         uint8_t type = source_parse_unary(fe, cs, pp);
         if (cs->has_error) return 0;
-        if (type == T_INT) bc_emit_byte(cs, OP_NEG_I);
-        else if (type == T_NBR) bc_emit_byte(cs, OP_NEG_F);
-        else bc_set_error(cs, "Unary '-' requires a numeric expression");
+        if (type == T_INT)
+            bc_emit_byte(cs, OP_NEG_I);
+        else if (type == T_NBR)
+            bc_emit_byte(cs, OP_NEG_F);
+        else
+            bc_set_error(cs, "Unary '-' requires a numeric expression");
         return type;
     }
     return source_parse_primary(fe, cs, pp);
 }
 
-static uint8_t source_parse_power_expr(BCSourceFrontend *fe, BCCompiler *cs, const char **pp) {
+static uint8_t source_parse_power_expr(BCSourceFrontend * fe, BCCompiler * cs, const char ** pp) {
     uint8_t left = source_parse_unary(fe, cs, pp);
     if (cs->has_error) return 0;
 
     while (1) {
-        const char *p = *pp;
+        const char * p = *pp;
         source_skip_space(&p);
         if (*p != '^') break;
         p++;
@@ -2190,10 +2281,14 @@ static uint8_t source_parse_power_expr(BCSourceFrontend *fe, BCCompiler *cs, con
         uint32_t right_start = cs->code_len;
         uint8_t right = source_parse_unary(fe, cs, &p);
         if (cs->has_error) return 0;
-        if (left == T_INT) source_insert_byte(cs, right_start, OP_CVT_I2F);
-        else if (left != T_NBR) bc_set_error(cs, "Power requires numeric expressions");
-        if (right == T_INT) bc_emit_byte(cs, OP_CVT_I2F);
-        else if (right != T_NBR) bc_set_error(cs, "Power requires numeric expressions");
+        if (left == T_INT)
+            source_insert_byte(cs, right_start, OP_CVT_I2F);
+        else if (left != T_NBR)
+            bc_set_error(cs, "Power requires numeric expressions");
+        if (right == T_INT)
+            bc_emit_byte(cs, OP_CVT_I2F);
+        else if (right != T_NBR)
+            bc_set_error(cs, "Power requires numeric expressions");
         bc_emit_byte(cs, OP_POW_F);
         left = T_NBR;
         *pp = p;
@@ -2202,7 +2297,7 @@ static uint8_t source_parse_power_expr(BCSourceFrontend *fe, BCCompiler *cs, con
     return left;
 }
 
-static uint8_t source_emit_numeric_binary(BCCompiler *cs, uint8_t left, uint8_t right,
+static uint8_t source_emit_numeric_binary(BCCompiler * cs, uint8_t left, uint8_t right,
                                           uint32_t right_start, char op) {
     if ((left & T_STR) || (right & T_STR)) {
         if (op == '+' && (left & T_STR) && (right & T_STR)) {
@@ -2238,25 +2333,41 @@ static uint8_t source_emit_numeric_binary(BCCompiler *cs, uint8_t left, uint8_t 
         if (left == T_INT) source_insert_byte(cs, right_start, OP_CVT_I2F);
         if (right == T_INT) bc_emit_byte(cs, OP_CVT_I2F);
         switch (op) {
-            case '+': bc_emit_byte(cs, OP_ADD_F); break;
-            case '-': bc_emit_byte(cs, OP_SUB_F); break;
-            case '*': bc_emit_byte(cs, OP_MUL_F); break;
-            default:  bc_set_error(cs, "Unsupported numeric operator"); return 0;
+        case '+':
+            bc_emit_byte(cs, OP_ADD_F);
+            break;
+        case '-':
+            bc_emit_byte(cs, OP_SUB_F);
+            break;
+        case '*':
+            bc_emit_byte(cs, OP_MUL_F);
+            break;
+        default:
+            bc_set_error(cs, "Unsupported numeric operator");
+            return 0;
         }
         return T_NBR;
     }
 
     switch (op) {
-        case '+': bc_emit_byte(cs, OP_ADD_I); break;
-        case '-': bc_emit_byte(cs, OP_SUB_I); break;
-        case '*': bc_emit_byte(cs, OP_MUL_I); break;
-        default:  bc_set_error(cs, "Unsupported numeric operator"); return 0;
+    case '+':
+        bc_emit_byte(cs, OP_ADD_I);
+        break;
+    case '-':
+        bc_emit_byte(cs, OP_SUB_I);
+        break;
+    case '*':
+        bc_emit_byte(cs, OP_MUL_I);
+        break;
+    default:
+        bc_set_error(cs, "Unsupported numeric operator");
+        return 0;
     }
     return T_INT;
 }
 
-static int source_match_compare(const char **pp, char *op) {
-    const char *p = *pp;
+static int source_match_compare(const char ** pp, char * op) {
+    const char * p = *pp;
     source_skip_space(&p);
     if (p[0] == '<' && p[1] == '>') {
         *op = 'n';
@@ -2291,7 +2402,7 @@ static int source_match_compare(const char **pp, char *op) {
     return 0;
 }
 
-static uint8_t source_emit_compare(BCCompiler *cs, uint8_t left, uint8_t right,
+static uint8_t source_emit_compare(BCCompiler * cs, uint8_t left, uint8_t right,
                                    uint32_t right_start, char op) {
     if ((left & T_STR) || (right & T_STR)) {
         if (!(left & T_STR) || !(right & T_STR)) {
@@ -2299,13 +2410,27 @@ static uint8_t source_emit_compare(BCCompiler *cs, uint8_t left, uint8_t right,
             return 0;
         }
         switch (op) {
-            case '=': bc_emit_byte(cs, OP_EQ_S); break;
-            case 'n': bc_emit_byte(cs, OP_NE_S); break;
-            case '<': bc_emit_byte(cs, OP_LT_S); break;
-            case '>': bc_emit_byte(cs, OP_GT_S); break;
-            case 'l': bc_emit_byte(cs, OP_LE_S); break;
-            case 'g': bc_emit_byte(cs, OP_GE_S); break;
-            default:  bc_set_error(cs, "Unsupported comparison"); return 0;
+        case '=':
+            bc_emit_byte(cs, OP_EQ_S);
+            break;
+        case 'n':
+            bc_emit_byte(cs, OP_NE_S);
+            break;
+        case '<':
+            bc_emit_byte(cs, OP_LT_S);
+            break;
+        case '>':
+            bc_emit_byte(cs, OP_GT_S);
+            break;
+        case 'l':
+            bc_emit_byte(cs, OP_LE_S);
+            break;
+        case 'g':
+            bc_emit_byte(cs, OP_GE_S);
+            break;
+        default:
+            bc_set_error(cs, "Unsupported comparison");
+            return 0;
         }
         return T_INT;
     }
@@ -2314,52 +2439,84 @@ static uint8_t source_emit_compare(BCCompiler *cs, uint8_t left, uint8_t right,
         if (left == T_INT) source_insert_byte(cs, right_start, OP_CVT_I2F);
         if (right == T_INT) bc_emit_byte(cs, OP_CVT_I2F);
         switch (op) {
-            case '=': bc_emit_byte(cs, OP_EQ_F); break;
-            case 'n': bc_emit_byte(cs, OP_NE_F); break;
-            case '<': bc_emit_byte(cs, OP_LT_F); break;
-            case '>': bc_emit_byte(cs, OP_GT_F); break;
-            case 'l': bc_emit_byte(cs, OP_LE_F); break;
-            case 'g': bc_emit_byte(cs, OP_GE_F); break;
-            default:  bc_set_error(cs, "Unsupported comparison"); return 0;
+        case '=':
+            bc_emit_byte(cs, OP_EQ_F);
+            break;
+        case 'n':
+            bc_emit_byte(cs, OP_NE_F);
+            break;
+        case '<':
+            bc_emit_byte(cs, OP_LT_F);
+            break;
+        case '>':
+            bc_emit_byte(cs, OP_GT_F);
+            break;
+        case 'l':
+            bc_emit_byte(cs, OP_LE_F);
+            break;
+        case 'g':
+            bc_emit_byte(cs, OP_GE_F);
+            break;
+        default:
+            bc_set_error(cs, "Unsupported comparison");
+            return 0;
         }
         return T_INT;
     }
 
     switch (op) {
-        case '=': bc_emit_byte(cs, OP_EQ_I); break;
-        case 'n': bc_emit_byte(cs, OP_NE_I); break;
-        case '<': bc_emit_byte(cs, OP_LT_I); break;
-        case '>': bc_emit_byte(cs, OP_GT_I); break;
-        case 'l': bc_emit_byte(cs, OP_LE_I); break;
-        case 'g': bc_emit_byte(cs, OP_GE_I); break;
-        default:  bc_set_error(cs, "Unsupported comparison"); return 0;
+    case '=':
+        bc_emit_byte(cs, OP_EQ_I);
+        break;
+    case 'n':
+        bc_emit_byte(cs, OP_NE_I);
+        break;
+    case '<':
+        bc_emit_byte(cs, OP_LT_I);
+        break;
+    case '>':
+        bc_emit_byte(cs, OP_GT_I);
+        break;
+    case 'l':
+        bc_emit_byte(cs, OP_LE_I);
+        break;
+    case 'g':
+        bc_emit_byte(cs, OP_GE_I);
+        break;
+    default:
+        bc_set_error(cs, "Unsupported comparison");
+        return 0;
     }
     return T_INT;
 }
 
-static uint8_t source_emit_int_binary(BCCompiler *cs, uint8_t left, uint8_t right,
+static uint8_t source_emit_int_binary(BCCompiler * cs, uint8_t left, uint8_t right,
                                       uint32_t right_start, uint8_t op) {
-    if (left == T_NBR) source_insert_byte(cs, right_start, OP_CVT_F2I);
-    else if (left != T_INT) bc_set_error(cs, "Expected numeric expression");
-    if (right == T_NBR) bc_emit_byte(cs, OP_CVT_F2I);
-    else if (right != T_INT) bc_set_error(cs, "Expected numeric expression");
+    if (left == T_NBR)
+        source_insert_byte(cs, right_start, OP_CVT_F2I);
+    else if (left != T_INT)
+        bc_set_error(cs, "Expected numeric expression");
+    if (right == T_NBR)
+        bc_emit_byte(cs, OP_CVT_F2I);
+    else if (right != T_INT)
+        bc_set_error(cs, "Expected numeric expression");
     bc_emit_byte(cs, op);
     return T_INT;
 }
 
-static uint8_t source_parse_mul_expr(BCSourceFrontend *fe, BCCompiler *cs, const char **pp) {
+static uint8_t source_parse_mul_expr(BCSourceFrontend * fe, BCCompiler * cs, const char ** pp) {
     uint32_t expr_start = cs->code_len;
     uint8_t left = source_parse_power_expr(fe, cs, pp);
     if (cs->has_error) return 0;
 
     while (1) {
-        const char *p = *pp;
+        const char * p = *pp;
         source_skip_space(&p);
         char op = 0;
         if (*p == '*' || *p == '/' || *p == '\\') {
             op = *p++;
         } else {
-            const char *q = p;
+            const char * q = p;
             if (source_keyword(&q, "MOD")) {
                 op = 'm';
                 p = q;
@@ -2382,13 +2539,13 @@ static uint8_t source_parse_mul_expr(BCSourceFrontend *fe, BCCompiler *cs, const
     return left;
 }
 
-static uint8_t source_parse_add_expr(BCSourceFrontend *fe, BCCompiler *cs, const char **pp) {
+static uint8_t source_parse_add_expr(BCSourceFrontend * fe, BCCompiler * cs, const char ** pp) {
     uint32_t expr_start = cs->code_len;
     uint8_t left = source_parse_mul_expr(fe, cs, pp);
     if (cs->has_error) return 0;
 
     while (1) {
-        const char *p = *pp;
+        const char * p = *pp;
         source_skip_space(&p);
         if (*p != '+' && *p != '-') break;
         char op = *p++;
@@ -2407,12 +2564,12 @@ static uint8_t source_parse_add_expr(BCSourceFrontend *fe, BCCompiler *cs, const
     return left;
 }
 
-static uint8_t source_parse_shift_expr(BCSourceFrontend *fe, BCCompiler *cs, const char **pp) {
+static uint8_t source_parse_shift_expr(BCSourceFrontend * fe, BCCompiler * cs, const char ** pp) {
     uint8_t left = source_parse_add_expr(fe, cs, pp);
     if (cs->has_error) return 0;
 
     while (1) {
-        const char *p = *pp;
+        const char * p = *pp;
         source_skip_space(&p);
         uint8_t op = 0;
         if (p[0] == '<' && p[1] == '<') {
@@ -2434,11 +2591,11 @@ static uint8_t source_parse_shift_expr(BCSourceFrontend *fe, BCCompiler *cs, con
     return left;
 }
 
-static uint8_t source_parse_expression(BCSourceFrontend *fe, BCCompiler *cs, const char **pp) {
+static uint8_t source_parse_expression(BCSourceFrontend * fe, BCCompiler * cs, const char ** pp) {
     uint8_t left = source_parse_shift_expr(fe, cs, pp);
     if (cs->has_error) return 0;
 
-    const char *p = *pp;
+    const char * p = *pp;
     char op = 0;
     if (source_match_compare(&p, &op)) {
         uint32_t right_start = cs->code_len;
@@ -2452,7 +2609,7 @@ static uint8_t source_parse_expression(BCSourceFrontend *fe, BCCompiler *cs, con
         p = *pp;
         source_skip_space(&p);
         uint8_t bool_op = 0;
-        const char *q = p;
+        const char * q = p;
         if (source_keyword(&q, "AND")) {
             bool_op = OP_AND;
             p = q;
@@ -2485,8 +2642,8 @@ static uint8_t source_parse_expression(BCSourceFrontend *fe, BCCompiler *cs, con
     return left;
 }
 
-static void source_compile_assignment(BCSourceFrontend *fe, BCCompiler *cs, const char **pp) {
-    const char *p = *pp;
+static void source_compile_assignment(BCSourceFrontend * fe, BCCompiler * cs, const char ** pp) {
+    const char * p = *pp;
 
     // Phase 5: whole-struct assignments (scalar struct / struct array element /
     // struct-member chain ending at a T_STRUCT node) don't have native opcodes;
@@ -2496,7 +2653,7 @@ static void source_compile_assignment(BCSourceFrontend *fe, BCCompiler *cs, cons
     if (source_lhs_is_whole_struct(cs, p)) {
         /* Advance pp past the statement so the caller's statement_end is OK,
          * but emit the original raw text as a BRIDGE_CMD. */
-        const char *line_end = p;
+        const char * line_end = p;
         while (*line_end && *line_end != ':' && *line_end != '\'') line_end++;
         size_t len = (size_t)(line_end - p);
         if (len >= STRINGSIZE) len = STRINGSIZE - 1;
@@ -2569,21 +2726,29 @@ static void source_compile_assignment(BCSourceFrontend *fe, BCCompiler *cs, cons
             source_skip_space(&p);
             if (*p != '=') {
                 bc_set_error(cs, "Expected '='");
-                *pp = p; return;
+                *pp = p;
+                return;
             }
             p++;
             uint8_t etype = source_parse_expression(fe, cs, &p);
-            if (cs->has_error) { *pp = p; return; }
+            if (cs->has_error) {
+                *pp = p;
+                return;
+            }
             if ((leaf_type == T_STR) && !(etype & T_STR)) {
                 bc_set_error(cs, "Cannot assign numeric expression to string member");
-                *pp = p; return;
+                *pp = p;
+                return;
             }
             if ((leaf_type != T_STR) && (etype & T_STR)) {
                 bc_set_error(cs, "Cannot assign string expression to numeric member");
-                *pp = p; return;
+                *pp = p;
+                return;
             }
-            if ((leaf_type == T_INT) && (etype & T_NBR)) bc_emit_byte(cs, OP_CVT_F2I);
-            else if ((leaf_type == T_NBR) && (etype & T_INT)) bc_emit_byte(cs, OP_CVT_I2F);
+            if ((leaf_type == T_INT) && (etype & T_NBR))
+                bc_emit_byte(cs, OP_CVT_F2I);
+            else if ((leaf_type == T_NBR) && (etype & T_INT))
+                bc_emit_byte(cs, OP_CVT_I2F);
             source_emit_struct_chain_store_finish(cs, tmp_slot, /*outer_ndim=*/0,
                                                   leaf_type, leaf_size,
                                                   scalar_off, final_off,
@@ -2591,7 +2756,10 @@ static void source_compile_assignment(BCSourceFrontend *fe, BCCompiler *cs, cons
             *pp = p;
             return;
         }
-        if (r == 1) { *pp = p; return; }                   // error already reported
+        if (r == 1) {
+            *pp = p;
+            return;
+        } // error already reported
     }
 
     int is_local = 0;
@@ -2614,7 +2782,8 @@ static void source_compile_assignment(BCSourceFrontend *fe, BCCompiler *cs, cons
             int sidx = cs->slots[slot].struct_idx;
             if (sidx < 0 || sidx >= g_structcnt || g_structtbl[sidx] == NULL) {
                 bc_set_error(cs, "Invalid struct type on slot");
-                *pp = p; return;
+                *pp = p;
+                return;
             }
             int leaf_type = 0, leaf_size = 0, scalar_off = 0, final_off = 0, nseg = 0;
             int nested_off[CHAIN_MAX_NESTED];
@@ -2624,26 +2793,35 @@ static void source_compile_assignment(BCSourceFrontend *fe, BCCompiler *cs, cons
                                                 &leaf_type, &leaf_size,
                                                 &scalar_off, &final_off, &nseg,
                                                 nested_off, nested_stride)) {
-                *pp = p; return;
+                *pp = p;
+                return;
             }
             source_skip_space(&p);
             if (*p != '=') {
                 bc_set_error(cs, "Expected '='");
-                *pp = p; return;
+                *pp = p;
+                return;
             }
             p++;
             uint8_t etype = source_parse_expression(fe, cs, &p);
-            if (cs->has_error) { *pp = p; return; }
+            if (cs->has_error) {
+                *pp = p;
+                return;
+            }
             if ((leaf_type == T_STR) && !(etype & T_STR)) {
                 bc_set_error(cs, "Cannot assign numeric expression to string member");
-                *pp = p; return;
+                *pp = p;
+                return;
             }
             if ((leaf_type != T_STR) && (etype & T_STR)) {
                 bc_set_error(cs, "Cannot assign string expression to numeric member");
-                *pp = p; return;
+                *pp = p;
+                return;
             }
-            if ((leaf_type == T_INT) && (etype & T_NBR)) bc_emit_byte(cs, OP_CVT_F2I);
-            else if ((leaf_type == T_NBR) && (etype & T_INT)) bc_emit_byte(cs, OP_CVT_I2F);
+            if ((leaf_type == T_INT) && (etype & T_NBR))
+                bc_emit_byte(cs, OP_CVT_F2I);
+            else if ((leaf_type == T_NBR) && (etype & T_INT))
+                bc_emit_byte(cs, OP_CVT_I2F);
             source_emit_struct_chain_store_finish(cs, slot, ndim,
                                                   leaf_type, leaf_size,
                                                   scalar_off, final_off,
@@ -2674,8 +2852,10 @@ static void source_compile_assignment(BCSourceFrontend *fe, BCCompiler *cs, cons
             *pp = p;
             return;
         }
-        if ((vtype & T_INT) && (etype & T_NBR)) bc_emit_byte(cs, OP_CVT_F2I);
-        else if ((vtype & T_NBR) && (etype & T_INT)) bc_emit_byte(cs, OP_CVT_I2F);
+        if ((vtype & T_INT) && (etype & T_NBR))
+            bc_emit_byte(cs, OP_CVT_F2I);
+        else if ((vtype & T_NBR) && (etype & T_INT))
+            bc_emit_byte(cs, OP_CVT_I2F);
         source_emit_store_array(cs, slot, vtype, is_local, ndim);
         *pp = p;
         return;
@@ -2714,8 +2894,8 @@ static void source_compile_assignment(BCSourceFrontend *fe, BCCompiler *cs, cons
     *pp = p;
 }
 
-static void source_compile_for(BCSourceFrontend *fe, BCCompiler *cs, const char **pp) {
-    const char *p = *pp;
+static void source_compile_for(BCSourceFrontend * fe, BCCompiler * cs, const char ** pp) {
+    const char * p = *pp;
     char name[MAXVARLEN + 1];
     int name_len = 0;
     uint8_t vtype = 0;
@@ -2778,7 +2958,8 @@ static void source_compile_for(BCSourceFrontend *fe, BCCompiler *cs, const char 
         }
         source_emit_store_converted(cs, step_slot, vtype, step_type, lim_is_local);
     } else {
-        if (vtype == T_INT) bc_emit_byte(cs, OP_PUSH_ONE);
+        if (vtype == T_INT)
+            bc_emit_byte(cs, OP_PUSH_ONE);
         else {
             bc_emit_byte(cs, OP_PUSH_FLT);
             bc_emit_f64(cs, 1.0);
@@ -2799,7 +2980,7 @@ static void source_compile_for(BCSourceFrontend *fe, BCCompiler *cs, const char 
 
     uint32_t loop_top = cs->code_len;
     bc_nest_push(cs, NEST_FOR);
-    BCNestEntry *ne = bc_nest_top(cs);
+    BCNestEntry * ne = bc_nest_top(cs);
     if (ne) {
         ne->addr1 = loop_top;
         ne->addr2 = exit_patch;
@@ -2812,13 +2993,13 @@ static void source_compile_for(BCSourceFrontend *fe, BCCompiler *cs, const char 
     *pp = p;
 }
 
-static void source_compile_next(BCSourceFrontend *fe, BCCompiler *cs, const char **pp) {
+static void source_compile_next(BCSourceFrontend * fe, BCCompiler * cs, const char ** pp) {
     if (fe->fast_next_loop) {
         fe->fast_next_loop = 0;
         bc_set_error(cs, "'!FAST not yet supported for FOR loops (use DO WHILE instead)");
         return;
     }
-    BCNestEntry *ne = bc_nest_find(cs, NEST_FOR);
+    BCNestEntry * ne = bc_nest_find(cs, NEST_FOR);
     if (!ne) {
         bc_set_error(cs, "NEXT without matching FOR");
         return;
@@ -2835,7 +3016,7 @@ static void source_compile_next(BCSourceFrontend *fe, BCCompiler *cs, const char
         source_patch_jmp_here(cs, ne->exit_fixups[i]);
     bc_nest_pop(cs);
 
-    const char *p = *pp;
+    const char * p = *pp;
     source_skip_space(&p);
     if (isnamestart((unsigned char)*p)) {
         char name[MAXVARLEN + 1];
@@ -2846,9 +3027,9 @@ static void source_compile_next(BCSourceFrontend *fe, BCCompiler *cs, const char
     *pp = p;
 }
 
-static int source_parse_file_number(BCCompiler *cs, const char **pp, int *fnbr) {
-    const char *p = *pp;
-    char *end = NULL;
+static int source_parse_file_number(BCCompiler * cs, const char ** pp, int * fnbr) {
+    const char * p = *pp;
+    char * end = NULL;
     long value;
 
     source_skip_space(&p);
@@ -2876,28 +3057,34 @@ static int source_parse_file_number(BCCompiler *cs, const char **pp, int *fnbr) 
     return 1;
 }
 
-static void source_emit_file_print_expr(BCSourceFrontend *fe, BCCompiler *cs,
-                                        const char **pp, int fnbr) {
+static void source_emit_file_print_expr(BCSourceFrontend * fe, BCCompiler * cs,
+                                        const char ** pp, int fnbr) {
     uint8_t type = source_parse_expression(fe, cs, pp);
     uint16_t sysid;
     uint8_t aux[2];
 
     if (cs->has_error) return;
     switch (type & (T_INT | T_NBR | T_STR)) {
-        case T_INT: sysid = BC_SYS_FILE_PRINT_INT; break;
-        case T_NBR: sysid = BC_SYS_FILE_PRINT_FLT; break;
-        case T_STR: sysid = BC_SYS_FILE_PRINT_STR; break;
-        default:
-            bc_set_error(cs, "Invalid PRINT # expression");
-            return;
+    case T_INT:
+        sysid = BC_SYS_FILE_PRINT_INT;
+        break;
+    case T_NBR:
+        sysid = BC_SYS_FILE_PRINT_FLT;
+        break;
+    case T_STR:
+        sysid = BC_SYS_FILE_PRINT_STR;
+        break;
+    default:
+        bc_set_error(cs, "Invalid PRINT # expression");
+        return;
     }
     aux[0] = (uint8_t)(fnbr & 0xFF);
     aux[1] = (uint8_t)(fnbr >> 8);
     source_emit_syscall(cs, sysid, 1, aux, 2);
 }
 
-static void source_compile_file_print(BCSourceFrontend *fe, BCCompiler *cs, const char **pp) {
-    const char *p = *pp;
+static void source_compile_file_print(BCSourceFrontend * fe, BCCompiler * cs, const char ** pp) {
+    const char * p = *pp;
     int fnbr = 0;
     int suppress_newline = 0;
 
@@ -2947,8 +3134,8 @@ static void source_compile_file_print(BCSourceFrontend *fe, BCCompiler *cs, cons
     *pp = p;
 }
 
-static void source_compile_print(BCSourceFrontend *fe, BCCompiler *cs, const char **pp) {
-    const char *p = *pp;
+static void source_compile_print(BCSourceFrontend * fe, BCCompiler * cs, const char ** pp) {
+    const char * p = *pp;
     int suppress_newline = 0;
 
     source_skip_space(&p);
@@ -2991,7 +3178,10 @@ static void source_compile_print(BCSourceFrontend *fe, BCCompiler *cs, const cha
             }
             p++;
             uint8_t xt = source_parse_expression(fe, cs, &p);
-            if (cs->has_error) { *pp = p; return; }
+            if (cs->has_error) {
+                *pp = p;
+                return;
+            }
             source_emit_int_conversion(cs, xt);
             source_skip_space(&p);
             if (*p != ',') {
@@ -3001,14 +3191,20 @@ static void source_compile_print(BCSourceFrontend *fe, BCCompiler *cs, const cha
             }
             p++;
             uint8_t yt = source_parse_expression(fe, cs, &p);
-            if (cs->has_error) { *pp = p; return; }
+            if (cs->has_error) {
+                *pp = p;
+                return;
+            }
             source_emit_int_conversion(cs, yt);
             source_skip_space(&p);
             if (*p == ',') {
                 /* PrintPixelMode — parse and discard (see above) */
                 p++;
                 uint8_t mt = source_parse_expression(fe, cs, &p);
-                if (cs->has_error) { *pp = p; return; }
+                if (cs->has_error) {
+                    *pp = p;
+                    return;
+                }
                 source_emit_int_conversion(cs, mt);
                 bc_emit_byte(cs, OP_POP);
                 source_skip_space(&p);
@@ -3020,7 +3216,7 @@ static void source_compile_print(BCSourceFrontend *fe, BCCompiler *cs, const cha
             }
             p++;
             source_emit_syscall_noaux(cs, BC_SYS_PRINT_AT, 0);
-            suppress_newline = 1;  /* @ alone shouldn't emit a newline */
+            suppress_newline = 1; /* @ alone shouldn't emit a newline */
             source_skip_space(&p);
             if (*p == ',' || *p == ';') continue;
             /* No separator after @(x,y) — the next token is the value
@@ -3038,10 +3234,18 @@ static void source_compile_print(BCSourceFrontend *fe, BCCompiler *cs, const cha
 
         uint8_t op;
         switch (type & (T_INT | T_NBR | T_STR)) {
-            case T_INT: op = OP_PRINT_INT; break;
-            case T_NBR: op = OP_PRINT_FLT; break;
-            case T_STR: op = OP_PRINT_STR; break;
-            default:    op = OP_PRINT_INT; break;
+        case T_INT:
+            op = OP_PRINT_INT;
+            break;
+        case T_NBR:
+            op = OP_PRINT_FLT;
+            break;
+        case T_STR:
+            op = OP_PRINT_STR;
+            break;
+        default:
+            op = OP_PRINT_INT;
+            break;
         }
         bc_emit_byte(cs, op);
         bc_emit_byte(cs, PRINT_NO_NEWLINE);
@@ -3066,9 +3270,9 @@ static void source_compile_print(BCSourceFrontend *fe, BCCompiler *cs, const cha
  * BASIC label name. Emits the jump opcode + a 4-byte absolute offset
  * patched in place if the target is already known, otherwise queues a
  * fixup resolved at end-of-compile. */
-static int source_emit_jump_to_target(BCCompiler *cs, const char **pp,
-                                      uint8_t opcode, const char *what) {
-    const char *p = *pp;
+static int source_emit_jump_to_target(BCCompiler * cs, const char ** pp,
+                                      uint8_t opcode, const char * what) {
+    const char * p = *pp;
     source_skip_space(&p);
     if (isdigit((unsigned char)*p)) {
         int lineno = source_parse_line_number(&p);
@@ -3106,18 +3310,18 @@ static int source_emit_jump_to_target(BCCompiler *cs, const char **pp,
     return 0;
 }
 
-static void source_compile_goto(BCSourceFrontend *fe, BCCompiler *cs, const char **pp) {
+static void source_compile_goto(BCSourceFrontend * fe, BCCompiler * cs, const char ** pp) {
     (void)fe;
     source_emit_jump_to_target(cs, pp, OP_JMP_ABS, "GOTO");
 }
 
-static void source_compile_gosub(BCSourceFrontend *fe, BCCompiler *cs, const char **pp) {
+static void source_compile_gosub(BCSourceFrontend * fe, BCCompiler * cs, const char ** pp) {
     (void)fe;
     source_emit_jump_to_target(cs, pp, OP_GOSUB, "GOSUB");
 }
 
-static void source_compile_const(BCSourceFrontend *fe, BCCompiler *cs, const char **pp) {
-    const char *p = *pp;
+static void source_compile_const(BCSourceFrontend * fe, BCCompiler * cs, const char ** pp) {
+    const char * p = *pp;
 
     while (!cs->has_error) {
         char name[MAXVARLEN + 1];
@@ -3167,7 +3371,7 @@ static void source_compile_const(BCSourceFrontend *fe, BCCompiler *cs, const cha
             memcpy(&val, &cs->code[expr_start + 1], sizeof(val));
             cs->slots[slot].is_const = 1;
             cs->slots[slot].const_ival = val;
-            cs->code_len = expr_start;  /* roll back — no runtime code needed */
+            cs->code_len = expr_start; /* roll back — no runtime code needed */
         } else if (expr_len == 9 && cs->code[expr_start] == OP_PUSH_FLT &&
                    (vtype & T_NBR)) {
             double val;
@@ -3190,15 +3394,15 @@ static void source_compile_const(BCSourceFrontend *fe, BCCompiler *cs, const cha
 // Peek ahead on a DIM-arg sub-expression to see if its AS clause references
 // a registered struct type.  Returns struct_idx on hit, -1 otherwise.  Does
 // not consume p.  Used so source_compile_dim can decide whether to bridge.
-static int source_peek_dim_struct_type(const char *p) {
+static int source_peek_dim_struct_type(const char * p) {
     while (*p && *p != ',' && *p != '\'' && *p != '\n') {
         if ((p[0] == 'A' || p[0] == 'a') && (p[1] == 'S' || p[1] == 's') &&
             !isnamechar((unsigned char)p[2])) {
-            const char *q = p + 2;
+            const char * q = p + 2;
             while (*q == ' ' || *q == '\t') q++;
             if (strncasecmp(q, "INTEGER", 7) == 0 && !isnamechar((unsigned char)q[7])) return -1;
-            if (strncasecmp(q, "FLOAT",   5) == 0 && !isnamechar((unsigned char)q[5])) return -1;
-            if (strncasecmp(q, "STRING",  6) == 0 && !isnamechar((unsigned char)q[6])) return -1;
+            if (strncasecmp(q, "FLOAT", 5) == 0 && !isnamechar((unsigned char)q[5])) return -1;
+            if (strncasecmp(q, "STRING", 6) == 0 && !isnamechar((unsigned char)q[6])) return -1;
             if (isnamestart((unsigned char)*q)) return FindStructType((unsigned char *)q);
             return -1;
         }
@@ -3211,7 +3415,7 @@ static int source_peek_dim_struct_type(const char *p) {
 // BRIDGE_CMD with the resulting bytes.  Used to route DIM-of-struct through
 // the interpreter's cmd_dim so struct memory is allocated in g_vartbl (and
 // the post-bridge sync picks it up for subsequent VM field accesses).
-static void source_emit_bridge_for_stmt(BCCompiler *cs, const char *stmt) {
+static void source_emit_bridge_for_stmt(BCCompiler * cs, const char * stmt) {
     unsigned char saved_inpbuf[STRINGSIZE];
     unsigned char saved_tknbuf[STRINGSIZE];
     memcpy(saved_inpbuf, inpbuf, STRINGSIZE);
@@ -3224,9 +3428,12 @@ static void source_emit_bridge_for_stmt(BCCompiler *cs, const char *stmt) {
 
     tokenise(1);
 
-    unsigned char *tp = tknbuf;
+    unsigned char * tp = tknbuf;
     while (*tp) {
-        if (*tp == T_LINENBR) { tp += 3; continue; }
+        if (*tp == T_LINENBR) {
+            tp += 3;
+            continue;
+        }
         tp++;
     }
     uint16_t tok_len = (uint16_t)(tp - tknbuf);
@@ -3247,7 +3454,7 @@ static void source_emit_bridge_for_stmt(BCCompiler *cs, const char *stmt) {
 // `LENGTH`.  Used with fe->uses_struct_extract_insert to bridge these DIMs
 // so their storage is contiguous g_vartbl memory, matching what cmd_struct
 // EXTRACT/INSERT assumes when it memcpys into/out of the destination array.
-static int source_peek_dim_has_sized_array(const char *p) {
+static int source_peek_dim_has_sized_array(const char * p) {
     /* Skip leading whitespace */
     while (*p == ' ' || *p == '\t') p++;
     /* Skip the variable name (may include `.` for struct field-like names) */
@@ -3260,7 +3467,7 @@ static int source_peek_dim_has_sized_array(const char *p) {
      * `(` further on belongs to an init expression (`= Square%(n)`) or
      * AS clause, not a sized-array decl. */
     if (*p != '(') return 0;
-    const char *q = p + 1;
+    const char * q = p + 1;
     while (*q == ' ' || *q == '\t') q++;
     return (*q != ')');
 }
@@ -3269,16 +3476,19 @@ static int source_peek_dim_has_sized_array(const char *p) {
  * declares a sized string array, i.e. `name$(...)` or `name(...) AS STRING`
  * (when forced_type is T_STR).  Used to force string-array DIMs through
  * the bridge so bridged commands see the array in g_vartbl. */
-static int source_peek_dim_arg_is_string_array(const char *p, uint8_t forced_type) {
+static int source_peek_dim_arg_is_string_array(const char * p, uint8_t forced_type) {
     /* Skip the name */
     while (isnamechar((unsigned char)*p) || *p == '.') p++;
     uint8_t suffix = 0;
-    if (*p == '$') { suffix = T_STR; p++; }
-    else if (*p == '%' || *p == '!') p++;
+    if (*p == '$') {
+        suffix = T_STR;
+        p++;
+    } else if (*p == '%' || *p == '!')
+        p++;
     while (*p == ' ' || *p == '\t') p++;
     if (*p != '(') return 0;
     /* Non-empty `(...)` confirms sized array */
-    const char *q = p + 1;
+    const char * q = p + 1;
     while (*q == ' ' || *q == '\t') q++;
     if (*q == ')') return 0;
     if (suffix == T_STR) return 1;
@@ -3286,8 +3496,10 @@ static int source_peek_dim_arg_is_string_array(const char *p, uint8_t forced_typ
     int depth = 1;
     p++;
     while (*p && depth > 0) {
-        if (*p == '(') depth++;
-        else if (*p == ')') depth--;
+        if (*p == '(')
+            depth++;
+        else if (*p == ')')
+            depth--;
         if (depth == 0) break;
         p++;
     }
@@ -3302,8 +3514,8 @@ static int source_peek_dim_arg_is_string_array(const char *p, uint8_t forced_typ
     return forced_type == T_STR;
 }
 
-static void source_compile_dim(BCSourceFrontend *fe, BCCompiler *cs, const char **pp) {
-    const char *p = *pp;
+static void source_compile_dim(BCSourceFrontend * fe, BCCompiler * cs, const char ** pp) {
+    const char * p = *pp;
     uint8_t forced_type = 0;
 
     source_skip_space(&p);
@@ -3325,10 +3537,13 @@ static void source_compile_dim(BCSourceFrontend *fe, BCCompiler *cs, const char 
     // DIMs (scalar + struct on one line) — bridge still works in that case,
     // but the non-struct slots won't get the native OP_DIM_ARR_* fast path.
     {
-        const char *peek = p;
+        const char * peek = p;
         int needs_bridge = 0;
         while (*peek && *peek != '\n') {
-            if (source_peek_dim_struct_type(peek) >= 0) { needs_bridge = 1; break; }
+            if (source_peek_dim_struct_type(peek) >= 0) {
+                needs_bridge = 1;
+                break;
+            }
             while (*peek && *peek != ',') peek++;
             if (*peek == ',') peek++;
         }
@@ -3337,10 +3552,14 @@ static void source_compile_dim(BCSourceFrontend *fe, BCCompiler *cs, const char 
          * to cmd_dim which handles LENGTH natively.  Substring scan is fine
          * since `LENGTH` never appears inside a struct type name. */
         if (!needs_bridge) {
-            const char *scan = p;
+            const char * scan = p;
             int in_str = 0;
             while (*scan && *scan != '\n' && *scan != '\'') {
-                if (*scan == '"') { in_str = !in_str; scan++; continue; }
+                if (*scan == '"') {
+                    in_str = !in_str;
+                    scan++;
+                    continue;
+                }
                 if (!in_str && (scan[0] == 'L' || scan[0] == 'l') &&
                     strncasecmp(scan, "LENGTH", 6) == 0 &&
                     (scan == p || !isnamechar((unsigned char)scan[-1])) &&
@@ -3355,7 +3574,7 @@ static void source_compile_dim(BCSourceFrontend *fe, BCCompiler *cs, const char 
          * DIM that allocates a non-struct sized array goes through the bridge
          * so the storage lives in g_vartbl's contiguous layout. */
         if (!needs_bridge && fe && fe->uses_struct_extract_insert) {
-            const char *peek_arr = p;
+            const char * peek_arr = p;
             while (*peek_arr && *peek_arr != '\n') {
                 if (source_peek_dim_has_sized_array(peek_arr)) {
                     needs_bridge = 1;
@@ -3375,7 +3594,7 @@ static void source_compile_dim(BCSourceFrontend *fe, BCCompiler *cs, const char 
          * invisible to bridged commands, so this is correctness, not
          * just convenience. */
         if (!needs_bridge) {
-            const char *peek_arr = p;
+            const char * peek_arr = p;
             while (*peek_arr && *peek_arr != '\n') {
                 if (source_peek_dim_has_sized_array(peek_arr)) {
                     needs_bridge = 1;
@@ -3391,10 +3610,10 @@ static void source_compile_dim(BCSourceFrontend *fe, BCCompiler *cs, const char 
             // through non-struct args; they just get compile-time resolution
             // later when referenced).  We purposely don't emit any stores
             // here — cmd_dim handles initialisation on the bridge side.
-            const char *walk = p;
+            const char * walk = p;
             while (*walk && *walk != '\n') {
                 char name[MAXVARLEN + 1];
-                int  name_len = 0;
+                int name_len = 0;
                 uint8_t suffix_type = 0;
                 if (!source_parse_varname(&walk, name, &name_len, &suffix_type)) break;
                 source_skip_space(&walk);
@@ -3408,9 +3627,13 @@ static void source_compile_dim(BCSourceFrontend *fe, BCCompiler *cs, const char 
                     walk++;
                     int depth = 1;
                     while (*walk && depth > 0) {
-                        if (*walk == '(') depth++;
-                        else if (*walk == ')') { depth--; if (!depth) break; }
-                        else if (*walk == ',' && depth == 1) arr_ndim++;
+                        if (*walk == '(')
+                            depth++;
+                        else if (*walk == ')') {
+                            depth--;
+                            if (!depth) break;
+                        } else if (*walk == ',' && depth == 1)
+                            arr_ndim++;
                         walk++;
                     }
                     if (*walk == ')') walk++;
@@ -3418,9 +3641,7 @@ static void source_compile_dim(BCSourceFrontend *fe, BCCompiler *cs, const char 
                 }
                 int sidx = -1;
                 uint8_t as_type = source_parse_as_type_clause_ex(&walk, &sidx);
-                uint8_t vtype = suffix_type ? suffix_type :
-                                (as_type ? as_type :
-                                 (forced_type ? forced_type : T_NBR));
+                uint8_t vtype = suffix_type ? suffix_type : (as_type ? as_type : (forced_type ? forced_type : T_NBR));
                 if (vtype == T_STRUCT) {
                     uint16_t slot = source_resolve_global(cs, name, name_len, vtype, 1);
                     if (slot != 0xFFFF) {
@@ -3452,7 +3673,7 @@ static void source_compile_dim(BCSourceFrontend *fe, BCCompiler *cs, const char 
             int n = snprintf(buf, sizeof(buf), "DIM %s", *pp);
             if (n > 0 && (size_t)n < sizeof(buf)) {
                 // Trim trailing comment/newline.
-                char *eol = buf;
+                char * eol = buf;
                 while (*eol && *eol != '\n' && *eol != '\'') eol++;
                 *eol = 0;
                 source_emit_bridge_for_stmt(cs, buf);
@@ -3499,9 +3720,8 @@ static void source_compile_dim(BCSourceFrontend *fe, BCCompiler *cs, const char 
 
             uint16_t slot = source_resolve_global(cs, name, name_len, vtype, 1);
             if (slot != 0xFFFF) cs->slots[slot].is_array = 1;
-            uint8_t dim_op = (vtype == T_INT) ? OP_DIM_ARR_I :
-                             (vtype == T_STR) ? OP_DIM_ARR_S :
-                                                OP_DIM_ARR_F;
+            uint8_t dim_op = (vtype == T_INT) ? OP_DIM_ARR_I : (vtype == T_STR) ? OP_DIM_ARR_S
+                                                                                : OP_DIM_ARR_F;
             bc_emit_byte(cs, dim_op);
             bc_emit_u16(cs, slot);
             bc_emit_byte(cs, (uint8_t)ndim);
@@ -3527,7 +3747,10 @@ static void source_compile_dim(BCSourceFrontend *fe, BCCompiler *cs, const char 
                 int idx = 0;
                 while (!cs->has_error) {
                     source_skip_space(&p);
-                    if (*p == ')') { p++; break; }
+                    if (*p == ')') {
+                        p++;
+                        break;
+                    }
                     if (idx > 0) {
                         if (*p != ',') {
                             bc_set_error(cs, "Expected ',' or ')' in DIM initializer");
@@ -3549,8 +3772,10 @@ static void source_compile_dim(BCSourceFrontend *fe, BCCompiler *cs, const char 
                         *pp = p;
                         return;
                     }
-                    if (vtype == T_INT) source_emit_int_conversion(cs, etype);
-                    else if (vtype == T_NBR) source_emit_float_conversion(cs, etype);
+                    if (vtype == T_INT)
+                        source_emit_int_conversion(cs, etype);
+                    else if (vtype == T_NBR)
+                        source_emit_float_conversion(cs, etype);
                     source_emit_store_array(cs, slot, vtype, 0, 1);
                     idx++;
                 }
@@ -3588,8 +3813,8 @@ static void source_compile_dim(BCSourceFrontend *fe, BCCompiler *cs, const char 
     *pp = p;
 }
 
-static void source_compile_data(BCCompiler *cs, const char **pp) {
-    const char *p = *pp;
+static void source_compile_data(BCCompiler * cs, const char ** pp) {
+    const char * p = *pp;
 
     while (!cs->has_error) {
         source_skip_space(&p);
@@ -3599,10 +3824,10 @@ static void source_compile_data(BCCompiler *cs, const char **pp) {
             break;
         }
 
-        BCDataItem *item = &cs->data_pool[cs->data_count];
+        BCDataItem * item = &cs->data_pool[cs->data_count];
         if (*p == '"') {
             p++;
-            const char *start = p;
+            const char * start = p;
             while (*p && *p != '"') p++;
             uint16_t cidx = bc_add_constant_string(cs, (const uint8_t *)start, (int)(p - start));
             if (*p == '"') p++;
@@ -3610,14 +3835,14 @@ static void source_compile_data(BCCompiler *cs, const char **pp) {
             item->type = T_STR;
             cs->data_count++;
         } else if (*p == '+' || *p == '-' || *p == '.' || isdigit((unsigned char)*p)) {
-            char *end = NULL;
+            char * end = NULL;
             double v = strtod(p, &end);
             if (end == p) {
                 bc_set_error(cs, "Invalid DATA value");
                 break;
             }
             int is_float = 0;
-            for (const char *q = p; q < end; q++) {
+            for (const char * q = p; q < end; q++) {
                 if (*q == '.' || *q == 'e' || *q == 'E') {
                     is_float = 1;
                     break;
@@ -3633,9 +3858,9 @@ static void source_compile_data(BCCompiler *cs, const char **pp) {
             p = end;
             cs->data_count++;
         } else {
-            const char *start = p;
+            const char * start = p;
             while (*p && *p != ',' && *p != '\'') p++;
-            const char *end = p;
+            const char * end = p;
             while (end > start && (end[-1] == ' ' || end[-1] == '\t')) end--;
             uint16_t cidx = bc_add_constant_string(cs, (const uint8_t *)start, (int)(end - start));
             item->value.i = cidx;
@@ -3652,8 +3877,8 @@ static void source_compile_data(BCCompiler *cs, const char **pp) {
     *pp = p;
 }
 
-static void source_compile_read(BCSourceFrontend *fe, BCCompiler *cs, const char **pp) {
-    const char *p = *pp;
+static void source_compile_read(BCSourceFrontend * fe, BCCompiler * cs, const char ** pp) {
+    const char * p = *pp;
 
     while (!cs->has_error) {
         char name[MAXVARLEN + 1];
@@ -3667,7 +3892,7 @@ static void source_compile_read(BCSourceFrontend *fe, BCCompiler *cs, const char
         }
         if (vtype == 0) vtype = source_default_var_type(cs, name, name_len);
 
-        const char *after_name = p;
+        const char * after_name = p;
         source_skip_space(&after_name);
         if (*after_name == '(') {
             p = after_name;
@@ -3675,15 +3900,15 @@ static void source_compile_read(BCSourceFrontend *fe, BCCompiler *cs, const char
             int is_local = 0;
             uint16_t slot = source_resolve_var(cs, name, name_len, vtype, 1, &is_local);
             if (!is_local && slot != 0xFFFF) cs->slots[slot].is_array = 1;
-            bc_emit_byte(cs, (vtype == T_INT) ? OP_READ_I :
-                             (vtype == T_STR) ? OP_READ_S : OP_READ_F);
+            bc_emit_byte(cs, (vtype == T_INT) ? OP_READ_I : (vtype == T_STR) ? OP_READ_S
+                                                                             : OP_READ_F);
             source_emit_store_array(cs, slot, vtype, is_local, ndim);
         } else {
             p = after_name;
             int is_local = 0;
             uint16_t slot = source_resolve_var(cs, name, name_len, vtype, 1, &is_local);
-            bc_emit_byte(cs, (vtype == T_INT) ? OP_READ_I :
-                             (vtype == T_STR) ? OP_READ_S : OP_READ_F);
+            bc_emit_byte(cs, (vtype == T_INT) ? OP_READ_I : (vtype == T_STR) ? OP_READ_S
+                                                                             : OP_READ_F);
             bc_emit_store_var(cs, slot, vtype, is_local);
         }
 
@@ -3695,8 +3920,8 @@ static void source_compile_read(BCSourceFrontend *fe, BCCompiler *cs, const char
     *pp = p;
 }
 
-static void source_compile_inc(BCSourceFrontend *fe, BCCompiler *cs, const char **pp) {
-    const char *p = *pp;
+static void source_compile_inc(BCSourceFrontend * fe, BCCompiler * cs, const char ** pp) {
+    const char * p = *pp;
     char name[MAXVARLEN + 1];
     int name_len = 0;
     uint8_t vtype = 0;
@@ -3721,13 +3946,19 @@ static void source_compile_inc(BCSourceFrontend *fe, BCCompiler *cs, const char 
      * the store.  That matches the semantics a hand-rolled assignment
      * would have. */
     if (*p == '(') {
-        const char *indices_start = p;
-        const char *index_dup = p;
+        const char * indices_start = p;
+        const char * index_dup = p;
         int ndim_store = source_parse_array_indices(fe, cs, &index_dup);
-        if (cs->has_error) { *pp = index_dup; return; }
+        if (cs->has_error) {
+            *pp = index_dup;
+            return;
+        }
         int ndim_load = source_parse_array_indices(fe, cs, &p);
         (void)indices_start;
-        if (cs->has_error) { *pp = p; return; }
+        if (cs->has_error) {
+            *pp = p;
+            return;
+        }
         if (ndim_store != ndim_load) {
             bc_set_error(cs, "Internal: INC array index mismatch");
             *pp = p;
@@ -3746,8 +3977,10 @@ static void source_compile_inc(BCSourceFrontend *fe, BCCompiler *cs, const char 
             amount_type = T_INT;
         }
         uint8_t result_type = source_emit_numeric_binary(cs, vtype, amount_type, right_start, '+');
-        if (vtype == T_INT)      source_emit_int_conversion(cs, result_type);
-        else if (vtype == T_NBR) source_emit_float_conversion(cs, result_type);
+        if (vtype == T_INT)
+            source_emit_int_conversion(cs, result_type);
+        else if (vtype == T_NBR)
+            source_emit_float_conversion(cs, result_type);
         source_emit_store_array(cs, slot, vtype, is_local, ndim_store);
         *pp = p;
         return;
@@ -3774,21 +4007,24 @@ static void source_compile_inc(BCSourceFrontend *fe, BCCompiler *cs, const char 
 // starting at `p` is declared `As <structtype>` (scalar or array).  Used
 // by the SUB / FUNCTION compilers to decide whether to skip native
 // compilation of the body and bridge call sites through the interpreter.
-static int source_params_contain_struct(const char *p) {
+static int source_params_contain_struct(const char * p) {
     source_skip_space(&p);
     if (*p != '(') return 0;
     p++;
     while (*p && *p != ')') {
         source_skip_space(&p);
-        while (isnamechar((unsigned char)*p)) p++;   // name (may include dots)
+        while (isnamechar((unsigned char)*p)) p++; // name (may include dots)
         if (*p == '$' || *p == '%' || *p == '!') p++;
         source_skip_space(&p);
-        if (*p == '(') {                              // `name()` — array param
+        if (*p == '(') { // `name()` — array param
             int d = 0;
             do {
-                if (*p == '(') d++;
-                else if (*p == ')') d--;
-                else if (*p == 0) return 0;
+                if (*p == '(')
+                    d++;
+                else if (*p == ')')
+                    d--;
+                else if (*p == 0)
+                    return 0;
                 p++;
             } while (d > 0);
             source_skip_space(&p);
@@ -3805,17 +4041,20 @@ static int source_params_contain_struct(const char *p) {
                 // A type name that's not a scalar keyword — check g_structtbl.
                 if (FindStructType((unsigned char *)p) >= 0) return 1;
             }
-            while (isnamechar((unsigned char)*p)) p++;     // skip type name
+            while (isnamechar((unsigned char)*p)) p++; // skip type name
             source_skip_space(&p);
         }
-        if (*p == ',') { p++; continue; }
+        if (*p == ',') {
+            p++;
+            continue;
+        }
         break;
     }
     return 0;
 }
 
-static int source_parse_params(BCCompiler *cs, const char **pp, int sf_idx) {
-    const char *p = *pp;
+static int source_parse_params(BCCompiler * cs, const char ** pp, int sf_idx) {
+    const char * p = *pp;
     int nparams = 0;
     source_skip_space(&p);
     /* MMBasic allows both `Sub foo(a, b)` and `Sub foo a, b`.  When the
@@ -3849,7 +4088,7 @@ static int source_parse_params(BCCompiler *cs, const char **pp, int sf_idx) {
         int is_array = 0;
         source_skip_space(&p);
         if (*p == '(') {
-            const char *q = p + 1;
+            const char * q = p + 1;
             source_skip_space(&q);
             if (*q == ')') {
                 is_array = 1;
@@ -3890,14 +4129,15 @@ static int source_parse_params(BCCompiler *cs, const char **pp, int sf_idx) {
     return nparams;
 }
 
-static int source_compile_call_args(BCSourceFrontend *fe, BCCompiler *cs, const char **pp,
+static int source_compile_call_args(BCSourceFrontend * fe, BCCompiler * cs, const char ** pp,
                                     int require_parens) {
-    const char *p = *pp;
+    const char * p = *pp;
     int nargs = 0;
     source_skip_space(&p);
 
     int has_parens = (*p == '(');
-    if (has_parens) p++;
+    if (has_parens)
+        p++;
     else if (require_parens) {
         bc_set_error(cs, "Expected '(' in function call");
         *pp = p;
@@ -3938,9 +4178,9 @@ static int source_compile_call_args(BCSourceFrontend *fe, BCCompiler *cs, const 
     return nargs;
 }
 
-static void source_compile_local(BCSourceFrontend *fe, BCCompiler *cs, const char **pp) {
+static void source_compile_local(BCSourceFrontend * fe, BCCompiler * cs, const char ** pp) {
     (void)fe;
-    const char *p = *pp;
+    const char * p = *pp;
     if (cs->current_subfun < 0) {
         bc_set_error(cs, "LOCAL outside SUB/FUNCTION");
         *pp = p;
@@ -3973,7 +4213,7 @@ static void source_compile_local(BCSourceFrontend *fe, BCCompiler *cs, const cha
         int is_array = 0;
         source_skip_space(&p);
         if (*p == '(') {
-            const char *q = p + 1;
+            const char * q = p + 1;
             source_skip_space(&q);
             if (*q == ')') {
                 is_array = 1;
@@ -4016,11 +4256,11 @@ static void source_compile_local(BCSourceFrontend *fe, BCCompiler *cs, const cha
     *pp = p;
 }
 
-static void source_compile_sub(BCSourceFrontend *fe, BCCompiler *cs, const char **pp) {
-    const char *p = *pp;
+static void source_compile_sub(BCSourceFrontend * fe, BCCompiler * cs, const char ** pp) {
+    const char * p = *pp;
     source_skip_space(&p);
 
-    const char *name_start = p;
+    const char * name_start = p;
     char name[MAXVARLEN + 1];
     int name_len = 0;
     uint8_t unused_type = 0;
@@ -4049,9 +4289,12 @@ static void source_compile_sub(BCSourceFrontend *fe, BCCompiler *cs, const char 
         if (*p == '(') {
             int d = 0;
             do {
-                if (*p == '(') d++;
-                else if (*p == ')') d--;
-                else if (*p == 0) break;
+                if (*p == '(')
+                    d++;
+                else if (*p == ')')
+                    d--;
+                else if (*p == 0)
+                    break;
                 p++;
             } while (d > 0);
         }
@@ -4077,7 +4320,7 @@ static void source_compile_sub(BCSourceFrontend *fe, BCCompiler *cs, const char 
     bc_emit_u16(cs, 0);
 
     bc_nest_push(cs, NEST_SUB);
-    BCNestEntry *ne = bc_nest_top(cs);
+    BCNestEntry * ne = bc_nest_top(cs);
     if (ne) {
         ne->addr1 = skip_patch;
         ne->addr2 = nlocals_patch;
@@ -4085,8 +4328,8 @@ static void source_compile_sub(BCSourceFrontend *fe, BCCompiler *cs, const char 
     *pp = p;
 }
 
-static void source_compile_end_sub(BCCompiler *cs) {
-    BCNestEntry *ne = bc_nest_top(cs);
+static void source_compile_end_sub(BCCompiler * cs) {
+    BCNestEntry * ne = bc_nest_top(cs);
     if (!ne || ne->type != NEST_SUB) {
         bc_set_error(cs, "END SUB without matching SUB");
         return;
@@ -4104,11 +4347,11 @@ static void source_compile_end_sub(BCCompiler *cs) {
     bc_nest_pop(cs);
 }
 
-static void source_compile_function(BCSourceFrontend *fe, BCCompiler *cs, const char **pp) {
-    const char *p = *pp;
+static void source_compile_function(BCSourceFrontend * fe, BCCompiler * cs, const char ** pp) {
+    const char * p = *pp;
     source_skip_space(&p);
 
-    const char *name_start = p;
+    const char * name_start = p;
     char name[MAXVARLEN + 1];
     int name_len = 0;
     uint8_t ret_type = 0;
@@ -4128,14 +4371,17 @@ static void source_compile_function(BCSourceFrontend *fe, BCCompiler *cs, const 
      * struct-param subs/fns drop through to the statement-bridge). */
     {
         int has_struct_param = source_params_contain_struct(p);
-        const char *peek = p;
+        const char * peek = p;
         source_skip_space(&peek);
         if (*peek == '(') {
             int d = 0;
             do {
-                if (*peek == '(') d++;
-                else if (*peek == ')') d--;
-                else if (*peek == 0) break;
+                if (*peek == '(')
+                    d++;
+                else if (*peek == ')')
+                    d--;
+                else if (*peek == 0)
+                    break;
                 peek++;
             } while (d > 0);
         }
@@ -4177,7 +4423,7 @@ static void source_compile_function(BCSourceFrontend *fe, BCCompiler *cs, const 
     bc_emit_u16(cs, 0);
 
     bc_nest_push(cs, NEST_FUNCTION);
-    BCNestEntry *ne = bc_nest_top(cs);
+    BCNestEntry * ne = bc_nest_top(cs);
     if (ne) {
         ne->addr1 = skip_patch;
         ne->addr2 = nlocals_patch;
@@ -4187,8 +4433,8 @@ static void source_compile_function(BCSourceFrontend *fe, BCCompiler *cs, const 
     *pp = p;
 }
 
-static void source_compile_end_function(BCCompiler *cs) {
-    BCNestEntry *ne = bc_nest_top(cs);
+static void source_compile_end_function(BCCompiler * cs) {
+    BCNestEntry * ne = bc_nest_top(cs);
     if (!ne || ne->type != NEST_FUNCTION) {
         bc_set_error(cs, "END FUNCTION without matching FUNCTION");
         return;
@@ -4221,90 +4467,106 @@ static void source_compile_end_function(BCCompiler *cs) {
 
 /* Converter state */
 typedef struct {
-    uint8_t  rop[BC_FAST_MAX_ROP_BYTES]; /* micro-op output buffer */
+    uint8_t rop[BC_FAST_MAX_ROP_BYTES]; /* micro-op output buffer */
     uint32_t rop_len;
-    int      rop_overflow;
+    int rop_overflow;
 
     /* Simulated stack — each entry is a register index */
-    uint8_t  sim[64];
-    int      sim_sp;
+    uint8_t sim[64];
+    int sim_sp;
 
     /* Register allocation */
-    int      nlocals;            /* regs 0..nlocals-1 = local frame slots */
+    int nlocals; /* regs 0..nlocals-1 = local frame slots */
 
     /* Global register map */
-    struct { uint16_t slot; } globals[32];
-    int      nglobals;
+    struct {
+        uint16_t slot;
+    } globals[32];
+    int nglobals;
 
     /* Constant register map */
-    struct { int64_t ival; double fval; uint8_t type; } consts[32];
-    int      nconsts;
+    struct {
+        int64_t ival;
+        double fval;
+        uint8_t type;
+    } consts[32];
+    int nconsts;
 
     /* Array reference map (for 1D array access in fast loop) */
-    struct { uint8_t is_local; uint16_t slot; } arrays[16];
-    int      narrays;
+    struct {
+        uint8_t is_local;
+        uint16_t slot;
+    } arrays[16];
+    int narrays;
 
-    int      temp_base;          /* first temp register index */
-    int      temp_next;          /* next available temp */
-    int      max_regs;           /* high-water mark */
+    int temp_base; /* first temp register index */
+    int temp_next; /* next available temp */
+    int max_regs;  /* high-water mark */
 
     /* Bytecode-to-ROP offset mapping (for jump resolution) */
     uint16_t bc_to_rop[BC_FAST_MAX_BC_BYTES + 1]; /* indexed by bc offset within loop */
-    uint32_t bc_len;             /* length of loop bytecode being converted */
+    uint32_t bc_len;                              /* length of loop bytecode being converted */
 
     /* Forward jump fixups */
-    struct { uint32_t rop_addr; uint32_t bc_target; } fixups[64];
-    int      fixup_count;
+    struct {
+        uint32_t rop_addr;
+        uint32_t bc_target;
+    } fixups[64];
+    int fixup_count;
 
     /* Last line number seen (for error reporting) */
     uint16_t last_line;
 } FastConv;
 
-static void fc_emit(FastConv *fc, uint8_t b) {
-    if (fc->rop_len < sizeof(fc->rop)) fc->rop[fc->rop_len++] = b;
-    else fc->rop_overflow = 1;
+static void fc_emit(FastConv * fc, uint8_t b) {
+    if (fc->rop_len < sizeof(fc->rop))
+        fc->rop[fc->rop_len++] = b;
+    else
+        fc->rop_overflow = 1;
 }
 
-static void fc_emit_u16(FastConv *fc, uint16_t v) {
+static void fc_emit_u16(FastConv * fc, uint16_t v) {
     fc_emit(fc, v & 0xFF);
     fc_emit(fc, (v >> 8) & 0xFF);
 }
 
-static void fc_emit_i16(FastConv *fc, int16_t v) {
+static void fc_emit_i16(FastConv * fc, int16_t v) {
     fc_emit_u16(fc, (uint16_t)v);
 }
 
-static void fc_emit_i64(FastConv *fc, int64_t v) {
+static void fc_emit_i64(FastConv * fc, int64_t v) {
     for (int i = 0; i < 8; i++) fc_emit(fc, (v >> (i * 8)) & 0xFF);
 }
 
-static void fc_emit_f64(FastConv *fc, double v) {
-    int64_t bits; memcpy(&bits, &v, 8); fc_emit_i64(fc, bits);
+static void fc_emit_f64(FastConv * fc, double v) {
+    int64_t bits;
+    memcpy(&bits, &v, 8);
+    fc_emit_i64(fc, bits);
 }
 
 /* Push a register index onto the simulated stack */
-static void fc_sim_push(FastConv *fc, uint8_t reg) {
+static void fc_sim_push(FastConv * fc, uint8_t reg) {
     if (fc->sim_sp < 63) fc->sim[++fc->sim_sp] = reg;
 }
 
-static uint8_t fc_sim_pop(FastConv *fc) {
+static uint8_t fc_sim_pop(FastConv * fc) {
     return (fc->sim_sp >= 0) ? fc->sim[fc->sim_sp--] : 0;
 }
 
 /* Allocate a temporary register */
-static uint8_t fc_alloc_temp(FastConv *fc) {
+static uint8_t fc_alloc_temp(FastConv * fc) {
     uint8_t r = (uint8_t)fc->temp_next++;
     if (fc->temp_next > fc->max_regs) fc->max_regs = fc->temp_next;
     return r;
 }
 
 /* Reset temp allocator at statement boundary */
-static void fc_reset_temps(FastConv *fc) {
+static void fc_reset_temps(FastConv * fc) {
     fc->temp_next = fc->temp_base;
 }
 
 /* Find or create a global register mapping */
-static uint8_t fc_global_reg(FastConv *fc, uint16_t slot) {
+static uint8_t fc_global_reg(FastConv * fc, uint16_t slot) {
     for (int i = 0; i < fc->nglobals; i++) {
         if (fc->globals[i].slot == slot)
             return (uint8_t)(fc->nlocals + i);
@@ -4319,7 +4581,7 @@ static uint8_t fc_global_reg(FastConv *fc, uint16_t slot) {
 }
 
 /* Find or create a constant register mapping */
-static uint8_t fc_const_reg_i(FastConv *fc, int64_t val) {
+static uint8_t fc_const_reg_i(FastConv * fc, int64_t val) {
     int base = fc->nlocals + fc->nglobals;
     for (int i = 0; i < fc->nconsts; i++) {
         if (fc->consts[i].type == T_INT && fc->consts[i].ival == val)
@@ -4334,11 +4596,12 @@ static uint8_t fc_const_reg_i(FastConv *fc, int64_t val) {
     return (uint8_t)(base + idx);
 }
 
-static uint8_t fc_const_reg_f(FastConv *fc, double val) {
+static uint8_t fc_const_reg_f(FastConv * fc, double val) {
     int base = fc->nlocals + fc->nglobals;
     for (int i = 0; i < fc->nconsts; i++) {
         if (fc->consts[i].type == T_NBR) {
-            double d; memcpy(&d, &fc->consts[i].fval, sizeof(d));
+            double d;
+            memcpy(&d, &fc->consts[i].fval, sizeof(d));
             if (d == val) return (uint8_t)(base + i);
         }
     }
@@ -4352,7 +4615,7 @@ static uint8_t fc_const_reg_f(FastConv *fc, double val) {
 }
 
 /* Find or create an array reference */
-static uint8_t fc_array_ref(FastConv *fc, uint8_t is_local, uint16_t slot) {
+static uint8_t fc_array_ref(FastConv * fc, uint8_t is_local, uint16_t slot) {
     for (int i = 0; i < fc->narrays; i++) {
         if (fc->arrays[i].is_local == is_local && fc->arrays[i].slot == slot)
             return (uint8_t)i;
@@ -4365,18 +4628,23 @@ static uint8_t fc_array_ref(FastConv *fc, uint8_t is_local, uint16_t slot) {
 }
 
 /* Emit a 3-register op: [op][dst][s1][s2] */
-static void fc_emit_3reg(FastConv *fc, uint8_t op, uint8_t dst, uint8_t s1, uint8_t s2) {
-    fc_emit(fc, op); fc_emit(fc, dst); fc_emit(fc, s1); fc_emit(fc, s2);
+static void fc_emit_3reg(FastConv * fc, uint8_t op, uint8_t dst, uint8_t s1, uint8_t s2) {
+    fc_emit(fc, op);
+    fc_emit(fc, dst);
+    fc_emit(fc, s1);
+    fc_emit(fc, s2);
 }
 
 /* Emit a 2-register op: [op][dst][src] */
-static void fc_emit_2reg(FastConv *fc, uint8_t op, uint8_t dst, uint8_t src) {
-    fc_emit(fc, op); fc_emit(fc, dst); fc_emit(fc, src);
+static void fc_emit_2reg(FastConv * fc, uint8_t op, uint8_t dst, uint8_t src) {
+    fc_emit(fc, op);
+    fc_emit(fc, dst);
+    fc_emit(fc, src);
 }
 
 /* Try to patch the previous micro-op's destination to avoid a MOV.
  * Returns 1 if successful. */
-static int fc_patch_prev_dst(FastConv *fc, uint8_t old_dst, uint8_t new_dst) {
+static int fc_patch_prev_dst(FastConv * fc, uint8_t old_dst, uint8_t new_dst) {
     if (fc->rop_len < 3) return 0;
     /* The previous op should have its dst at rop[prev_start + 1] */
     uint8_t prev_op = fc->rop[fc->rop_len - 3]; /* for 2-reg ops, check -2 too */
@@ -4430,7 +4698,7 @@ static int fc_patch_prev_dst(FastConv *fc, uint8_t old_dst, uint8_t new_dst) {
 }
 
 /* Record a forward jump fixup */
-static void fc_add_fixup(FastConv *fc, uint32_t rop_addr, uint32_t bc_target) {
+static void fc_add_fixup(FastConv * fc, uint32_t rop_addr, uint32_t bc_target) {
     if (fc->fixup_count < 64) {
         fc->fixups[fc->fixup_count].rop_addr = rop_addr;
         fc->fixups[fc->fixup_count].bc_target = bc_target;
@@ -4442,13 +4710,16 @@ static void fc_add_fixup(FastConv *fc, uint32_t rop_addr, uint32_t bc_target) {
  * Convert loop bytecode [loop_start, loop_end) to register micro-ops.
  * Returns 1 on success, 0 on failure (sets cs->error_msg).
  */
-static int source_convert_fast_loop(BCCompiler *cs, uint32_t loop_start,
-                                     uint32_t loop_end) {
+static int source_convert_fast_loop(BCCompiler * cs, uint32_t loop_start,
+                                    uint32_t loop_end) {
     /* Heap-allocate: FastConv is ~12KB, too large for the 4KB device stack */
-    FastConv *fcp = (FastConv *)BC_COMPILER_ALLOC(sizeof(FastConv));
-    if (!fcp) { bc_set_error(cs, "'!FAST: out of memory"); return 0; }
+    FastConv * fcp = (FastConv *)BC_COMPILER_ALLOC(sizeof(FastConv));
+    if (!fcp) {
+        bc_set_error(cs, "'!FAST: out of memory");
+        return 0;
+    }
     memset(fcp, 0, sizeof(*fcp));
-    #define fc (*fcp)
+#define fc (*fcp)
     fc.sim_sp = -1;
     fc.nlocals = (cs->current_subfun >= 0) ? cs->local_count : 0;
     fc.temp_base = fc.nlocals;
@@ -4457,8 +4728,16 @@ static int source_convert_fast_loop(BCCompiler *cs, uint32_t loop_start,
     fc.bc_len = loop_end - loop_start;
 
     int fc_result = 0; /* used by FC_FAIL */
-    #define FC_FAIL do { fc_result = 0; goto fc_cleanup; } while(0)
-    #define FC_OK   do { fc_result = 1; goto fc_cleanup; } while(0)
+#define FC_FAIL          \
+    do {                 \
+        fc_result = 0;   \
+        goto fc_cleanup; \
+    } while (0)
+#define FC_OK            \
+    do {                 \
+        fc_result = 1;   \
+        goto fc_cleanup; \
+    } while (0)
 
     if (fc.bc_len > BC_FAST_MAX_BC_BYTES) {
         bc_set_error(cs, "'!FAST loop too large");
@@ -4468,8 +4747,8 @@ static int source_convert_fast_loop(BCCompiler *cs, uint32_t loop_start,
     /* Initialize bc_to_rop mapping with sentinel values */
     memset(fc.bc_to_rop, 0xFF, sizeof(fc.bc_to_rop));
 
-    uint8_t *base = &cs->code[loop_start];
-    uint8_t *end = &cs->code[loop_end];
+    uint8_t * base = &cs->code[loop_start];
+    uint8_t * end = &cs->code[loop_end];
 
     /* Fast loops only work inside subs/functions (locals only).
      * Module-scope globals have a register allocation collision with constants. */
@@ -4481,37 +4760,74 @@ static int source_convert_fast_loop(BCCompiler *cs, uint32_t loop_start,
     /* Pre-scan: register all constants so temp registers never overlap with them.
      * Without this, temps allocated before a constant is first seen can collide. */
     {
-        uint8_t *scan = base;
+        uint8_t * scan = base;
         while (scan < end) {
             uint8_t sop = *scan++;
             switch (sop) {
-            case OP_PUSH_INT: { int64_t v; memcpy(&v, scan, 8); scan += 8; fc_const_reg_i(&fc, v); break; }
-            case OP_PUSH_FLT: { double v; memcpy(&v, scan, 8); scan += 8; fc_const_reg_f(&fc, v); break; }
-            case OP_PUSH_ZERO: fc_const_reg_i(&fc, 0); break;
-            case OP_PUSH_ONE:  fc_const_reg_i(&fc, 1); break;
+            case OP_PUSH_INT: {
+                int64_t v;
+                memcpy(&v, scan, 8);
+                scan += 8;
+                fc_const_reg_i(&fc, v);
+                break;
+            }
+            case OP_PUSH_FLT: {
+                double v;
+                memcpy(&v, scan, 8);
+                scan += 8;
+                fc_const_reg_f(&fc, v);
+                break;
+            }
+            case OP_PUSH_ZERO:
+                fc_const_reg_i(&fc, 0);
+                break;
+            case OP_PUSH_ONE:
+                fc_const_reg_i(&fc, 1);
+                break;
             /* Skip operand bytes for known opcodes */
-            case OP_LOAD_LOCAL_I: case OP_LOAD_LOCAL_F: case OP_LOAD_LOCAL_S:
-            case OP_STORE_LOCAL_I: case OP_STORE_LOCAL_F: case OP_STORE_LOCAL_S:
-            case OP_LOAD_I: case OP_LOAD_F: case OP_LOAD_S:
-            case OP_STORE_I: case OP_STORE_F: case OP_STORE_S:
-            case OP_INC_I: case OP_LINE:
-                scan += 2; break;
-            case OP_LOAD_ARR_I: case OP_LOAD_ARR_F: case OP_LOAD_ARR_S:
-            case OP_STORE_ARR_I: case OP_STORE_ARR_F: case OP_STORE_ARR_S:
-                scan += 3; break; /* slot:16 + ndim:8 */
-            case OP_JMP: case OP_JZ: case OP_JNZ:
-                scan += 2; break;
-            case OP_JCMP_I: case OP_JCMP_F:
-                scan += 3; break; /* rel:8 + off:16 */
+            case OP_LOAD_LOCAL_I:
+            case OP_LOAD_LOCAL_F:
+            case OP_LOAD_LOCAL_S:
+            case OP_STORE_LOCAL_I:
+            case OP_STORE_LOCAL_F:
+            case OP_STORE_LOCAL_S:
+            case OP_LOAD_I:
+            case OP_LOAD_F:
+            case OP_LOAD_S:
+            case OP_STORE_I:
+            case OP_STORE_F:
+            case OP_STORE_S:
+            case OP_INC_I:
+            case OP_LINE:
+                scan += 2;
+                break;
+            case OP_LOAD_ARR_I:
+            case OP_LOAD_ARR_F:
+            case OP_LOAD_ARR_S:
+            case OP_STORE_ARR_I:
+            case OP_STORE_ARR_F:
+            case OP_STORE_ARR_S:
+                scan += 3;
+                break; /* slot:16 + ndim:8 */
+            case OP_JMP:
+            case OP_JZ:
+            case OP_JNZ:
+                scan += 2;
+                break;
+            case OP_JCMP_I:
+            case OP_JCMP_F:
+                scan += 3;
+                break; /* rel:8 + off:16 */
             case OP_MOV_VAR:
-                scan += 5; break; /* kind:8 src:16 dst:16 */
+                scan += 5;
+                break; /* kind:8 src:16 dst:16 */
             default:
                 break; /* zero-operand opcodes (arithmetic, etc) */
             }
         }
     }
 
-    uint8_t *pc = base;
+    uint8_t * pc = base;
 
     while (pc < end) {
         uint32_t bc_off = (uint32_t)(pc - base);
@@ -4523,13 +4839,17 @@ static int source_convert_fast_loop(BCCompiler *cs, uint32_t loop_start,
         /* --- Loads --- */
         case OP_LOAD_LOCAL_I:
         case OP_LOAD_LOCAL_F: {
-            uint16_t off; memcpy(&off, pc, 2); pc += 2;
+            uint16_t off;
+            memcpy(&off, pc, 2);
+            pc += 2;
             fc_sim_push(&fc, (uint8_t)off);
             break;
         }
         case OP_LOAD_I:
         case OP_LOAD_F: {
-            uint16_t slot; memcpy(&slot, pc, 2); pc += 2;
+            uint16_t slot;
+            memcpy(&slot, pc, 2);
+            pc += 2;
             uint8_t r = fc_global_reg(&fc, slot);
             fc_sim_push(&fc, r);
             break;
@@ -4538,7 +4858,9 @@ static int source_convert_fast_loop(BCCompiler *cs, uint32_t loop_start,
         /* --- Stores --- */
         case OP_STORE_LOCAL_I:
         case OP_STORE_LOCAL_F: {
-            uint16_t off; memcpy(&off, pc, 2); pc += 2;
+            uint16_t off;
+            memcpy(&off, pc, 2);
+            pc += 2;
             uint8_t src = fc_sim_pop(&fc);
             if (src != (uint8_t)off) {
                 if (!fc_patch_prev_dst(&fc, src, (uint8_t)off))
@@ -4549,7 +4871,9 @@ static int source_convert_fast_loop(BCCompiler *cs, uint32_t loop_start,
         }
         case OP_STORE_I:
         case OP_STORE_F: {
-            uint16_t slot; memcpy(&slot, pc, 2); pc += 2;
+            uint16_t slot;
+            memcpy(&slot, pc, 2);
+            pc += 2;
             uint8_t dst = fc_global_reg(&fc, slot);
             uint8_t src = fc_sim_pop(&fc);
             if (src != dst) {
@@ -4562,13 +4886,17 @@ static int source_convert_fast_loop(BCCompiler *cs, uint32_t loop_start,
 
         /* --- Constants --- */
         case OP_PUSH_INT: {
-            int64_t val; memcpy(&val, pc, 8); pc += 8;
+            int64_t val;
+            memcpy(&val, pc, 8);
+            pc += 8;
             uint8_t r = fc_const_reg_i(&fc, val);
             fc_sim_push(&fc, r);
             break;
         }
         case OP_PUSH_FLT: {
-            double val; memcpy(&val, pc, 8); pc += 8;
+            double val;
+            memcpy(&val, pc, 8);
+            pc += 8;
             uint8_t r = fc_const_reg_f(&fc, val);
             fc_sim_push(&fc, r);
             break;
@@ -4585,18 +4913,31 @@ static int source_convert_fast_loop(BCCompiler *cs, uint32_t loop_start,
         }
 
         /* --- Integer binary arithmetic --- */
-        case OP_ADD_I: case OP_SUB_I: case OP_MUL_I:
-        case OP_IDIV_I: case OP_MOD_I: {
+        case OP_ADD_I:
+        case OP_SUB_I:
+        case OP_MUL_I:
+        case OP_IDIV_I:
+        case OP_MOD_I: {
             uint8_t b = fc_sim_pop(&fc);
             uint8_t a = fc_sim_pop(&fc);
             uint8_t dst = fc_alloc_temp(&fc);
             uint8_t rop;
             switch (op) {
-                case OP_ADD_I:  rop = ROP_ADD_I;  break;
-                case OP_SUB_I:  rop = ROP_SUB_I;  break;
-                case OP_MUL_I:  rop = ROP_MUL_I;  break;
-                case OP_IDIV_I: rop = ROP_IDIV_I; break;
-                default:        rop = ROP_MOD_I;   break;
+            case OP_ADD_I:
+                rop = ROP_ADD_I;
+                break;
+            case OP_SUB_I:
+                rop = ROP_SUB_I;
+                break;
+            case OP_MUL_I:
+                rop = ROP_MUL_I;
+                break;
+            case OP_IDIV_I:
+                rop = ROP_IDIV_I;
+                break;
+            default:
+                rop = ROP_MOD_I;
+                break;
             }
             fc_emit_3reg(&fc, rop, dst, a, b);
             fc_sim_push(&fc, dst);
@@ -4604,16 +4945,27 @@ static int source_convert_fast_loop(BCCompiler *cs, uint32_t loop_start,
         }
 
         /* --- Float binary arithmetic --- */
-        case OP_ADD_F: case OP_SUB_F: case OP_MUL_F: case OP_DIV_F: {
+        case OP_ADD_F:
+        case OP_SUB_F:
+        case OP_MUL_F:
+        case OP_DIV_F: {
             uint8_t b = fc_sim_pop(&fc);
             uint8_t a = fc_sim_pop(&fc);
             uint8_t dst = fc_alloc_temp(&fc);
             uint8_t rop;
             switch (op) {
-                case OP_ADD_F: rop = ROP_ADD_F; break;
-                case OP_SUB_F: rop = ROP_SUB_F; break;
-                case OP_MUL_F: rop = ROP_MUL_F; break;
-                default:       rop = ROP_DIV_F; break;
+            case OP_ADD_F:
+                rop = ROP_ADD_F;
+                break;
+            case OP_SUB_F:
+                rop = ROP_SUB_F;
+                break;
+            case OP_MUL_F:
+                rop = ROP_MUL_F;
+                break;
+            default:
+                rop = ROP_DIV_F;
+                break;
             }
             fc_emit_3reg(&fc, rop, dst, a, b);
             fc_sim_push(&fc, dst);
@@ -4621,15 +4973,26 @@ static int source_convert_fast_loop(BCCompiler *cs, uint32_t loop_start,
         }
 
         /* --- Unary --- */
-        case OP_NEG_I: case OP_NEG_F: case OP_NOT: case OP_INV: {
+        case OP_NEG_I:
+        case OP_NEG_F:
+        case OP_NOT:
+        case OP_INV: {
             uint8_t src = fc_sim_pop(&fc);
             uint8_t dst = fc_alloc_temp(&fc);
             uint8_t rop;
             switch (op) {
-                case OP_NEG_I: rop = ROP_NEG_I; break;
-                case OP_NEG_F: rop = ROP_NEG_F; break;
-                case OP_NOT:   rop = ROP_NOT;   break;
-                default:       rop = ROP_INV;   break;
+            case OP_NEG_I:
+                rop = ROP_NEG_I;
+                break;
+            case OP_NEG_F:
+                rop = ROP_NEG_F;
+                break;
+            case OP_NOT:
+                rop = ROP_NOT;
+                break;
+            default:
+                rop = ROP_INV;
+                break;
             }
             fc_emit_2reg(&fc, rop, dst, src);
             fc_sim_push(&fc, dst);
@@ -4637,17 +5000,31 @@ static int source_convert_fast_loop(BCCompiler *cs, uint32_t loop_start,
         }
 
         /* --- Bitwise --- */
-        case OP_AND: case OP_OR: case OP_XOR: case OP_SHL: case OP_SHR: {
+        case OP_AND:
+        case OP_OR:
+        case OP_XOR:
+        case OP_SHL:
+        case OP_SHR: {
             uint8_t b = fc_sim_pop(&fc);
             uint8_t a = fc_sim_pop(&fc);
             uint8_t dst = fc_alloc_temp(&fc);
             uint8_t rop;
             switch (op) {
-                case OP_AND: rop = ROP_AND; break;
-                case OP_OR:  rop = ROP_OR;  break;
-                case OP_XOR: rop = ROP_XOR; break;
-                case OP_SHL: rop = ROP_SHL; break;
-                default:     rop = ROP_SHR; break;
+            case OP_AND:
+                rop = ROP_AND;
+                break;
+            case OP_OR:
+                rop = ROP_OR;
+                break;
+            case OP_XOR:
+                rop = ROP_XOR;
+                break;
+            case OP_SHL:
+                rop = ROP_SHL;
+                break;
+            default:
+                rop = ROP_SHR;
+                break;
             }
             fc_emit_3reg(&fc, rop, dst, a, b);
             fc_sim_push(&fc, dst);
@@ -4655,19 +5032,35 @@ static int source_convert_fast_loop(BCCompiler *cs, uint32_t loop_start,
         }
 
         /* --- Integer comparisons (produce 0/1) --- */
-        case OP_EQ_I: case OP_NE_I: case OP_LT_I:
-        case OP_GT_I: case OP_LE_I: case OP_GE_I: {
+        case OP_EQ_I:
+        case OP_NE_I:
+        case OP_LT_I:
+        case OP_GT_I:
+        case OP_LE_I:
+        case OP_GE_I: {
             uint8_t b = fc_sim_pop(&fc);
             uint8_t a = fc_sim_pop(&fc);
             uint8_t dst = fc_alloc_temp(&fc);
             uint8_t rop;
             switch (op) {
-                case OP_EQ_I: rop = ROP_EQ_I; break;
-                case OP_NE_I: rop = ROP_NE_I; break;
-                case OP_LT_I: rop = ROP_LT_I; break;
-                case OP_GT_I: rop = ROP_GT_I; break;
-                case OP_LE_I: rop = ROP_LE_I; break;
-                default:      rop = ROP_GE_I; break;
+            case OP_EQ_I:
+                rop = ROP_EQ_I;
+                break;
+            case OP_NE_I:
+                rop = ROP_NE_I;
+                break;
+            case OP_LT_I:
+                rop = ROP_LT_I;
+                break;
+            case OP_GT_I:
+                rop = ROP_GT_I;
+                break;
+            case OP_LE_I:
+                rop = ROP_LE_I;
+                break;
+            default:
+                rop = ROP_GE_I;
+                break;
             }
             fc_emit_3reg(&fc, rop, dst, a, b);
             fc_sim_push(&fc, dst);
@@ -4697,7 +5090,9 @@ static int source_convert_fast_loop(BCCompiler *cs, uint32_t loop_start,
             uint8_t a = fc_sim_pop(&fc);
             uint8_t dst = fc_alloc_temp(&fc);
             fc_emit(&fc, op == OP_MATH_SQRDIV ? ROP_SQRDIV : ROP_SQRSHR);
-            fc_emit(&fc, dst); fc_emit(&fc, a); fc_emit(&fc, bits);
+            fc_emit(&fc, dst);
+            fc_emit(&fc, a);
+            fc_emit(&fc, bits);
             fc_sim_push(&fc, dst);
             break;
         }
@@ -4708,7 +5103,10 @@ static int source_convert_fast_loop(BCCompiler *cs, uint32_t loop_start,
             uint8_t a = fc_sim_pop(&fc);
             uint8_t dst = fc_alloc_temp(&fc);
             fc_emit(&fc, op == OP_MATH_MULDIV ? ROP_MULDIV : ROP_MULSHR);
-            fc_emit(&fc, dst); fc_emit(&fc, a); fc_emit(&fc, b); fc_emit(&fc, bits);
+            fc_emit(&fc, dst);
+            fc_emit(&fc, a);
+            fc_emit(&fc, b);
+            fc_emit(&fc, bits);
             fc_sim_push(&fc, dst);
             break;
         }
@@ -4719,8 +5117,11 @@ static int source_convert_fast_loop(BCCompiler *cs, uint32_t loop_start,
             uint8_t a = fc_sim_pop(&fc);
             uint8_t dst = fc_alloc_temp(&fc);
             fc_emit(&fc, ROP_MULSHRADD);
-            fc_emit(&fc, dst); fc_emit(&fc, a); fc_emit(&fc, b);
-            fc_emit(&fc, bits); fc_emit(&fc, c);
+            fc_emit(&fc, dst);
+            fc_emit(&fc, a);
+            fc_emit(&fc, b);
+            fc_emit(&fc, bits);
+            fc_emit(&fc, c);
             fc_sim_push(&fc, dst);
             break;
         }
@@ -4728,27 +5129,42 @@ static int source_convert_fast_loop(BCCompiler *cs, uint32_t loop_start,
         /* --- JCMP_I (fused compare+jump) --- */
         case OP_JCMP_I: {
             uint8_t rel = *pc++;
-            int16_t off; memcpy(&off, pc, 2); pc += 2;
+            int16_t off;
+            memcpy(&off, pc, 2);
+            pc += 2;
             uint8_t b = fc_sim_pop(&fc);
             uint8_t a = fc_sim_pop(&fc);
             uint8_t rop;
             switch (rel) {
-                case BC_JCMP_EQ: rop = ROP_JCMP_EQ_I; break;
-                case BC_JCMP_NE: rop = ROP_JCMP_NE_I; break;
-                case BC_JCMP_LT: rop = ROP_JCMP_LT_I; break;
-                case BC_JCMP_GT: rop = ROP_JCMP_GT_I; break;
-                case BC_JCMP_LE: rop = ROP_JCMP_LE_I; break;
-                case BC_JCMP_GE: rop = ROP_JCMP_GE_I; break;
-                default:
-                    bc_set_error(cs, "'!FAST: unknown JCMP relation %d", rel);
-                    FC_FAIL;
+            case BC_JCMP_EQ:
+                rop = ROP_JCMP_EQ_I;
+                break;
+            case BC_JCMP_NE:
+                rop = ROP_JCMP_NE_I;
+                break;
+            case BC_JCMP_LT:
+                rop = ROP_JCMP_LT_I;
+                break;
+            case BC_JCMP_GT:
+                rop = ROP_JCMP_GT_I;
+                break;
+            case BC_JCMP_LE:
+                rop = ROP_JCMP_LE_I;
+                break;
+            case BC_JCMP_GE:
+                rop = ROP_JCMP_GE_I;
+                break;
+            default:
+                bc_set_error(cs, "'!FAST: unknown JCMP relation %d", rel);
+                FC_FAIL;
             }
             /* Compute bytecode target (absolute within loop) */
             uint32_t bc_here = (uint32_t)(pc - base);
             uint32_t bc_target = (uint32_t)((int32_t)bc_here + off);
 
             fc_emit(&fc, rop);
-            fc_emit(&fc, a); fc_emit(&fc, b);
+            fc_emit(&fc, a);
+            fc_emit(&fc, b);
             uint32_t fixup_addr = fc.rop_len;
 
             if (bc_target <= bc_off) {
@@ -4765,8 +5181,11 @@ static int source_convert_fast_loop(BCCompiler *cs, uint32_t loop_start,
         }
 
         /* --- JZ / JNZ --- */
-        case OP_JZ: case OP_JNZ: {
-            int16_t off; memcpy(&off, pc, 2); pc += 2;
+        case OP_JZ:
+        case OP_JNZ: {
+            int16_t off;
+            memcpy(&off, pc, 2);
+            pc += 2;
             uint8_t src = fc_sim_pop(&fc);
             uint8_t rop = (op == OP_JZ) ? ROP_JZ : ROP_JNZ;
             uint32_t bc_here = (uint32_t)(pc - base);
@@ -4789,7 +5208,9 @@ static int source_convert_fast_loop(BCCompiler *cs, uint32_t loop_start,
 
         /* --- JMP --- */
         case OP_JMP: {
-            int16_t off; memcpy(&off, pc, 2); pc += 2;
+            int16_t off;
+            memcpy(&off, pc, 2);
+            pc += 2;
             uint32_t bc_here = (uint32_t)(pc - base);
             uint32_t bc_target = (uint32_t)((int32_t)bc_here + off);
 
@@ -4812,7 +5233,9 @@ static int source_convert_fast_loop(BCCompiler *cs, uint32_t loop_start,
 
         /* --- INC_I (increment variable) --- */
         case OP_INC_I: {
-            uint16_t raw_slot; memcpy(&raw_slot, pc, 2); pc += 2;
+            uint16_t raw_slot;
+            memcpy(&raw_slot, pc, 2);
+            pc += 2;
             int is_local = (raw_slot & 0x8000u) != 0;
             uint16_t slot = raw_slot & 0x7FFFu;
             uint8_t delta = fc_sim_pop(&fc);
@@ -4825,8 +5248,12 @@ static int source_convert_fast_loop(BCCompiler *cs, uint32_t loop_start,
         /* --- MOV_VAR --- */
         case OP_MOV_VAR: {
             uint8_t kind = *pc++;
-            uint16_t src_raw; memcpy(&src_raw, pc, 2); pc += 2;
-            uint16_t dst_raw; memcpy(&dst_raw, pc, 2); pc += 2;
+            uint16_t src_raw;
+            memcpy(&src_raw, pc, 2);
+            pc += 2;
+            uint16_t dst_raw;
+            memcpy(&dst_raw, pc, 2);
+            pc += 2;
             int src_local = (src_raw & 0x8000u) != 0;
             int dst_local = (dst_raw & 0x8000u) != 0;
             uint16_t src_slot = src_raw & 0x7FFFu;
@@ -4840,9 +5267,13 @@ static int source_convert_fast_loop(BCCompiler *cs, uint32_t loop_start,
         }
 
         /* --- 1D Array access --- */
-        case OP_LOAD_LOCAL_ARR_I: case OP_LOAD_LOCAL_ARR_F:
-        case OP_LOAD_ARR_I: case OP_LOAD_ARR_F: {
-            uint16_t slot; memcpy(&slot, pc, 2); pc += 2;
+        case OP_LOAD_LOCAL_ARR_I:
+        case OP_LOAD_LOCAL_ARR_F:
+        case OP_LOAD_ARR_I:
+        case OP_LOAD_ARR_F: {
+            uint16_t slot;
+            memcpy(&slot, pc, 2);
+            pc += 2;
             uint8_t ndim = *pc++;
             if (ndim != 1) {
                 bc_set_error(cs, "'!FAST: only 1D arrays supported (got %dD)", ndim);
@@ -4854,13 +5285,19 @@ static int source_convert_fast_loop(BCCompiler *cs, uint32_t loop_start,
             uint8_t idx_reg = fc_sim_pop(&fc);
             uint8_t dst = fc_alloc_temp(&fc);
             fc_emit(&fc, is_float ? ROP_LOAD_ARR_F : ROP_LOAD_ARR_I);
-            fc_emit(&fc, dst); fc_emit(&fc, arr_idx); fc_emit(&fc, idx_reg);
+            fc_emit(&fc, dst);
+            fc_emit(&fc, arr_idx);
+            fc_emit(&fc, idx_reg);
             fc_sim_push(&fc, dst);
             break;
         }
-        case OP_STORE_LOCAL_ARR_I: case OP_STORE_LOCAL_ARR_F:
-        case OP_STORE_ARR_I: case OP_STORE_ARR_F: {
-            uint16_t slot; memcpy(&slot, pc, 2); pc += 2;
+        case OP_STORE_LOCAL_ARR_I:
+        case OP_STORE_LOCAL_ARR_F:
+        case OP_STORE_ARR_I:
+        case OP_STORE_ARR_F: {
+            uint16_t slot;
+            memcpy(&slot, pc, 2);
+            pc += 2;
             uint8_t ndim = *pc++;
             if (ndim != 1) {
                 bc_set_error(cs, "'!FAST: only 1D arrays supported (got %dD)", ndim);
@@ -4872,14 +5309,18 @@ static int source_convert_fast_loop(BCCompiler *cs, uint32_t loop_start,
             uint8_t idx_reg = fc_sim_pop(&fc);
             uint8_t arr_idx = fc_array_ref(&fc, is_local, slot);
             fc_emit(&fc, is_float ? ROP_STORE_ARR_F : ROP_STORE_ARR_I);
-            fc_emit(&fc, val_reg); fc_emit(&fc, arr_idx); fc_emit(&fc, idx_reg);
+            fc_emit(&fc, val_reg);
+            fc_emit(&fc, arr_idx);
+            fc_emit(&fc, idx_reg);
             if (fc.sim_sp < 0) fc_reset_temps(&fc);
             break;
         }
 
         /* --- Housekeeping (skip or convert) --- */
         case OP_LINE: {
-            uint16_t line; memcpy(&line, pc, 2); pc += 2;
+            uint16_t line;
+            memcpy(&line, pc, 2);
+            pc += 2;
             fc.last_line = line;
             break; /* skip — no micro-op needed */
         }
@@ -4935,7 +5376,7 @@ static int source_convert_fast_loop(BCCompiler *cs, uint32_t loop_start,
 
     /* Calculate total payload size */
     uint32_t global_map_size = fc.nglobals * 2;
-    uint32_t array_map_size = fc.narrays * 3; /* is_local:8 + slot:16 per array */
+    uint32_t array_map_size = fc.narrays * 3;  /* is_local:8 + slot:16 per array */
     uint32_t const_data_size = fc.nconsts * 9; /* type:8 + value:64 per const */
     uint32_t total_payload = 5 + global_map_size + array_map_size + const_data_size + fc.rop_len;
     /* header: nregs:8 nlocals:8 nglobals:8 nconsts:8 narrays:8 = 5 bytes */
@@ -4976,9 +5417,9 @@ static int source_convert_fast_loop(BCCompiler *cs, uint32_t loop_start,
     FC_OK;
 
 fc_cleanup:
-    #undef fc
-    #undef FC_FAIL
-    #undef FC_OK
+#undef fc
+#undef FC_FAIL
+#undef FC_OK
     BC_COMPILER_FREE(fcp);
     return fc_result;
 }
@@ -4989,41 +5430,55 @@ fc_cleanup:
 
 /* Assembler state */
 typedef struct {
-    uint8_t  rop[4096];          /* micro-op output buffer */
+    uint8_t rop[4096]; /* micro-op output buffer */
     uint32_t rop_len;
 
-    int      nlocals;            /* regs 0..nlocals-1 = local frame slots */
+    int nlocals; /* regs 0..nlocals-1 = local frame slots */
 
     /* Constant pool */
-    struct { int64_t ival; double fval; uint8_t type; } consts[32];
-    int      nconsts;
+    struct {
+        int64_t ival;
+        double fval;
+        uint8_t type;
+    } consts[32];
+    int nconsts;
 
     /* Array reference map */
-    struct { uint8_t is_local; uint16_t slot; } arrays[16];
-    int      narrays;
+    struct {
+        uint8_t is_local;
+        uint16_t slot;
+    } arrays[16];
+    int narrays;
 
-    int      max_regs;           /* high-water mark */
+    int max_regs; /* high-water mark */
 
     /* Labels */
-    struct { char name[32]; uint32_t rop_addr; int defined; } labels[64];
-    int      nlabels;
+    struct {
+        char name[32];
+        uint32_t rop_addr;
+        int defined;
+    } labels[64];
+    int nlabels;
 
     /* Forward jump fixups (label-based) */
-    struct { uint32_t rop_addr; int label_idx; } fixups[128];
-    int      fixup_count;
+    struct {
+        uint32_t rop_addr;
+        int label_idx;
+    } fixups[128];
+    int fixup_count;
 } AsmCtx;
 
-static void asm_emit(AsmCtx *ctx, uint8_t b) {
+static void asm_emit(AsmCtx * ctx, uint8_t b) {
     if (ctx->rop_len < sizeof(ctx->rop)) ctx->rop[ctx->rop_len++] = b;
 }
 
-static void asm_emit_i16(AsmCtx *ctx, int16_t v) {
+static void asm_emit_i16(AsmCtx * ctx, int16_t v) {
     asm_emit(ctx, (uint8_t)(v & 0xFF));
     asm_emit(ctx, (uint8_t)((v >> 8) & 0xFF));
 }
 
 /* Find or create a label entry. Returns index. */
-static int asm_find_label(AsmCtx *ctx, const char *name) {
+static int asm_find_label(AsmCtx * ctx, const char * name) {
     for (int i = 0; i < ctx->nlabels; i++) {
         if (strncasecmp(ctx->labels[i].name, name, 31) == 0) return i;
     }
@@ -5032,14 +5487,14 @@ static int asm_find_label(AsmCtx *ctx, const char *name) {
     strncpy(ctx->labels[idx].name, name, 31);
     ctx->labels[idx].name[31] = '\0';
     /* Lowercase for case-insensitive matching */
-    for (char *c = ctx->labels[idx].name; *c; c++) *c = tolower((unsigned char)*c);
+    for (char * c = ctx->labels[idx].name; *c; c++) *c = tolower((unsigned char)*c);
     ctx->labels[idx].rop_addr = 0;
     ctx->labels[idx].defined = 0;
     return idx;
 }
 
 /* Find or create a constant register (integer) */
-static uint8_t asm_const_reg_i(AsmCtx *ctx, int64_t val) {
+static uint8_t asm_const_reg_i(AsmCtx * ctx, int64_t val) {
     int base = ctx->nlocals;
     for (int i = 0; i < ctx->nconsts; i++) {
         if (ctx->consts[i].type == T_INT && ctx->consts[i].ival == val)
@@ -5055,7 +5510,7 @@ static uint8_t asm_const_reg_i(AsmCtx *ctx, int64_t val) {
 }
 
 /* Find or create a constant register (float) */
-static uint8_t asm_const_reg_f(AsmCtx *ctx, double val) {
+static uint8_t asm_const_reg_f(AsmCtx * ctx, double val) {
     int base = ctx->nlocals;
     for (int i = 0; i < ctx->nconsts; i++) {
         if (ctx->consts[i].type == T_NBR) {
@@ -5075,7 +5530,7 @@ static uint8_t asm_const_reg_f(AsmCtx *ctx, double val) {
 }
 
 /* Emit a jump to a label (forward or backward). Adds fixup if forward. */
-static void asm_emit_jump_to_label(AsmCtx *ctx, int label_idx) {
+static void asm_emit_jump_to_label(AsmCtx * ctx, int label_idx) {
     if (ctx->labels[label_idx].defined) {
         /* Backward reference — compute relative offset */
         int16_t rel = (int16_t)((int32_t)ctx->labels[label_idx].rop_addr -
@@ -5093,13 +5548,13 @@ static void asm_emit_jump_to_label(AsmCtx *ctx, int label_idx) {
 }
 
 /* Skip whitespace and comments in an assembly line */
-static void asm_skip_ws(const char **pp) {
+static void asm_skip_ws(const char ** pp) {
     while (**pp == ' ' || **pp == '\t') (*pp)++;
 }
 
 /* Parse an identifier (alphanumeric + underscore + dot for mnemonics, case-insensitive) */
-static int asm_parse_ident(const char **pp, char *buf, int bufsz) {
-    const char *p = *pp;
+static int asm_parse_ident(const char ** pp, char * buf, int bufsz) {
+    const char * p = *pp;
     int len = 0;
     while (*p && (isalnum((unsigned char)*p) || *p == '_' || *p == '.') && len < bufsz - 1) {
         buf[len++] = tolower((unsigned char)*p);
@@ -5119,11 +5574,11 @@ static int asm_parse_ident(const char **pp, char *buf, int bufsz) {
 typedef struct {
     char name[32];
     uint8_t reg;
-    int is_const;     /* 1 if this is a .const entry */
+    int is_const; /* 1 if this is a .const entry */
 } AsmName;
 
-static int asm_resolve_operand(AsmCtx *ctx, AsmName *names, int nnames,
-                               BCCompiler *cs, const char *ident, int *is_const_out) {
+static int asm_resolve_operand(AsmCtx * ctx, AsmName * names, int nnames,
+                               BCCompiler * cs, const char * ident, int * is_const_out) {
     *is_const_out = 0;
 
     /* 1. Check .const names first */
@@ -5147,15 +5602,18 @@ static int asm_resolve_operand(AsmCtx *ctx, AsmName *names, int nnames,
 /*
  * Assemble lines and emit OP_FAST_LOOP block.
  */
-static void source_assemble_block(BCSourceFrontend *fe, BCCompiler *cs) {
+static void source_assemble_block(BCSourceFrontend * fe, BCCompiler * cs) {
     if (cs->current_subfun < 0) {
         bc_set_error(cs, "'!ASM must be inside a SUB or FUNCTION");
         return;
     }
 
     /* Heap-allocate: AsmCtx is large */
-    AsmCtx *ctx = (AsmCtx *)BC_COMPILER_ALLOC(sizeof(AsmCtx));
-    if (!ctx) { bc_set_error(cs, "'!ASM: out of memory"); return; }
+    AsmCtx * ctx = (AsmCtx *)BC_COMPILER_ALLOC(sizeof(AsmCtx));
+    if (!ctx) {
+        bc_set_error(cs, "'!ASM: out of memory");
+        return;
+    }
     memset(ctx, 0, sizeof(*ctx));
 
     ctx->nlocals = cs->local_count;
@@ -5191,7 +5649,7 @@ static void source_assemble_block(BCSourceFrontend *fe, BCCompiler *cs) {
 
     /* --- Pass 1: directives and labels --- */
     for (int ln = 0; ln < fe->asm_line_count; ln++) {
-        const char *p = fe->asm_lines[ln];
+        const char * p = fe->asm_lines[ln];
         asm_skip_ws(&p);
 
         /* Skip empty lines and comments */
@@ -5216,10 +5674,13 @@ static void source_assemble_block(BCSourceFrontend *fe, BCCompiler *cs) {
 
             /* Parse value (integer or float) */
             int is_negative = 0;
-            if (*p == '-') { is_negative = 1; p++; }
+            if (*p == '-') {
+                is_negative = 1;
+                p++;
+            }
 
             /* Check if it's a float (contains '.') */
-            const char *vstart = p;
+            const char * vstart = p;
             int has_dot = 0;
             while (*p && *p != ';' && *p != ',' && *p != ' ' && *p != '\t') {
                 if (*p == '.') has_dot = 1;
@@ -5267,7 +5728,7 @@ static void source_assemble_block(BCSourceFrontend *fe, BCCompiler *cs) {
             fullname[flen] = '\0';
 
             /* Must end with () — strip them to get the lookup name */
-            if (flen < 3 || fullname[flen-2] != '(' || fullname[flen-1] != ')') {
+            if (flen < 3 || fullname[flen - 2] != '(' || fullname[flen - 1] != ')') {
                 cs->current_line = fe->asm_line_nos[ln];
                 bc_set_error(cs, "'!ASM: .array name must include type suffix and (), e.g. buf%%()");
                 goto asm_cleanup;
@@ -5297,7 +5758,7 @@ static void source_assemble_block(BCSourceFrontend *fe, BCCompiler *cs) {
                     /* Also try matching without parens (local name might not have them) */
                     if (strncasecmp(cs->locals[i].name, lookup_name, lookup_len) == 0 &&
                         (cs->locals[i].name[lookup_len] == '\0' ||
-                         (cs->locals[i].name[lookup_len] == '(' && cs->locals[i].name[lookup_len+1] == ')')) &&
+                         (cs->locals[i].name[lookup_len] == '(' && cs->locals[i].name[lookup_len + 1] == ')')) &&
                         cs->locals[i].is_array) {
                         is_local = 1;
                         slot = (uint16_t)i;
@@ -5335,8 +5796,8 @@ static void source_assemble_block(BCSourceFrontend *fe, BCCompiler *cs) {
 
         /* Label definition: .name: */
         if (*p == '.') {
-            const char *lstart = p + 1;
-            const char *lend = lstart;
+            const char * lstart = p + 1;
+            const char * lend = lstart;
             while (*lend && (isalnum((unsigned char)*lend) || *lend == '_')) lend++;
             if (*lend == ':') {
                 /* It's a label definition — just record it (positions filled in pass 2) */
@@ -5350,7 +5811,7 @@ static void source_assemble_block(BCSourceFrontend *fe, BCCompiler *cs) {
 
     /* --- Pass 2: assemble instructions --- */
     for (int ln = 0; ln < fe->asm_line_count; ln++) {
-        const char *p = fe->asm_lines[ln];
+        const char * p = fe->asm_lines[ln];
         asm_skip_ws(&p);
 
         if (*p == '\0' || *p == ';') continue;
@@ -5361,8 +5822,8 @@ static void source_assemble_block(BCSourceFrontend *fe, BCCompiler *cs) {
 
         /* Label definition */
         if (*p == '.') {
-            const char *lstart = p + 1;
-            const char *lend = lstart;
+            const char * lstart = p + 1;
+            const char * lend = lstart;
             while (*lend && (isalnum((unsigned char)*lend) || *lend == '_')) lend++;
             if (*lend == ':') {
                 char lname[32];
@@ -5398,8 +5859,8 @@ static void source_assemble_block(BCSourceFrontend *fe, BCCompiler *cs) {
         }
         asm_skip_ws(&p);
 
-        /* Helper: parse one operand (name, literal, or label) */
-        #define ASM_MAX_OPERANDS 6
+/* Helper: parse one operand (name, literal, or label) */
+#define ASM_MAX_OPERANDS 6
         char operands[ASM_MAX_OPERANDS][32];
         int op_is_label[ASM_MAX_OPERANDS];
         int nops = 0;
@@ -5460,13 +5921,16 @@ static void source_assemble_block(BCSourceFrontend *fe, BCCompiler *cs) {
             }
 
             asm_skip_ws(&p);
-            if (*p == ',') { p++; asm_skip_ws(&p); }
+            if (*p == ',') {
+                p++;
+                asm_skip_ws(&p);
+            }
         }
 
         /* Resolve name operands to register indices */
         uint8_t regs[ASM_MAX_OPERANDS];
-        int     reg_is_const[ASM_MAX_OPERANDS];
-        int     label_indices[ASM_MAX_OPERANDS];
+        int reg_is_const[ASM_MAX_OPERANDS];
+        int label_indices[ASM_MAX_OPERANDS];
         memset(regs, 0, sizeof(regs));
         memset(reg_is_const, 0, sizeof(reg_is_const));
         memset(label_indices, -1, sizeof(label_indices));
@@ -5498,143 +5962,235 @@ static void source_assemble_block(BCSourceFrontend *fe, BCCompiler *cs) {
             }
         }
 
-        /* Resolve array operands for array instructions */
-        /* Find array index by bare name (match against .array declarations) */
-        #define ASM_RESOLVE_ARRAY(op_idx) do { \
-            int found = -1; \
-            /* Search for the bare name among declared arrays */ \
-            for (int ai = 0; ai < ctx->narrays; ai++) { \
-                /* Match bare name: strip suffix from locals[slot].name or slots[slot].name */ \
-                uint16_t aslot = ctx->arrays[ai].slot; \
-                const char *aname = NULL; \
-                if (ctx->arrays[ai].is_local) { \
-                    aname = cs->locals[aslot].name; \
-                } else { \
-                    aname = cs->slots[aslot].name; \
-                } \
-                /* Extract bare name (no suffix, no parens) */ \
-                char bare[32]; \
-                int bl = 0; \
-                while (aname[bl] && isalnum((unsigned char)aname[bl]) && bl < 31) { \
-                    bare[bl] = tolower((unsigned char)aname[bl]); \
-                    bl++; \
-                } \
-                bare[bl] = '\0'; \
-                if (strncasecmp(bare, operands[op_idx], 31) == 0) { \
-                    found = ai; break; \
-                } \
-            } \
-            if (found < 0) { \
-                cs->current_line = fe->asm_line_nos[ln]; \
-                bc_set_error(cs, "'!ASM: array '%s' not declared with .array", operands[op_idx]); \
-                goto asm_cleanup; \
-            } \
-            regs[op_idx] = (uint8_t)found; \
-        } while(0)
+/* Resolve array operands for array instructions */
+/* Find array index by bare name (match against .array declarations) */
+#define ASM_RESOLVE_ARRAY(op_idx)                                                             \
+    do {                                                                                      \
+        int found = -1;                                                                       \
+        /* Search for the bare name among declared arrays */                                  \
+        for (int ai = 0; ai < ctx->narrays; ai++) {                                           \
+            /* Match bare name: strip suffix from locals[slot].name or slots[slot].name */    \
+            uint16_t aslot = ctx->arrays[ai].slot;                                            \
+            const char * aname = NULL;                                                        \
+            if (ctx->arrays[ai].is_local) {                                                   \
+                aname = cs->locals[aslot].name;                                               \
+            } else {                                                                          \
+                aname = cs->slots[aslot].name;                                                \
+            }                                                                                 \
+            /* Extract bare name (no suffix, no parens) */                                    \
+            char bare[32];                                                                    \
+            int bl = 0;                                                                       \
+            while (aname[bl] && isalnum((unsigned char)aname[bl]) && bl < 31) {               \
+                bare[bl] = tolower((unsigned char)aname[bl]);                                 \
+                bl++;                                                                         \
+            }                                                                                 \
+            bare[bl] = '\0';                                                                  \
+            if (strncasecmp(bare, operands[op_idx], 31) == 0) {                               \
+                found = ai;                                                                   \
+                break;                                                                        \
+            }                                                                                 \
+        }                                                                                     \
+        if (found < 0) {                                                                      \
+            cs->current_line = fe->asm_line_nos[ln];                                          \
+            bc_set_error(cs, "'!ASM: array '%s' not declared with .array", operands[op_idx]); \
+            goto asm_cleanup;                                                                 \
+        }                                                                                     \
+        regs[op_idx] = (uint8_t)found;                                                        \
+    } while (0)
 
-        /* Check destination is not a constant */
-        #define ASM_CHECK_DST(idx) do { \
-            if (reg_is_const[idx]) { \
-                cs->current_line = fe->asm_line_nos[ln]; \
-                bc_set_error(cs, "'!ASM: cannot write to constant '%s'", operands[idx]); \
-                goto asm_cleanup; \
-            } \
-        } while(0)
+/* Check destination is not a constant */
+#define ASM_CHECK_DST(idx)                                                           \
+    do {                                                                             \
+        if (reg_is_const[idx]) {                                                     \
+            cs->current_line = fe->asm_line_nos[ln];                                 \
+            bc_set_error(cs, "'!ASM: cannot write to constant '%s'", operands[idx]); \
+            goto asm_cleanup;                                                        \
+        }                                                                            \
+    } while (0)
 
         /* Instruction dispatch */
         /* 3-register integer arithmetic: addi, subi, muli, divi, modi */
         if (strcmp(mnemonic, "addi") == 0 || strcmp(mnemonic, "subi") == 0 ||
             strcmp(mnemonic, "muli") == 0 || strcmp(mnemonic, "divi") == 0 ||
             strcmp(mnemonic, "modi") == 0) {
-            if (nops != 3) { cs->current_line = fe->asm_line_nos[ln]; bc_set_error(cs, "'!ASM: %s requires 3 operands", mnemonic); goto asm_cleanup; }
+            if (nops != 3) {
+                cs->current_line = fe->asm_line_nos[ln];
+                bc_set_error(cs, "'!ASM: %s requires 3 operands", mnemonic);
+                goto asm_cleanup;
+            }
             ASM_CHECK_DST(0);
             uint8_t rop;
-            if      (strcmp(mnemonic, "addi") == 0) rop = ROP_ADD_I;
-            else if (strcmp(mnemonic, "subi") == 0) rop = ROP_SUB_I;
-            else if (strcmp(mnemonic, "muli") == 0) rop = ROP_MUL_I;
-            else if (strcmp(mnemonic, "divi") == 0) rop = ROP_IDIV_I;
-            else                                     rop = ROP_MOD_I;
-            asm_emit(ctx, rop); asm_emit(ctx, regs[0]); asm_emit(ctx, regs[1]); asm_emit(ctx, regs[2]);
+            if (strcmp(mnemonic, "addi") == 0)
+                rop = ROP_ADD_I;
+            else if (strcmp(mnemonic, "subi") == 0)
+                rop = ROP_SUB_I;
+            else if (strcmp(mnemonic, "muli") == 0)
+                rop = ROP_MUL_I;
+            else if (strcmp(mnemonic, "divi") == 0)
+                rop = ROP_IDIV_I;
+            else
+                rop = ROP_MOD_I;
+            asm_emit(ctx, rop);
+            asm_emit(ctx, regs[0]);
+            asm_emit(ctx, regs[1]);
+            asm_emit(ctx, regs[2]);
         }
         /* 3-register float arithmetic: addf, subf, mulf, divf */
         else if (strcmp(mnemonic, "addf") == 0 || strcmp(mnemonic, "subf") == 0 ||
                  strcmp(mnemonic, "mulf") == 0 || strcmp(mnemonic, "divf") == 0) {
-            if (nops != 3) { cs->current_line = fe->asm_line_nos[ln]; bc_set_error(cs, "'!ASM: %s requires 3 operands", mnemonic); goto asm_cleanup; }
+            if (nops != 3) {
+                cs->current_line = fe->asm_line_nos[ln];
+                bc_set_error(cs, "'!ASM: %s requires 3 operands", mnemonic);
+                goto asm_cleanup;
+            }
             ASM_CHECK_DST(0);
             uint8_t rop;
-            if      (strcmp(mnemonic, "addf") == 0) rop = ROP_ADD_F;
-            else if (strcmp(mnemonic, "subf") == 0) rop = ROP_SUB_F;
-            else if (strcmp(mnemonic, "mulf") == 0) rop = ROP_MUL_F;
-            else                                     rop = ROP_DIV_F;
-            asm_emit(ctx, rop); asm_emit(ctx, regs[0]); asm_emit(ctx, regs[1]); asm_emit(ctx, regs[2]);
+            if (strcmp(mnemonic, "addf") == 0)
+                rop = ROP_ADD_F;
+            else if (strcmp(mnemonic, "subf") == 0)
+                rop = ROP_SUB_F;
+            else if (strcmp(mnemonic, "mulf") == 0)
+                rop = ROP_MUL_F;
+            else
+                rop = ROP_DIV_F;
+            asm_emit(ctx, rop);
+            asm_emit(ctx, regs[0]);
+            asm_emit(ctx, regs[1]);
+            asm_emit(ctx, regs[2]);
         }
         /* Unary: negi, negf, not, inv */
         else if (strcmp(mnemonic, "negi") == 0 || strcmp(mnemonic, "negf") == 0 ||
-                 strcmp(mnemonic, "not") == 0  || strcmp(mnemonic, "inv") == 0) {
-            if (nops != 2) { cs->current_line = fe->asm_line_nos[ln]; bc_set_error(cs, "'!ASM: %s requires 2 operands", mnemonic); goto asm_cleanup; }
+                 strcmp(mnemonic, "not") == 0 || strcmp(mnemonic, "inv") == 0) {
+            if (nops != 2) {
+                cs->current_line = fe->asm_line_nos[ln];
+                bc_set_error(cs, "'!ASM: %s requires 2 operands", mnemonic);
+                goto asm_cleanup;
+            }
             ASM_CHECK_DST(0);
             uint8_t rop;
-            if      (strcmp(mnemonic, "negi") == 0) rop = ROP_NEG_I;
-            else if (strcmp(mnemonic, "negf") == 0) rop = ROP_NEG_F;
-            else if (strcmp(mnemonic, "not") == 0)  rop = ROP_NOT;
-            else                                     rop = ROP_INV;
-            asm_emit(ctx, rop); asm_emit(ctx, regs[0]); asm_emit(ctx, regs[1]);
+            if (strcmp(mnemonic, "negi") == 0)
+                rop = ROP_NEG_I;
+            else if (strcmp(mnemonic, "negf") == 0)
+                rop = ROP_NEG_F;
+            else if (strcmp(mnemonic, "not") == 0)
+                rop = ROP_NOT;
+            else
+                rop = ROP_INV;
+            asm_emit(ctx, rop);
+            asm_emit(ctx, regs[0]);
+            asm_emit(ctx, regs[1]);
         }
         /* Bitwise: and, or, xor, shl, shr */
         else if (strcmp(mnemonic, "and") == 0 || strcmp(mnemonic, "or") == 0 ||
                  strcmp(mnemonic, "xor") == 0 || strcmp(mnemonic, "shl") == 0 ||
                  strcmp(mnemonic, "shr") == 0) {
-            if (nops != 3) { cs->current_line = fe->asm_line_nos[ln]; bc_set_error(cs, "'!ASM: %s requires 3 operands", mnemonic); goto asm_cleanup; }
+            if (nops != 3) {
+                cs->current_line = fe->asm_line_nos[ln];
+                bc_set_error(cs, "'!ASM: %s requires 3 operands", mnemonic);
+                goto asm_cleanup;
+            }
             ASM_CHECK_DST(0);
             uint8_t rop;
-            if      (strcmp(mnemonic, "and") == 0) rop = ROP_AND;
-            else if (strcmp(mnemonic, "or") == 0)  rop = ROP_OR;
-            else if (strcmp(mnemonic, "xor") == 0) rop = ROP_XOR;
-            else if (strcmp(mnemonic, "shl") == 0) rop = ROP_SHL;
-            else                                    rop = ROP_SHR;
-            asm_emit(ctx, rop); asm_emit(ctx, regs[0]); asm_emit(ctx, regs[1]); asm_emit(ctx, regs[2]);
+            if (strcmp(mnemonic, "and") == 0)
+                rop = ROP_AND;
+            else if (strcmp(mnemonic, "or") == 0)
+                rop = ROP_OR;
+            else if (strcmp(mnemonic, "xor") == 0)
+                rop = ROP_XOR;
+            else if (strcmp(mnemonic, "shl") == 0)
+                rop = ROP_SHL;
+            else
+                rop = ROP_SHR;
+            asm_emit(ctx, rop);
+            asm_emit(ctx, regs[0]);
+            asm_emit(ctx, regs[1]);
+            asm_emit(ctx, regs[2]);
         }
         /* Move / convert: mov, cvtif, cvtfi */
         else if (strcmp(mnemonic, "mov") == 0 || strcmp(mnemonic, "cvtif") == 0 ||
                  strcmp(mnemonic, "cvtfi") == 0) {
-            if (nops != 2) { cs->current_line = fe->asm_line_nos[ln]; bc_set_error(cs, "'!ASM: %s requires 2 operands", mnemonic); goto asm_cleanup; }
+            if (nops != 2) {
+                cs->current_line = fe->asm_line_nos[ln];
+                bc_set_error(cs, "'!ASM: %s requires 2 operands", mnemonic);
+                goto asm_cleanup;
+            }
             ASM_CHECK_DST(0);
             uint8_t rop;
-            if      (strcmp(mnemonic, "mov") == 0)    rop = ROP_MOV;
-            else if (strcmp(mnemonic, "cvtif") == 0)  rop = ROP_CVT_I2F;
-            else                                       rop = ROP_CVT_F2I;
-            asm_emit(ctx, rop); asm_emit(ctx, regs[0]); asm_emit(ctx, regs[1]);
+            if (strcmp(mnemonic, "mov") == 0)
+                rop = ROP_MOV;
+            else if (strcmp(mnemonic, "cvtif") == 0)
+                rop = ROP_CVT_I2F;
+            else
+                rop = ROP_CVT_F2I;
+            asm_emit(ctx, rop);
+            asm_emit(ctx, regs[0]);
+            asm_emit(ctx, regs[1]);
         }
         /* Fused fixed-point: sqrshr, mulshr, mulshradd */
         else if (strcmp(mnemonic, "sqrshr") == 0) {
-            if (nops != 3) { cs->current_line = fe->asm_line_nos[ln]; bc_set_error(cs, "'!ASM: sqrshr requires 3 operands (dst, a, bits)"); goto asm_cleanup; }
+            if (nops != 3) {
+                cs->current_line = fe->asm_line_nos[ln];
+                bc_set_error(cs, "'!ASM: sqrshr requires 3 operands (dst, a, bits)");
+                goto asm_cleanup;
+            }
             ASM_CHECK_DST(0);
-            asm_emit(ctx, ROP_SQRSHR); asm_emit(ctx, regs[0]); asm_emit(ctx, regs[1]); asm_emit(ctx, regs[2]);
-        }
-        else if (strcmp(mnemonic, "mulshr") == 0) {
-            if (nops != 4) { cs->current_line = fe->asm_line_nos[ln]; bc_set_error(cs, "'!ASM: mulshr requires 4 operands (dst, a, b, bits)"); goto asm_cleanup; }
+            asm_emit(ctx, ROP_SQRSHR);
+            asm_emit(ctx, regs[0]);
+            asm_emit(ctx, regs[1]);
+            asm_emit(ctx, regs[2]);
+        } else if (strcmp(mnemonic, "mulshr") == 0) {
+            if (nops != 4) {
+                cs->current_line = fe->asm_line_nos[ln];
+                bc_set_error(cs, "'!ASM: mulshr requires 4 operands (dst, a, b, bits)");
+                goto asm_cleanup;
+            }
             ASM_CHECK_DST(0);
-            asm_emit(ctx, ROP_MULSHR); asm_emit(ctx, regs[0]); asm_emit(ctx, regs[1]); asm_emit(ctx, regs[2]); asm_emit(ctx, regs[3]);
-        }
-        else if (strcmp(mnemonic, "mulshradd") == 0) {
-            if (nops != 5) { cs->current_line = fe->asm_line_nos[ln]; bc_set_error(cs, "'!ASM: mulshradd requires 5 operands (dst, a, b, bits, c)"); goto asm_cleanup; }
+            asm_emit(ctx, ROP_MULSHR);
+            asm_emit(ctx, regs[0]);
+            asm_emit(ctx, regs[1]);
+            asm_emit(ctx, regs[2]);
+            asm_emit(ctx, regs[3]);
+        } else if (strcmp(mnemonic, "mulshradd") == 0) {
+            if (nops != 5) {
+                cs->current_line = fe->asm_line_nos[ln];
+                bc_set_error(cs, "'!ASM: mulshradd requires 5 operands (dst, a, b, bits, c)");
+                goto asm_cleanup;
+            }
             ASM_CHECK_DST(0);
-            asm_emit(ctx, ROP_MULSHRADD); asm_emit(ctx, regs[0]); asm_emit(ctx, regs[1]); asm_emit(ctx, regs[2]); asm_emit(ctx, regs[3]); asm_emit(ctx, regs[4]);
+            asm_emit(ctx, ROP_MULSHRADD);
+            asm_emit(ctx, regs[0]);
+            asm_emit(ctx, regs[1]);
+            asm_emit(ctx, regs[2]);
+            asm_emit(ctx, regs[3]);
+            asm_emit(ctx, regs[4]);
         }
         /* Integer comparisons: eqi, nei, lti, gti, lei, gei */
         else if (strcmp(mnemonic, "eqi") == 0 || strcmp(mnemonic, "nei") == 0 ||
                  strcmp(mnemonic, "lti") == 0 || strcmp(mnemonic, "gti") == 0 ||
                  strcmp(mnemonic, "lei") == 0 || strcmp(mnemonic, "gei") == 0) {
-            if (nops != 3) { cs->current_line = fe->asm_line_nos[ln]; bc_set_error(cs, "'!ASM: %s requires 3 operands", mnemonic); goto asm_cleanup; }
+            if (nops != 3) {
+                cs->current_line = fe->asm_line_nos[ln];
+                bc_set_error(cs, "'!ASM: %s requires 3 operands", mnemonic);
+                goto asm_cleanup;
+            }
             ASM_CHECK_DST(0);
             uint8_t rop;
-            if      (strcmp(mnemonic, "eqi") == 0) rop = ROP_EQ_I;
-            else if (strcmp(mnemonic, "nei") == 0) rop = ROP_NE_I;
-            else if (strcmp(mnemonic, "lti") == 0) rop = ROP_LT_I;
-            else if (strcmp(mnemonic, "gti") == 0) rop = ROP_GT_I;
-            else if (strcmp(mnemonic, "lei") == 0) rop = ROP_LE_I;
-            else                                    rop = ROP_GE_I;
-            asm_emit(ctx, rop); asm_emit(ctx, regs[0]); asm_emit(ctx, regs[1]); asm_emit(ctx, regs[2]);
+            if (strcmp(mnemonic, "eqi") == 0)
+                rop = ROP_EQ_I;
+            else if (strcmp(mnemonic, "nei") == 0)
+                rop = ROP_NE_I;
+            else if (strcmp(mnemonic, "lti") == 0)
+                rop = ROP_LT_I;
+            else if (strcmp(mnemonic, "gti") == 0)
+                rop = ROP_GT_I;
+            else if (strcmp(mnemonic, "lei") == 0)
+                rop = ROP_LE_I;
+            else
+                rop = ROP_GE_I;
+            asm_emit(ctx, rop);
+            asm_emit(ctx, regs[0]);
+            asm_emit(ctx, regs[1]);
+            asm_emit(ctx, regs[2]);
         }
         /* Fused compare-and-jump: jeq, jne, jlt, jgt, jle, jge */
         else if (strcmp(mnemonic, "jeq") == 0 || strcmp(mnemonic, "jne") == 0 ||
@@ -5646,13 +6202,21 @@ static void source_assemble_block(BCSourceFrontend *fe, BCCompiler *cs) {
                 goto asm_cleanup;
             }
             uint8_t rop;
-            if      (strcmp(mnemonic, "jeq") == 0) rop = ROP_JCMP_EQ_I;
-            else if (strcmp(mnemonic, "jne") == 0) rop = ROP_JCMP_NE_I;
-            else if (strcmp(mnemonic, "jlt") == 0) rop = ROP_JCMP_LT_I;
-            else if (strcmp(mnemonic, "jgt") == 0) rop = ROP_JCMP_GT_I;
-            else if (strcmp(mnemonic, "jle") == 0) rop = ROP_JCMP_LE_I;
-            else                                    rop = ROP_JCMP_GE_I;
-            asm_emit(ctx, rop); asm_emit(ctx, regs[0]); asm_emit(ctx, regs[1]);
+            if (strcmp(mnemonic, "jeq") == 0)
+                rop = ROP_JCMP_EQ_I;
+            else if (strcmp(mnemonic, "jne") == 0)
+                rop = ROP_JCMP_NE_I;
+            else if (strcmp(mnemonic, "jlt") == 0)
+                rop = ROP_JCMP_LT_I;
+            else if (strcmp(mnemonic, "jgt") == 0)
+                rop = ROP_JCMP_GT_I;
+            else if (strcmp(mnemonic, "jle") == 0)
+                rop = ROP_JCMP_LE_I;
+            else
+                rop = ROP_JCMP_GE_I;
+            asm_emit(ctx, rop);
+            asm_emit(ctx, regs[0]);
+            asm_emit(ctx, regs[1]);
             asm_emit_jump_to_label(ctx, label_indices[2]);
         }
         /* Conditional jump: jz, jnz */
@@ -5663,22 +6227,36 @@ static void source_assemble_block(BCSourceFrontend *fe, BCCompiler *cs) {
                 goto asm_cleanup;
             }
             uint8_t rop = (strcmp(mnemonic, "jz") == 0) ? ROP_JZ : ROP_JNZ;
-            asm_emit(ctx, rop); asm_emit(ctx, regs[0]);
+            asm_emit(ctx, rop);
+            asm_emit(ctx, regs[0]);
             asm_emit_jump_to_label(ctx, label_indices[1]);
         }
         /* 1D Array access: loadi.a, storei.a, loadf.a, storef.a */
         else if (strcmp(mnemonic, "loadi.a") == 0 || strcmp(mnemonic, "loadf.a") == 0) {
-            if (nops != 3) { cs->current_line = fe->asm_line_nos[ln]; bc_set_error(cs, "'!ASM: %s requires reg, array, idx", mnemonic); goto asm_cleanup; }
+            if (nops != 3) {
+                cs->current_line = fe->asm_line_nos[ln];
+                bc_set_error(cs, "'!ASM: %s requires reg, array, idx", mnemonic);
+                goto asm_cleanup;
+            }
             ASM_CHECK_DST(0);
             ASM_RESOLVE_ARRAY(1);
             uint8_t rop = (strcmp(mnemonic, "loadi.a") == 0) ? ROP_LOAD_ARR_I : ROP_LOAD_ARR_F;
-            asm_emit(ctx, rop); asm_emit(ctx, regs[0]); asm_emit(ctx, regs[1]); asm_emit(ctx, regs[2]);
-        }
-        else if (strcmp(mnemonic, "storei.a") == 0 || strcmp(mnemonic, "storef.a") == 0) {
-            if (nops != 3) { cs->current_line = fe->asm_line_nos[ln]; bc_set_error(cs, "'!ASM: %s requires reg, array, idx", mnemonic); goto asm_cleanup; }
+            asm_emit(ctx, rop);
+            asm_emit(ctx, regs[0]);
+            asm_emit(ctx, regs[1]);
+            asm_emit(ctx, regs[2]);
+        } else if (strcmp(mnemonic, "storei.a") == 0 || strcmp(mnemonic, "storef.a") == 0) {
+            if (nops != 3) {
+                cs->current_line = fe->asm_line_nos[ln];
+                bc_set_error(cs, "'!ASM: %s requires reg, array, idx", mnemonic);
+                goto asm_cleanup;
+            }
             ASM_RESOLVE_ARRAY(1);
             uint8_t rop = (strcmp(mnemonic, "storei.a") == 0) ? ROP_STORE_ARR_I : ROP_STORE_ARR_F;
-            asm_emit(ctx, rop); asm_emit(ctx, regs[0]); asm_emit(ctx, regs[1]); asm_emit(ctx, regs[2]);
+            asm_emit(ctx, rop);
+            asm_emit(ctx, regs[0]);
+            asm_emit(ctx, regs[1]);
+            asm_emit(ctx, regs[2]);
         }
         /* Control flow */
         else if (strcmp(mnemonic, "jmp") == 0) {
@@ -5689,20 +6267,17 @@ static void source_assemble_block(BCSourceFrontend *fe, BCCompiler *cs) {
             }
             asm_emit(ctx, ROP_JMP);
             asm_emit_jump_to_label(ctx, label_indices[0]);
-        }
-        else if (strcmp(mnemonic, "exit") == 0) {
+        } else if (strcmp(mnemonic, "exit") == 0) {
             asm_emit(ctx, ROP_EXIT);
-        }
-        else if (strcmp(mnemonic, "checkint") == 0) {
+        } else if (strcmp(mnemonic, "checkint") == 0) {
             asm_emit(ctx, ROP_CHECKINT);
-        }
-        else {
+        } else {
             cs->current_line = fe->asm_line_nos[ln];
             bc_set_error(cs, "'!ASM: unknown instruction '%s'", mnemonic);
             goto asm_cleanup;
         }
 
-        #undef ASM_MAX_OPERANDS
+#undef ASM_MAX_OPERANDS
     }
 
     /* Append implicit ROP_EXIT */
@@ -5741,7 +6316,7 @@ static void source_assemble_block(BCSourceFrontend *fe, BCCompiler *cs) {
     bc_emit_u16(cs, (uint16_t)total_payload);
     bc_emit_byte(cs, (uint8_t)ctx->max_regs);
     bc_emit_byte(cs, (uint8_t)ctx->nlocals);
-    bc_emit_byte(cs, 0);  /* nglobals = 0, ASM only supports locals */
+    bc_emit_byte(cs, 0); /* nglobals = 0, ASM only supports locals */
     bc_emit_byte(cs, (uint8_t)ctx->nconsts);
     bc_emit_byte(cs, (uint8_t)ctx->narrays);
 
@@ -5767,18 +6342,18 @@ static void source_assemble_block(BCSourceFrontend *fe, BCCompiler *cs) {
         bc_emit_byte(cs, ctx->rop[i]);
 
 asm_cleanup:
-    #undef ASM_CHECK_DST
-    #undef ASM_RESOLVE_ARRAY
+#undef ASM_CHECK_DST
+#undef ASM_RESOLVE_ARRAY
     BC_COMPILER_FREE(ctx);
 }
 
-static void source_compile_do(BCSourceFrontend *fe, BCCompiler *cs, const char **pp) {
-    const char *p = *pp;
+static void source_compile_do(BCSourceFrontend * fe, BCCompiler * cs, const char ** pp) {
+    const char * p = *pp;
     source_skip_space(&p);
 
     uint32_t loop_top = cs->code_len;
     bc_nest_push(cs, NEST_DO);
-    BCNestEntry *ne = bc_nest_top(cs);
+    BCNestEntry * ne = bc_nest_top(cs);
     if (ne) {
         ne->addr1 = loop_top;
         ne->addr2 = 0xFFFFFFFF;
@@ -5797,8 +6372,8 @@ static void source_compile_do(BCSourceFrontend *fe, BCCompiler *cs, const char *
     *pp = p;
 }
 
-static void source_compile_loop(BCSourceFrontend *fe, BCCompiler *cs, const char **pp) {
-    BCNestEntry *ne = bc_nest_find(cs, NEST_DO);
+static void source_compile_loop(BCSourceFrontend * fe, BCCompiler * cs, const char ** pp) {
+    BCNestEntry * ne = bc_nest_find(cs, NEST_DO);
     if (!ne) ne = bc_nest_find(cs, NEST_WHILE);
     if (!ne) {
         bc_set_error(cs, "LOOP without matching DO or WHILE");
@@ -5809,7 +6384,7 @@ static void source_compile_loop(BCSourceFrontend *fe, BCCompiler *cs, const char
     int do_fast = fe->fast_next_loop;
     fe->fast_next_loop = 0;
 
-    const char *p = *pp;
+    const char * p = *pp;
     source_skip_space(&p);
 
     if (ne->type == NEST_WHILE) {
@@ -5856,12 +6431,12 @@ static void source_compile_loop(BCSourceFrontend *fe, BCCompiler *cs, const char
     *pp = p;
 }
 
-static void source_compile_exit(BCCompiler *cs, const char **pp) {
-    const char *p = *pp;
+static void source_compile_exit(BCCompiler * cs, const char ** pp) {
+    const char * p = *pp;
     source_skip_space(&p);
 
     if (source_keyword(&p, "DO")) {
-        BCNestEntry *ne = bc_nest_find(cs, NEST_DO);
+        BCNestEntry * ne = bc_nest_find(cs, NEST_DO);
         if (!ne) {
             bc_set_error(cs, "EXIT DO without matching DO");
             *pp = p;
@@ -5874,7 +6449,7 @@ static void source_compile_exit(BCCompiler *cs, const char **pp) {
     }
 
     if (source_keyword(&p, "FOR")) {
-        BCNestEntry *ne = bc_nest_find(cs, NEST_FOR);
+        BCNestEntry * ne = bc_nest_find(cs, NEST_FOR);
         if (!ne) {
             bc_set_error(cs, "EXIT FOR without matching FOR");
             *pp = p;
@@ -5887,7 +6462,7 @@ static void source_compile_exit(BCCompiler *cs, const char **pp) {
     }
 
     if (source_keyword(&p, "FUNCTION")) {
-        BCNestEntry *ne = bc_nest_find(cs, NEST_FUNCTION);
+        BCNestEntry * ne = bc_nest_find(cs, NEST_FUNCTION);
         if (!ne) {
             bc_set_error(cs, "EXIT FUNCTION without matching FUNCTION");
             *pp = p;
@@ -5901,7 +6476,7 @@ static void source_compile_exit(BCCompiler *cs, const char **pp) {
     }
 
     if (source_keyword(&p, "SUB")) {
-        BCNestEntry *ne = bc_nest_find(cs, NEST_SUB);
+        BCNestEntry * ne = bc_nest_find(cs, NEST_SUB);
         if (!ne) {
             bc_set_error(cs, "EXIT SUB without matching SUB");
             *pp = p;
@@ -5917,7 +6492,7 @@ static void source_compile_exit(BCCompiler *cs, const char **pp) {
      * Matches MMBasic interpreter behaviour — bare EXIT does NOT exit a
      * FOR loop (which requires explicit `Exit For`). */
     if (*p == '\0' || *p == '\'' || *p == ':') {
-        BCNestEntry *ne = bc_nest_find(cs, NEST_DO);
+        BCNestEntry * ne = bc_nest_find(cs, NEST_DO);
         if (!ne) {
             bc_set_error(cs, "No DO loop is in effect");
             *pp = p;
@@ -5934,8 +6509,8 @@ static void source_compile_exit(BCCompiler *cs, const char **pp) {
     *pp = p;
 }
 
-static void source_compile_fastgfx(BCSourceFrontend *fe, BCCompiler *cs, const char **pp) {
-    const char *p = *pp;
+static void source_compile_fastgfx(BCSourceFrontend * fe, BCCompiler * cs, const char ** pp) {
+    const char * p = *pp;
     source_skip_space(&p);
 
     if (source_keyword(&p, "CREATE")) {
@@ -5970,8 +6545,8 @@ static void source_compile_fastgfx(BCSourceFrontend *fe, BCCompiler *cs, const c
     *pp = p;
 }
 
-static int source_parse_framebuffer_target(const char **pp, char *target_out) {
-    const char *p = *pp;
+static int source_parse_framebuffer_target(const char ** pp, char * target_out) {
+    const char * p = *pp;
     source_skip_space(&p);
     if (*p == '"') {
         p++;
@@ -5993,16 +6568,16 @@ static int source_parse_framebuffer_target(const char **pp, char *target_out) {
     return 0;
 }
 
-static int source_parse_framebuffer_merge_mode(const char **pp, uint8_t *mode_out) {
-    const char *p = *pp;
+static int source_parse_framebuffer_merge_mode(const char ** pp, uint8_t * mode_out) {
+    const char * p = *pp;
     source_skip_space(&p);
     if (*p == '"') {
         p++;
         if ((*p == 'A' || *p == 'a' || *p == 'B' || *p == 'b' || *p == 'R' || *p == 'r') &&
             p[1] == '"') {
             char mode = (char)toupper((unsigned char)*p);
-            *mode_out = (mode == 'A') ? BC_FB_MERGE_MODE_A :
-                        (mode == 'B') ? BC_FB_MERGE_MODE_B : BC_FB_MERGE_MODE_R;
+            *mode_out = (mode == 'A') ? BC_FB_MERGE_MODE_A : (mode == 'B') ? BC_FB_MERGE_MODE_B
+                                                                           : BC_FB_MERGE_MODE_R;
             p += 2;
             *pp = p;
             return 1;
@@ -6011,8 +6586,8 @@ static int source_parse_framebuffer_merge_mode(const char **pp, uint8_t *mode_ou
     }
     if (*p == 'A' || *p == 'a' || *p == 'B' || *p == 'b' || *p == 'R' || *p == 'r') {
         char mode = (char)toupper((unsigned char)*p);
-        *mode_out = (mode == 'A') ? BC_FB_MERGE_MODE_A :
-                    (mode == 'B') ? BC_FB_MERGE_MODE_B : BC_FB_MERGE_MODE_R;
+        *mode_out = (mode == 'A') ? BC_FB_MERGE_MODE_A : (mode == 'B') ? BC_FB_MERGE_MODE_B
+                                                                       : BC_FB_MERGE_MODE_R;
         p++;
         *pp = p;
         return 1;
@@ -6020,8 +6595,8 @@ static int source_parse_framebuffer_merge_mode(const char **pp, uint8_t *mode_ou
     return 0;
 }
 
-static void source_compile_framebuffer(BCSourceFrontend *fe, BCCompiler *cs, const char **pp) {
-    const char *p = *pp;
+static void source_compile_framebuffer(BCSourceFrontend * fe, BCCompiler * cs, const char ** pp) {
+    const char * p = *pp;
     uint8_t aux[4];
     source_skip_space(&p);
 
@@ -6194,8 +6769,8 @@ static void source_compile_framebuffer(BCSourceFrontend *fe, BCCompiler *cs, con
  * so both the interpreter and the VM land in Audio.c's cmd_play — one
  * subcommand-parsing implementation shared across paths. */
 
-static void source_compile_pwm(BCSourceFrontend *fe, BCCompiler *cs, const char **pp) {
-    const char *p = *pp;
+static void source_compile_pwm(BCSourceFrontend * fe, BCCompiler * cs, const char ** pp) {
+    const char * p = *pp;
     source_skip_space(&p);
 
     if (source_keyword(&p, "SYNC")) {
@@ -6258,17 +6833,14 @@ static void source_compile_pwm(BCSourceFrontend *fe, BCCompiler *cs, const char 
                 break;
             p++;
         }
-        source_emit_syscall(cs, BC_SYS_PWM_CONFIG, (uint8_t)(2 + ((present & 0x01) ? 1 : 0) +
-                                                             ((present & 0x02) ? 1 : 0) +
-                                                             ((present & 0x04) ? 1 : 0) +
-                                                             ((present & 0x08) ? 1 : 0)),
+        source_emit_syscall(cs, BC_SYS_PWM_CONFIG, (uint8_t)(2 + ((present & 0x01) ? 1 : 0) + ((present & 0x02) ? 1 : 0) + ((present & 0x04) ? 1 : 0) + ((present & 0x08) ? 1 : 0)),
                             &present, 1);
         *pp = p;
     }
 }
 
-static void source_compile_servo(BCSourceFrontend *fe, BCCompiler *cs, const char **pp) {
-    const char *p = *pp;
+static void source_compile_servo(BCSourceFrontend * fe, BCCompiler * cs, const char ** pp) {
+    const char * p = *pp;
     uint8_t present = 0;
     uint8_t type = source_parse_expression(fe, cs, &p);
     source_emit_int_conversion(cs, type);
@@ -6294,14 +6866,13 @@ static void source_compile_servo(BCSourceFrontend *fe, BCCompiler *cs, const cha
             break;
         p++;
     }
-    source_emit_syscall(cs, BC_SYS_SERVO, (uint8_t)(1 + ((present & 0x01) ? 1 : 0) +
-                                                   ((present & 0x02) ? 1 : 0)),
+    source_emit_syscall(cs, BC_SYS_SERVO, (uint8_t)(1 + ((present & 0x01) ? 1 : 0) + ((present & 0x02) ? 1 : 0)),
                         &present, 1);
     *pp = p;
 }
 
-static void source_compile_setpin(BCSourceFrontend *fe, BCCompiler *cs, const char **pp) {
-    const char *p = *pp;
+static void source_compile_setpin(BCSourceFrontend * fe, BCCompiler * cs, const char ** pp) {
+    const char * p = *pp;
     int mode = 0;
     int option = VM_PIN_OPT_NONE;
 
@@ -6346,8 +6917,8 @@ static void source_compile_setpin(BCSourceFrontend *fe, BCCompiler *cs, const ch
     *pp = p;
 }
 
-static void source_compile_open(BCSourceFrontend *fe, BCCompiler *cs, const char **pp) {
-    const char *p = *pp;
+static void source_compile_open(BCSourceFrontend * fe, BCCompiler * cs, const char ** pp) {
+    const char * p = *pp;
     int fnbr = 0;
     int mode = 0;
     uint8_t type;
@@ -6402,8 +6973,8 @@ static void source_compile_open(BCSourceFrontend *fe, BCCompiler *cs, const char
     *pp = p;
 }
 
-static void source_compile_close(BCCompiler *cs, const char **pp) {
-    const char *p = *pp;
+static void source_compile_close(BCCompiler * cs, const char ** pp) {
+    const char * p = *pp;
 
     while (!cs->has_error) {
         int fnbr = 0;
@@ -6424,8 +6995,8 @@ static void source_compile_close(BCCompiler *cs, const char **pp) {
     *pp = p;
 }
 
-static int source_parse_string_expression(BCSourceFrontend *fe, BCCompiler *cs, const char **pp,
-                                          const char *msg) {
+static int source_parse_string_expression(BCSourceFrontend * fe, BCCompiler * cs, const char ** pp,
+                                          const char * msg) {
     uint8_t type = source_parse_expression(fe, cs, pp);
     if (cs->has_error) return 0;
     if (type != T_STR) {
@@ -6435,8 +7006,8 @@ static int source_parse_string_expression(BCSourceFrontend *fe, BCCompiler *cs, 
     return 1;
 }
 
-static void source_compile_drive(BCSourceFrontend *fe, BCCompiler *cs, const char **pp) {
-    const char *p = *pp;
+static void source_compile_drive(BCSourceFrontend * fe, BCCompiler * cs, const char ** pp) {
+    const char * p = *pp;
     if (!source_parse_string_expression(fe, cs, &p, "DRIVE requires string argument")) {
         *pp = p;
         return;
@@ -6445,8 +7016,8 @@ static void source_compile_drive(BCSourceFrontend *fe, BCCompiler *cs, const cha
     *pp = p;
 }
 
-static void source_compile_seek(BCSourceFrontend *fe, BCCompiler *cs, const char **pp) {
-    const char *p = *pp;
+static void source_compile_seek(BCSourceFrontend * fe, BCCompiler * cs, const char ** pp) {
+    const char * p = *pp;
     int fnbr = 0;
     uint8_t type;
 
@@ -6467,9 +7038,9 @@ static void source_compile_seek(BCSourceFrontend *fe, BCCompiler *cs, const char
     *pp = p;
 }
 
-static void source_compile_file_path_command(BCSourceFrontend *fe, BCCompiler *cs, const char **pp,
-                                             uint16_t sysid, const char *msg) {
-    const char *p = *pp;
+static void source_compile_file_path_command(BCSourceFrontend * fe, BCCompiler * cs, const char ** pp,
+                                             uint16_t sysid, const char * msg) {
+    const char * p = *pp;
     if (!source_parse_string_expression(fe, cs, &p, msg)) {
         *pp = p;
         return;
@@ -6478,8 +7049,8 @@ static void source_compile_file_path_command(BCSourceFrontend *fe, BCCompiler *c
     *pp = p;
 }
 
-static void source_compile_rename(BCSourceFrontend *fe, BCCompiler *cs, const char **pp) {
-    const char *p = *pp;
+static void source_compile_rename(BCSourceFrontend * fe, BCCompiler * cs, const char ** pp) {
+    const char * p = *pp;
     if (!source_parse_string_expression(fe, cs, &p, "RENAME requires string source")) {
         *pp = p;
         return;
@@ -6498,15 +7069,19 @@ static void source_compile_rename(BCSourceFrontend *fe, BCCompiler *cs, const ch
     *pp = p;
 }
 
-static void source_compile_copy(BCSourceFrontend *fe, BCCompiler *cs, const char **pp) {
-    const char *p = *pp;
+static void source_compile_copy(BCSourceFrontend * fe, BCCompiler * cs, const char ** pp) {
+    const char * p = *pp;
     uint8_t mode = 0;
 
     source_skip_space(&p);
-    if (source_keyword(&p, "A2A")) mode = 1;
-    else if (source_keyword(&p, "A2B")) mode = 2;
-    else if (source_keyword(&p, "B2A")) mode = 3;
-    else if (source_keyword(&p, "B2B")) mode = 4;
+    if (source_keyword(&p, "A2A"))
+        mode = 1;
+    else if (source_keyword(&p, "A2B"))
+        mode = 2;
+    else if (source_keyword(&p, "B2A"))
+        mode = 3;
+    else if (source_keyword(&p, "B2B"))
+        mode = 4;
 
     if (!source_parse_string_expression(fe, cs, &p, "COPY requires string source")) {
         *pp = p;
@@ -6531,8 +7106,8 @@ static void source_compile_copy(BCSourceFrontend *fe, BCCompiler *cs, const char
  * so both the interpreter and the VM land in FileIO.c's cmd_files —
  * one formatted-listing implementation shared across paths. */
 
-static void source_compile_line_input(BCSourceFrontend *fe, BCCompiler *cs, const char **pp) {
-    const char *p = *pp;
+static void source_compile_line_input(BCSourceFrontend * fe, BCCompiler * cs, const char ** pp) {
+    const char * p = *pp;
     int fnbr = 0;
     char name[MAXVARLEN + 1];
     int name_len = 0;
@@ -6584,9 +7159,9 @@ typedef struct {
     uint16_t slot;
 } SourceGfxArg;
 
-static int source_compile_expr_slice(BCSourceFrontend *fe, BCCompiler *cs,
-                                     const char *start, const char *end,
-                                     uint8_t *type_out) {
+static int source_compile_expr_slice(BCSourceFrontend * fe, BCCompiler * cs,
+                                     const char * start, const char * end,
+                                     uint8_t * type_out) {
     while (start < end && (*start == ' ' || *start == '\t')) start++;
     while (end > start && (end[-1] == ' ' || end[-1] == '\t')) end--;
     if (end <= start) return 0;
@@ -6598,17 +7173,17 @@ static int source_compile_expr_slice(BCSourceFrontend *fe, BCCompiler *cs,
     char expr[STRINGSIZE + 1];
     memcpy(expr, start, (size_t)(end - start));
     expr[end - start] = '\0';
-    const char *p = expr;
+    const char * p = expr;
     *type_out = source_parse_expression(fe, cs, &p);
     source_statement_end(cs, p);
     return cs->has_error ? -1 : 1;
 }
 
-static int source_compile_text_just_literal(BCCompiler *cs, const char *start, const char *end) {
+static int source_compile_text_just_literal(BCCompiler * cs, const char * start, const char * end) {
     while (start < end && (*start == ' ' || *start == '\t')) start++;
     while (end > start && (end[-1] == ' ' || end[-1] == '\t')) end--;
     if (end <= start || (size_t)(end - start) >= STRINGSIZE) return 0;
-    for (const char *p = start; p < end; p++) {
+    for (const char * p = start; p < end; p++) {
         if (!isalpha((unsigned char)*p) && *p != ' ') return 0;
     }
     uint16_t idx = bc_add_constant_string(cs, (const uint8_t *)start, (int)(end - start));
@@ -6617,9 +7192,9 @@ static int source_compile_text_just_literal(BCCompiler *cs, const char *start, c
     return 1;
 }
 
-static int source_try_parse_gfx_array_ref(BCCompiler *cs, SourceGfxArg *arg,
-                                          const char *cmd_name,
-                                          const char *start, const char *end) {
+static int source_try_parse_gfx_array_ref(BCCompiler * cs, SourceGfxArg * arg,
+                                          const char * cmd_name,
+                                          const char * start, const char * end) {
     char name[MAXVARLEN + 1];
     int name_len = 0;
     uint8_t type_hint = 0;
@@ -6632,7 +7207,7 @@ static int source_try_parse_gfx_array_ref(BCCompiler *cs, SourceGfxArg *arg,
     while (end > start && (end[-1] == ' ' || end[-1] == '\t')) end--;
     if (start >= end || !isnamestart((unsigned char)*start)) return 0;
 
-    const char *p = start;
+    const char * p = start;
     if (!source_parse_varname(&p, name, &name_len, &type_hint)) return 0;
     source_skip_space(&p);
     if (p < end) {
@@ -6682,8 +7257,8 @@ static int source_try_parse_gfx_array_ref(BCCompiler *cs, SourceGfxArg *arg,
     return 1;
 }
 
-static void source_emit_syscall(BCCompiler *cs, uint16_t sysid, uint8_t argc,
-                                const uint8_t *aux, uint8_t auxlen) {
+static void source_emit_syscall(BCCompiler * cs, uint16_t sysid, uint8_t argc,
+                                const uint8_t * aux, uint8_t auxlen) {
     bc_emit_byte(cs, OP_SYSCALL);
     bc_emit_u16(cs, sysid);
     bc_emit_byte(cs, argc);
@@ -6693,11 +7268,11 @@ static void source_emit_syscall(BCCompiler *cs, uint16_t sysid, uint8_t argc,
     }
 }
 
-static void source_emit_syscall_noaux(BCCompiler *cs, uint16_t sysid, uint8_t argc) {
+static void source_emit_syscall_noaux(BCCompiler * cs, uint16_t sysid, uint8_t argc) {
     source_emit_syscall(cs, sysid, argc, NULL, 0);
 }
 
-static uint8_t source_gfx_stack_argc(int max_args, SourceGfxArg *args) {
+static uint8_t source_gfx_stack_argc(int max_args, SourceGfxArg * args) {
     uint8_t argc = 0;
     for (int i = 0; i < max_args; i++) {
         if (args[i].kind == BC_BOX_ARG_STACK) argc++;
@@ -6705,8 +7280,8 @@ static uint8_t source_gfx_stack_argc(int max_args, SourceGfxArg *args) {
     return argc;
 }
 
-static void source_emit_gfx_native(BCCompiler *cs, uint16_t sysid, int max_args,
-                                   int field_count, SourceGfxArg *args) {
+static void source_emit_gfx_native(BCCompiler * cs, uint16_t sysid, int max_args,
+                                   int field_count, SourceGfxArg * args) {
     uint8_t argc = source_gfx_stack_argc(max_args, args);
     uint8_t aux[1 + BC_TEXT_ARG_COUNT * 3];
     int auxlen = 0;
@@ -6725,11 +7300,11 @@ static void source_emit_gfx_native(BCCompiler *cs, uint16_t sysid, int max_args,
     source_emit_syscall(cs, sysid, argc, aux, (uint8_t)auxlen);
 }
 
-static void source_compile_gfx_args(BCSourceFrontend *fe, BCCompiler *cs, const char **pp,
-                                    const char *cmd_name, uint16_t sysid,
+static void source_compile_gfx_args(BCSourceFrontend * fe, BCCompiler * cs, const char ** pp,
+                                    const char * cmd_name, uint16_t sysid,
                                     int min_args, int max_args, int text_mode) {
     SourceGfxArg args[BC_TEXT_ARG_COUNT];
-    const char *p = *pp;
+    const char * p = *pp;
     int field_count = 0;
     int idx = 0;
 
@@ -6738,17 +7313,21 @@ static void source_compile_gfx_args(BCSourceFrontend *fe, BCCompiler *cs, const 
 
     while (idx < max_args) {
         source_skip_space(&p);
-        const char *start = p;
+        const char * start = p;
         int in_string = 0;
         int depth = 0;
         while (*p) {
-            if (*p == '"') in_string = !in_string;
-            else if (!in_string && *p == '(') depth++;
-            else if (!in_string && *p == ')') depth--;
-            else if (!in_string && depth == 0 && (*p == ',' || *p == '\'')) break;
+            if (*p == '"')
+                in_string = !in_string;
+            else if (!in_string && *p == '(')
+                depth++;
+            else if (!in_string && *p == ')')
+                depth--;
+            else if (!in_string && depth == 0 && (*p == ',' || *p == '\''))
+                break;
             p++;
         }
-        const char *end = p;
+        const char * end = p;
 
         uint8_t type = 0;
         int present = 0;
@@ -6806,9 +7385,9 @@ static void source_compile_gfx_args(BCSourceFrontend *fe, BCCompiler *cs, const 
     *pp = p;
 }
 
-static void source_compile_polygon(BCSourceFrontend *fe, BCCompiler *cs, const char **pp) {
+static void source_compile_polygon(BCSourceFrontend * fe, BCCompiler * cs, const char ** pp) {
     SourceGfxArg args[BC_POLYGON_ARG_COUNT];
-    const char *p = *pp;
+    const char * p = *pp;
     int field_count = 0;
 
     memset(args, 0, sizeof(args));
@@ -6816,17 +7395,21 @@ static void source_compile_polygon(BCSourceFrontend *fe, BCCompiler *cs, const c
 
     for (int idx = 0; idx < BC_POLYGON_ARG_COUNT; idx++) {
         source_skip_space(&p);
-        const char *start = p;
+        const char * start = p;
         int in_string = 0;
         int depth = 0;
         while (*p) {
-            if (*p == '"') in_string = !in_string;
-            else if (!in_string && *p == '(') depth++;
-            else if (!in_string && *p == ')') depth--;
-            else if (!in_string && depth == 0 && (*p == ',' || *p == '\'')) break;
+            if (*p == '"')
+                in_string = !in_string;
+            else if (!in_string && *p == '(')
+                depth++;
+            else if (!in_string && *p == ')')
+                depth--;
+            else if (!in_string && depth == 0 && (*p == ',' || *p == '\''))
+                break;
             p++;
         }
-        const char *end = p;
+        const char * end = p;
         uint8_t type = 0;
         int present = 0;
         int array_rc = source_try_parse_gfx_array_ref(cs, &args[idx], "POLYGON", start, end);
@@ -6879,8 +7462,8 @@ static void source_compile_polygon(BCSourceFrontend *fe, BCCompiler *cs, const c
     *pp = p;
 }
 
-static void source_compile_cls(BCSourceFrontend *fe, BCCompiler *cs, const char **pp) {
-    const char *p = *pp;
+static void source_compile_cls(BCSourceFrontend * fe, BCCompiler * cs, const char ** pp) {
+    const char * p = *pp;
     source_skip_space(&p);
     int has_arg = 0;
     if (*p && *p != '\'') {
@@ -6896,8 +7479,8 @@ static void source_compile_cls(BCSourceFrontend *fe, BCCompiler *cs, const char 
     *pp = p;
 }
 
-static void source_compile_select_case(BCSourceFrontend *fe, BCCompiler *cs, const char **pp) {
-    const char *p = *pp;
+static void source_compile_select_case(BCSourceFrontend * fe, BCCompiler * cs, const char ** pp) {
+    const char * p = *pp;
     source_skip_space(&p);
     if (!source_keyword(&p, "CASE")) {
         bc_set_error(cs, "Expected CASE after SELECT");
@@ -6909,7 +7492,7 @@ static void source_compile_select_case(BCSourceFrontend *fe, BCCompiler *cs, con
     source_emit_store_converted(cs, slot, type, type, 0);
 
     bc_nest_push(cs, NEST_SELECT);
-    BCNestEntry *ne = bc_nest_top(cs);
+    BCNestEntry * ne = bc_nest_top(cs);
     if (ne) {
         ne->select_slot = slot;
         ne->select_type = type;
@@ -6918,8 +7501,8 @@ static void source_compile_select_case(BCSourceFrontend *fe, BCCompiler *cs, con
     *pp = p;
 }
 
-static void source_compile_case(BCSourceFrontend *fe, BCCompiler *cs, const char **pp) {
-    BCNestEntry *ne = bc_nest_find(cs, NEST_SELECT);
+static void source_compile_case(BCSourceFrontend * fe, BCCompiler * cs, const char ** pp) {
+    BCNestEntry * ne = bc_nest_find(cs, NEST_SELECT);
     if (!ne) {
         bc_set_error(cs, "CASE without matching SELECT CASE");
         return;
@@ -6932,7 +7515,7 @@ static void source_compile_case(BCSourceFrontend *fe, BCCompiler *cs, const char
         ne->addr1 = 0xFFFFFFFF;
     }
 
-    const char *p = *pp;
+    const char * p = *pp;
     source_skip_space(&p);
     if (source_keyword(&p, "ELSE")) {
         ne->has_else = 1;
@@ -6975,8 +7558,8 @@ static void source_compile_case(BCSourceFrontend *fe, BCCompiler *cs, const char
     *pp = p;
 }
 
-static void source_compile_end_select(BCCompiler *cs) {
-    BCNestEntry *ne = bc_nest_find(cs, NEST_SELECT);
+static void source_compile_end_select(BCCompiler * cs) {
+    BCNestEntry * ne = bc_nest_find(cs, NEST_SELECT);
     if (!ne) {
         bc_set_error(cs, "END SELECT without matching SELECT CASE");
         return;
@@ -6987,8 +7570,8 @@ static void source_compile_end_select(BCCompiler *cs) {
     bc_nest_pop(cs);
 }
 
-static const char *source_find_keyword_outside_string(const char *p, const char *kw) {
-    const char *base = p;
+static const char * source_find_keyword_outside_string(const char * p, const char * kw) {
+    const char * base = p;
     int in_string = 0;
     size_t len = strlen(kw);
     for (; *p; p++) {
@@ -7006,14 +7589,14 @@ static const char *source_find_keyword_outside_string(const char *p, const char 
     return NULL;
 }
 
-static void source_compile_statement_list(BCSourceFrontend *fe, BCCompiler *cs, const char *text) {
-    const char *p = text;
+static void source_compile_statement_list(BCSourceFrontend * fe, BCCompiler * cs, const char * text) {
+    const char * p = text;
     while (*p && !cs->has_error) {
         source_skip_space(&p);
         if (*p == '\0' || *p == '\'') break;
 
-        const char *start = p;
-        const char *kw_probe = p;
+        const char * start = p;
+        const char * kw_probe = p;
         int if_statement = source_keyword(&kw_probe, "IF");
         int in_string = 0;
         while (*p) {
@@ -7037,9 +7620,9 @@ static void source_compile_statement_list(BCSourceFrontend *fe, BCCompiler *cs, 
     }
 }
 
-static void source_compile_if(BCSourceFrontend *fe, BCCompiler *cs, const char **pp) {
-    const char *p = *pp;
-    const char *then_kw = source_find_keyword_outside_string(p, "THEN");
+static void source_compile_if(BCSourceFrontend * fe, BCCompiler * cs, const char ** pp) {
+    const char * p = *pp;
+    const char * then_kw = source_find_keyword_outside_string(p, "THEN");
     if (!then_kw) {
         bc_set_error(cs, "IF without THEN");
         *pp = p;
@@ -7051,7 +7634,7 @@ static void source_compile_if(BCSourceFrontend *fe, BCCompiler *cs, const char *
     if (cond_len > STRINGSIZE) cond_len = STRINGSIZE;
     memcpy(cond, p, cond_len);
     cond[cond_len] = '\0';
-    const char *cond_p = cond;
+    const char * cond_p = cond;
     uint8_t cond_type = source_parse_expression(fe, cs, &cond_p);
     if (cs->has_error) {
         *pp = p;
@@ -7070,10 +7653,10 @@ static void source_compile_if(BCSourceFrontend *fe, BCCompiler *cs, const char *
 
     uint32_t false_patch = source_emit_jmp_placeholder(cs, OP_JZ);
 
-    const char *then_start = then_kw + 4;
+    const char * then_start = then_kw + 4;
     if (source_line_empty_or_comment(then_start)) {
         bc_nest_push(cs, NEST_IF);
-        BCNestEntry *ne = bc_nest_top(cs);
+        BCNestEntry * ne = bc_nest_top(cs);
         if (ne) {
             ne->addr1 = false_patch;
             ne->addr2 = 0xFFFFFFFF;
@@ -7082,7 +7665,7 @@ static void source_compile_if(BCSourceFrontend *fe, BCCompiler *cs, const char *
         return;
     }
 
-    const char *else_kw = source_find_keyword_outside_string(then_start, "ELSE");
+    const char * else_kw = source_find_keyword_outside_string(then_start, "ELSE");
     char then_stmt[STRINGSIZE + 1];
     size_t then_len = else_kw ? (size_t)(else_kw - then_start) : strlen(then_start);
     if (then_len > STRINGSIZE) then_len = STRINGSIZE;
@@ -7107,8 +7690,8 @@ static void source_compile_if(BCSourceFrontend *fe, BCCompiler *cs, const char *
     *pp = then_start + strlen(then_start);
 }
 
-static void source_compile_elseif(BCSourceFrontend *fe, BCCompiler *cs, const char **pp) {
-    BCNestEntry *ne = bc_nest_top(cs);
+static void source_compile_elseif(BCSourceFrontend * fe, BCCompiler * cs, const char ** pp) {
+    BCNestEntry * ne = bc_nest_top(cs);
     if (!ne || ne->type != NEST_IF) {
         bc_set_error(cs, "ELSEIF without matching IF");
         return;
@@ -7118,8 +7701,8 @@ static void source_compile_elseif(BCSourceFrontend *fe, BCCompiler *cs, const ch
     if (ne->exit_fixup_count < 64) ne->exit_fixups[ne->exit_fixup_count++] = end_patch;
     if (ne->addr1 != 0xFFFFFFFF) source_patch_jmp_here(cs, ne->addr1);
 
-    const char *p = *pp;
-    const char *then_kw = source_find_keyword_outside_string(p, "THEN");
+    const char * p = *pp;
+    const char * then_kw = source_find_keyword_outside_string(p, "THEN");
     if (!then_kw) {
         bc_set_error(cs, "ELSEIF without THEN");
         *pp = p;
@@ -7131,7 +7714,7 @@ static void source_compile_elseif(BCSourceFrontend *fe, BCCompiler *cs, const ch
     if (cond_len > STRINGSIZE) cond_len = STRINGSIZE;
     memcpy(cond, p, cond_len);
     cond[cond_len] = '\0';
-    const char *cond_p = cond;
+    const char * cond_p = cond;
     uint8_t cond_type = source_parse_expression(fe, cs, &cond_p);
     if (cond_type == T_STR) bc_set_error(cs, "ELSEIF requires a numeric condition");
     source_statement_end(cs, cond_p);
@@ -7141,7 +7724,7 @@ static void source_compile_elseif(BCSourceFrontend *fe, BCCompiler *cs, const ch
     }
 
     ne->addr1 = source_emit_jmp_placeholder(cs, OP_JZ);
-    const char *then_start = then_kw + 4;
+    const char * then_start = then_kw + 4;
     if (source_line_empty_or_comment(then_start)) {
         *pp = then_start + strlen(then_start);
         return;
@@ -7151,8 +7734,8 @@ static void source_compile_elseif(BCSourceFrontend *fe, BCCompiler *cs, const ch
     *pp = then_start + strlen(then_start);
 }
 
-static void source_compile_else(BCCompiler *cs, const char **pp) {
-    BCNestEntry *ne = bc_nest_top(cs);
+static void source_compile_else(BCCompiler * cs, const char ** pp) {
+    BCNestEntry * ne = bc_nest_top(cs);
     if (!ne || ne->type != NEST_IF) {
         bc_set_error(cs, "ELSE without matching IF");
         return;
@@ -7162,13 +7745,13 @@ static void source_compile_else(BCCompiler *cs, const char **pp) {
     if (ne->addr1 != 0xFFFFFFFF) source_patch_jmp_here(cs, ne->addr1);
     ne->addr1 = 0xFFFFFFFF;
     ne->has_else = 1;
-    const char *p = *pp;
+    const char * p = *pp;
     source_skip_space(&p);
     *pp = p;
 }
 
-static void source_compile_endif(BCCompiler *cs) {
-    BCNestEntry *ne = bc_nest_top(cs);
+static void source_compile_endif(BCCompiler * cs) {
+    BCNestEntry * ne = bc_nest_top(cs);
     if (!ne || ne->type != NEST_IF) {
         /* MMBasic interpreter quirk: a stray ENDIF (no matching IF) is
          * silently ignored.  Real programs depend on this — e.g.
@@ -7186,14 +7769,24 @@ static void source_compile_endif(BCCompiler *cs) {
 // compilation can't express it — any arg evaluation would try to load a
 // struct slot — so we bridge the whole line.  Scans identifier-shaped
 // tokens and checks against cs->subfuns[].
-static int source_stmt_references_bridged_subfun(BCCompiler *cs, const char *stmt) {
-    const char *p = stmt;
+static int source_stmt_references_bridged_subfun(BCCompiler * cs, const char * stmt) {
+    const char * p = stmt;
     int in_str = 0;
     while (*p) {
-        if (*p == '\"') { in_str = !in_str; p++; continue; }
-        if (in_str) { p++; continue; }
-        if (!isnamestart((unsigned char)*p)) { p++; continue; }
-        const char *nstart = p;
+        if (*p == '\"') {
+            in_str = !in_str;
+            p++;
+            continue;
+        }
+        if (in_str) {
+            p++;
+            continue;
+        }
+        if (!isnamestart((unsigned char)*p)) {
+            p++;
+            continue;
+        }
+        const char * nstart = p;
         while (isnamechar((unsigned char)*p) && *p != '.') p++;
         if (*p == '$' || *p == '%' || *p == '!') p++;
         int nlen = (int)(p - nstart);
@@ -7201,7 +7794,7 @@ static int source_stmt_references_bridged_subfun(BCCompiler *cs, const char *stm
         /* Ignore trailing suffix for sub-name match — BCSubFun stores names
          * without type suffix. */
         int match_len = nlen;
-        unsigned char last = (unsigned char)nstart[nlen-1];
+        unsigned char last = (unsigned char)nstart[nlen - 1];
         if (last == '$' || last == '%' || last == '!') match_len--;
         int sf_idx = bc_find_subfun(cs, nstart, match_len);
         if (sf_idx >= 0 && cs->subfuns[sf_idx].bridged) return 1;
@@ -7216,27 +7809,26 @@ static int source_stmt_references_bridged_subfun(BCCompiler *cs, const char *stm
  * scanner (before the `:` statement separator gets stripped) and in
  * source_compile_statement (for the inline `: mylabel:` case after an
  * earlier statement on the same line). */
-static int source_try_register_label(BCCompiler *cs, const char **pp) {
-    const char *p = *pp;
+static int source_try_register_label(BCCompiler * cs, const char ** pp) {
+    const char * p = *pp;
     while (*p == ' ' || *p == '\t') p++;
     if (!(*p) || (!isalpha((unsigned char)*p) && *p != '_')) return 0;
-    const char *q = p;
+    const char * q = p;
     while (isalnum((unsigned char)*q) || *q == '_' || *q == '.') q++;
     int name_len = (int)(q - p);
-    const char *cs_q = q;
+    const char * cs_q = q;
     while (*cs_q == ' ' || *cs_q == '\t') cs_q++;
     if (*cs_q != ':' || cs_q[1] == '=') return 0;
     if (name_len <= 0 || name_len > BC_MAX_LABEL_NAME) return 0;
 
-    static const char *reserved[] = {
+    static const char * reserved[] = {
         "IF", "FOR", "DO", "WHILE", "SUB", "FUNCTION",
         "SELECT", "END", "EXIT", "NEXT", "LOOP", "RETURN",
         "GOTO", "GOSUB", "DIM", "LOCAL", "STATIC", "CONST",
         "PRINT", "INPUT", "OPEN", "CLOSE", "DATA", "READ",
         "RESTORE", "REM", "OPTION", "ON", "ELSE", "ELSEIF",
         "THEN", "TO", "STEP", "AS", "CASE", "DEFAULT",
-        NULL
-    };
+        NULL};
     for (int i = 0; reserved[i]; i++) {
         size_t rl = strlen(reserved[i]);
         if ((size_t)name_len == rl && strncasecmp(p, reserved[i], rl) == 0)
@@ -7253,7 +7845,8 @@ static int source_try_register_label(BCCompiler *cs, const char **pp) {
     int hit = -1;
     for (uint16_t i = 0; i < cs->labelmap_count; i++) {
         if (strcasecmp(cs->labelmap[i].name, buf) == 0) {
-            hit = (int)i; break;
+            hit = (int)i;
+            break;
         }
     }
     if (hit >= 0) {
@@ -7270,8 +7863,8 @@ static int source_try_register_label(BCCompiler *cs, const char **pp) {
     return 1;
 }
 
-static void source_compile_statement(BCSourceFrontend *fe, BCCompiler *cs, const char *stmt) {
-    const char *p = stmt;
+static void source_compile_statement(BCSourceFrontend * fe, BCCompiler * cs, const char * stmt) {
+    const char * p = stmt;
     source_skip_space(&p);
 
     /* BASIC label definition (also handled in source_compile_line —
@@ -7291,7 +7884,7 @@ static void source_compile_statement(BCSourceFrontend *fe, BCCompiler *cs, const
      * arg evaluation can't load struct slots.  Skip for SUB / FUNCTION /
      * END declarations — the name there is the definition, not a call. */
     {
-        const char *probe = stmt;
+        const char * probe = stmt;
         source_skip_space(&probe);
         int is_def = (strncasecmp(probe, "SUB", 3) == 0 && !isnamechar((unsigned char)probe[3])) ||
                      (strncasecmp(probe, "FUNCTION", 8) == 0 && !isnamechar((unsigned char)probe[8])) ||
@@ -7300,7 +7893,7 @@ static void source_compile_statement(BCSourceFrontend *fe, BCCompiler *cs, const
                      (strncasecmp(probe, "LOCAL", 5) == 0 && !isnamechar((unsigned char)probe[5])) ||
                      (strncasecmp(probe, "STATIC", 6) == 0 && !isnamechar((unsigned char)probe[6]));
         if (!is_def && source_stmt_references_bridged_subfun(cs, stmt)) {
-            const char *line_end = stmt;
+            const char * line_end = stmt;
             while (*line_end && *line_end != ':' && *line_end != '\'') line_end++;
             size_t len = (size_t)(line_end - stmt);
             if (len >= STRINGSIZE) len = STRINGSIZE - 1;
@@ -7319,10 +7912,10 @@ static void source_compile_statement(BCSourceFrontend *fe, BCCompiler *cs, const
          * still compile natively but won't see interpreter-opened files,
          * which is documented as the tradeoff. */
         if (fe->uses_struct_file_io &&
-            ((strncasecmp(probe, "OPEN",  4) == 0 && !isnamechar((unsigned char)probe[4])) ||
+            ((strncasecmp(probe, "OPEN", 4) == 0 && !isnamechar((unsigned char)probe[4])) ||
              (strncasecmp(probe, "CLOSE", 5) == 0 && !isnamechar((unsigned char)probe[5])) ||
-             (strncasecmp(probe, "SEEK",  4) == 0 && !isnamechar((unsigned char)probe[4])))) {
-            const char *line_end = stmt;
+             (strncasecmp(probe, "SEEK", 4) == 0 && !isnamechar((unsigned char)probe[4])))) {
+            const char * line_end = stmt;
             while (*line_end && *line_end != ':' && *line_end != '\'') line_end++;
             size_t len = (size_t)(line_end - stmt);
             if (len >= STRINGSIZE) len = STRINGSIZE - 1;
@@ -7343,13 +7936,17 @@ static void source_compile_statement(BCSourceFrontend *fe, BCCompiler *cs, const
          * avoid matching '#' inside text. */
         {
             int has_var_fnbr = 0;
-            const char *scan = stmt;
+            const char * scan = stmt;
             int in_str = 0;
             while (*scan && *scan != '\n' && *scan != '\'') {
                 char c = *scan;
-                if (c == '"') { in_str = !in_str; scan++; continue; }
+                if (c == '"') {
+                    in_str = !in_str;
+                    scan++;
+                    continue;
+                }
                 if (!in_str && c == '#') {
-                    const char *q = scan + 1;
+                    const char * q = scan + 1;
                     while (*q == ' ' || *q == '\t') q++;
                     if (*q && !isdigit((unsigned char)*q)) {
                         has_var_fnbr = 1;
@@ -7359,7 +7956,7 @@ static void source_compile_statement(BCSourceFrontend *fe, BCCompiler *cs, const
                 scan++;
             }
             if (has_var_fnbr) {
-                const char *line_end = stmt;
+                const char * line_end = stmt;
                 int s_in_str = 0;
                 while (*line_end && *line_end != '\n') {
                     if (*line_end == '"') s_in_str = !s_in_str;
@@ -7426,7 +8023,7 @@ static void source_compile_statement(BCSourceFrontend *fe, BCCompiler *cs, const
             bc_set_error(cs, "Too many structure types");
             return;
         }
-        struct s_structdef *sd = (struct s_structdef *)GetMemory(sizeof(struct s_structdef));
+        struct s_structdef * sd = (struct s_structdef *)GetMemory(sizeof(struct s_structdef));
         memset(sd, 0, sizeof(*sd));
         memcpy(sd->name, tname, tlen + 1);
         fe->struct_def_inprogress = sd;
@@ -7482,7 +8079,10 @@ static void source_compile_statement(BCSourceFrontend *fe, BCCompiler *cs, const
             bc_emit_u16(cs, 0);
             int idx = -1;
             for (uint16_t i = 0; i < cs->labelmap_count; i++) {
-                if (strcasecmp(cs->labelmap[i].name, name) == 0) { idx = (int)i; break; }
+                if (strcasecmp(cs->labelmap[i].name, name) == 0) {
+                    idx = (int)i;
+                    break;
+                }
             }
             if (idx >= 0 && cs->labelmap[idx].data_index != 0xFFFF) {
                 bc_patch_u16(cs, patch, cs->labelmap[idx].data_index);
@@ -7752,9 +8352,9 @@ static void source_compile_statement(BCSourceFrontend *fe, BCCompiler *cs, const
     }
 
     {
-        const char *q = p;
+        const char * q = p;
         if (source_keyword(&q, "LINE")) {
-            const char *r = q;
+            const char * r = q;
             source_skip_space(&r);
             if (source_keyword(&r, "INPUT")) {
                 p = r;
@@ -7823,7 +8423,7 @@ static void source_compile_statement(BCSourceFrontend *fe, BCCompiler *cs, const
     }
 
     if (source_keyword(&p, "ELSE")) {
-        const char *q = p;
+        const char * q = p;
         source_skip_space(&q);
         if (source_keyword(&q, "IF")) {
             source_compile_elseif(fe, cs, &q);
@@ -7923,7 +8523,7 @@ static void source_compile_statement(BCSourceFrontend *fe, BCCompiler *cs, const
     }
 
     if (isnamestart((unsigned char)*p)) {
-        const char *probe = p;
+        const char * probe = p;
         char name[MAXVARLEN + 1];
         int name_len = 0;
         uint8_t type = 0;
@@ -7934,13 +8534,16 @@ static void source_compile_statement(BCSourceFrontend *fe, BCCompiler *cs, const
                 source_statement_end(cs, p);
                 return;
             }
-            const char *after_name = probe;
+            const char * after_name = probe;
             if (*probe == '(') {
                 int depth = 0;
                 do {
-                    if (*probe == '(') depth++;
-                    else if (*probe == ')') depth--;
-                    else if (*probe == '\0') break;
+                    if (*probe == '(')
+                        depth++;
+                    else if (*probe == ')')
+                        depth--;
+                    else if (*probe == '\0')
+                        break;
                     probe++;
                 } while (depth > 0);
                 source_skip_space(&probe);
@@ -7985,13 +8588,16 @@ static void source_compile_statement(BCSourceFrontend *fe, BCCompiler *cs, const
         memcpy(inpbuf, stmt, slen);
         inpbuf[slen] = 0;
 
-        tokenise(1);  /* console mode: no T_NEWLINE prefix */
+        tokenise(1); /* console mode: no T_NEWLINE prefix */
 
         /* tknbuf now has: cmd_token(2 bytes) + tokenized args + 0x00 terminator.
          * Find the length of the tokenized form. */
-        unsigned char *tp = tknbuf;
+        unsigned char * tp = tknbuf;
         while (*tp) {
-            if (*tp == T_LINENBR) { tp += 3; continue; }
+            if (*tp == T_LINENBR) {
+                tp += 3;
+                continue;
+            }
             tp++;
         }
         uint16_t tok_len = (uint16_t)(tp - tknbuf);
@@ -8010,10 +8616,10 @@ static void source_compile_statement(BCSourceFrontend *fe, BCCompiler *cs, const
     }
 }
 
-static void source_compile_line(BCSourceFrontend *fe, BCCompiler *cs, const char *line) {
+static void source_compile_line(BCSourceFrontend * fe, BCCompiler * cs, const char * line) {
     bc_crash_checkpoint(BC_CK_LINE_ENTER, "line: enter");
     bc_crash_snapshot_cs(cs);
-    const char *p = line;
+    const char * p = line;
     source_skip_space(&p);
 
     /* Inside a FUNCTION foo() AS <struct> body — skip every line until we
@@ -8021,11 +8627,14 @@ static void source_compile_line(BCSourceFrontend *fe, BCCompiler *cs, const char
      * them via bridged cmd_let); the VM doesn't emit any bytecode for the
      * body. */
     if (fe->in_struct_fn) {
-        const char *cp = p;
+        const char * cp = p;
         if (isdigit((unsigned char)*cp)) {
-            char *end = NULL;
+            char * end = NULL;
             (void)strtol(cp, &end, 10);
-            if (end != cp) { cp = end; source_skip_space(&cp); }
+            if (end != cp) {
+                cp = end;
+                source_skip_space(&cp);
+            }
         }
         if ((strncasecmp(cp, "END FUNCTION", 12) == 0 && !isnamechar((unsigned char)cp[12])) ||
             (strncasecmp(cp, "END SUB", 7) == 0 && !isnamechar((unsigned char)cp[7]))) {
@@ -8040,14 +8649,17 @@ static void source_compile_line(BCSourceFrontend *fe, BCCompiler *cs, const char
      * g_structtbl.  Skip any leading line-number prefix so tests that use
      * numbered lines still terminate on `999 END TYPE`. */
     if (fe->in_type_block) {
-        const char *cp = p;
+        const char * cp = p;
         if (isdigit((unsigned char)*cp)) {
-            char *end = NULL;
+            char * end = NULL;
             (void)strtol(cp, &end, 10);
-            if (end != cp) { cp = end; source_skip_space(&cp); }
+            if (end != cp) {
+                cp = end;
+                source_skip_space(&cp);
+            }
         }
         if (strncasecmp(cp, "END TYPE", 8) == 0 && !isnamechar((unsigned char)cp[8])) {
-            struct s_structdef *sd = fe->struct_def_inprogress;
+            struct s_structdef * sd = fe->struct_def_inprogress;
             if (sd) {
                 if (sd->num_members > 0 && g_structcnt < MAX_STRUCT_TYPES) {
                     // Pad total_size to natural alignment so arrays of structs
@@ -8066,10 +8678,10 @@ static void source_compile_line(BCSourceFrontend *fe, BCCompiler *cs, const char
             fe->in_type_block = 0;
             return;
         }
-        if (*cp == 0 || *cp == '\'') return;                        // blank / comment line
+        if (*cp == 0 || *cp == '\'') return; // blank / comment line
         if (fe->struct_def_inprogress) {
-            const char *merr = ParseStructMember((unsigned char *)cp,
-                                                 fe->struct_def_inprogress);
+            const char * merr = ParseStructMember((unsigned char *)cp,
+                                                  fe->struct_def_inprogress);
             if (merr) bc_set_error(cs, "%s", merr);
         }
         return;
@@ -8077,13 +8689,16 @@ static void source_compile_line(BCSourceFrontend *fe, BCCompiler *cs, const char
 
     /* If inside '!ASM block, accumulate lines until '!ENDASM */
     if (fe->asm_active) {
-        const char *cp = p;
+        const char * cp = p;
         source_skip_space(&cp);
         /* Check for line number prefix */
         if (isdigit((unsigned char)*cp)) {
-            char *end = NULL;
+            char * end = NULL;
             (void)strtol(cp, &end, 10);
-            if (end != cp) { cp = end; source_skip_space(&cp); }
+            if (end != cp) {
+                cp = end;
+                source_skip_space(&cp);
+            }
         }
         /* Check for '!ENDASM */
         if (*cp == '\'' && strncasecmp(cp, "'!ENDASM", 8) == 0) {
@@ -8095,7 +8710,7 @@ static void source_compile_line(BCSourceFrontend *fe, BCCompiler *cs, const char
         }
         /* Strip comment-only prefix if line starts with ' — it's ASM content */
         /* Accumulate the raw line content (after any ' prefix) */
-        const char *content = cp;
+        const char * content = cp;
         if (*content == '\'') content++; /* strip leading ' if present */
         if (fe->asm_line_count < ASM_MAX_LINES) {
             strncpy(fe->asm_lines[fe->asm_line_count], content, ASM_MAX_LINE_LEN - 1);
@@ -8110,7 +8725,7 @@ static void source_compile_line(BCSourceFrontend *fe, BCCompiler *cs, const char
 
     int explicit_line = 0;
     if (isdigit((unsigned char)*p)) {
-        char *end = NULL;
+        char * end = NULL;
         long n = strtol(p, &end, 10);
         if (end != p) {
             explicit_line = (int)n;
@@ -8121,7 +8736,7 @@ static void source_compile_line(BCSourceFrontend *fe, BCCompiler *cs, const char
 
     if (source_line_empty_or_comment(p)) {
         /* Check for '!FAST compiler directive */
-        const char *cp = p;
+        const char * cp = p;
         source_skip_space(&cp);
         if (*cp == '\'' && strncasecmp(cp, "'!FAST", 6) == 0) {
             fe->fast_next_loop = 1;
@@ -8161,8 +8776,8 @@ static void source_compile_line(BCSourceFrontend *fe, BCCompiler *cs, const char
          * through and the outer `while` exits. */
         if (source_try_register_label(cs, &p)) continue;
 
-        const char *start = p;
-        const char *kw_probe = p;
+        const char * start = p;
+        const char * kw_probe = p;
         int if_statement = source_keyword(&kw_probe, "IF");
         int in_string = 0;
         while (*p) {
@@ -8188,8 +8803,8 @@ static void source_compile_line(BCSourceFrontend *fe, BCCompiler *cs, const char
     }
 }
 
-static void source_skip_parenthesized(const char **pp) {
-    const char *p = *pp;
+static void source_skip_parenthesized(const char ** pp) {
+    const char * p = *pp;
     if (*p != '(') return;
 
     int depth = 0;
@@ -8198,7 +8813,8 @@ static void source_skip_parenthesized(const char **pp) {
         if (*p == '"') {
             in_string = !in_string;
         } else if (!in_string) {
-            if (*p == '(') depth++;
+            if (*p == '(')
+                depth++;
             else if (*p == ')') {
                 depth--;
                 if (depth == 0) {
@@ -8212,12 +8828,12 @@ static void source_skip_parenthesized(const char **pp) {
     *pp = p;
 }
 
-static void source_predeclare_line(BCCompiler *cs, const char *line, int line_no) {
-    const char *p = line;
+static void source_predeclare_line(BCCompiler * cs, const char * line, int line_no) {
+    const char * p = line;
     source_skip_space(&p);
 
     if (isdigit((unsigned char)*p)) {
-        char *end = NULL;
+        char * end = NULL;
         (void)strtol(p, &end, 10);
         if (end != p) {
             p = end;
@@ -8229,7 +8845,7 @@ static void source_predeclare_line(BCCompiler *cs, const char *line, int line_no
     cs->current_line = line_no;
     if (source_keyword(&p, "SUB")) {
         source_skip_space(&p);
-        const char *name_start = p;
+        const char * name_start = p;
         char name[MAXVARLEN + 1];
         int name_len = 0;
         uint8_t type = 0;
@@ -8250,7 +8866,7 @@ static void source_predeclare_line(BCCompiler *cs, const char *line, int line_no
 
     if (source_keyword(&p, "FUNCTION")) {
         source_skip_space(&p);
-        const char *name_start = p;
+        const char * name_start = p;
         char name[MAXVARLEN + 1];
         int name_len = 0;
         uint8_t ret_type = 0;
@@ -8276,13 +8892,13 @@ static void source_predeclare_line(BCCompiler *cs, const char *line, int line_no
     }
 }
 
-static void source_update_continuation_setting(const char *line, unsigned char *continuation) {
-    const char *p = line;
+static void source_update_continuation_setting(const char * line, unsigned char * continuation) {
+    const char * p = line;
 
     if (!continuation) return;
     source_skip_space(&p);
     if (isdigit((unsigned char)*p)) {
-        char *end = NULL;
+        char * end = NULL;
         (void)strtol(p, &end, 10);
         if (end != p) {
             p = end;
@@ -8302,10 +8918,10 @@ static void source_update_continuation_setting(const char *line, unsigned char *
     }
 }
 
-static int source_read_logical_line(const char **pp, char *line, size_t line_cap,
-                                    int *physical_line_io, int *line_no_out,
-                                    unsigned char *continuation) {
-    const char *p = *pp;
+static int source_read_logical_line(const char ** pp, char * line, size_t line_cap,
+                                    int * physical_line_io, int * line_no_out,
+                                    unsigned char * continuation) {
+    const char * p = *pp;
     size_t out_len = 0;
     int line_no = *physical_line_io;
 
@@ -8313,7 +8929,7 @@ static int source_read_logical_line(const char **pp, char *line, size_t line_cap
     line[0] = '\0';
 
     while (*p) {
-        const char *start = p;
+        const char * start = p;
         size_t len;
         while (*p && *p != '\n' && *p != '\r') p++;
         len = (size_t)(p - start);
@@ -8322,8 +8938,10 @@ static int source_read_logical_line(const char **pp, char *line, size_t line_cap
         out_len += len;
         line[out_len] = '\0';
 
-        if (*p == '\r' && p[1] == '\n') p += 2;
-        else if (*p == '\n' || *p == '\r') p++;
+        if (*p == '\r' && p[1] == '\n')
+            p += 2;
+        else if (*p == '\n' || *p == '\r')
+            p++;
 
         (*physical_line_io)++;
         if (*continuation && out_len >= 2 &&
@@ -8347,23 +8965,26 @@ static int source_read_logical_line(const char **pp, char *line, size_t line_cap
 // makes it interpreter-owned, and call sites emit OP_CALL_SUB for a sub
 // whose body we later flag `.bridged`.  Mirrors source_compile_line's TYPE
 // block handling but without any bytecode emission.
-static void source_prescan_types(BCCompiler *cs, const char *source) {
+static void source_prescan_types(BCCompiler * cs, const char * source) {
     (void)cs;
     int physical_line = 1;
     int line_no = 1;
     unsigned char continuation = 0;
-    const char *p = source;
+    const char * p = source;
     char line[STRINGSIZE + 1];
-    struct s_structdef *sd = NULL;
+    struct s_structdef * sd = NULL;
     int in_asm = 0;
 
     while (source_read_logical_line(&p, line, sizeof(line), &physical_line, &line_no, &continuation)) {
-        const char *lp = line;
+        const char * lp = line;
         source_skip_space(&lp);
         if (isdigit((unsigned char)*lp)) {
-            char *end = NULL;
+            char * end = NULL;
             (void)strtol(lp, &end, 10);
-            if (end != lp) { lp = end; source_skip_space(&lp); }
+            if (end != lp) {
+                lp = end;
+                source_skip_space(&lp);
+            }
         }
         if (in_asm) {
             if (*lp == '\'' && strncasecmp(lp, "'!ENDASM", 8) == 0) in_asm = 0;
@@ -8394,7 +9015,7 @@ static void source_prescan_types(BCCompiler *cs, const char *source) {
         }
 
         if (strncasecmp(lp, "TYPE", 4) == 0 && !isnamechar((unsigned char)lp[4])) {
-            const char *tp = lp + 4;
+            const char * tp = lp + 4;
             source_skip_space(&tp);
             unsigned char tname[MAXVARLEN + 1];
             int tlen = 0;
@@ -8404,7 +9025,7 @@ static void source_prescan_types(BCCompiler *cs, const char *source) {
             }
             tname[tlen] = 0;
             if (tlen == 0) continue;
-            if (FindStructType(tname) >= 0) continue;      // already registered
+            if (FindStructType(tname) >= 0) continue; // already registered
             if (g_structcnt >= MAX_STRUCT_TYPES) continue;
             sd = (struct s_structdef *)GetMemory(sizeof(struct s_structdef));
             memset(sd, 0, sizeof(*sd));
@@ -8418,14 +9039,24 @@ static void source_prescan_types(BCCompiler *cs, const char *source) {
  * clause where <name> resolves to a registered struct type?  Returns 1 if so.
  * Walks identifier-shaped tokens, skipping quoted strings and tail comments,
  * so spurious hits inside `"AS Point"` string literals are ignored. */
-static int source_local_line_has_struct_as(const char *line) {
-    const char *p = line;
+static int source_local_line_has_struct_as(const char * line) {
+    const char * p = line;
     int in_str = 0;
     while (*p && *p != '\'') {
-        if (*p == '"') { in_str = !in_str; p++; continue; }
-        if (in_str) { p++; continue; }
-        if (!isnamestart((unsigned char)*p)) { p++; continue; }
-        const char *ns = p;
+        if (*p == '"') {
+            in_str = !in_str;
+            p++;
+            continue;
+        }
+        if (in_str) {
+            p++;
+            continue;
+        }
+        if (!isnamestart((unsigned char)*p)) {
+            p++;
+            continue;
+        }
+        const char * ns = p;
         while (isnamechar((unsigned char)*p)) p++;
         int nlen = (int)(p - ns);
         if (nlen == 2 && (ns[0] | 0x20) == 'a' && (ns[1] | 0x20) == 's') {
@@ -8445,11 +9076,11 @@ static int source_local_line_has_struct_as(const char *line) {
     return 0;
 }
 
-static void source_predeclare_subfuns(BCCompiler *cs, const char *source) {
+static void source_predeclare_subfuns(BCCompiler * cs, const char * source) {
     int physical_line = 1;
     int line_no = 1;
     unsigned char continuation = 0;
-    const char *p = source;
+    const char * p = source;
     char line[STRINGSIZE + 1];
     int in_asm = 0;
     /* Phase 8: track the enclosing SUB/FUNCTION across lines.  A body-level
@@ -8461,13 +9092,16 @@ static void source_predeclare_subfuns(BCCompiler *cs, const char *source) {
     while (!cs->has_error &&
            source_read_logical_line(&p, line, sizeof(line), &physical_line, &line_no, &continuation)) {
         /* Skip lines inside '!ASM blocks */
-        const char *lp = line;
+        const char * lp = line;
         source_skip_space(&lp);
         /* Skip line number prefix */
         if (isdigit((unsigned char)*lp)) {
-            char *end = NULL;
+            char * end = NULL;
             (void)strtol(lp, &end, 10);
-            if (end != lp) { lp = end; source_skip_space(&lp); }
+            if (end != lp) {
+                lp = end;
+                source_skip_space(&lp);
+            }
         }
         if (in_asm) {
             if (*lp == '\'' && strncasecmp(lp, "'!ENDASM", 8) == 0)
@@ -8484,9 +9118,9 @@ static void source_predeclare_subfuns(BCCompiler *cs, const char *source) {
         /* Phase 8 body-scan: update current_sf on SUB/FUNCTION boundaries and
          * mark the sub bridged when its body declares a struct-typed LOCAL. */
         if (strncasecmp(lp, "SUB", 3) == 0 && !isnamechar((unsigned char)lp[3])) {
-            const char *np = lp + 3;
+            const char * np = lp + 3;
             source_skip_space(&np);
-            const char *ns = np;
+            const char * ns = np;
             char sn[MAXVARLEN + 1];
             int snl = 0;
             uint8_t stype = 0;
@@ -8496,9 +9130,9 @@ static void source_predeclare_subfuns(BCCompiler *cs, const char *source) {
             continue;
         }
         if (strncasecmp(lp, "FUNCTION", 8) == 0 && !isnamechar((unsigned char)lp[8])) {
-            const char *np = lp + 8;
+            const char * np = lp + 8;
             source_skip_space(&np);
-            const char *ns = np;
+            const char * ns = np;
             char sn[MAXVARLEN + 1];
             int snl = 0;
             uint8_t stype = 0;
@@ -8517,10 +9151,10 @@ static void source_predeclare_subfuns(BCCompiler *cs, const char *source) {
         }
         if (current_sf < 0 || cs->subfuns[current_sf].bridged) continue;
 
-        int is_local  = (strncasecmp(lp, "LOCAL",  5) == 0 && !isnamechar((unsigned char)lp[5]));
+        int is_local = (strncasecmp(lp, "LOCAL", 5) == 0 && !isnamechar((unsigned char)lp[5]));
         int is_static = (strncasecmp(lp, "STATIC", 6) == 0 && !isnamechar((unsigned char)lp[6]));
         if (is_local || is_static) {
-            const char *decls = lp + (is_local ? 5 : 6);
+            const char * decls = lp + (is_local ? 5 : 6);
             if (source_local_line_has_struct_as(decls)) {
                 cs->subfuns[current_sf].bridged = 1;
                 continue;
@@ -8536,13 +9170,13 @@ static void source_predeclare_subfuns(BCCompiler *cs, const char *source) {
          * substring scan; false positives just bridge a sub
          * unnecessarily, doesn't affect correctness. */
         {
-            const char *q = lp;
+            const char * q = lp;
             int in_str = 0;
             while (*q && *q != '\n') {
                 if (*q == '"') in_str = !in_str;
                 if (!in_str && *q == '\'') break;
                 if (!in_str && *q == '#') {
-                    const char *r = q + 1;
+                    const char * r = q + 1;
                     while (*r == ' ' || *r == '\t') r++;
                     if (*r && !isdigit((unsigned char)*r)) {
                         cs->subfuns[current_sf].bridged = 1;
@@ -8559,16 +9193,16 @@ static void source_predeclare_subfuns(BCCompiler *cs, const char *source) {
  * `wanted` (NULL-terminated list of uppercase names).  Substring scan — both
  * tokens are unique enough that false positives in comments/strings only
  * cause a bit of extra bridging, not incorrect behaviour. */
-static int source_program_uses_struct_subcmd(const char *source, const char *const *wanted) {
-    const char *p = source;
+static int source_program_uses_struct_subcmd(const char * source, const char * const * wanted) {
+    const char * p = source;
     while (*p) {
         if ((*p == 's' || *p == 'S') &&
             strncasecmp(p, "STRUCT", 6) == 0 &&
             (p == source || !isnamechar((unsigned char)p[-1])) &&
             !isnamechar((unsigned char)p[6])) {
-            const char *q = p + 6;
+            const char * q = p + 6;
             while (*q == ' ' || *q == '\t') q++;
-            for (const char *const *w = wanted; *w; w++) {
+            for (const char * const * w = wanted; *w; w++) {
                 int wl = (int)strlen(*w);
                 if (strncasecmp(q, *w, wl) == 0 && !isnamechar((unsigned char)q[wl]))
                     return 1;
@@ -8579,17 +9213,17 @@ static int source_program_uses_struct_subcmd(const char *source, const char *con
     return 0;
 }
 
-static int source_program_uses_struct_file_io(const char *source) {
-    static const char *const wanted[] = {"SAVE", "LOAD", NULL};
+static int source_program_uses_struct_file_io(const char * source) {
+    static const char * const wanted[] = {"SAVE", "LOAD", NULL};
     return source_program_uses_struct_subcmd(source, wanted);
 }
 
-static int source_program_uses_struct_extract_insert(const char *source) {
-    static const char *const wanted[] = {"EXTRACT", "INSERT", NULL};
+static int source_program_uses_struct_extract_insert(const char * source) {
+    static const char * const wanted[] = {"EXTRACT", "INSERT", NULL};
     return source_program_uses_struct_subcmd(source, wanted);
 }
 
-int bc_compile_source(BCCompiler *cs, const char *source, const char *source_name) {
+int bc_compile_source(BCCompiler * cs, const char * source, const char * source_name) {
     BCSourceFrontend fe;
     memset(&fe, 0, sizeof(fe));
     (void)source_name;
@@ -8603,9 +9237,12 @@ int bc_compile_source(BCCompiler *cs, const char *source, const char *source_nam
     source_predeclare_subfuns(cs, source);
     fe.uses_struct_file_io = source_program_uses_struct_file_io(source);
     fe.uses_struct_extract_insert = source_program_uses_struct_extract_insert(source);
-    if (cs->has_error) { source_asm_buf_free(&fe); return -1; }
+    if (cs->has_error) {
+        source_asm_buf_free(&fe);
+        return -1;
+    }
 
-    const char *p = source;
+    const char * p = source;
     int physical_line = 1;
     unsigned char continuation = 0;
     while (!cs->has_error) {
@@ -8630,6 +9267,6 @@ int bc_compile_source(BCCompiler *cs, const char *source, const char *source_nam
     bc_crash_checkpoint(BC_CK_COMPILE_FIXUPS, "resolve fixups");
     bc_resolve_fixups(cs);
     bc_crash_checkpoint(BC_CK_COMPILE_DONE, "compile done");
-    source_asm_buf_free(&fe);  /* no-op if never allocated */
+    source_asm_buf_free(&fe); /* no-op if never allocated */
     return cs->has_error ? -1 : 0;
 }

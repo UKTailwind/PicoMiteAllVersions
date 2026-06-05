@@ -13,12 +13,20 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-typedef struct { int _placeholder; } mutex_t;
+typedef struct {
+    int _placeholder;
+} mutex_t;
 
-static inline void mutex_init(mutex_t *m) { (void)m; }
-static inline void mutex_enter_blocking(mutex_t *m) { (void)m; }
-static inline void mutex_exit(mutex_t *m) { (void)m; }
-static inline bool mutex_try_enter(mutex_t *m, uint32_t *owner_out) {
+static inline void mutex_init(mutex_t * m) {
+    (void)m;
+}
+static inline void mutex_enter_blocking(mutex_t * m) {
+    (void)m;
+}
+static inline void mutex_exit(mutex_t * m) {
+    (void)m;
+}
+static inline bool mutex_try_enter(mutex_t * m, uint32_t * owner_out) {
     (void)m;
     if (owner_out) *owner_out = 0;
     return true;

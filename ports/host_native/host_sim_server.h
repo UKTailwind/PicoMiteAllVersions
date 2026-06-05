@@ -8,7 +8,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-int host_sim_server_start(const char *listen_addr, int port, const char *web_root);
+int host_sim_server_start(const char * listen_addr, int port, const char * web_root);
 void host_sim_server_stop(void);
 
 /*
@@ -31,7 +31,7 @@ void host_sim_tick_stop(void);
  * via host_sim_pop_key(). Returns -1 when empty.
  */
 void host_sim_push_key(int code);
-int  host_sim_pop_key(void);
+int host_sim_pop_key(void);
 
 /*
  * Graphics command stream used by --sim mode. Drawing primitives record
@@ -45,12 +45,12 @@ int  host_sim_pop_key(void);
  * the strong defs in host_sim_server.c override at link time when the
  * sim variant is built. Call sites stay unconditional.
  */
-int  host_sim_cmds_target_is_front(void);
+int host_sim_cmds_target_is_front(void);
 void host_sim_emit_cls(int colour);
 void host_sim_emit_rect(int x1, int y1, int x2, int y2, int colour);
 void host_sim_emit_pixel(int x, int y, int colour);
 void host_sim_emit_scroll(int lines, int bg);
-void host_sim_emit_blit(int x, int y, int w, int h, const uint32_t *pixels);
-size_t host_sim_cmd_drain(uint8_t **out_buf, size_t *out_cap);
+void host_sim_emit_blit(int x, int y, int w, int h, const uint32_t * pixels);
+size_t host_sim_cmd_drain(uint8_t ** out_buf, size_t * out_cap);
 
 #endif

@@ -33,89 +33,103 @@
 
 extern lfs_t lfs;
 
-int FileSize(char *p){
-    char q[FF_MAX_LFN]={0};
-    int retval=0;
-    int waste=0, t=FatFSFileSystem+1;
-    int localfilesystemsave=FatFSFileSystem;
-    t = drivecheck(p,&waste);
-    p+=waste;
-    getfullfilename(p,q);
-    FatFSFileSystem=t-1;
-    if(FatFSFileSystem==0){
+int FileSize(char * p) {
+    char q[FF_MAX_LFN] = {0};
+    int retval = 0;
+    int waste = 0, t = FatFSFileSystem + 1;
+    int localfilesystemsave = FatFSFileSystem;
+    t = drivecheck(p, &waste);
+    p += waste;
+    getfullfilename(p, q);
+    FatFSFileSystem = t - 1;
+    if (FatFSFileSystem == 0) {
         struct lfs_info lfsinfo;
-        memset(&lfsinfo,0,sizeof(DIR));
+        memset(&lfsinfo, 0, sizeof(DIR));
         FSerror = lfs_stat(&lfs, q, &lfsinfo);
-        if(lfsinfo.type==LFS_TYPE_REG)retval= lfsinfo.size;
+        if (lfsinfo.type == LFS_TYPE_REG) retval = lfsinfo.size;
     } else {
         DIR djd;
         FILINFO fnod;
-        memset(&djd,0,sizeof(DIR));
-        memset(&fnod,0,sizeof(FILINFO));
-        if(!InitSDCard()) return -1;
+        memset(&djd, 0, sizeof(DIR));
+        memset(&fnod, 0, sizeof(FILINFO));
+        if (!InitSDCard()) return -1;
         FSerror = f_stat(q, &fnod);
-        if(FSerror != FR_OK)iret=0;
-        else if(!(fnod.fattrib & AM_DIR))retval=fnod.fsize;
+        if (FSerror != FR_OK)
+            iret = 0;
+        else if (!(fnod.fattrib & AM_DIR))
+            retval = fnod.fsize;
     }
-    FatFSFileSystem=localfilesystemsave;
+    FatFSFileSystem = localfilesystemsave;
     return retval;
 }
 
-int ExistsFile(char *p){
-    char q[FF_MAX_LFN]={0};
-    int retval=0;
-    int waste=0, t=FatFSFileSystem+1;
-    int localfilesystemsave=FatFSFileSystem;
-    t = drivecheck(p,&waste);
-    p+=waste;
-    getfullfilename(p,q);
-    FatFSFileSystem=t-1;
-    if(FatFSFileSystem==0){
+int ExistsFile(char * p) {
+    char q[FF_MAX_LFN] = {0};
+    int retval = 0;
+    int waste = 0, t = FatFSFileSystem + 1;
+    int localfilesystemsave = FatFSFileSystem;
+    t = drivecheck(p, &waste);
+    p += waste;
+    getfullfilename(p, q);
+    FatFSFileSystem = t - 1;
+    if (FatFSFileSystem == 0) {
         struct lfs_info lfsinfo;
-        memset(&lfsinfo,0,sizeof(DIR));
+        memset(&lfsinfo, 0, sizeof(DIR));
         FSerror = lfs_stat(&lfs, q, &lfsinfo);
-        if(lfsinfo.type==LFS_TYPE_REG)retval= 1;
+        if (lfsinfo.type == LFS_TYPE_REG) retval = 1;
     } else {
         DIR djd;
         FILINFO fnod;
-        memset(&djd,0,sizeof(DIR));
-        memset(&fnod,0,sizeof(FILINFO));
-        if(!InitSDCard()) return -1;
+        memset(&djd, 0, sizeof(DIR));
+        memset(&fnod, 0, sizeof(FILINFO));
+        if (!InitSDCard()) return -1;
         FSerror = f_stat(q, &fnod);
-        if(FSerror != FR_OK)iret=0;
-        else if(!(fnod.fattrib & AM_DIR))retval=1;
+        if (FSerror != FR_OK)
+            iret = 0;
+        else if (!(fnod.fattrib & AM_DIR))
+            retval = 1;
     }
-    FatFSFileSystem=localfilesystemsave;
+    FatFSFileSystem = localfilesystemsave;
     return retval;
 }
 
-int ExistsDir(char *p, char *q, int *filesystem){
-    int ireturn=0;
-    ireturn=0;
-    int localfilesystemsave=FatFSFileSystem;
-    int waste=0, t=FatFSFileSystem+1;
-    t = drivecheck(p,&waste);
-    p+=waste;
-    getfullfilename(p,q);
-    FatFSFileSystem=t-1;
-    *filesystem=FatFSFileSystem;
-    if(strcmp(q,"/")==0 || strcmp(q,"/.")==0 || strcmp(q,"/..")==0 ){FatFSFileSystem=localfilesystemsave;ireturn= 1; return ireturn;}
-    if(FatFSFileSystem==0){
+int ExistsDir(char * p, char * q, int * filesystem) {
+    int ireturn = 0;
+    ireturn = 0;
+    int localfilesystemsave = FatFSFileSystem;
+    int waste = 0, t = FatFSFileSystem + 1;
+    t = drivecheck(p, &waste);
+    p += waste;
+    getfullfilename(p, q);
+    FatFSFileSystem = t - 1;
+    *filesystem = FatFSFileSystem;
+    if (strcmp(q, "/") == 0 || strcmp(q, "/.") == 0 || strcmp(q, "/..") == 0) {
+        FatFSFileSystem = localfilesystemsave;
+        ireturn = 1;
+        return ireturn;
+    }
+    if (FatFSFileSystem == 0) {
         struct lfs_info lfsinfo;
-        memset(&lfsinfo,0,sizeof(DIR));
+        memset(&lfsinfo, 0, sizeof(DIR));
         FSerror = lfs_stat(&lfs, q, &lfsinfo);
-        if(lfsinfo.type==LFS_TYPE_DIR)ireturn= 1;
+        if (lfsinfo.type == LFS_TYPE_DIR) ireturn = 1;
     } else {
         DIR djd;
         FILINFO fnod;
-        memset(&djd,0,sizeof(DIR));
-        memset(&fnod,0,sizeof(FILINFO));
-        if(q[strlen(q)-1]=='/')strcat(q,".");
-        if(!InitSDCard()) {FatFSFileSystem=localfilesystemsave;ireturn= -1; return ireturn;}
+        memset(&djd, 0, sizeof(DIR));
+        memset(&fnod, 0, sizeof(FILINFO));
+        if (q[strlen(q) - 1] == '/') strcat(q, ".");
+        if (!InitSDCard()) {
+            FatFSFileSystem = localfilesystemsave;
+            ireturn = -1;
+            return ireturn;
+        }
         FSerror = f_stat(q, &fnod);
-        if(FSerror != FR_OK)ireturn=0;
-        else if((fnod.fattrib & AM_DIR))ireturn=1;
+        if (FSerror != FR_OK)
+            ireturn = 0;
+        else if ((fnod.fattrib & AM_DIR))
+            ireturn = 1;
     }
-    FatFSFileSystem=localfilesystemsave;
+    FatFSFileSystem = localfilesystemsave;
     return ireturn;
 }

@@ -20,42 +20,50 @@ static inline void io_wait(void) {
     outb(0x80, 0);
 }
 
-#define PIC1_CMD   0x20
-#define PIC1_DATA  0x21
-#define PIC2_CMD   0xA0
-#define PIC2_DATA  0xA1
+#define PIC1_CMD 0x20
+#define PIC1_DATA 0x21
+#define PIC2_CMD 0xA0
+#define PIC2_DATA 0xA1
 
-#define ICW1_INIT  0x10
-#define ICW1_ICW4  0x01
-#define ICW4_8086  0x01
+#define ICW1_INIT 0x10
+#define ICW1_ICW4 0x01
+#define ICW4_8086 0x01
 
-#define PIC_EOI    0x20
+#define PIC_EOI 0x20
 #define PIC_READ_ISR 0x0B
 
 void pic_init(void) {
     /* ICW1: start init sequence in cascade mode (ICW1_ICW4 says ICW4
      * needed). */
-    outb(PIC1_CMD, ICW1_INIT | ICW1_ICW4); io_wait();
-    outb(PIC2_CMD, ICW1_INIT | ICW1_ICW4); io_wait();
+    outb(PIC1_CMD, ICW1_INIT | ICW1_ICW4);
+    io_wait();
+    outb(PIC2_CMD, ICW1_INIT | ICW1_ICW4);
+    io_wait();
 
     /* ICW2: vector base. */
-    outb(PIC1_DATA, PIC_REMAP_OFFSET);     io_wait();
-    outb(PIC2_DATA, PIC_REMAP_OFFSET + 8); io_wait();
+    outb(PIC1_DATA, PIC_REMAP_OFFSET);
+    io_wait();
+    outb(PIC2_DATA, PIC_REMAP_OFFSET + 8);
+    io_wait();
 
     /* ICW3: cascading wiring — master tells slave it's on IRQ2; slave
      * tells master its cascade ID is 2. */
-    outb(PIC1_DATA, 1 << 2);  io_wait();
-    outb(PIC2_DATA, 2);       io_wait();
+    outb(PIC1_DATA, 1 << 2);
+    io_wait();
+    outb(PIC2_DATA, 2);
+    io_wait();
 
     /* ICW4: 8086/88 mode (vs 8080). */
-    outb(PIC1_DATA, ICW4_8086); io_wait();
-    outb(PIC2_DATA, ICW4_8086); io_wait();
+    outb(PIC1_DATA, ICW4_8086);
+    io_wait();
+    outb(PIC2_DATA, ICW4_8086);
+    io_wait();
 
     /* Mask everything until handlers are registered. Cascade line
      * (IRQ2) MUST stay enabled on the master so slave-side IRQs
      * propagate; we'll let pic_unmask(2) be implicit by leaving it
      * unmasked here. */
-    outb(PIC1_DATA, 0xFB);   /* all masked except IRQ2 cascade */
+    outb(PIC1_DATA, 0xFB); /* all masked except IRQ2 cascade */
     outb(PIC2_DATA, 0xFF);
 }
 

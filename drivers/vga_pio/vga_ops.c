@@ -32,8 +32,13 @@ int ScreenSize = 0;
  * since the ifdef went away; the VGA stub below satisfies the link
  * and is never called (the dead branches are guarded by
  * `if(!WriteBuf)` / `if(s != NULL)`, both always false on VGA). */
-void copyframetoscreen(uint8_t *s, int xstart, int xend, int ystart, int yend, int odd) {
-    (void)s; (void)xstart; (void)xend; (void)ystart; (void)yend; (void)odd;
+void copyframetoscreen(uint8_t * s, int xstart, int xend, int ystart, int yend, int odd) {
+    (void)s;
+    (void)xstart;
+    (void)xend;
+    (void)ystart;
+    (void)yend;
+    (void)odd;
 }
 
 /* cmd_blit MERGE on non-VGA uses blitmerge + setframebuffer in the
@@ -42,9 +47,13 @@ void copyframetoscreen(uint8_t *s, int xstart, int xend, int ystart, int yend, i
  * hal_display_merge_has_pipeline() guard, but the linker still needs
  * the symbols — the branches are dead code on VGA. */
 void blitmerge(int x0, int y0, int w, int h, uint8_t colour) {
-    (void)x0; (void)y0; (void)w; (void)h; (void)colour;
+    (void)x0;
+    (void)y0;
+    (void)w;
+    (void)h;
+    (void)colour;
 }
-void setframebuffer(void) { }
+void setframebuffer(void) {}
 
 int hal_vga_ops_handle_cls(int c) {
     if (!(DISPLAY_TYPE == SCREENMODE1 && WriteBuf == DisplayBuf)) return 0;
@@ -68,11 +77,10 @@ int hal_vga_ops_handle_tile_cls(int colour) {
 }
 
 int hal_vga_ops_handle_layer_clear(void) {
-    if ((WriteBuf == LayerBuf && (DISPLAY_TYPE == SCREENMODE2 || DISPLAY_TYPE == SCREENMODE3) && LayerBuf != DisplayBuf)
-     || (WriteBuf == SecondLayer && (DISPLAY_TYPE == SCREENMODE2 || DISPLAY_TYPE == SCREENMODE3) && SecondLayer != DisplayBuf)) {
+    if ((WriteBuf == LayerBuf && (DISPLAY_TYPE == SCREENMODE2 || DISPLAY_TYPE == SCREENMODE3) && LayerBuf != DisplayBuf) || (WriteBuf == SecondLayer && (DISPLAY_TYPE == SCREENMODE2 || DISPLAY_TYPE == SCREENMODE3) && SecondLayer != DisplayBuf)) {
         uint8_t colourv = (WriteBuf == LayerBuf
-                             ? transparent | (transparent << 4)
-                             : transparents | (transparents << 4));
+                               ? transparent | (transparent << 4)
+                               : transparents | (transparents << 4));
         memset((void *)WriteBuf, colourv, HRes * VRes / 2);
         return 1;
     }
@@ -86,7 +94,7 @@ int hal_vga_ops_handle_layer_clear(void) {
         return 1;
     }
     if ((void *)WriteBuf == LayerBuf && DISPLAY_TYPE == SCREENMODE4 && LayerBuf != DisplayBuf) {
-        uint16_t *p = (uint16_t *)WriteBuf;
+        uint16_t * p = (uint16_t *)WriteBuf;
         for (int i = 0; i < HRes * VRes; i++) *p++ = RGBtransparent;
         return 1;
     }
@@ -106,9 +114,9 @@ uint8_t hal_vga_ops_layer_merge_byte(uint8_t primary, int x, int y) {
     return (uint8_t)((hi << 4) | lo);
 }
 
-void hal_vga_ops_tile_colour(int x, int y, int *front, int *back) {
+void hal_vga_ops_tile_colour(int x, int y, int * front, int * back) {
     int tile = (x / 8) + (y / ytileheight) * X_TILE;
-    *back  = RGB121map[tilebcols[tile] & 0xF];
+    *back = RGB121map[tilebcols[tile] & 0xF];
     *front = RGB121map[tilefcols[tile] & 0xF];
 }
 
@@ -159,11 +167,11 @@ void hal_vga_ops_fb2_fill_tile_colours(int x1, int y1, int w_px, int h_px, int f
     }
 }
 
-volatile unsigned char *hal_vga_ops_fb_n_target(void) {
+volatile unsigned char * hal_vga_ops_fb_n_target(void) {
     return (volatile unsigned char *)DisplayBuf;
 }
 
-volatile unsigned char *hal_vga_ops_fb_t_target(void) {
+volatile unsigned char * hal_vga_ops_fb_t_target(void) {
 #ifdef rp2350
     return (volatile unsigned char *)SecondLayer;
 #else
@@ -190,7 +198,7 @@ uint8_t hal_vga_ops_layer_merge_rgb8(uint8_t primary, int x, int y) {
 /* Display_Refresh on VGA: the scanline-DMA runs continuously so there
  * is no flush step. SPI-LCD ports implement the real thing in
  * drivers/spi_lcd/spi_lcd.c. */
-void Display_Refresh(void) { }
+void Display_Refresh(void) {}
 
 /* hal_vga_ops_wait_scanline_zero impl moved to per-port files:
  * vga_qvga_modes.c (pure-VGA — spins on QVgaScanLine) and

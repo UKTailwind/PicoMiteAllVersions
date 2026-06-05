@@ -9,13 +9,13 @@
 #ifndef _PC386_PLATFORM_H
 #define _PC386_PLATFORM_H
 
-#define PICOMITE     1
+#define PICOMITE 1
 #define MMBASIC_HOST 1
 
 /* Pico SDK section/attribute macros — no-op on pc386. */
-#define __not_in_flash_func(x)   x
+#define __not_in_flash_func(x) x
 #define __not_in_flash(x)
-#define __uninitialized_ram(x)   x
+#define __uninitialized_ram(x) x
 #define __in_flash(x)
 #define __scratch_x(x)
 #define __scratch_y(x)
@@ -24,9 +24,9 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include <stdlib.h>   /* lfs_util.h calls malloc without including <stdlib.h> */
-#include <setjmp.h>   /* MMBasic.h uses jmp_buf without including <setjmp.h> */
-#include <time.h>     /* MM_Misc.h uses time_t without an explicit include */
+#include <stdlib.h> /* lfs_util.h calls malloc without including <stdlib.h> */
+#include <setjmp.h> /* MMBasic.h uses jmp_buf without including <setjmp.h> */
+#include <time.h>   /* MM_Misc.h uses time_t without an explicit include */
 
 #ifndef uint
 typedef unsigned int uint;

@@ -21,31 +21,28 @@ typedef struct {
     uint16_t reset_us;
 } ws2812_timing_t;
 
-static uint16_t ws2812_ticks(uint32_t ns)
-{
+static uint16_t ws2812_ticks(uint32_t ns) {
     return (uint16_t)((ns * (WS2812_RMT_RESOLUTION_HZ / 1000000u) + 999u) / 1000u);
 }
 
-static ws2812_timing_t ws2812_timing_for(hal_ws2812_type_t type)
-{
+static ws2812_timing_t ws2812_timing_for(hal_ws2812_type_t type) {
     switch (type) {
-        case HAL_WS2812_ORIGINAL:
-            return (ws2812_timing_t){ ws2812_ticks(350), ws2812_ticks(800),
-                                      ws2812_ticks(700), ws2812_ticks(600), 50 };
-        case HAL_WS2812_SK6812:
-        case HAL_WS2812_SK6812W:
-            return (ws2812_timing_t){ ws2812_ticks(300), ws2812_ticks(900),
-                                      ws2812_ticks(600), ws2812_ticks(600), 80 };
-        case HAL_WS2812_B:
-        default:
-            return (ws2812_timing_t){ ws2812_ticks(400), ws2812_ticks(850),
-                                      ws2812_ticks(800), ws2812_ticks(450), 280 };
+    case HAL_WS2812_ORIGINAL:
+        return (ws2812_timing_t){ws2812_ticks(350), ws2812_ticks(800),
+                                 ws2812_ticks(700), ws2812_ticks(600), 50};
+    case HAL_WS2812_SK6812:
+    case HAL_WS2812_SK6812W:
+        return (ws2812_timing_t){ws2812_ticks(300), ws2812_ticks(900),
+                                 ws2812_ticks(600), ws2812_ticks(600), 80};
+    case HAL_WS2812_B:
+    default:
+        return (ws2812_timing_t){ws2812_ticks(400), ws2812_ticks(850),
+                                 ws2812_ticks(800), ws2812_ticks(450), 280};
     }
 }
 
 int hal_ws2812_write(uint32_t gpio, hal_ws2812_type_t type,
-                     const uint8_t *wire_bytes, size_t wire_len)
-{
+                     const uint8_t * wire_bytes, size_t wire_len) {
     ws2812_timing_t timing = ws2812_timing_for(type);
     rmt_channel_handle_t channel = NULL;
     rmt_encoder_handle_t encoder = NULL;
@@ -102,4 +99,3 @@ int hal_ws2812_write(uint32_t gpio, hal_ws2812_type_t type,
 
     return err == ESP_OK ? 0 : -1;
 }
-

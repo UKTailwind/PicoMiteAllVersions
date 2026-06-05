@@ -19,10 +19,10 @@
 #define HAL_PORT_CONFIG_INCLUDED 1
 
 /* Chip-level: RP2350 (HDMI is rp2350-only). */
-#define HAL_PORT_PWM_SLICE_COUNT         12
-#define HAL_PORT_GPIO_COUNT              48
-#define HAL_PORT_PIO_COUNT               3
-#define HAL_PORT_PULLDOWN_NEEDS_RESET    1
+#define HAL_PORT_PWM_SLICE_COUNT 12
+#define HAL_PORT_GPIO_COUNT 48
+#define HAL_PORT_PIO_COUNT 3
+#define HAL_PORT_PULLDOWN_NEEDS_RESET 1
 /* HDMI + WiFi: HSTX scanout (no PIO), audio I²S on PIO 2 matching the
  * legacy HDMI port's choice. The CYW43 bus PIO uses
  * pio_claim_free_sm_and_add_program_for_gpio_range so it picks
@@ -31,28 +31,27 @@
  * audio with high-numbered pins (>GP31) can hard-fault during boot;
  * not yet root-caused. Use lower-numbered I²S pins or skip I²S on
  * this port until the conflict is understood. */
-#define HAL_PORT_AUDIO_I2S_PIO_NUM       2
-#define HAL_PORT_DEFAULT_CPU_SPEED_KHZ   378000
+#define HAL_PORT_AUDIO_I2S_PIO_NUM 2
+#define HAL_PORT_DEFAULT_CPU_SPEED_KHZ 378000
 
-#define HAL_PORT_HAS_I2C_KEYPAD          0
+#define HAL_PORT_HAS_I2C_KEYPAD 0
 #define HAL_PORT_BACKLIGHT_VIA_KEYPAD_I2C 0
-#define HAL_PORT_I2C_TIMEOUT_MS          5
-#define HAL_PORT_I2C_SLOW_HZ             100000
+#define HAL_PORT_I2C_TIMEOUT_MS 5
+#define HAL_PORT_I2C_SLOW_HZ 100000
 
 /* MMInkey pinned to RAM — rp2350 has plenty of SRAM. */
-#define MMINKEY_DECL(name)      __not_in_flash_func(name)
-
+#define MMINKEY_DECL(name) __not_in_flash_func(name)
 
 /* HDMI + WiFi combined. PSRAM + UPNG + DEFINES inherit from HDMI
  * (RM2's CYW43 lives off the QSPI pins so PSRAM stays available).
  * GUICONTROLS off — no touch panel on a DVI display. */
-#define HAL_PORT_HAS_WIFI                1
-#define HAL_PORT_HAS_GUICONTROLS         0
+#define HAL_PORT_HAS_WIFI 1
+#define HAL_PORT_HAS_GUICONTROLS 0
 /* HAL_PORT_KEYBOARD_USB_HOST is set by usb_role() in port_sources.cmake. */
 
 /* core1stack[] size in words. HDMI runs the DVI scanout loop on core1
  * (hdmi_scanout::HDMICore, 512-byte stack). */
-#define HAL_PORT_CORE1_STACK_WORDS       128
+#define HAL_PORT_CORE1_STACK_WORDS 128
 
 /* Stage-D per-port memory + clock + MMBasic-table values (decascade plan
  * D1). HDMI's MIN_CPU is FreqX (250 MHz in the VGA-family freq table);
@@ -65,74 +64,72 @@
  * scratch, the BASIC heap fits at ~120 KB on RP2350's 520 KB SRAM
  * (about 80 KB lower than HDMI-only's 184 KB). The intent is that
  * BASIC programs use PSRAM for big allocations via cmd_psram. */
-#define HAL_PORT_HEAP_MEMORY_SIZE        (120 * 1024)
-#define HAL_PORT_MAX_CPU                 378000
-#define HAL_PORT_MIN_CPU                 250000
-#define HAL_PORT_MAX_VARS                768
-#define HAL_PORT_MAX_SUBFUN              512
-#define HAL_PORT_MAX_MODES               5
-#define HAL_PORT_FLASH_TARGET_OFFSET     (1408 * 1024)
+#define HAL_PORT_HEAP_MEMORY_SIZE (120 * 1024)
+#define HAL_PORT_MAX_CPU 378000
+#define HAL_PORT_MIN_CPU 250000
+#define HAL_PORT_MAX_VARS 768
+#define HAL_PORT_MAX_SUBFUN 512
+#define HAL_PORT_MAX_MODES 5
+#define HAL_PORT_FLASH_TARGET_OFFSET (1408 * 1024)
 #define HAL_PORT_FLASH_TARGET_OFFSET_USB (1408 * 1024)
 /* Unique magic key — pick anything not used by an existing port. */
-#define HAL_PORT_MAGIC_KEY               0xD51F77E4
-#define HAL_PORT_MAGIC_KEY_USB           0xD51F77E4
-#define HAL_PORT_HEAP_TOP                0x2007D000
-#define HAL_PORT_HEAP_TOP_USB            0x2007D000
-#define HAL_PORT_CONSOLE_RX_BUF_SIZE     256
-#define HAL_PORT_PIOMAX                  3
-#define HAL_PORT_NBR_PINS                62
+#define HAL_PORT_MAGIC_KEY 0xD51F77E4
+#define HAL_PORT_MAGIC_KEY_USB 0xD51F77E4
+#define HAL_PORT_HEAP_TOP 0x2007D000
+#define HAL_PORT_HEAP_TOP_USB 0x2007D000
+#define HAL_PORT_CONSOLE_RX_BUF_SIZE 256
+#define HAL_PORT_PIOMAX 3
+#define HAL_PORT_NBR_PINS 62
 /* HDMI scanout + DVI mode tables claim all three PIO instances. */
-#define HAL_PORT_PIO0_CLAIMED            true
-#define HAL_PORT_PIO1_CLAIMED            true
-#define HAL_PORT_PIO2_CLAIMED            true
-#define HAL_PORT_PSRAM_BASE              0x11000000
-#define HAL_PORT_PSRAM_BLOCK_SIZE        0x1A0000
+#define HAL_PORT_PIO0_CLAIMED true
+#define HAL_PORT_PIO1_CLAIMED true
+#define HAL_PORT_PIO2_CLAIMED true
+#define HAL_PORT_PSRAM_BASE 0x11000000
+#define HAL_PORT_PSRAM_BLOCK_SIZE 0x1A0000
 /* CYW43 owns the LED on standard pico2_w pinout (RM2 module on
  * pico_stretch wires the same way). No user-pickable heartbeat pin. */
 /* GP29 is CYW43 SPI clock; ADC3 (GP29) unavailable. RP2350B exposes
  * GP40-47 with additional ADC channels; bump this number once the
  * core ADC code is taught about them. */
-#define HAL_PORT_ADC_CHANNEL_MAX         3
+#define HAL_PORT_ADC_CHANNEL_MAX 3
 
 /* cmd_files flist[] cap. Device has the RAM and the SaveContext+InitHeap
  * dance to allocate ~76 KB. Host caps lower in host/port_config.h. */
-#define HAL_PORT_FILES_MAX               1000
+#define HAL_PORT_FILES_MAX 1000
 
 /* VGA-family build (PICOMITEVGA defined). VGA+HDMI ports share core paths
  * that branch on this flag at runtime — gated as preprocessor #ifdef in
  * the original source. */
-#define HAL_PORT_IS_VGA                  1
+#define HAL_PORT_IS_VGA 1
 
 /* HDMI variant of the VGA family. */
-#define HAL_PORT_HAS_HDMI                1
-#define HAL_PORT_HAS_NEXTGEN_DISPLAY    0
+#define HAL_PORT_HAS_HDMI 1
+#define HAL_PORT_HAS_NEXTGEN_DISPLAY 0
 
 /* FLAC decoder base sample-rate cap (RP2350 → 48 kHz). */
-#define HAL_PORT_AUDIO_FLAC_MAX_BASE_HZ  48000
-#define HAL_PORT_AUDIO_MOD_BUFFER_SIZE   8192
-#define HAL_PORT_HAS_MP3                 1
+#define HAL_PORT_AUDIO_FLAC_MAX_BASE_HZ 48000
+#define HAL_PORT_AUDIO_MOD_BUFFER_SIZE 8192
+#define HAL_PORT_HAS_MP3 1
 
-#define PORT_RAM_FUNC(name)          __not_in_flash_func(name)
+#define PORT_RAM_FUNC(name) __not_in_flash_func(name)
 
 /* Placement for MMBasic's per-expression hot functions (getvalue,
  * findvar) and the big DefinedSubFun dispatch. rp2350 HDMI has plenty
  * of RAM; put both in SRAM. */
-#define MMB_HOT_FUNC(name)    __not_in_flash_func(name)
+#define MMB_HOT_FUNC(name) __not_in_flash_func(name)
 #define MMB_DISPATCH_FUNC(name) __not_in_flash_func(name)
 
 /* HDMI framebuffer trailer: 320*240*2 = 153600 bytes (same as VGA
  * rp2350 — HDMI scanout reads the same 320x240 logical buffer and
  * upscales via the DVI PHY). */
-#define HAL_PORT_FRAMEBUFFER_TRAILER_BYTES (320*240*2)
-#define HAL_PORT_ALLMEMORY_ALIGN           256
-
+#define HAL_PORT_FRAMEBUFFER_TRAILER_BYTES (320 * 240 * 2)
+#define HAL_PORT_ALLMEMORY_ALIGN 256
 
 /* SPI-LCD clock-pin field: rp2040 PICOMITE shares SYSTEM_CLK for the
  * LCD; rp2350 PICOMITE breaks it out as Option.LCD_CLK. Ports without
  * an SPI LCD at all (VGA/HDMI/WEB) never read it at runtime but need
  * the macro defined so Draw.c compiles. */
-#define HAL_PORT_LCD_SPI_CLK_PIN         Option.SYSTEM_CLK
-
+#define HAL_PORT_LCD_SPI_CLK_PIN Option.SYSTEM_CLK
 
 /* Console medium font (FontTable[2]) — VGA ports at QVGA
  * resolution use the narrower arial_bold so an 80-column console
@@ -152,7 +149,6 @@
  * register values stored before the fault. Host has no such
  * section — plain BSS. */
 #define BC_CRASH_INFO_ATTR __attribute__((section(".uninitialized_data.bc_crash_info")))
-
 
 /* Compiler-table sizes. */
 #include "../bc_tables_rp2350.h"

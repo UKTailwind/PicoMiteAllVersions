@@ -21,7 +21,7 @@
 #define IDT_NUM_VECTORS 256
 
 /* Gate type byte: present=1, DPL=0, 32-bit interrupt gate. */
-#define IDT_GATE_INTR32  0x8E
+#define IDT_GATE_INTR32 0x8E
 
 /* CPU register snapshot the asm stubs push before calling into C.
  * Order matches the actual stack layout (top to bottom of struct):
@@ -43,10 +43,10 @@ void idt_init(void);
 /* Register a C handler for a specific vector. The handler is called
  * from the common asm dispatcher with a pointer to the saved register
  * frame. NULL clears the slot back to "unhandled". */
-typedef void (*idt_handler_t)(idt_regs_t *r);
+typedef void (*idt_handler_t)(idt_regs_t * r);
 void idt_register_handler(uint8_t vector, idt_handler_t fn);
 
 /* Convenience for stage 4b — print "EXCEPTION %d at %08x" and halt. */
-void exc_unhandled(idt_regs_t *r);
+void exc_unhandled(idt_regs_t * r);
 
 #endif

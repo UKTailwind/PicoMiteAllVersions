@@ -25,6 +25,6 @@ void bc_run_diag_note_load(char fs, unsigned size, unsigned old_free, unsigned v
 void bc_run_diag_note_source_alloc_fail(unsigned need, unsigned cfree, unsigned cap);
 void bc_run_diag_note_vm_stage(BCRunVmStage stage, unsigned vm_used, unsigned vm_hw,
                                unsigned c_used, unsigned c_free, unsigned r_lim, unsigned cap);
-void bc_run_diag_dump(const char *reason);
+void bc_run_diag_dump(const char * reason);
 
 #endif

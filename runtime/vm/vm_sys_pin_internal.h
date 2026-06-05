@@ -29,7 +29,7 @@ static inline int vm_pin_mode_is_pwm(int mode) {
            (mode >= VM_PIN_MODE_PWM8A && mode <= VM_PIN_MODE_PWM11B);
 }
 
-static inline int vm_pin_pwm_mode_to_slice_chan(int mode, int *slice, int *chan) {
+static inline int vm_pin_pwm_mode_to_slice_chan(int mode, int * slice, int * chan) {
     if (mode >= VM_PIN_MODE_PWM0A && mode <= VM_PIN_MODE_PWM7B) {
         int index = mode - VM_PIN_MODE_PWM0A;
         *slice = index / 2;
@@ -78,4 +78,4 @@ static inline int vm_pwm_max_slice(void) {
     return rp2350a ? 7 : 11;
 }
 
-#endif  /* VM_SYS_PIN_INTERNAL_H */
+#endif /* VM_SYS_PIN_INTERNAL_H */

@@ -17,8 +17,7 @@
 /* Visible to pc386_libc.c so srand() can reseed us. */
 uint32_t pc386_rand_state = 0x12345678u;
 
-uint32_t hal_random_u32(void)
-{
+uint32_t hal_random_u32(void) {
     /* Marsaglia xorshift32. Avoid the 0 fixed point: srand(0) becomes 1. */
     if (pc386_rand_state == 0) pc386_rand_state = 1;
     pc386_rand_state ^= pc386_rand_state << 13;

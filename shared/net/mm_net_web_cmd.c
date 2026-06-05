@@ -5,9 +5,9 @@
 #include "MMBasic_Includes.h"
 #include "shared/net/mm_net_web_cmd.h"
 
-void mm_net_web_dispatch(unsigned char *line,
-                         const mm_net_web_dispatch_t *dispatch) {
-    unsigned char *tp;
+void mm_net_web_dispatch(unsigned char * line,
+                         const mm_net_web_dispatch_t * dispatch) {
+    unsigned char * tp;
 
     if (!dispatch) error("Syntax");
 

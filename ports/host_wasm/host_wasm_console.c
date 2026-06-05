@@ -29,8 +29,8 @@
  * than a few dozen keys. Power of two so the mask in push/pop is a nop. */
 #define WASM_KEY_RING_SIZE 2048
 static volatile int wasm_key_ring[WASM_KEY_RING_SIZE];
-static volatile unsigned wasm_key_ring_head;  /* producer: wasm_push_key  */
-static volatile unsigned wasm_key_ring_tail;  /* consumer: host_read_byte_nonblock */
+static volatile unsigned wasm_key_ring_head; /* producer: wasm_push_key  */
+static volatile unsigned wasm_key_ring_tail; /* consumer: host_read_byte_nonblock */
 static int wasm_pending_byte = -1;
 
 /* ---------------------------------------------------------------- JS-facing */
@@ -51,7 +51,7 @@ EMSCRIPTEN_KEEPALIVE
 #endif
 void wasm_push_key(int code) {
     unsigned next = (wasm_key_ring_head + 1) & (WASM_KEY_RING_SIZE - 1);
-    if (next == wasm_key_ring_tail) return;  /* ring full — drop */
+    if (next == wasm_key_ring_tail) return; /* ring full — drop */
     wasm_key_ring[wasm_key_ring_head] = code;
     wasm_key_ring_head = next;
 }
@@ -65,13 +65,21 @@ void wasm_push_key(int code) {
  */
 #ifdef __EMSCRIPTEN__
 EMSCRIPTEN_KEEPALIVE
-uintptr_t wasm_key_ring_ptr(void)      { return (uintptr_t)wasm_key_ring; }
+uintptr_t wasm_key_ring_ptr(void) {
+    return (uintptr_t)wasm_key_ring;
+}
 EMSCRIPTEN_KEEPALIVE
-uintptr_t wasm_key_ring_head_ptr(void) { return (uintptr_t)&wasm_key_ring_head; }
+uintptr_t wasm_key_ring_head_ptr(void) {
+    return (uintptr_t)&wasm_key_ring_head;
+}
 EMSCRIPTEN_KEEPALIVE
-uintptr_t wasm_key_ring_tail_ptr(void) { return (uintptr_t)&wasm_key_ring_tail; }
+uintptr_t wasm_key_ring_tail_ptr(void) {
+    return (uintptr_t)&wasm_key_ring_tail;
+}
 EMSCRIPTEN_KEEPALIVE
-int wasm_key_ring_size(void)           { return WASM_KEY_RING_SIZE; }
+int wasm_key_ring_size(void) {
+    return WASM_KEY_RING_SIZE;
+}
 #endif
 
 /* ---------------------------------------------------------------- host API */
@@ -100,7 +108,7 @@ int host_read_byte_blocking_ms(int ms) {
     /* Poll the ring every 1 ms. nanosleep parks this pthread via
      * Atomics.wait under the wasm runtime, so we don't burn CPU
      * busy-waiting for input. */
-    struct timespec req = { .tv_sec = 0, .tv_nsec = 1000000L };  /* 1 ms */
+    struct timespec req = {.tv_sec = 0, .tv_nsec = 1000000L}; /* 1 ms */
     for (int i = 0; i < ms; ++i) {
         int c = host_read_byte_nonblock();
         if (c >= 0) return c;
@@ -136,7 +144,7 @@ int host_poll_break_key(int break_key) {
  * do the same here. mmbasic_runtime_port_begin still enforces a floor of
  * SCREENHEIGHT (24) for pagination so programs that assume at least 24
  * rows don't hang. */
-int host_terminal_get_size(int *rows, int *cols) {
+int host_terminal_get_size(int * rows, int * cols) {
     if (rows) *rows = 30;
     if (cols) *cols = 53;
     return 0;

@@ -15,8 +15,7 @@
 #include "vm_sys_file_internal.h"
 #include "vm_host_fat.h"
 
-
-static FIL *vm_files[MAXOPENFILES + 1];
+static FIL * vm_files[MAXOPENFILES + 1];
 static int vm_current_drive = 1;
 static char vm_cwd[2][FF_MAX_LFN] = {"/", "/"};
 
@@ -24,8 +23,8 @@ static void vm_file_check_number(int fnbr) {
     if (fnbr < 1 || fnbr > MAXOPENFILES) error("File number");
 }
 
-static void vm_file_resolve_path(const char *filename, int *fs_out, char *path) {
-    const char *name = filename;
+static void vm_file_resolve_path(const char * filename, int * fs_out, char * path) {
+    const char * name = filename;
     int fs = vm_current_drive;
 
     if (!filename || !*filename) error("File name");
@@ -53,7 +52,7 @@ static void vm_file_resolve_path(const char *filename, int *fs_out, char *path) 
     *fs_out = fs;
 }
 
-void vm_sys_file_host_resolve_path(const char *filename, char *path, int path_size) {
+void vm_sys_file_host_resolve_path(const char * filename, char * path, int path_size) {
     int fs;
     char full[FF_MAX_LFN] = {0};
     (void)path_size;
@@ -63,9 +62,9 @@ void vm_sys_file_host_resolve_path(const char *filename, char *path, int path_si
     path[FF_MAX_LFN - 1] = '\0';
 }
 
-static void vm_file_ensure_parent_exists(const char *path) {
+static void vm_file_ensure_parent_exists(const char * path) {
     char dir[FF_MAX_LFN] = {0};
-    char *slash;
+    char * slash;
     FRESULT res;
     DIR dj;
 
@@ -80,7 +79,7 @@ static void vm_file_ensure_parent_exists(const char *path) {
     f_closedir(&dj);
 }
 
-void vm_sys_file_open(const char *filename, int fnbr, int mode) {
+void vm_sys_file_open(const char * filename, int fnbr, int mode) {
     BYTE fmode = 0;
     FRESULT res;
     int fs;
@@ -90,11 +89,20 @@ void vm_sys_file_open(const char *filename, int fnbr, int mode) {
     if (vm_files[fnbr]) error("File number already open");
 
     switch (mode) {
-        case VM_FILE_MODE_INPUT:  fmode = FA_READ; break;
-        case VM_FILE_MODE_OUTPUT: fmode = FA_WRITE | FA_CREATE_ALWAYS; break;
-        case VM_FILE_MODE_APPEND: fmode = FA_WRITE | FA_OPEN_APPEND; break;
-        case VM_FILE_MODE_RANDOM: fmode = FA_WRITE | FA_OPEN_APPEND | FA_READ; break;
-        default: error("File access mode");
+    case VM_FILE_MODE_INPUT:
+        fmode = FA_READ;
+        break;
+    case VM_FILE_MODE_OUTPUT:
+        fmode = FA_WRITE | FA_CREATE_ALWAYS;
+        break;
+    case VM_FILE_MODE_APPEND:
+        fmode = FA_WRITE | FA_OPEN_APPEND;
+        break;
+    case VM_FILE_MODE_RANDOM:
+        fmode = FA_WRITE | FA_OPEN_APPEND | FA_READ;
+        break;
+    default:
+        error("File access mode");
     }
 
     vm_file_resolve_path(filename, &fs, path);
@@ -135,7 +143,7 @@ void vm_sys_file_reset(void) {
     strcpy(vm_cwd[1], "/");
 }
 
-void vm_sys_file_print_buf(int fnbr, const char *buf, int len) {
+void vm_sys_file_print_buf(int fnbr, const char * buf, int len) {
     UINT wrote = 0;
     vm_file_check_number(fnbr);
     if (!vm_files[fnbr]) error("File number is not open");
@@ -146,7 +154,7 @@ void vm_sys_file_print_buf(int fnbr, const char *buf, int len) {
     }
 }
 
-void vm_sys_file_print_str(int fnbr, const uint8_t *mstr) {
+void vm_sys_file_print_str(int fnbr, const uint8_t * mstr) {
     vm_sys_file_print_buf(fnbr, (const char *)mstr + 1, mstr[0]);
 }
 
@@ -154,7 +162,7 @@ void vm_sys_file_print_newline(int fnbr) {
     vm_sys_file_print_buf(fnbr, "\r\n", 2);
 }
 
-void vm_sys_file_line_input(int fnbr, uint8_t *dest) {
+void vm_sys_file_line_input(int fnbr, uint8_t * dest) {
     int len = 0;
     int ch;
     vm_file_check_number(fnbr);
@@ -193,7 +201,7 @@ int vm_sys_file_getc(int fnbr) {
     return read == 1 ? (int)c : -1;
 }
 
-void vm_sys_file_drive(const char *drive) {
+void vm_sys_file_drive(const char * drive) {
     vm_current_drive = vm_file_drive_index(drive);
 }
 
@@ -206,7 +214,7 @@ void vm_sys_file_seek(int fnbr, int position) {
     if (res != FR_OK) error("File error");
 }
 
-void vm_sys_file_mkdir(const char *path) {
+void vm_sys_file_mkdir(const char * path) {
     int fs;
     char full[FF_MAX_LFN] = {0};
     FRESULT res;
@@ -218,7 +226,7 @@ void vm_sys_file_mkdir(const char *path) {
     if (res != FR_OK) error("File error");
 }
 
-void vm_sys_file_chdir(const char *path) {
+void vm_sys_file_chdir(const char * path) {
     int fs;
     char full[FF_MAX_LFN] = {0};
     DIR dj;
@@ -235,7 +243,7 @@ void vm_sys_file_chdir(const char *path) {
     vm_cwd[fs][FF_MAX_LFN - 1] = '\0';
 }
 
-void vm_sys_file_rmdir(const char *path) {
+void vm_sys_file_rmdir(const char * path) {
     int fs;
     char full[FF_MAX_LFN] = {0};
     FRESULT res;
@@ -247,7 +255,7 @@ void vm_sys_file_rmdir(const char *path) {
     if (res != FR_OK) error("File error");
 }
 
-void vm_sys_file_kill(const char *path) {
+void vm_sys_file_kill(const char * path) {
     int fs;
     char full[FF_MAX_LFN] = {0};
     FRESULT res;
@@ -259,7 +267,7 @@ void vm_sys_file_kill(const char *path) {
     if (res != FR_OK) error("File error");
 }
 
-void vm_sys_file_rename(const char *old_name, const char *new_name) {
+void vm_sys_file_rename(const char * old_name, const char * new_name) {
     int old_fs, new_fs;
     char old_full[FF_MAX_LFN] = {0};
     char new_full[FF_MAX_LFN] = {0};
@@ -274,7 +282,7 @@ void vm_sys_file_rename(const char *old_name, const char *new_name) {
     if (res != FR_OK) error("File error");
 }
 
-void vm_sys_file_copy(const char *from_name, const char *to_name, int mode) {
+void vm_sys_file_copy(const char * from_name, const char * to_name, int mode) {
     FIL src, dst;
     char from_full[FF_MAX_LFN] = {0};
     char to_full[FF_MAX_LFN] = {0};

@@ -25,9 +25,9 @@ typedef struct {
 /* Print the mmap to the kernel console, one line per entry. Safe to
  * call even when the bootloader did not provide a map (prints a one-
  * line note in that case). */
-void mmap_print(const mb1_info_t *info);
+void mmap_print(const mb1_info_t * info);
 
 /* Compute aggregate stats. Returns true if the mmap was usable. */
-bool mmap_summarize(const mb1_info_t *info, mmap_summary_t *out);
+bool mmap_summarize(const mb1_info_t * info, mmap_summary_t * out);
 
 #endif

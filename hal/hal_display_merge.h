@@ -88,7 +88,7 @@ void hal_display_merge_post_fill(unsigned colour);
 void hal_display_merge_post_bg(unsigned colour, unsigned timer_us);
 
 /* Post a FRAMEBUFFER COPY B (async buffer copy) message: (cmd=1, src). */
-void hal_display_merge_post_copy(const void *src);
+void hal_display_merge_post_copy(const void * src);
 
 /* Post a BLIT WRITE …, B rect-fill-merge message:
  * (cmd=4, x, y, w, h, colour). */

@@ -14,23 +14,23 @@ static int valid_dims(int width, int height) {
     return width > 0 && height > 0 && width <= 0xffff && height <= 0xffff;
 }
 
-static void put_u16_le(uint8_t *dst, uint16_t v) {
+static void put_u16_le(uint8_t * dst, uint16_t v) {
     dst[0] = (uint8_t)(v & 0xffu);
     dst[1] = (uint8_t)((v >> 8) & 0xffu);
 }
 
-static void put_i16_le(uint8_t *dst, int16_t v) {
+static void put_i16_le(uint8_t * dst, int16_t v) {
     put_u16_le(dst, (uint16_t)v);
 }
 
-static void put_u32_le(uint8_t *dst, uint32_t v) {
+static void put_u32_le(uint8_t * dst, uint32_t v) {
     dst[0] = (uint8_t)(v & 0xffu);
     dst[1] = (uint8_t)((v >> 8) & 0xffu);
     dst[2] = (uint8_t)((v >> 16) & 0xffu);
     dst[3] = (uint8_t)((v >> 24) & 0xffu);
 }
 
-static void put_rgb24_as_rgba8(uint8_t *dst, const uint32_t *src,
+static void put_rgb24_as_rgba8(uint8_t * dst, const uint32_t * src,
                                size_t pixels) {
     for (size_t i = 0; i < pixels; ++i) {
         uint32_t c = src[i];
@@ -46,7 +46,7 @@ static size_t pixel_count_for_dims(int width, int height) {
     return (size_t)width * (size_t)height;
 }
 
-static void pack_frame_header(uint8_t *dst, const char magic[4],
+static void pack_frame_header(uint8_t * dst, const char magic[4],
                               int width, int height) {
     memcpy(dst, magic, 4);
     put_u16_le(dst + 4, (uint16_t)width);
@@ -65,9 +65,9 @@ size_t web_console_cmds_len(size_t command_len) {
     return WEB_CONSOLE_FRAME_HEADER_LEN + command_len;
 }
 
-size_t web_console_pack_frmb(uint8_t *dst, size_t dst_len,
+size_t web_console_pack_frmb(uint8_t * dst, size_t dst_len,
                              int width, int height,
-                             const uint32_t *rgb24_pixels,
+                             const uint32_t * rgb24_pixels,
                              size_t pixel_count) {
     size_t pixels = pixel_count_for_dims(width, height);
     size_t need = web_console_frmb_len(width, height);
@@ -81,9 +81,9 @@ size_t web_console_pack_frmb(uint8_t *dst, size_t dst_len,
     return need;
 }
 
-size_t web_console_pack_cmds(uint8_t *dst, size_t dst_len,
+size_t web_console_pack_cmds(uint8_t * dst, size_t dst_len,
                              int width, int height,
-                             const uint8_t *commands,
+                             const uint8_t * commands,
                              size_t command_len) {
     size_t need = web_console_cmds_len(command_len);
     if (!dst || !valid_dims(width, height) || !need || dst_len < need ||
@@ -97,19 +97,27 @@ size_t web_console_pack_cmds(uint8_t *dst, size_t dst_len,
     return need;
 }
 
-size_t web_console_pack_cmd_cls(uint8_t *dst, size_t dst_len, int colour) {
+size_t web_console_pack_cmd_cls(uint8_t * dst, size_t dst_len, int colour) {
     if (!dst || dst_len < 5u) return 0;
     dst[0] = WEB_CONSOLE_OP_CLS;
     put_u32_le(dst + 1, (uint32_t)colour & 0x00ffffffu);
     return 5u;
 }
 
-size_t web_console_pack_cmd_rect(uint8_t *dst, size_t dst_len,
+size_t web_console_pack_cmd_rect(uint8_t * dst, size_t dst_len,
                                  int x1, int y1, int x2, int y2,
                                  int colour) {
     if (!dst || dst_len < 13u) return 0;
-    if (x1 > x2) { int t = x1; x1 = x2; x2 = t; }
-    if (y1 > y2) { int t = y1; y1 = y2; y2 = t; }
+    if (x1 > x2) {
+        int t = x1;
+        x1 = x2;
+        x2 = t;
+    }
+    if (y1 > y2) {
+        int t = y1;
+        y1 = y2;
+        y2 = t;
+    }
     dst[0] = WEB_CONSOLE_OP_RECT;
     put_i16_le(dst + 1, (int16_t)x1);
     put_i16_le(dst + 3, (int16_t)y1);
@@ -119,7 +127,7 @@ size_t web_console_pack_cmd_rect(uint8_t *dst, size_t dst_len,
     return 13u;
 }
 
-size_t web_console_pack_cmd_pixel(uint8_t *dst, size_t dst_len,
+size_t web_console_pack_cmd_pixel(uint8_t * dst, size_t dst_len,
                                   int x, int y, int colour) {
     if (!dst || dst_len < 9u) return 0;
     dst[0] = WEB_CONSOLE_OP_PIXEL;
@@ -129,7 +137,7 @@ size_t web_console_pack_cmd_pixel(uint8_t *dst, size_t dst_len,
     return 9u;
 }
 
-size_t web_console_pack_cmd_scroll(uint8_t *dst, size_t dst_len,
+size_t web_console_pack_cmd_scroll(uint8_t * dst, size_t dst_len,
                                    int lines, int bg) {
     if (!dst || dst_len < 7u) return 0;
     dst[0] = WEB_CONSOLE_OP_SCROLL;
@@ -138,9 +146,9 @@ size_t web_console_pack_cmd_scroll(uint8_t *dst, size_t dst_len,
     return 7u;
 }
 
-size_t web_console_pack_cmd_blit(uint8_t *dst, size_t dst_len,
+size_t web_console_pack_cmd_blit(uint8_t * dst, size_t dst_len,
                                  int x, int y, int width, int height,
-                                 const uint32_t *rgb24_pixels) {
+                                 const uint32_t * rgb24_pixels) {
     size_t pixels = pixel_count_for_dims(width, height);
     if (!dst || !rgb24_pixels || !pixels ||
         pixels > (SIZE_MAX - 9u) / 4u) {
@@ -158,14 +166,14 @@ size_t web_console_pack_cmd_blit(uint8_t *dst, size_t dst_len,
     return need;
 }
 
-static const char *skip_ws(const char *p, const char *end) {
+static const char * skip_ws(const char * p, const char * end) {
     while (p < end && isspace((unsigned char)*p)) ++p;
     return p;
 }
 
-static int parse_json_string(const char **pp, const char *end,
-                             char *out, size_t out_len) {
-    const char *p = skip_ws(*pp, end);
+static int parse_json_string(const char ** pp, const char * end,
+                             char * out, size_t out_len) {
+    const char * p = skip_ws(*pp, end);
     size_t n = 0;
     if (p >= end || *p != '"' || out_len == 0) return 0;
     ++p;
@@ -183,8 +191,8 @@ static int parse_json_string(const char **pp, const char *end,
     return 1;
 }
 
-static int parse_json_long(const char **pp, const char *end, long *out) {
-    const char *p = skip_ws(*pp, end);
+static int parse_json_long(const char ** pp, const char * end, long * out) {
+    const char * p = skip_ws(*pp, end);
     int neg = 0;
     long v = 0;
     if (p < end && *p == '-') {
@@ -201,10 +209,10 @@ static int parse_json_long(const char **pp, const char *end, long *out) {
     return 1;
 }
 
-int web_console_parse_key_json(const char *text, size_t len, int *out_code) {
+int web_console_parse_key_json(const char * text, size_t len, int * out_code) {
     if (!text || !out_code) return 0;
-    const char *p = text;
-    const char *end = text + len;
+    const char * p = text;
+    const char * end = text + len;
     int saw_op = 0;
     int saw_key_op = 0;
     int saw_code = 0;
@@ -268,7 +276,7 @@ int web_console_parse_key_json(const char *text, size_t len, int *out_code) {
     return 1;
 }
 
-int web_console_audio_build_tone(char *dst, size_t dst_len,
+int web_console_audio_build_tone(char * dst, size_t dst_len,
                                  double left_hz, double right_hz,
                                  int has_duration,
                                  int64_t duration_ms) {
@@ -286,15 +294,15 @@ int web_console_audio_build_tone(char *dst, size_t dst_len,
     return (n >= 0 && (size_t)n < dst_len) ? n : -1;
 }
 
-int web_console_audio_build_stop(char *dst, size_t dst_len) {
+int web_console_audio_build_stop(char * dst, size_t dst_len) {
     if (!dst || dst_len == 0) return -1;
     int n = snprintf(dst, dst_len, "{\"op\":\"stop\"}");
     return (n >= 0 && (size_t)n < dst_len) ? n : -1;
 }
 
-int web_console_audio_build_sound(char *dst, size_t dst_len,
-                                  int slot, const char *ch,
-                                  const char *type, double freq_hz,
+int web_console_audio_build_sound(char * dst, size_t dst_len,
+                                  int slot, const char * ch,
+                                  const char * type, double freq_hz,
                                   int volume) {
     if (!dst || dst_len == 0) return -1;
     int n = snprintf(dst, dst_len,
@@ -308,7 +316,7 @@ int web_console_audio_build_sound(char *dst, size_t dst_len,
     return (n >= 0 && (size_t)n < dst_len) ? n : -1;
 }
 
-int web_console_audio_build_volume(char *dst, size_t dst_len,
+int web_console_audio_build_volume(char * dst, size_t dst_len,
                                    int left, int right) {
     if (!dst || dst_len == 0) return -1;
     int n = snprintf(dst, dst_len,
@@ -317,13 +325,13 @@ int web_console_audio_build_volume(char *dst, size_t dst_len,
     return (n >= 0 && (size_t)n < dst_len) ? n : -1;
 }
 
-int web_console_audio_build_pause(char *dst, size_t dst_len) {
+int web_console_audio_build_pause(char * dst, size_t dst_len) {
     if (!dst || dst_len == 0) return -1;
     int n = snprintf(dst, dst_len, "{\"op\":\"pause\"}");
     return (n >= 0 && (size_t)n < dst_len) ? n : -1;
 }
 
-int web_console_audio_build_resume(char *dst, size_t dst_len) {
+int web_console_audio_build_resume(char * dst, size_t dst_len) {
     if (!dst || dst_len == 0) return -1;
     int n = snprintf(dst, dst_len, "{\"op\":\"resume\"}");
     return (n >= 0 && (size_t)n < dst_len) ? n : -1;

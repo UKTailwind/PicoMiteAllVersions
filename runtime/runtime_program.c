@@ -7,23 +7,20 @@
 
 extern void flash_range_erase(uint32_t off, uint32_t count);
 
-static char ascii_lower(char c)
-{
+static char ascii_lower(char c) {
     if (c >= 'A' && c <= 'Z') return (char)(c - 'A' + 'a');
     return c;
 }
 
-static int ascii_starts_with_ci(const char *s, const char *prefix)
-{
+static int ascii_starts_with_ci(const char * s, const char * prefix) {
     while (*prefix) {
         if (ascii_lower(*s++) != ascii_lower(*prefix++)) return 0;
     }
     return 1;
 }
 
-static void update_continuation_setting(const char *line, unsigned char *continuation)
-{
-    const char *p = line;
+static void update_continuation_setting(const char * line, unsigned char * continuation) {
+    const char * p = line;
     if (!continuation) return;
     while (*p == ' ' || *p == '\t') p++;
     if (*p >= '0' && *p <= '9') {
@@ -39,30 +36,27 @@ static void update_continuation_setting(const char *line, unsigned char *continu
     }
 }
 
-static const char *find_line_end(const char *line)
-{
+static const char * find_line_end(const char * line) {
     while (*line && *line != '\r' && *line != '\n') line++;
     return line;
 }
 
-static const char *skip_line_end(const char *line)
-{
+static const char * skip_line_end(const char * line) {
     if (*line == '\r') line++;
     if (*line == '\n') line++;
     return line;
 }
 
-static int read_logical_line(const char **linep, char *out, size_t out_cap,
-                             unsigned char *continuation)
-{
-    const char *line = *linep;
+static int read_logical_line(const char ** linep, char * out, size_t out_cap,
+                             unsigned char * continuation) {
+    const char * line = *linep;
     size_t out_len = 0;
 
     if (*line == '\0') return 0;
     out[0] = '\0';
 
     while (*line) {
-        const char *eol = find_line_end(line);
+        const char * eol = find_line_end(line);
         size_t len = (size_t)(eol - line);
         if (out_len + len > out_cap - 1) len = (out_cap - 1) - out_len;
         memcpy(out + out_len, line, len);
@@ -85,10 +79,9 @@ static int read_logical_line(const char **linep, char *out, size_t out_cap,
     return 1;
 }
 
-static int read_batch_line(const char **linep, char *out, size_t out_cap)
-{
-    const char *line = *linep;
-    const char *eol;
+static int read_batch_line(const char ** linep, char * out, size_t out_cap) {
+    const char * line = *linep;
+    const char * eol;
     size_t len;
 
     if (*line == '\0') return 0;
@@ -101,19 +94,17 @@ static int read_batch_line(const char **linep, char *out, size_t out_cap)
     return 1;
 }
 
-static void append_tokenised_line(unsigned char **pm)
-{
-    unsigned char *tp = tknbuf;
+static void append_tokenised_line(unsigned char ** pm) {
+    unsigned char * tp = tknbuf;
     while (!(tp[0] == 0 && tp[1] == 0)) {
         *(*pm)++ = *tp++;
     }
     *(*pm)++ = 0;
 }
 
-int mmbasic_tokenise_source_to_progmem(const char *source, unsigned flags)
-{
-    unsigned char *pm;
-    const char *line;
+int mmbasic_tokenise_source_to_progmem(const char * source, unsigned flags) {
+    unsigned char * pm;
+    const char * line;
     unsigned char continuation = 0;
 
     if (!source) return -1;
@@ -155,8 +146,7 @@ int mmbasic_tokenise_source_to_progmem(const char *source, unsigned flags)
     return 0;
 }
 
-int mmbasic_save_loaded_source(const char *source, unsigned flags)
-{
+int mmbasic_save_loaded_source(const char * source, unsigned flags) {
     int rc = mmbasic_tokenise_source_to_progmem(source, flags);
     if (rc != 0) return rc;
     PrepareProgram(false);

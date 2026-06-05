@@ -33,7 +33,6 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * The following section will be excluded from the documentation.
  */
 
-
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 #include "Draw.h"
@@ -49,83 +48,78 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include <math.h>
 void flist(int, int, int);
 //void clearprog(void);
-extern void bc_run_source_string(const char *source, const char *source_name);
+extern void bc_run_source_string(const char * source, const char * source_name);
 /* WEB stack teardown hooks — real impls in MMtcpserver.c /
  * MMTCPclient.c, no-op stubs in MMweb_stubs.c / host_peripheral_stubs.c. */
 extern void cleanserver(void);
 extern void close_tcpclient(void);
 extern void port_runtime_abort_dma(void);
-char *KeyInterrupt=NULL;
-unsigned char* SaveNextDataLine = NULL;
-void execute_one_command(unsigned char *p);
-void ListNewLine(int *ListCnt, int all);
-int printWrappedText(const char *text, int screenWidth, int listcnt, int all) ;
-char MMErrMsg[MAXERRMSG];                                           // the error message
-volatile bool Keycomplete=false;
-int keyselect=0;
+char * KeyInterrupt = NULL;
+unsigned char * SaveNextDataLine = NULL;
+void execute_one_command(unsigned char * p);
+void ListNewLine(int * ListCnt, int all);
+int printWrappedText(const char * text, int screenWidth, int listcnt, int all);
+char MMErrMsg[MAXERRMSG]; // the error message
+volatile bool Keycomplete = false;
+int keyselect = 0;
 extern volatile unsigned int ScrewUpTimer;
 int SaveNextData = 0;
 struct sa_data datastore[MAXRESTORE];
 int restorepointer = 0;
-uint64_t g_flag=0;
-const uint8_t pinlist[]={ //this is a Basic program to print out the status of all the pins
-	1,132,128,95,113,37,0,
-	1,153,128,95,113,37,144,48,32,204,32,241,109,97,120,32,103,112,41,0,
-	1,168,128,34,71,80,34,130,186,95,113,37,41,44,32,241,112,105,110,110,111,32,34,71,80,34,130,186,
-	95,113,37,41,41,44,241,112,105,110,32,241,112,105,110,110,111,32,34,71,80,34,130,186,95,113,37,41,41,41,0,
-	1,166,128,0,
-    1,147,128,95,113,37,0,0
-};
-const uint8_t i2clist[]={ //this is a Basic program to print out the I2C devices connected to the SYSTEM I2C pins
-  1, 132, 128, 105, 110, 116, 101, 103, 101, 114, 32, 95, 97, 100, 0,
-  1, 132, 128, 105, 110, 116, 101, 103, 101, 114, 32, 120, 95, 44, 121, 95, 0,
-  1, 168, 128, 34, 32, 72, 69, 88, 32, 32, 48, 32, 32, 49, 32, 32, 50, 32, 32, 51, 32, 32, 52, 32, 32, 53, 32, 32, 54, 32, 32, 55, 32, 32,
-  56, 32, 32, 57, 32, 32, 65, 32, 32, 66, 32, 32, 67, 32, 32, 68, 32, 32, 69, 32, 32, 70, 34, 0,
-  1, 153, 128, 121, 95, 32, 144, 32, 48, 32, 204, 32, 55, 0,
-  1, 168, 128, 34, 32, 34, 59, 32, 164, 121, 95, 44, 32, 49, 41, 59, 32, 34, 48, 58, 32, 34, 59, 0,
-  1, 153, 128, 120, 95, 32, 144, 32, 48, 32, 204, 32, 49, 53, 0,
-  1, 161, 128, 95, 97, 100, 32, 144, 32, 121, 95, 32, 133, 32, 49, 54, 32, 130, 32, 120, 95, 0,
-  1, 158, 128, 241, 83, 89, 83, 84, 69, 77, 32, 73, 50, 67, 41, 144, 34, 73, 50, 67, 34, 32, 203, 32, 228, 128, 99, 104,
-  101, 99, 107, 32, 95, 97, 100, 32, 199, 32, 229, 128, 32, 99, 104, 101, 99, 107, 32, 95, 97, 100, 0,
-  1, 158, 128, 243, 68, 41, 32, 144, 32, 48, 32, 203, 0,
-  1, 158, 128, 95, 97, 100, 32, 144, 32, 48, 32, 203, 32, 168, 128, 34, 45, 45, 32, 34, 59, 0,
-  1, 158, 128, 95, 97, 100, 32, 143, 32, 48, 32, 203, 32, 168, 128, 164, 95, 97, 100, 44, 32, 50, 41, 59, 34, 32, 34, 59, 0,
-  1, 139, 128, 0, 1, 168, 128, 34, 45, 45, 32, 34, 59, 0, 1, 143, 128, 0, 1, 166, 128, 120, 95, 0,
-  1, 168, 128, 0, 1, 166, 128, 121, 95, 0, 1, 147, 128, 120, 95, 44, 121, 95, 0,
-  1, 147, 128, 95, 97, 100, 0,0
- };
+uint64_t g_flag = 0;
+const uint8_t pinlist[] = { //this is a Basic program to print out the status of all the pins
+    1, 132, 128, 95, 113, 37, 0,
+    1, 153, 128, 95, 113, 37, 144, 48, 32, 204, 32, 241, 109, 97, 120, 32, 103, 112, 41, 0,
+    1, 168, 128, 34, 71, 80, 34, 130, 186, 95, 113, 37, 41, 44, 32, 241, 112, 105, 110, 110, 111, 32, 34, 71, 80, 34, 130, 186,
+    95, 113, 37, 41, 41, 44, 241, 112, 105, 110, 32, 241, 112, 105, 110, 110, 111, 32, 34, 71, 80, 34, 130, 186, 95, 113, 37, 41, 41, 41, 0,
+    1, 166, 128, 0,
+    1, 147, 128, 95, 113, 37, 0, 0};
+const uint8_t i2clist[] = { //this is a Basic program to print out the I2C devices connected to the SYSTEM I2C pins
+    1, 132, 128, 105, 110, 116, 101, 103, 101, 114, 32, 95, 97, 100, 0,
+    1, 132, 128, 105, 110, 116, 101, 103, 101, 114, 32, 120, 95, 44, 121, 95, 0,
+    1, 168, 128, 34, 32, 72, 69, 88, 32, 32, 48, 32, 32, 49, 32, 32, 50, 32, 32, 51, 32, 32, 52, 32, 32, 53, 32, 32, 54, 32, 32, 55, 32, 32,
+    56, 32, 32, 57, 32, 32, 65, 32, 32, 66, 32, 32, 67, 32, 32, 68, 32, 32, 69, 32, 32, 70, 34, 0,
+    1, 153, 128, 121, 95, 32, 144, 32, 48, 32, 204, 32, 55, 0,
+    1, 168, 128, 34, 32, 34, 59, 32, 164, 121, 95, 44, 32, 49, 41, 59, 32, 34, 48, 58, 32, 34, 59, 0,
+    1, 153, 128, 120, 95, 32, 144, 32, 48, 32, 204, 32, 49, 53, 0,
+    1, 161, 128, 95, 97, 100, 32, 144, 32, 121, 95, 32, 133, 32, 49, 54, 32, 130, 32, 120, 95, 0,
+    1, 158, 128, 241, 83, 89, 83, 84, 69, 77, 32, 73, 50, 67, 41, 144, 34, 73, 50, 67, 34, 32, 203, 32, 228, 128, 99, 104,
+    101, 99, 107, 32, 95, 97, 100, 32, 199, 32, 229, 128, 32, 99, 104, 101, 99, 107, 32, 95, 97, 100, 0,
+    1, 158, 128, 243, 68, 41, 32, 144, 32, 48, 32, 203, 0,
+    1, 158, 128, 95, 97, 100, 32, 144, 32, 48, 32, 203, 32, 168, 128, 34, 45, 45, 32, 34, 59, 0,
+    1, 158, 128, 95, 97, 100, 32, 143, 32, 48, 32, 203, 32, 168, 128, 164, 95, 97, 100, 44, 32, 50, 41, 59, 34, 32, 34, 59, 0,
+    1, 139, 128, 0, 1, 168, 128, 34, 45, 45, 32, 34, 59, 0, 1, 143, 128, 0, 1, 166, 128, 120, 95, 0,
+    1, 168, 128, 0, 1, 166, 128, 121, 95, 0, 1, 147, 128, 120, 95, 44, 121, 95, 0,
+    1, 147, 128, 95, 97, 100, 0, 0};
 // stack to keep track of nested FOR/NEXT loops
 struct s_forstack g_forstack[MAXFORLOOPS + 1];
 int g_forindex;
 
-
-
 // stack to keep track of nested DO/LOOP loops
 struct s_dostack g_dostack[MAXDOLOOPS];
-int g_doindex;                                // counts the number of nested DO/LOOP loops
-
+int g_doindex; // counts the number of nested DO/LOOP loops
 
 // stack to keep track of GOSUBs, SUBs and FUNCTIONs
-unsigned char *gosubstack[MAXGOSUB];
-unsigned char *errorstack[MAXGOSUB];
+unsigned char * gosubstack[MAXGOSUB];
+unsigned char * errorstack[MAXGOSUB];
 int gosubindex;
 
-unsigned char g_DimUsed = false;						// used to catch OPTION BASE after DIM has been used
+unsigned char g_DimUsed = false; // used to catch OPTION BASE after DIM has been used
 
-int TraceOn;                                // used to track the state of TRON/TROFF
-unsigned char *TraceBuff[TRACE_BUFF_SIZE];
-int TraceBuffIndex;                       // used for listing the contents of the trace buffer
-int OptionErrorSkip;                                               // how to handle an error
-int MMerrno;                                                        // the error number
+int TraceOn; // used to track the state of TRON/TROFF
+unsigned char * TraceBuff[TRACE_BUFF_SIZE];
+int TraceBuffIndex;  // used for listing the contents of the trace buffer
+int OptionErrorSkip; // how to handle an error
+int MMerrno;         // the error number
 unsigned char cmdlinebuff[STRINGSIZE];
-const unsigned int CaseOption = 0xffffffff;	// used to store the case of the listed output
+const unsigned int CaseOption = 0xffffffff; // used to store the case of the listed output
 
-static inline CommandToken commandtbl_decode(const unsigned char *p){
-    return ((CommandToken)(p[0] & 0x7f)) | ((CommandToken)(p[1] & 0x7f)<<7);
+static inline CommandToken commandtbl_decode(const unsigned char * p) {
+    return ((CommandToken)(p[0] & 0x7f)) | ((CommandToken)(p[1] & 0x7f) << 7);
 }
 
 void MMB_HOT_FUNC(cmd_null)(void) {
-	// do nothing (this is just a placeholder for commands that have no action)
+    // do nothing (this is just a placeholder for commands that have no action)
 }
 /** @endcond */
 /**
@@ -133,395 +127,400 @@ void MMB_HOT_FUNC(cmd_null)(void) {
  * @param a the integer, float or string to be changed
  * @param b OPTIONAL for integers and floats - defaults to 1. Otherwise the amount to increment the number or the string to concatenate
  */
-void MIPS16 MMB_DISPATCH_FUNC(cmd_inc)(void){
-	unsigned char *p, *q;
+void MIPS16 MMB_DISPATCH_FUNC(cmd_inc)(void) {
+    unsigned char *p, *q;
     int vtype;
-	getargs(&cmdline,3,(unsigned char *)",");
-	if(argc==1){
-		p = findvar(argv[0], V_FIND);
-		if(g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
+    getargs(&cmdline, 3, (unsigned char *)",");
+    if (argc == 1) {
+        p = findvar(argv[0], V_FIND);
+        if (g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
         vtype = TypeMask(g_vartbl[g_VarIndex].type);
-        if(vtype & T_STR) error("Invalid variable");                // sanity check
-		if(vtype & T_NBR)
+        if (vtype & T_STR) error("Invalid variable"); // sanity check
+        if (vtype & T_NBR)
             (*(MMFLOAT *)p) = (*(MMFLOAT *)p) + 1.0;
-		else if(vtype & T_INT)*(int64_t *)p = *(int64_t *)p + 1;
-		else error("Syntax");
-	} else {
-		p = findvar(argv[0], V_FIND);
-		if(g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
+        else if (vtype & T_INT)
+            *(int64_t *)p = *(int64_t *)p + 1;
+        else
+            error("Syntax");
+    } else {
+        p = findvar(argv[0], V_FIND);
+        if (g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
         vtype = TypeMask(g_vartbl[g_VarIndex].type);
-        if(vtype & T_STR){
-			int size=g_vartbl[g_VarIndex].size;
-        	q=getstring(argv[2]);
-    		if(*p + *q > size) error("String too long");
-			Mstrcat(p, q);
-        } else if(vtype & T_NBR){
-        	 (*(MMFLOAT *)p) = (*(MMFLOAT *)p)+getnumber(argv[2]);
-        } else if(vtype & T_INT){
-        	*(int64_t *)p = *(int64_t *)p+getinteger(argv[2]);
-        } else error("syntax");
- 	}
+        if (vtype & T_STR) {
+            int size = g_vartbl[g_VarIndex].size;
+            q = getstring(argv[2]);
+            if (*p + *q > size) error("String too long");
+            Mstrcat(p, q);
+        } else if (vtype & T_NBR) {
+            (*(MMFLOAT *)p) = (*(MMFLOAT *)p) + getnumber(argv[2]);
+        } else if (vtype & T_INT) {
+            *(int64_t *)p = *(int64_t *)p + getinteger(argv[2]);
+        } else
+            error("syntax");
+    }
 }
 // the PRINT command
 void cmd_print(void) {
-	unsigned char *s, *p;
-    unsigned char *ss;
-	MMFLOAT f;
-    int64_t  i64;
-	int i, t, fnbr;
-	int docrlf;														// this is used to suppress the cr/lf if needed
+    unsigned char *s, *p;
+    unsigned char * ss;
+    MMFLOAT f;
+    int64_t i64;
+    int i, t, fnbr;
+    int docrlf; // this is used to suppress the cr/lf if needed
 
-	getargs(&cmdline, (MAX_ARG_COUNT * 2) - 1, (unsigned char *)";,");				// this is a macro and must be the first executable stmt
+    getargs(&cmdline, (MAX_ARG_COUNT * 2) - 1, (unsigned char *)";,"); // this is a macro and must be the first executable stmt
 
-//    s = 0; *s = 56;											    // for testing the exception handler
+    //    s = 0; *s = 56;											    // for testing the exception handler
 
-	docrlf = true;
+    docrlf = true;
 
-	if(argc > 0 && *argv[0] == '#') {								// check if the first arg is a file number
-		argv[0]++;
-         if((*argv[0] == 'G') || (*argv[0] == 'g')){
+    if (argc > 0 && *argv[0] == '#') { // check if the first arg is a file number
+        argv[0]++;
+        if ((*argv[0] == 'G') || (*argv[0] == 'g')) {
             argv[0]++;
-            if(!((*argv[0] == 'P') || (*argv[0] == 'p')))error("Syntax");
+            if (!((*argv[0] == 'P') || (*argv[0] == 'p'))) error("Syntax");
             argv[0]++;
-            if(!((*argv[0] == 'S') || (*argv[0] == 's')))error("Syntax");
-            if(!GPSchannel) error("GPS not activated");
-            if(argc!=3) error("Only a single string parameter allowed");
+            if (!((*argv[0] == 'S') || (*argv[0] == 's'))) error("Syntax");
+            if (!GPSchannel) error("GPS not activated");
+            if (argc != 3) error("Only a single string parameter allowed");
             p = argv[2];
-			t = T_NOTYPE;
-			p = evaluate(p, &f, &i64, &s, &t, true);			// get the value and type of the argument
-            ss=(unsigned char *)s;
-            if(!(t & T_STR)) error("Only a single string parameter allowed");
-            int i,xsum=0;
-            if(ss[1]!='$' || ss[ss[0]]!='*')error("GPS command must start with dollar and end with star");
-            for(i=1;i<=ss[0];i++){
+            t = T_NOTYPE;
+            p = evaluate(p, &f, &i64, &s, &t, true); // get the value and type of the argument
+            ss = (unsigned char *)s;
+            if (!(t & T_STR)) error("Only a single string parameter allowed");
+            int i, xsum = 0;
+            if (ss[1] != '$' || ss[ss[0]] != '*') error("GPS command must start with dollar and end with star");
+            for (i = 1; i <= ss[0]; i++) {
                 SerialPutchar(GPSchannel, s[i]);
-                if(s[i]=='$')xsum=0;
-                if(s[i]!='*')xsum ^=s[i];
+                if (s[i] == '$') xsum = 0;
+                if (s[i] != '*') xsum ^= s[i];
             }
-            i=xsum/16;
-            i=i+'0';
-            if(i>'9')i=i-'0'+'A';
+            i = xsum / 16;
+            i = i + '0';
+            if (i > '9') i = i - '0' + 'A';
             SerialPutchar(GPSchannel, i);
-            i=xsum % 16;
-            i=i+'0';
-            if(i>'9')i=i-'0'+'A';
+            i = xsum % 16;
+            i = i + '0';
+            if (i > '9') i = i - '0' + 'A';
             SerialPutchar(GPSchannel, i);
             SerialPutchar(GPSchannel, 13);
             SerialPutchar(GPSchannel, 10);
             return;
         } else {
-			fnbr = getinteger(argv[0]);									// get the number
-			i = 1;
-			if(argc >= 2 && *argv[1] == ',') i = 2;						// and set the next argument to be looked at
-		}
-	} else {
-		fnbr = 0;													// no file number so default to the standard output
-		i = 0;
-	}
+            fnbr = getinteger(argv[0]); // get the number
+            i = 1;
+            if (argc >= 2 && *argv[1] == ',') i = 2; // and set the next argument to be looked at
+        }
+    } else {
+        fnbr = 0; // no file number so default to the standard output
+        i = 0;
+    }
 
-	for(; i < argc; i++) {											// step through the arguments
-		if(*argv[i] == ',') {
-			MMfputc('\t', fnbr);									// print a tab for a comma
-			docrlf = false;                                         // a trailing comma should suppress CR/LF
-		}
-		else if(*argv[i] == ';') {
-			docrlf = false;											// other than suppress cr/lf do nothing for a semicolon
-		}
-		else {														// we have a normal expression
-			p = argv[i];
-			while(*p) {
-				t = T_NOTYPE;
-				p = evaluate(p, &f, &i64, &s, &t, true);			// get the value and type of the argument
-                if(t & T_NBR) {
-                    *inpbuf = ' ';                                  // preload a space
-                    FloatToStr((char *)inpbuf + ((f >= 0) ? 1:0), f, 0, STR_AUTO_PRECISION, (unsigned char)' ');// if positive output a space instead of the sign
-					MMfputs((unsigned char *)CtoM(inpbuf), fnbr);					// convert to a MMBasic string and output
-				} else if(t & T_INT) {
-                    *inpbuf = ' ';                                  // preload a space
-                    IntToStr((char *)inpbuf + ((i64 >= 0) ? 1:0), i64, 10); // if positive output a space instead of the sign
-					MMfputs((unsigned char *)CtoM(inpbuf), fnbr);					// convert to a MMBasic string and output
-				} else if(t & T_STR) {
-					MMfputs((unsigned char *)s, fnbr);								// print if a string (s is a MMBasic string)
-				} else error("Attempt to print reserved word");
-			}
-			docrlf = true;
-		}
-	}
-	if(docrlf) MMfputs((unsigned char *)"\2\r\n", fnbr);								// print the terminating cr/lf unless it has been suppressed
-	if(PrintPixelMode!=0)SSPrintString("\033[m");
-	PrintPixelMode=0;
+    for (; i < argc; i++) { // step through the arguments
+        if (*argv[i] == ',') {
+            MMfputc('\t', fnbr); // print a tab for a comma
+            docrlf = false;      // a trailing comma should suppress CR/LF
+        } else if (*argv[i] == ';') {
+            docrlf = false; // other than suppress cr/lf do nothing for a semicolon
+        } else {            // we have a normal expression
+            p = argv[i];
+            while (*p) {
+                t = T_NOTYPE;
+                p = evaluate(p, &f, &i64, &s, &t, true); // get the value and type of the argument
+                if (t & T_NBR) {
+                    *inpbuf = ' ';                                                                                 // preload a space
+                    FloatToStr((char *)inpbuf + ((f >= 0) ? 1 : 0), f, 0, STR_AUTO_PRECISION, (unsigned char)' '); // if positive output a space instead of the sign
+                    MMfputs((unsigned char *)CtoM(inpbuf), fnbr);                                                  // convert to a MMBasic string and output
+                } else if (t & T_INT) {
+                    *inpbuf = ' ';                                            // preload a space
+                    IntToStr((char *)inpbuf + ((i64 >= 0) ? 1 : 0), i64, 10); // if positive output a space instead of the sign
+                    MMfputs((unsigned char *)CtoM(inpbuf), fnbr);             // convert to a MMBasic string and output
+                } else if (t & T_STR) {
+                    MMfputs((unsigned char *)s, fnbr); // print if a string (s is a MMBasic string)
+                } else
+                    error("Attempt to print reserved word");
+            }
+            docrlf = true;
+        }
+    }
+    if (docrlf) MMfputs((unsigned char *)"\2\r\n", fnbr); // print the terminating cr/lf unless it has been suppressed
+    if (PrintPixelMode != 0) SSPrintString("\033[m");
+    PrintPixelMode = 0;
 }
-void cmd_arrayset(void){
-	array_set(cmdline);
+void cmd_arrayset(void) {
+    array_set(cmdline);
 }
-void array_set(unsigned char *tp){
+void array_set(unsigned char * tp) {
     MMFLOAT f;
     int64_t i64;
-    unsigned char *s;
-	int dims[MAXDIM]={0};
-	int i,t,copy,card1=1;
-	unsigned char size=0;
-	MMFLOAT *a1float=NULL;
-	int64_t *a1int=NULL;
-	unsigned char *a1str=NULL;
-	getargs(&tp, 3,(unsigned char *)",");
-	if(!(argc == 3)) error("Argument count");
-	findvar(argv[2], V_FIND | V_EMPTY_OK | V_NOFIND_ERR);
-	t=g_vartbl[g_VarIndex].type;
-	evaluate(argv[0], &f, &i64, &s, &t, false);
-	if(t & T_STR){
-		card1=parsestringarray(argv[2],&a1str,2,0, dims, true, &size);
-		copy=(int)size+1;
-		memset(a1str,0,copy*card1);
-		if(*s){
-			for(i=0; i< card1;i++){
-				Mstrcpy(&a1str[i*copy],s);
-			}
-		}
-	} else {
-		card1=parsenumberarray(argv[2],&a1float,&a1int,2,0, dims, true);
-		if(t & T_STR) error("Syntax");
+    unsigned char * s;
+    int dims[MAXDIM] = {0};
+    int i, t, copy, card1 = 1;
+    unsigned char size = 0;
+    MMFLOAT * a1float = NULL;
+    int64_t * a1int = NULL;
+    unsigned char * a1str = NULL;
+    getargs(&tp, 3, (unsigned char *)",");
+    if (!(argc == 3)) error("Argument count");
+    findvar(argv[2], V_FIND | V_EMPTY_OK | V_NOFIND_ERR);
+    t = g_vartbl[g_VarIndex].type;
+    evaluate(argv[0], &f, &i64, &s, &t, false);
+    if (t & T_STR) {
+        card1 = parsestringarray(argv[2], &a1str, 2, 0, dims, true, &size);
+        copy = (int)size + 1;
+        memset(a1str, 0, copy * card1);
+        if (*s) {
+            for (i = 0; i < card1; i++) {
+                Mstrcpy(&a1str[i * copy], s);
+            }
+        }
+    } else {
+        card1 = parsenumberarray(argv[2], &a1float, &a1int, 2, 0, dims, true);
+        if (t & T_STR) error("Syntax");
 
-		if(a1float!=NULL){
-			for(i=0; i< card1;i++)*a1float++ = ((t & T_INT) ? (MMFLOAT)i64 : f);
-		} else {
-			for(i=0; i< card1;i++)*a1int++ = ((t & T_INT) ? i64 : FloatToInt64(f));
-		}
-	}
+        if (a1float != NULL) {
+            for (i = 0; i < card1; i++) *a1float++ = ((t & T_INT) ? (MMFLOAT)i64 : f);
+        } else {
+            for (i = 0; i < card1; i++) *a1int++ = ((t & T_INT) ? i64 : FloatToInt64(f));
+        }
+    }
 }
-void cmd_add(void){
-	array_add(cmdline);
+void cmd_add(void) {
+    array_add(cmdline);
 }
 
-void array_add(unsigned char *tp){
+void array_add(unsigned char * tp) {
     MMFLOAT f;
     int64_t i64;
-    unsigned char *s;
-	int dims[MAXDIM]={0};
-	int i,t,card1=1, card2=1;
-	MMFLOAT *a1float=NULL,*a2float=NULL, scale;
-	int64_t *a1int=NULL, *a2int=NULL;
-	unsigned char *a1str=NULL, *a2str=NULL;
-	getargs(&tp, 5,(unsigned char *)",");
-	if(!(argc == 5)) error("Argument count");
-	findvar(argv[0], V_FIND | V_EMPTY_OK | V_NOFIND_ERR);
-	t=g_vartbl[g_VarIndex].type;
-	if(t & T_STR){
-		unsigned char size=0,size2=0;
-		unsigned char *toadd;
-		card1=parsestringarray(argv[0], &a1str, 1, 0,dims, false, &size);
-		evaluate(argv[2], &f, &i64, &s, &t, false);
-		if(!(t & T_STR)) error("Syntax");
-		toadd=getstring(argv[2]);
-		card2=parsestringarray(argv[4], &a2str, 3, 0,dims, true, &size2);
-		if(card1 != card2)error("Array size mismatch");
-		unsigned char *buff = GetTempMemory(STRINGSIZE);								// this will last for the life of the command
-		int copy=size+1;
-		int copy2=size2+1;
-		for(i=0; i< card1;i++){
-			unsigned char *sarg1=a1str+i*copy;
-			unsigned char *sarg2=a2str+i*copy2;
-			if(*sarg1 + *toadd > size2) error("String too long");
-			Mstrcpy(buff, sarg1);
-			Mstrcat(buff, toadd);
-			Mstrcpy(sarg2,buff);
-		}
-	} else {
-		card1=parsenumberarray(argv[0], &a1float, &a1int, 1, 0,dims, false);
-		evaluate(argv[2], &f, &i64, &s, &t, false);
-		if(t & T_STR) error("Syntax");
-		scale=getnumber(argv[2]);
-		card2=parsenumberarray(argv[4], &a2float, &a2int, 3, 0,dims, true);
-		if(card1 != card2)error("Array size mismatch");
-		if(scale!=0.0){
-			if(a2float!=NULL && a1float!=NULL){
-				for(i=0; i< card1;i++)*a2float++ = ((t & T_INT) ? (MMFLOAT)i64 : f) + (*a1float++);
-			} else if(a2float!=NULL && a1float==NULL){
-				for(i=0; i< card1;i++)(*a2float++) = ((t & T_INT) ? (MMFLOAT)i64 : f) + ((MMFLOAT)*a1int++);
-			} else if(a2float==NULL && a1float!=NULL){
-				for(i=0; i< card1;i++)(*a2int++) = FloatToInt64(((t & T_INT) ? i64 : FloatToInt64(f)) + (*a1float++));
-			} else {
-				for(i=0; i< card1;i++)(*a2int++) = ((t & T_INT) ? i64 : FloatToInt64(f)) + (*a1int++);
-			}
-		} else {
-			if(a2float!=NULL && a1float!=NULL){
-				for(i=0; i< card1;i++)*a2float++ = *a1float++;
-			} else if(a2float!=NULL && a1float==NULL){
-				for(i=0; i< card1;i++)(*a2float++) = ((MMFLOAT)*a1int++);
-			} else if(a2float==NULL && a1float!=NULL){
-				for(i=0; i< card1;i++)(*a2int++) = FloatToInt64(*a1float++);
-			} else {
-				for(i=0; i< card1;i++)*a2int++ = *a1int++;
-			}
-		}
-	}
+    unsigned char * s;
+    int dims[MAXDIM] = {0};
+    int i, t, card1 = 1, card2 = 1;
+    MMFLOAT *a1float = NULL, *a2float = NULL, scale;
+    int64_t *a1int = NULL, *a2int = NULL;
+    unsigned char *a1str = NULL, *a2str = NULL;
+    getargs(&tp, 5, (unsigned char *)",");
+    if (!(argc == 5)) error("Argument count");
+    findvar(argv[0], V_FIND | V_EMPTY_OK | V_NOFIND_ERR);
+    t = g_vartbl[g_VarIndex].type;
+    if (t & T_STR) {
+        unsigned char size = 0, size2 = 0;
+        unsigned char * toadd;
+        card1 = parsestringarray(argv[0], &a1str, 1, 0, dims, false, &size);
+        evaluate(argv[2], &f, &i64, &s, &t, false);
+        if (!(t & T_STR)) error("Syntax");
+        toadd = getstring(argv[2]);
+        card2 = parsestringarray(argv[4], &a2str, 3, 0, dims, true, &size2);
+        if (card1 != card2) error("Array size mismatch");
+        unsigned char * buff = GetTempMemory(STRINGSIZE); // this will last for the life of the command
+        int copy = size + 1;
+        int copy2 = size2 + 1;
+        for (i = 0; i < card1; i++) {
+            unsigned char * sarg1 = a1str + i * copy;
+            unsigned char * sarg2 = a2str + i * copy2;
+            if (*sarg1 + *toadd > size2) error("String too long");
+            Mstrcpy(buff, sarg1);
+            Mstrcat(buff, toadd);
+            Mstrcpy(sarg2, buff);
+        }
+    } else {
+        card1 = parsenumberarray(argv[0], &a1float, &a1int, 1, 0, dims, false);
+        evaluate(argv[2], &f, &i64, &s, &t, false);
+        if (t & T_STR) error("Syntax");
+        scale = getnumber(argv[2]);
+        card2 = parsenumberarray(argv[4], &a2float, &a2int, 3, 0, dims, true);
+        if (card1 != card2) error("Array size mismatch");
+        if (scale != 0.0) {
+            if (a2float != NULL && a1float != NULL) {
+                for (i = 0; i < card1; i++) *a2float++ = ((t & T_INT) ? (MMFLOAT)i64 : f) + (*a1float++);
+            } else if (a2float != NULL && a1float == NULL) {
+                for (i = 0; i < card1; i++) (*a2float++) = ((t & T_INT) ? (MMFLOAT)i64 : f) + ((MMFLOAT)*a1int++);
+            } else if (a2float == NULL && a1float != NULL) {
+                for (i = 0; i < card1; i++) (*a2int++) = FloatToInt64(((t & T_INT) ? i64 : FloatToInt64(f)) + (*a1float++));
+            } else {
+                for (i = 0; i < card1; i++) (*a2int++) = ((t & T_INT) ? i64 : FloatToInt64(f)) + (*a1int++);
+            }
+        } else {
+            if (a2float != NULL && a1float != NULL) {
+                for (i = 0; i < card1; i++) *a2float++ = *a1float++;
+            } else if (a2float != NULL && a1float == NULL) {
+                for (i = 0; i < card1; i++) (*a2float++) = ((MMFLOAT)*a1int++);
+            } else if (a2float == NULL && a1float != NULL) {
+                for (i = 0; i < card1; i++) (*a2int++) = FloatToInt64(*a1float++);
+            } else {
+                for (i = 0; i < card1; i++) *a2int++ = *a1int++;
+            }
+        }
+    }
 }
-void cmd_insert(void){
-	array_insert(cmdline);
+void cmd_insert(void) {
+    array_insert(cmdline);
 }
-void array_insert(unsigned char *tp){
-	int i, j, t, start, increment, dim[MAXDIM], pos[MAXDIM],off[MAXDIM], dimcount=0, target=-1;
-	int64_t *a1int=NULL,*a2int=NULL;
-	MMFLOAT *afloat=NULL;
-	unsigned char *a1str=NULL, *a2str=NULL;
-	unsigned char size=0,size2=0;
-    int dims[MAXDIM]={0};
-	getargs(&tp, 15,(unsigned char *)",");
-	if(argc<7)error("Argument count");
-	findvar(argv[0], V_FIND | V_EMPTY_OK | V_NOFIND_ERR);
-	t=g_vartbl[g_VarIndex].type;
-	if(t & T_STR){
-		parsestringarray(argv[0],&a1str,1,0,dims, false,&size);
-	} else {
-		parsenumberarray(argv[0],&afloat,&a1int,1,0,dims, false);
-		if(!a1int)a1int=(int64_t *)afloat;
-	}
-	if(dims[1]<=0)error("Argument 1 must be a 2D or more array");
-	for(i=0;i<MAXDIM;i++){
-		if(dims[i]-g_OptionBase>0){
-			dimcount++;
-			dim[i]=dims[i]-g_OptionBase;
-		} else dim[i]=0;
-	}
-	if(((argc-1)/2-1)!=dimcount)error("Argument count");
-	for(i=0; i<dimcount;i++ ){
-		if(*argv[i*2 +2]) pos[i]=getint(argv[i*2 +2],g_OptionBase,dim[i]+g_OptionBase)-g_OptionBase;
-		else {
-			if(target!=-1)error("Only one index can be omitted");
-			target=i;
-			pos[i]=1;
-		}
-	}
-	if(t & T_STR){
-		parsestringarray(argv[i*2 +2],&a2str,i+1,1,dims, true,&size2);
-	} else {
-		parsenumberarray(argv[i*2 +2],&afloat,&a2int,i+1,1,dims,true);
-		if(!a2int)a2int=(int64_t *)afloat;
-	}
-	if(target==-1)return;
-	if(dim[target]+g_OptionBase!=dims[0])error("Size mismatch between insert and target array");
-	if(size!=size2)error("String arrays differ in string length");
-	i=dimcount-1;
-	while(i>=0){
-		off[i]=1;
-		for(j=0; j<i; j++)off[i]*=(dim[j]+1);
-		i--;
-	}
-	start=1;
-	for(i=0;i<dimcount;i++){
-		start+= (pos[i]*off[i]);
-	}
-	start--;
-	increment=off[target];
-	start-=increment;
-	if(t & T_STR){
-		int copy=(int)size+1;
-		for(i=0;i<=dim[target];i++) {
-			unsigned char *p=a2str+i*copy;
-			unsigned char *q=&a1str[(start+i*increment)*copy];
-			memcpy(q,p,copy);
-		}
-	} else	{
-		for(i=0;i<=dim[target];i++) a1int[start+i*increment]=*a2int++;
-	}
-	return;
-
+void array_insert(unsigned char * tp) {
+    int i, j, t, start, increment, dim[MAXDIM], pos[MAXDIM], off[MAXDIM], dimcount = 0, target = -1;
+    int64_t *a1int = NULL, *a2int = NULL;
+    MMFLOAT * afloat = NULL;
+    unsigned char *a1str = NULL, *a2str = NULL;
+    unsigned char size = 0, size2 = 0;
+    int dims[MAXDIM] = {0};
+    getargs(&tp, 15, (unsigned char *)",");
+    if (argc < 7) error("Argument count");
+    findvar(argv[0], V_FIND | V_EMPTY_OK | V_NOFIND_ERR);
+    t = g_vartbl[g_VarIndex].type;
+    if (t & T_STR) {
+        parsestringarray(argv[0], &a1str, 1, 0, dims, false, &size);
+    } else {
+        parsenumberarray(argv[0], &afloat, &a1int, 1, 0, dims, false);
+        if (!a1int) a1int = (int64_t *)afloat;
+    }
+    if (dims[1] <= 0) error("Argument 1 must be a 2D or more array");
+    for (i = 0; i < MAXDIM; i++) {
+        if (dims[i] - g_OptionBase > 0) {
+            dimcount++;
+            dim[i] = dims[i] - g_OptionBase;
+        } else
+            dim[i] = 0;
+    }
+    if (((argc - 1) / 2 - 1) != dimcount) error("Argument count");
+    for (i = 0; i < dimcount; i++) {
+        if (*argv[i * 2 + 2])
+            pos[i] = getint(argv[i * 2 + 2], g_OptionBase, dim[i] + g_OptionBase) - g_OptionBase;
+        else {
+            if (target != -1) error("Only one index can be omitted");
+            target = i;
+            pos[i] = 1;
+        }
+    }
+    if (t & T_STR) {
+        parsestringarray(argv[i * 2 + 2], &a2str, i + 1, 1, dims, true, &size2);
+    } else {
+        parsenumberarray(argv[i * 2 + 2], &afloat, &a2int, i + 1, 1, dims, true);
+        if (!a2int) a2int = (int64_t *)afloat;
+    }
+    if (target == -1) return;
+    if (dim[target] + g_OptionBase != dims[0]) error("Size mismatch between insert and target array");
+    if (size != size2) error("String arrays differ in string length");
+    i = dimcount - 1;
+    while (i >= 0) {
+        off[i] = 1;
+        for (j = 0; j < i; j++) off[i] *= (dim[j] + 1);
+        i--;
+    }
+    start = 1;
+    for (i = 0; i < dimcount; i++) {
+        start += (pos[i] * off[i]);
+    }
+    start--;
+    increment = off[target];
+    start -= increment;
+    if (t & T_STR) {
+        int copy = (int)size + 1;
+        for (i = 0; i <= dim[target]; i++) {
+            unsigned char * p = a2str + i * copy;
+            unsigned char * q = &a1str[(start + i * increment) * copy];
+            memcpy(q, p, copy);
+        }
+    } else {
+        for (i = 0; i <= dim[target]; i++) a1int[start + i * increment] = *a2int++;
+    }
+    return;
 }
-void cmd_slice(void){
-	array_slice(cmdline);
+void cmd_slice(void) {
+    array_slice(cmdline);
 }
-void array_slice(unsigned char *tp){
-	int i, j, t, start, increment, dim[MAXDIM], pos[MAXDIM],off[MAXDIM], dimcount=0, target=-1, toarray=0;
-	int64_t *a1int=NULL,*a2int=NULL;
-	MMFLOAT *afloat=NULL;
-	unsigned char *a1str=NULL,*a2str=NULL;
-	unsigned char size=0,size2=0;
-    int dims[MAXDIM]={0};
-	getargs(&tp, 15,(unsigned char *)",");
-	if(argc<7)error("Argument count");
-	findvar(argv[0], V_FIND | V_EMPTY_OK | V_NOFIND_ERR);
-	t=g_vartbl[g_VarIndex].type;
-	if(t & T_STR){
-		parsestringarray(argv[0],&a1str,1,0,dims, false, &size);
-	} else {
-		parsenumberarray(argv[0],&afloat,&a1int,1,0,dims, false);
-		if(!a1int)a1int=(int64_t *)afloat;
-	}
-	if(dims[1]<=0)error("Argument 1 must be a 2D or more array");
-	for(i=0;i<MAXDIM;i++){
-		if(dims[i]-g_OptionBase>0){
-			dimcount++;
-			dim[i]=dims[i]-g_OptionBase;
-		} else dim[i]=0;
-	}
-	if(((argc-1)/2-1)!=dimcount)error("Argument count");
-	for(i=0; i<dimcount;i++ ){
-		if(*argv[i*2 +2]) pos[i]=getint(argv[i*2 +2],g_OptionBase,dim[i]+g_OptionBase)-g_OptionBase;
-		else {
-			if(target!=-1)error("Only one index can be omitted");
-			target=i;
-			pos[i]=1;
-		}
-	}
-	if(t & T_STR){
-		toarray=parsestringarray(argv[i*2 +2],&a2str,i+1,1,dims, true, &size2)-1;
-	} else {
-		toarray=parsenumberarray(argv[i*2 +2],&afloat,&a2int,i+1,1,dims, true)-1;
-		if(!a2int)a2int=(int64_t *)afloat;
-	}
-	if(dim[target]!=toarray)error("Size mismatch between slice and target array");
-	if(size!=size2)error("String arrays differ in string length");
-	i=dimcount-1;
-	while(i>=0){
-		off[i]=1;
-		for(j=0; j<i; j++)off[i]*=(dim[j]+1);
-		i--;
-	}
-	start=1;
-	for(i=0;i<dimcount;i++){
-		start+= (pos[i]*off[i]);
-	}
-	start--;
-	increment=off[target];
-	start-=increment;
-	if(t & T_STR){
-		int copy=(int)size+1; //allow for the length character of the string
-		for(i=0;i<=dim[target];i++){
-			unsigned char *p=a2str+i*copy;
-			unsigned char *q=&a1str[(start+i*increment)*copy];
-			memcpy(p,q,copy);
-		}
-	} else {
-		for(i=0;i<=dim[target];i++)*a2int++ = a1int[start+i*increment];
-	}
-	return;
+void array_slice(unsigned char * tp) {
+    int i, j, t, start, increment, dim[MAXDIM], pos[MAXDIM], off[MAXDIM], dimcount = 0, target = -1, toarray = 0;
+    int64_t *a1int = NULL, *a2int = NULL;
+    MMFLOAT * afloat = NULL;
+    unsigned char *a1str = NULL, *a2str = NULL;
+    unsigned char size = 0, size2 = 0;
+    int dims[MAXDIM] = {0};
+    getargs(&tp, 15, (unsigned char *)",");
+    if (argc < 7) error("Argument count");
+    findvar(argv[0], V_FIND | V_EMPTY_OK | V_NOFIND_ERR);
+    t = g_vartbl[g_VarIndex].type;
+    if (t & T_STR) {
+        parsestringarray(argv[0], &a1str, 1, 0, dims, false, &size);
+    } else {
+        parsenumberarray(argv[0], &afloat, &a1int, 1, 0, dims, false);
+        if (!a1int) a1int = (int64_t *)afloat;
+    }
+    if (dims[1] <= 0) error("Argument 1 must be a 2D or more array");
+    for (i = 0; i < MAXDIM; i++) {
+        if (dims[i] - g_OptionBase > 0) {
+            dimcount++;
+            dim[i] = dims[i] - g_OptionBase;
+        } else
+            dim[i] = 0;
+    }
+    if (((argc - 1) / 2 - 1) != dimcount) error("Argument count");
+    for (i = 0; i < dimcount; i++) {
+        if (*argv[i * 2 + 2])
+            pos[i] = getint(argv[i * 2 + 2], g_OptionBase, dim[i] + g_OptionBase) - g_OptionBase;
+        else {
+            if (target != -1) error("Only one index can be omitted");
+            target = i;
+            pos[i] = 1;
+        }
+    }
+    if (t & T_STR) {
+        toarray = parsestringarray(argv[i * 2 + 2], &a2str, i + 1, 1, dims, true, &size2) - 1;
+    } else {
+        toarray = parsenumberarray(argv[i * 2 + 2], &afloat, &a2int, i + 1, 1, dims, true) - 1;
+        if (!a2int) a2int = (int64_t *)afloat;
+    }
+    if (dim[target] != toarray) error("Size mismatch between slice and target array");
+    if (size != size2) error("String arrays differ in string length");
+    i = dimcount - 1;
+    while (i >= 0) {
+        off[i] = 1;
+        for (j = 0; j < i; j++) off[i] *= (dim[j] + 1);
+        i--;
+    }
+    start = 1;
+    for (i = 0; i < dimcount; i++) {
+        start += (pos[i] * off[i]);
+    }
+    start--;
+    increment = off[target];
+    start -= increment;
+    if (t & T_STR) {
+        int copy = (int)size + 1; //allow for the length character of the string
+        for (i = 0; i <= dim[target]; i++) {
+            unsigned char * p = a2str + i * copy;
+            unsigned char * q = &a1str[(start + i * increment) * copy];
+            memcpy(p, q, copy);
+        }
+    } else {
+        for (i = 0; i <= dim[target]; i++) *a2int++ = a1int[start + i * increment];
+    }
+    return;
 }
 
 // the LET command
 // because the LET is implied (ie, line does not have a recognisable command)
 // it ends up as the place where mistyped commands are discovered.  This is why
 // the error message is "Unknown command"
-void  MIPS16 MMB_HOT_FUNC(cmd_let)(void) {
-	int t, size;
-	MMFLOAT f;
-    int64_t  i64;
-	unsigned char *s;
-	unsigned char *p1, *p2;
+void MIPS16 MMB_HOT_FUNC(cmd_let)(void) {
+    int t, size;
+    MMFLOAT f;
+    int64_t i64;
+    unsigned char * s;
+    unsigned char *p1, *p2;
 
-	p1 = cmdline;
-	// search through the line looking for the equals sign
-	while(*p1 && tokenfunction(*p1) != op_equal) p1++;
-	if(!*p1) error("Unknown command");
+    p1 = cmdline;
+    // search through the line looking for the equals sign
+    while (*p1 && tokenfunction(*p1) != op_equal) p1++;
+    if (!*p1) error("Unknown command");
 
-	// check that we have a straight forward variable
-	p2 = skipvar(cmdline, false);
-	skipspace(p2);
-	if(p1 != p2) error("Syntax");
+    // check that we have a straight forward variable
+    p2 = skipvar(cmdline, false);
+    skipspace(p2);
+    if (p1 != p2) error("Syntax");
 
-	// create the variable and get the length if it is a string
-	p2 = findvar(cmdline, V_FIND);
+    // create the variable and get the length if it is a string
+    p2 = findvar(cmdline, V_FIND);
     size = g_vartbl[g_VarIndex].size;
-    if(g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
+    if (g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
 
     // If this was a struct-member LHS (e.g. `pt.x = ...`), the findvar dot-hook
     // returned a pointer into the struct's backing buffer and stashed the member's
@@ -533,90 +532,81 @@ void  MIPS16 MMB_HOT_FUNC(cmd_let)(void) {
         size = g_StructMemberSize;
     }
 
-	// step over the equals sign, evaluate the rest of the command and save in the variable
-	p1++;
-	if(lhs_type & T_STR) {
-		t = T_STR;
-		p1 = evaluate(p1, &f, &i64, &s, &t, false);
-		if(*s > size) error("String too long");
-		Mstrcpy(p2, s);
-	}
-	else if(lhs_type & T_NBR) {
-		t = T_NBR;
-		p1 = evaluate(p1, &f, &i64, &s, &t, false);
-		if(t & T_NBR)
+    // step over the equals sign, evaluate the rest of the command and save in the variable
+    p1++;
+    if (lhs_type & T_STR) {
+        t = T_STR;
+        p1 = evaluate(p1, &f, &i64, &s, &t, false);
+        if (*s > size) error("String too long");
+        Mstrcpy(p2, s);
+    } else if (lhs_type & T_NBR) {
+        t = T_NBR;
+        p1 = evaluate(p1, &f, &i64, &s, &t, false);
+        if (t & T_NBR)
             (*(MMFLOAT *)p2) = f;
         else
             (*(MMFLOAT *)p2) = (MMFLOAT)i64;
-	}
-	else if (lhs_type & T_STRUCT) {
-		// Whole-struct assignment (Phase 5 — ported from UKTailwind 6.02
-		// Commands.c cmd_let @04f81d0).  Snapshot dst type+size before
-		// evaluate() runs, since evaluating the RHS may change g_VarIndex
-		// when it walks its own findvar path.
-		int dest_struct_idx = (g_StructMemberType != 0)
-			? g_StructMemberSize                             // nested member: struct-idx lives in member size
-			: (int)g_vartbl[g_VarIndex].size;                // scalar / array-elem LHS
-		if (dest_struct_idx < 0 || dest_struct_idx >= g_structcnt ||
-		    g_structtbl[dest_struct_idx] == NULL)
-			error("Invalid structure type");
-		int dest_struct_size = g_structtbl[dest_struct_idx]->total_size;
+    } else if (lhs_type & T_STRUCT) {
+        // Whole-struct assignment (Phase 5 — ported from UKTailwind 6.02
+        // Commands.c cmd_let @04f81d0).  Snapshot dst type+size before
+        // evaluate() runs, since evaluating the RHS may change g_VarIndex
+        // when it walks its own findvar path.
+        int dest_struct_idx = (g_StructMemberType != 0)
+                                  ? g_StructMemberSize              // nested member: struct-idx lives in member size
+                                  : (int)g_vartbl[g_VarIndex].size; // scalar / array-elem LHS
+        if (dest_struct_idx < 0 || dest_struct_idx >= g_structcnt ||
+            g_structtbl[dest_struct_idx] == NULL)
+            error("Invalid structure type");
+        int dest_struct_size = g_structtbl[dest_struct_idx]->total_size;
 
-		t = T_NOTYPE;
-		p1 = evaluate(p1, &f, &i64, &s, &t, false);
+        t = T_NOTYPE;
+        p1 = evaluate(p1, &f, &i64, &s, &t, false);
 
-		if (!(t & T_STRUCT))
-			error("Expected a structure value");
-		if (g_ExprStructType >= 0 && g_ExprStructType != dest_struct_idx)
-			error("Structure types must match");
-		if (s == NULL)
-			error("No struct value");
-		memcpy(p2, s, dest_struct_size);
-	} else {
-		t = T_INT;
-		p1 = evaluate(p1, &f, &i64, &s, &t, false);
-		if(t & T_INT)
-            (*(int64_t  *)p2) = i64;
+        if (!(t & T_STRUCT))
+            error("Expected a structure value");
+        if (g_ExprStructType >= 0 && g_ExprStructType != dest_struct_idx)
+            error("Structure types must match");
+        if (s == NULL)
+            error("No struct value");
+        memcpy(p2, s, dest_struct_size);
+    } else {
+        t = T_INT;
+        p1 = evaluate(p1, &f, &i64, &s, &t, false);
+        if (t & T_INT)
+            (*(int64_t *)p2) = i64;
         else
-            (*(int64_t  *)p2) = FloatToInt64(f);
-	}
-	checkend(p1);
+            (*(int64_t *)p2) = FloatToInt64(f);
+    }
+    checkend(p1);
 }
 /**
  * @cond
  * The following section will be excluded from the documentation.
  */
-int MIPS16 as_strcmpi (const char *s1, const char *s2)
-{
-  const unsigned char *p1 = (const unsigned char *) s1;
-  const unsigned char *p2 = (const unsigned char *) s2;
-  unsigned char c1, c2;
+int MIPS16 as_strcmpi(const char * s1, const char * s2) {
+    const unsigned char * p1 = (const unsigned char *)s1;
+    const unsigned char * p2 = (const unsigned char *)s2;
+    unsigned char c1, c2;
 
-  if (p1 == p2)
-    return 0;
+    if (p1 == p2)
+        return 0;
 
-  do
-    {
-      c1 = tolower (*p1++);
-      c2 = tolower (*p2++);
-      if (c1 == '\0')
-	break;
-    }
-  while (c1 == c2);
+    do {
+        c1 = tolower(*p1++);
+        c2 = tolower(*p2++);
+        if (c1 == '\0')
+            break;
+    } while (c1 == c2);
 
-  return c1 - c2;
+    return c1 - c2;
 }
-void MIPS16 sortStrings(char **arr, int n)
-{
+void MIPS16 sortStrings(char ** arr, int n) {
     char temp[STRINGSIZE];
-    int i,j;
+    int i, j;
     // Sorting strings using bubble sort
-    for (j=0; j<n-1; j++)
-    {
-        for (i=j+1; i<n; i++)
-        {
-            if (as_strcmpi(arr[j], arr[i]) > 0)
-            {
+    for (j = 0; j < n - 1; j++) {
+        for (i = j + 1; i < n; i++) {
+            if (as_strcmpi(arr[j], arr[i]) > 0) {
                 strcpy(temp, arr[j]);
                 strcpy(arr[j], arr[i]);
                 strcpy(arr[i], temp);
@@ -624,91 +614,94 @@ void MIPS16 sortStrings(char **arr, int n)
         }
     }
 }
-void MIPS16 ListFile(char *pp, int all) {
-	char buff[STRINGSIZE];
+void MIPS16 ListFile(char * pp, int all) {
+    char buff[STRINGSIZE];
     int fnbr;
-    int i,ListCnt = CurrentY/(FontTable[gui_font >> 4][1] * (gui_font & 0b1111)) + 2;
-	fnbr = FindFreeFileNbr();
-	if(!BasicFileOpen(pp, fnbr, FA_READ)) return;
-	while(!FileEOF(fnbr)) {                                     // while waiting for the end of file
-		memset(buff,0,256);
-		MMgetline(fnbr, (char *)buff);									    // get the input line
-		for(i=0;i<strlen(buff);i++)if(buff[i] == TAB) buff[i] = ' ';
-		ListCnt=printWrappedText(buff,Option.Width,ListCnt,all);
-	}
-	FileClose(fnbr);
-}
-
-void MIPS16 ListNewLine(int *ListCnt, int all) {
-	unsigned char noscroll=Option.NoScroll;
-	if(!all && (void *)ReadBuffer!=(void *)DisplayNotSet)Option.NoScroll=0;
-	MMPrintString("\r\n");
-	(*ListCnt)++;
-    if(!all && *ListCnt >= Option.Height-overlap) {
-		hal_keyboard_clear_repeat_state();
-    	MMPrintString("PRESS ANY KEY ...");
-    	MMgetchar();
-    	MMPrintString("\r                 \r");
-        if(Option.DISPLAY_CONSOLE){ClearScreen(gui_bcolour);CurrentX=0;CurrentY=0;}
-    	*ListCnt = 2;
+    int i, ListCnt = CurrentY / (FontTable[gui_font >> 4][1] * (gui_font & 0b1111)) + 2;
+    fnbr = FindFreeFileNbr();
+    if (!BasicFileOpen(pp, fnbr, FA_READ)) return;
+    while (!FileEOF(fnbr)) { // while waiting for the end of file
+        memset(buff, 0, 256);
+        MMgetline(fnbr, (char *)buff); // get the input line
+        for (i = 0; i < strlen(buff); i++)
+            if (buff[i] == TAB) buff[i] = ' ';
+        ListCnt = printWrappedText(buff, Option.Width, ListCnt, all);
     }
-	Option.NoScroll=noscroll;
+    FileClose(fnbr);
 }
 
-
-void MIPS16 ListProgram(unsigned char *p, int all) {
-	char b[STRINGSIZE];
-	char *pp;
-    int ListCnt = CurrentY/(FontTable[gui_font >> 4][1] * (gui_font & 0b1111)) + 2;
-	while(!(*p == 0 || *p == 0xff)) {                               // normally a LIST ends at the break so this is a safety precaution
-        if(*p == T_NEWLINE) {
-			p = llist((unsigned char *)b, p);                                        // otherwise expand the line
-            if(!(b[0]=='\'' && b[1]=='#')){
-				pp = b;
-				if(Option.continuation){
-					format_string(pp,Option.Width);
-					while(*pp) {
-						if(*pp=='\n'){
-							ListNewLine(&ListCnt, all);
-							pp++;
-							continue;
-						}
-						MMputchar(*pp++,0);
-					}
-				} else {
-					while(*pp) {
-						if(MMCharPos > Option.Width) ListNewLine(&ListCnt, all);
-						MMputchar(*pp++,0);
-					}
-				}
-				fflush(stdout);
-				ListNewLine(&ListCnt, all);
-				if(p[0] == 0 && p[1] == 0) break;                       // end of the listing ?
-			}
-		}
-	}
+void MIPS16 ListNewLine(int * ListCnt, int all) {
+    unsigned char noscroll = Option.NoScroll;
+    if (!all && (void *)ReadBuffer != (void *)DisplayNotSet) Option.NoScroll = 0;
+    MMPrintString("\r\n");
+    (*ListCnt)++;
+    if (!all && *ListCnt >= Option.Height - overlap) {
+        hal_keyboard_clear_repeat_state();
+        MMPrintString("PRESS ANY KEY ...");
+        MMgetchar();
+        MMPrintString("\r                 \r");
+        if (Option.DISPLAY_CONSOLE) {
+            ClearScreen(gui_bcolour);
+            CurrentX = 0;
+            CurrentY = 0;
+        }
+        *ListCnt = 2;
+    }
+    Option.NoScroll = noscroll;
 }
 
+void MIPS16 ListProgram(unsigned char * p, int all) {
+    char b[STRINGSIZE];
+    char * pp;
+    int ListCnt = CurrentY / (FontTable[gui_font >> 4][1] * (gui_font & 0b1111)) + 2;
+    while (!(*p == 0 || *p == 0xff)) { // normally a LIST ends at the break so this is a safety precaution
+        if (*p == T_NEWLINE) {
+            p = llist((unsigned char *)b, p); // otherwise expand the line
+            if (!(b[0] == '\'' && b[1] == '#')) {
+                pp = b;
+                if (Option.continuation) {
+                    format_string(pp, Option.Width);
+                    while (*pp) {
+                        if (*pp == '\n') {
+                            ListNewLine(&ListCnt, all);
+                            pp++;
+                            continue;
+                        }
+                        MMputchar(*pp++, 0);
+                    }
+                } else {
+                    while (*pp) {
+                        if (MMCharPos > Option.Width) ListNewLine(&ListCnt, all);
+                        MMputchar(*pp++, 0);
+                    }
+                }
+                fflush(stdout);
+                ListNewLine(&ListCnt, all);
+                if (p[0] == 0 && p[1] == 0) break; // end of the listing ?
+            }
+        }
+    }
+}
 
-void MIPS16 do_run(unsigned char *cmdline, bool CMM2mode) {
+void MIPS16 do_run(unsigned char * cmdline, bool CMM2mode) {
     // RUN [ filename$ ] [, cmd_args$ ]
     unsigned char *filename = (unsigned char *)"", *cmd_args = (unsigned char *)"";
-	unsigned char *cmdbuf=GetMemory(256);
-	memcpy(cmdbuf,cmdline,STRINGSIZE);
+    unsigned char * cmdbuf = GetMemory(256);
+    memcpy(cmdbuf, cmdline, STRINGSIZE);
     getargs(&cmdbuf, 3, (unsigned char *)",");
-	    switch (argc) {
-        case 0:
-            break;
-        case 1:
-            filename = getCstring(argv[0]);
-            break;
-        case 2:
-            cmd_args = getCstring(argv[1]);
-            break;
-        default:
-            filename = getCstring(argv[0]);
-            if(*argv[2])cmd_args = getCstring(argv[2]);
-            break;
+    switch (argc) {
+    case 0:
+        break;
+    case 1:
+        filename = getCstring(argv[0]);
+        break;
+    case 2:
+        cmd_args = getCstring(argv[1]);
+        break;
+    default:
+        filename = getCstring(argv[0]);
+        if (*argv[2]) cmd_args = getCstring(argv[2]);
+        break;
     }
 
     // The memory allocated by getCstring() is not preserved across
@@ -718,229 +711,280 @@ void MIPS16 do_run(unsigned char *cmdline, bool CMM2mode) {
     if (snprintf((char *)buf, MAXSTRLEN + 1, "\"%s\",%s", filename, cmd_args) > MAXSTRLEN) {
         error("RUN command line too long");
     }
-    unsigned char *pcmd_args = buf + strlen((char *)filename) + 3; // *** THW 16/4/23
+    unsigned char * pcmd_args = buf + strlen((char *)filename) + 3; // *** THW 16/4/23
     CloseAudio(1);
 
-    if(CMM2mode){
-		/* FileLoadCMM2Program has a failure-returning stub on rp2040
+    if (CMM2mode) {
+        /* FileLoadCMM2Program has a failure-returning stub on rp2040
 		 * (defines_loader.c), so CMM2mode always no-ops there. */
-		if (*filename && !FileLoadCMM2Program((char *)buf,false)) return;
-	} else {
-		if (*filename && !FileLoadProgram(buf, false)) return;
-	}
+        if (*filename && !FileLoadCMM2Program((char *)buf, false)) return;
+    } else {
+        if (*filename && !FileLoadProgram(buf, false)) return;
+    }
     ClearRuntime(true);
     PrepareProgram(true);
-    if(Option.DISPLAY_CONSOLE && (SPIREAD  || Option.NoScroll)){ClearScreen(gui_bcolour);CurrentX=0;CurrentY=0;}
+    if (Option.DISPLAY_CONSOLE && (SPIREAD || Option.NoScroll)) {
+        ClearScreen(gui_bcolour);
+        CurrentX = 0;
+        CurrentY = 0;
+    }
     // Create a global constant MM.CMDLINE$ containing 'cmd_args'.
-//    void *ptr = findvar((unsigned char *)"MM.CMDLINE$", V_FIND | V_DIM_VAR | T_CONST);
+    //    void *ptr = findvar((unsigned char *)"MM.CMDLINE$", V_FIND | V_DIM_VAR | T_CONST);
     CtoM(pcmd_args);
-//    memcpy(cmdlinebuff, pcmd_args, *pcmd_args + 1); // *** THW 16/4/23
-	Mstrcpy(cmdlinebuff, pcmd_args);
+    //    memcpy(cmdlinebuff, pcmd_args, *pcmd_args + 1); // *** THW 16/4/23
+    Mstrcpy(cmdlinebuff, pcmd_args);
     IgnorePIN = false;
-	if(Option.LIBRARY_FLASH_SIZE == MAX_PROG_SIZE) ExecuteProgram(LibMemory);       // run anything that might be in the library
-    if(*ProgMemory != T_NEWLINE) return;                             // no program to run
-	cleanserver();
+    if (Option.LIBRARY_FLASH_SIZE == MAX_PROG_SIZE) ExecuteProgram(LibMemory); // run anything that might be in the library
+    if (*ProgMemory != T_NEWLINE) return;                                      // no program to run
+    cleanserver();
     /* initMouse0 is a no-op stub on USB builds (drivers/usb_host_kbd/
      * USBKeyboard.c) since Option.MOUSE_CLOCK is never set there. */
-    if(mouse0==false && Option.MOUSE_CLOCK)initMouse0(0);
-	nextstmt = ProgMemory;
+    if (mouse0 == false && Option.MOUSE_CLOCK) initMouse0(0);
+    nextstmt = ProgMemory;
 }
 /** @endcond */
 void MIPS16 cmd_list(void) {
-	unsigned char *p;
-	int i,j,k,m,step;
-    if((p = checkstring(cmdline, (unsigned char *)"ALL"))) {
-        if(!(*p == 0 || *p == '\'')) {
-        	if(Option.DISPLAY_CONSOLE && (SPIREAD  || Option.NoScroll)){ClearScreen(gui_bcolour);CurrentX=0;CurrentY=0;}
-        	getargs(&p,1,(unsigned char *)",");
-        	char *buff=GetTempMemory(STRINGSIZE);
-        	strcpy(buff,(char *)getCstring(argv[0]));
-    		if(strchr(buff, '.') == NULL) strcat(buff, ".bas");
+    unsigned char * p;
+    int i, j, k, m, step;
+    if ((p = checkstring(cmdline, (unsigned char *)"ALL"))) {
+        if (!(*p == 0 || *p == '\'')) {
+            if (Option.DISPLAY_CONSOLE && (SPIREAD || Option.NoScroll)) {
+                ClearScreen(gui_bcolour);
+                CurrentX = 0;
+                CurrentY = 0;
+            }
+            getargs(&p, 1, (unsigned char *)",");
+            char * buff = GetTempMemory(STRINGSIZE);
+            strcpy(buff, (char *)getCstring(argv[0]));
+            if (strchr(buff, '.') == NULL) strcat(buff, ".bas");
             ListFile(buff, true);
         } else {
-        	if(Option.DISPLAY_CONSOLE && (SPIREAD  || Option.NoScroll)){ClearScreen(gui_bcolour);CurrentX=0;CurrentY=0;}
-        	ListProgram(ProgMemory, true);
-        	checkend(p);
+            if (Option.DISPLAY_CONSOLE && (SPIREAD || Option.NoScroll)) {
+                ClearScreen(gui_bcolour);
+                CurrentX = 0;
+                CurrentY = 0;
+            }
+            ListProgram(ProgMemory, true);
+            checkend(p);
         }
-	} else if((p = checkstring(cmdline, (unsigned char *)"OPTIONS"))) {
-		printoptions();
-	} else if((p = checkstring(cmdline, (unsigned char *)"VARIABLES"))) {
-		int count=0;
-		int64_t *dest=NULL;
-		char *buff=NULL;
-		int j=0;
-		getargs(&p,1,(unsigned char *)",");
-		if(argc){
-			j=(parseintegerarray(argv[0],&dest,1,1,NULL,true)-1)*8;
-			dest[0] = 0;
-		}
-		for(int i=0;i<MAXVARS;i++){
-			if(g_vartbl[i].type & (T_INT|T_STR|T_NBR)){
-				count++;
-			}
-		}
-		if(!count)return;
-		char** c=GetTempMemory(count*sizeof(*c)+count*(MAXVARLEN+30));
-		for(int i=0,j=0;i<MAXVARS;i++){
-			char out[MAXVARLEN+30];
-			if(g_vartbl[i].type & (T_INT|T_STR|T_NBR)){
-				if(g_vartbl[i].level==0)strcpy(out,"DIM ");
-				else strcpy(out,"LOCAL ");
-				if(!(g_vartbl[i].namelen & NAMELEN_EXPLICIT)){
-					if(g_vartbl[i].type & T_INT){
-						strcat(out,"INTEGER ");
-					}
-					if(g_vartbl[i].type & T_STR){
-						strcat(out,"STRING ");
-					}
-					if(g_vartbl[i].type & T_NBR){
-						strcat(out,"FLOAT ");
-					}
-				}
-				strcat(out,(char *)g_vartbl[i].name);
-				if(g_vartbl[i].type & T_INT){
-					if(g_vartbl[i].namelen & NAMELEN_EXPLICIT)strcat(out,"%");
-				}
-				if(g_vartbl[i].type & T_STR){
-					if(g_vartbl[i].namelen & NAMELEN_EXPLICIT)strcat(out,"$");
-				}
-				if(g_vartbl[i].type & T_NBR){
-					if(g_vartbl[i].namelen & NAMELEN_EXPLICIT)strcat(out,"!");
-				}
-				if(g_vartbl[i].dims[0]>0){
-					strcat(out,"(");
-					for(int k=0;k<MAXDIM;k++){
-						if(g_vartbl[i].dims[k]>0){
-							char s[20];
-							IntToStr(s, (int64_t)g_vartbl[i].dims[k], 10);
-							strcat(out,s)					;
-						}
-						if(k<MAXDIM-1 && g_vartbl[i].dims[k+1]>0)strcat(out,",");
-					}
-					strcat(out,")");
-				}
-				c[j]= (char *)(c + count) + j*(MAXVARLEN+30);
-				strcpy(c[j],out);
-				j++;
-			}
-		}
-		sortStrings(c,count);
-    	int ListCnt = 2;
-		if(dest==NULL){
-			for(int i=0;i<count;i++){
-				MMPrintString(c[i]);
-				if(Option.DISPLAY_CONSOLE)ListNewLine(&ListCnt, 0);
-				else MMPrintString("\r\n");
-			}
-		} else {
-			int ol=0;
-			buff=(char *)&dest[1];
-			for(int i=0;i<count;i++){
-				if(ol+strlen(c[i])+2 > j)error("Destination array too small");
-				else ol+=strlen(c[i])+2;
-				strcat(buff,c[i]);
-				strcat(buff,"\r\n");
-			}
-			dest[0]=ol;
-		}
+    } else if ((p = checkstring(cmdline, (unsigned char *)"OPTIONS"))) {
+        printoptions();
+    } else if ((p = checkstring(cmdline, (unsigned char *)"VARIABLES"))) {
+        int count = 0;
+        int64_t * dest = NULL;
+        char * buff = NULL;
+        int j = 0;
+        getargs(&p, 1, (unsigned char *)",");
+        if (argc) {
+            j = (parseintegerarray(argv[0], &dest, 1, 1, NULL, true) - 1) * 8;
+            dest[0] = 0;
+        }
+        for (int i = 0; i < MAXVARS; i++) {
+            if (g_vartbl[i].type & (T_INT | T_STR | T_NBR)) {
+                count++;
+            }
+        }
+        if (!count) return;
+        char ** c = GetTempMemory(count * sizeof(*c) + count * (MAXVARLEN + 30));
+        for (int i = 0, j = 0; i < MAXVARS; i++) {
+            char out[MAXVARLEN + 30];
+            if (g_vartbl[i].type & (T_INT | T_STR | T_NBR)) {
+                if (g_vartbl[i].level == 0)
+                    strcpy(out, "DIM ");
+                else
+                    strcpy(out, "LOCAL ");
+                if (!(g_vartbl[i].namelen & NAMELEN_EXPLICIT)) {
+                    if (g_vartbl[i].type & T_INT) {
+                        strcat(out, "INTEGER ");
+                    }
+                    if (g_vartbl[i].type & T_STR) {
+                        strcat(out, "STRING ");
+                    }
+                    if (g_vartbl[i].type & T_NBR) {
+                        strcat(out, "FLOAT ");
+                    }
+                }
+                strcat(out, (char *)g_vartbl[i].name);
+                if (g_vartbl[i].type & T_INT) {
+                    if (g_vartbl[i].namelen & NAMELEN_EXPLICIT) strcat(out, "%");
+                }
+                if (g_vartbl[i].type & T_STR) {
+                    if (g_vartbl[i].namelen & NAMELEN_EXPLICIT) strcat(out, "$");
+                }
+                if (g_vartbl[i].type & T_NBR) {
+                    if (g_vartbl[i].namelen & NAMELEN_EXPLICIT) strcat(out, "!");
+                }
+                if (g_vartbl[i].dims[0] > 0) {
+                    strcat(out, "(");
+                    for (int k = 0; k < MAXDIM; k++) {
+                        if (g_vartbl[i].dims[k] > 0) {
+                            char s[20];
+                            IntToStr(s, (int64_t)g_vartbl[i].dims[k], 10);
+                            strcat(out, s);
+                        }
+                        if (k < MAXDIM - 1 && g_vartbl[i].dims[k + 1] > 0) strcat(out, ",");
+                    }
+                    strcat(out, ")");
+                }
+                c[j] = (char *)(c + count) + j * (MAXVARLEN + 30);
+                strcpy(c[j], out);
+                j++;
+            }
+        }
+        sortStrings(c, count);
+        int ListCnt = 2;
+        if (dest == NULL) {
+            for (int i = 0; i < count; i++) {
+                MMPrintString(c[i]);
+                if (Option.DISPLAY_CONSOLE)
+                    ListNewLine(&ListCnt, 0);
+                else
+                    MMPrintString("\r\n");
+            }
+        } else {
+            int ol = 0;
+            buff = (char *)&dest[1];
+            for (int i = 0; i < count; i++) {
+                if (ol + strlen(c[i]) + 2 > j)
+                    error("Destination array too small");
+                else
+                    ol += strlen(c[i]) + 2;
+                strcat(buff, c[i]);
+                strcat(buff, "\r\n");
+            }
+            dest[0] = ol;
+        }
 
-   	} else if((p = checkstring(cmdline, (unsigned char *)"PINS"))) {
-		/* rp2350a is unconditionally true on rp2040 targets and runtime-
+    } else if ((p = checkstring(cmdline, (unsigned char *)"PINS"))) {
+        /* rp2350a is unconditionally true on rp2040 targets and runtime-
 		 * detected on rp2350; only the rp2350 WEB pinlist actually
 		 * requires the RP2350A package. On every other target this
 		 * branch is a no-op. */
-		if(!rp2350a)error("Incompatible board, RP2350A only" );
-		CallExecuteProgram((char *)pinlist);
-		return;
-   	} else if((p = checkstring(cmdline, (unsigned char *)"SYSTEM I2C"))) {
-		if(I2C0locked || I2C1locked)CallExecuteProgram((char *)i2clist);
-		else error("System I2c not defined");
-		return;
-   	} else if((p = checkstring(cmdline, (unsigned char *)"COMMANDS"))) {
-    	int ListCnt = 2;
-    	step=Option.DISPLAY_CONSOLE ? HRes/gui_font_width/20 : 5;
-        if(Option.DISPLAY_CONSOLE && (SPIREAD  || Option.NoScroll)){ClearScreen(gui_bcolour);CurrentX=0;CurrentY=0;}
-    	m=0;
-		int x=0;
-		char** c=GetTempMemory((CommandTableSize+x)*sizeof(*c)+(CommandTableSize+x)*18);
-		for(i=0;i<CommandTableSize+x;i++){
-				c[m]= (char *)(c + CommandTableSize+x) + m*18;
-				if(m<CommandTableSize)strcpy(c[m],(char *)commandtbl[i].name);
-				if(*c[m]=='_' && c[m][1]!='(')*c[m]='.';
-    			m++;
-		}
-    	sortStrings(c,m);
-    	for(i=1;i<m;i+=step){
-    		for(k=0;k<step;k++){
-        		if(i+k<m){
-        			MMPrintString(c[i+k]);
-        			if(k!=(step-1))for(j=strlen(c[i+k]);j<15;j++)MMputchar(' ',1);
-        		}
-    		}
-			if(Option.DISPLAY_CONSOLE)ListNewLine(&ListCnt, 0);
-    		else MMPrintString("\r\n");
-    	}
-		MMPrintString("Total of ");PInt(m-1);MMPrintString(" commands\r\n");
-    } else if((p = checkstring(cmdline, (unsigned char *)"FUNCTIONS"))) {
-    	m=0;
-    	int ListCnt = 2;
-    	step=Option.DISPLAY_CONSOLE ? HRes/gui_font_width/20 : 5;
-        if(Option.DISPLAY_CONSOLE && (SPIREAD  || Option.NoScroll)){ClearScreen(gui_bcolour);CurrentX=0;CurrentY=0;}
-		int x=3+MMEND;
-		char** c=GetTempMemory((TokenTableSize+x)*sizeof(*c)+(TokenTableSize+x)*20);
-		for(i=0;i<TokenTableSize+x;i++){
-				c[m]= (char *)(c + TokenTableSize+x) + m*20;
-				if(m<TokenTableSize)strcpy(c[m],(char *)tokentbl[i].name);
-	   			else if(m<TokenTableSize+MMEND && m>=TokenTableSize)strcpy(c[m],overlaid_functions[i-TokenTableSize]);
-    			else if(m==TokenTableSize+MMEND)strcpy(c[m],"=<");
-    			else if(m==TokenTableSize+MMEND+1)strcpy(c[m],"=>");
-    			else strcpy(c[m],"MM.Info$(");
-				m++;
-		}
-    	sortStrings(c,m);
-    	for(i=1;i<m-1;i+=step){
-    		for(k=0;k<step;k++){
-        		if(i+k<m-1){
-        			MMPrintString(c[i+k]);
-        			if(k!=(step-1))for(j=strlen(c[i+k]);j<15;j++)MMputchar(' ',1);
-        		}
-    		}
-			if(Option.DISPLAY_CONSOLE)ListNewLine(&ListCnt, 0);
-    		else MMPrintString("\r\n");
-    	}
-		MMPrintString("Total of ");PInt(m-1);MMPrintString(" functions and operators\r\n");
+        if (!rp2350a) error("Incompatible board, RP2350A only");
+        CallExecuteProgram((char *)pinlist);
+        return;
+    } else if ((p = checkstring(cmdline, (unsigned char *)"SYSTEM I2C"))) {
+        if (I2C0locked || I2C1locked)
+            CallExecuteProgram((char *)i2clist);
+        else
+            error("System I2c not defined");
+        return;
+    } else if ((p = checkstring(cmdline, (unsigned char *)"COMMANDS"))) {
+        int ListCnt = 2;
+        step = Option.DISPLAY_CONSOLE ? HRes / gui_font_width / 20 : 5;
+        if (Option.DISPLAY_CONSOLE && (SPIREAD || Option.NoScroll)) {
+            ClearScreen(gui_bcolour);
+            CurrentX = 0;
+            CurrentY = 0;
+        }
+        m = 0;
+        int x = 0;
+        char ** c = GetTempMemory((CommandTableSize + x) * sizeof(*c) + (CommandTableSize + x) * 18);
+        for (i = 0; i < CommandTableSize + x; i++) {
+            c[m] = (char *)(c + CommandTableSize + x) + m * 18;
+            if (m < CommandTableSize) strcpy(c[m], (char *)commandtbl[i].name);
+            if (*c[m] == '_' && c[m][1] != '(') *c[m] = '.';
+            m++;
+        }
+        sortStrings(c, m);
+        for (i = 1; i < m; i += step) {
+            for (k = 0; k < step; k++) {
+                if (i + k < m) {
+                    MMPrintString(c[i + k]);
+                    if (k != (step - 1))
+                        for (j = strlen(c[i + k]); j < 15; j++) MMputchar(' ', 1);
+                }
+            }
+            if (Option.DISPLAY_CONSOLE)
+                ListNewLine(&ListCnt, 0);
+            else
+                MMPrintString("\r\n");
+        }
+        MMPrintString("Total of ");
+        PInt(m - 1);
+        MMPrintString(" commands\r\n");
+    } else if ((p = checkstring(cmdline, (unsigned char *)"FUNCTIONS"))) {
+        m = 0;
+        int ListCnt = 2;
+        step = Option.DISPLAY_CONSOLE ? HRes / gui_font_width / 20 : 5;
+        if (Option.DISPLAY_CONSOLE && (SPIREAD || Option.NoScroll)) {
+            ClearScreen(gui_bcolour);
+            CurrentX = 0;
+            CurrentY = 0;
+        }
+        int x = 3 + MMEND;
+        char ** c = GetTempMemory((TokenTableSize + x) * sizeof(*c) + (TokenTableSize + x) * 20);
+        for (i = 0; i < TokenTableSize + x; i++) {
+            c[m] = (char *)(c + TokenTableSize + x) + m * 20;
+            if (m < TokenTableSize)
+                strcpy(c[m], (char *)tokentbl[i].name);
+            else if (m < TokenTableSize + MMEND && m >= TokenTableSize)
+                strcpy(c[m], overlaid_functions[i - TokenTableSize]);
+            else if (m == TokenTableSize + MMEND)
+                strcpy(c[m], "=<");
+            else if (m == TokenTableSize + MMEND + 1)
+                strcpy(c[m], "=>");
+            else
+                strcpy(c[m], "MM.Info$(");
+            m++;
+        }
+        sortStrings(c, m);
+        for (i = 1; i < m - 1; i += step) {
+            for (k = 0; k < step; k++) {
+                if (i + k < m - 1) {
+                    MMPrintString(c[i + k]);
+                    if (k != (step - 1))
+                        for (j = strlen(c[i + k]); j < 15; j++) MMputchar(' ', 1);
+                }
+            }
+            if (Option.DISPLAY_CONSOLE)
+                ListNewLine(&ListCnt, 0);
+            else
+                MMPrintString("\r\n");
+        }
+        MMPrintString("Total of ");
+        PInt(m - 1);
+        MMPrintString(" functions and operators\r\n");
     } else {
-        if(!(*cmdline == 0 || *cmdline == '\'')) {
-        	getargs(&cmdline,1,(unsigned char *)",");
-        	if(Option.DISPLAY_CONSOLE && (SPIREAD  || Option.NoScroll)){ClearScreen(gui_bcolour);CurrentX=0;CurrentY=0;}
-        	char *buff=GetTempMemory(STRINGSIZE);
-        	strcpy(buff,(char *)getCstring(argv[0]));
-    		if(strchr(buff, '.') == NULL) {
-				if(!ExistsFile(buff))strcat(buff, ".bas");
-			}
-			ListFile(buff, false);
+        if (!(*cmdline == 0 || *cmdline == '\'')) {
+            getargs(&cmdline, 1, (unsigned char *)",");
+            if (Option.DISPLAY_CONSOLE && (SPIREAD || Option.NoScroll)) {
+                ClearScreen(gui_bcolour);
+                CurrentX = 0;
+                CurrentY = 0;
+            }
+            char * buff = GetTempMemory(STRINGSIZE);
+            strcpy(buff, (char *)getCstring(argv[0]));
+            if (strchr(buff, '.') == NULL) {
+                if (!ExistsFile(buff)) strcat(buff, ".bas");
+            }
+            ListFile(buff, false);
         } else {
-        	if(Option.DISPLAY_CONSOLE && (SPIREAD  || Option.NoScroll)){ClearScreen(gui_bcolour);CurrentX=0;CurrentY=0;}
-			ListProgram(ProgMemory, false);
-			checkend(cmdline);
-		}
+            if (Option.DISPLAY_CONSOLE && (SPIREAD || Option.NoScroll)) {
+                ClearScreen(gui_bcolour);
+                CurrentX = 0;
+                CurrentY = 0;
+            }
+            ListProgram(ProgMemory, false);
+            checkend(cmdline);
+        }
     }
 }
 #include <stdio.h>
 #include <string.h>
 
-int printWrappedText(const char *text, int screenWidth, int listcnt, int all) {
+int printWrappedText(const char * text, int screenWidth, int listcnt, int all) {
     int length = strlen(text);
     int start = 0; // Start index of the current line
-	char buff[STRINGSIZE];
+    char buff[STRINGSIZE];
     while (start < length) {
         int end = start + screenWidth; // Calculate the end index for the current line
         if (end >= length) {
             // If end is beyond the text length, just print the remaining text
-			memset(buff,0,STRINGSIZE);
-            sprintf(buff,"%s", text + start);
-			MMPrintString(buff);
-			ListNewLine(&listcnt, all);
+            memset(buff, 0, STRINGSIZE);
+            sprintf(buff, "%s", text + start);
+            MMPrintString(buff);
+            ListNewLine(&listcnt, all);
             break;
         }
 
@@ -954,21 +998,21 @@ int printWrappedText(const char *text, int screenWidth, int listcnt, int all) {
 
         if (lastSpace != -1) {
             // If a space is found, break at the space
-			memset(buff,0,STRINGSIZE);
+            memset(buff, 0, STRINGSIZE);
             sprintf(buff, "%.*s", lastSpace - start, text + start);
-			MMPrintString(buff);
-			ListNewLine(&listcnt, all);
+            MMPrintString(buff);
+            ListNewLine(&listcnt, all);
             start = lastSpace + 1; // Skip the space
         } else {
             // If no space is found, truncate at screen width
-			memset(buff,0,STRINGSIZE);
-            sprintf(buff,"%.*s", screenWidth, text + start);
-			MMPrintString(buff);
-			ListNewLine(&listcnt, all);
+            memset(buff, 0, STRINGSIZE);
+            sprintf(buff, "%.*s", screenWidth, text + start);
+            MMPrintString(buff);
+            ListNewLine(&listcnt, all);
             start += screenWidth;
         }
     }
-	return listcnt;
+    return listcnt;
 }
 
 /* Curated list of REPL / "DOS-like" commands shown by HELP with no args.
@@ -1026,483 +1070,488 @@ static const char * const help_repl_cmds[] = {
     "",
     "HELP                      This list",
     "HELP <pattern>            Filter list (substring), or look up in A:/help.txt",
-    NULL
-};
+    NULL};
 
-void cmd_help(void){
-	getargs(&cmdline,1,(unsigned char *)",");
-	if(!argc){
-		/* No args: page through the REPL command reference. This path
+void cmd_help(void) {
+    getargs(&cmdline, 1, (unsigned char *)",");
+    if (!argc) {
+        /* No args: page through the REPL command reference. This path
 		 * doesn't need A:/help.txt, so a stock device works out of the
 		 * box — users only need the help file for per-command lookups. */
-		int ListCnt = CurrentY/(FontTable[gui_font >> 4][1] * (gui_font & 0b1111)) + 2;
-		for (const char * const *pp = help_repl_cmds; *pp; pp++) {
-			MMPrintString((char *)*pp);
-			ListNewLine(&ListCnt, 0);
-		}
-		return;
-	}
-	/* With an argument: case-insensitive substring filter against the
+        int ListCnt = CurrentY / (FontTable[gui_font >> 4][1] * (gui_font & 0b1111)) + 2;
+        for (const char * const * pp = help_repl_cmds; *pp; pp++) {
+            MMPrintString((char *)*pp);
+            ListNewLine(&ListCnt, 0);
+        }
+        return;
+    }
+    /* With an argument: case-insensitive substring filter against the
 	 * built-in REPL list. If at least one line matches, show the header
 	 * and the matches; otherwise fall through to the A:/help.txt lookup
 	 * (handy for non-REPL commands that aren't in the built-in list). */
-	{
-		char *needle = (char *)getCstring(argv[0]);
-		char upper[MAXVARLEN + 1];
-		int nl = (int)strlen(needle);
-		if (nl > MAXVARLEN) nl = MAXVARLEN;
-		for (int i = 0; i < nl; i++) upper[i] = (char)toupper((unsigned char)needle[i]);
-		upper[nl] = 0;
+    {
+        char * needle = (char *)getCstring(argv[0]);
+        char upper[MAXVARLEN + 1];
+        int nl = (int)strlen(needle);
+        if (nl > MAXVARLEN) nl = MAXVARLEN;
+        for (int i = 0; i < nl; i++) upper[i] = (char)toupper((unsigned char)needle[i]);
+        upper[nl] = 0;
 
-		int matches = 0;
-		for (const char * const *pp = help_repl_cmds; *pp; pp++) {
-			const char *line = *pp;
-			if (!*line) continue;
-			char uline[160];
-			int ll = (int)strlen(line);
-			if (ll >= (int)sizeof(uline)) ll = (int)sizeof(uline) - 1;
-			for (int i = 0; i < ll; i++) uline[i] = (char)toupper((unsigned char)line[i]);
-			uline[ll] = 0;
-			if (nl == 0 || strstr(uline, upper)) matches++;
-		}
+        int matches = 0;
+        for (const char * const * pp = help_repl_cmds; *pp; pp++) {
+            const char * line = *pp;
+            if (!*line) continue;
+            char uline[160];
+            int ll = (int)strlen(line);
+            if (ll >= (int)sizeof(uline)) ll = (int)sizeof(uline) - 1;
+            for (int i = 0; i < ll; i++) uline[i] = (char)toupper((unsigned char)line[i]);
+            uline[ll] = 0;
+            if (nl == 0 || strstr(uline, upper)) matches++;
+        }
 
-		if (matches > 0) {
-			int ListCnt = CurrentY/(FontTable[gui_font >> 4][1] * (gui_font & 0b1111)) + 2;
-			for (const char * const *pp = help_repl_cmds; *pp; pp++) {
-				const char *line = *pp;
-				if (!*line) continue;
-				char uline[160];
-				int ll = (int)strlen(line);
-				if (ll >= (int)sizeof(uline)) ll = (int)sizeof(uline) - 1;
-				for (int i = 0; i < ll; i++) uline[i] = (char)toupper((unsigned char)line[i]);
-				uline[ll] = 0;
-				if (strstr(uline, upper)) {
-					MMPrintString((char *)line);
-					ListNewLine(&ListCnt, 0);
-				}
-			}
-			return;
-		}
-	}
-	if(!ExistsFile("A:/help.txt"))error("A:/help.txt not found");
-	{
-		int fnbr = FindFreeFileNbr();
-		char *buff=GetTempMemory(STRINGSIZE);
-		BasicFileOpen("A:/help.txt",fnbr, FA_READ);
-		int ListCnt = CurrentY/(FontTable[gui_font >> 4][1] * (gui_font & 0b1111)) + 2;
-		char *p=(char *)getCstring(argv[0]);
-		bool end=false;
-		while (!FileEOF(fnbr))            { // while waiting for the end of file
-			memset(buff,0,STRINGSIZE);
-			char *in=buff;
-			while(1){
-				if(FileEOF(fnbr)){end=true;break;}
-				char c = FileGetChar(fnbr);
-				if(c=='\n')break;
-				if(c=='\r')continue;
-				*in++=c;
-			}
-			if(end)break;
-			skipspace(p);
-			if(buff[0]=='~'){
-				if(pattern_matching(p,&buff[1],0,0)){
-					while(1){ //loop through all lines for the command
-						memset(buff,0,STRINGSIZE);
-						char *in=buff;
-							while(1){ //get this line
-							if(FileEOF(fnbr)){end=true;break;}
-							char c = FileGetChar(fnbr);
-							if(c=='\n')break;
-							if(c=='\r')continue;
-							*in++=c;
-						}
-						if(end)break;
-						if(buff[0]=='~'){ //now we need to rewind the file to check this line
-							ListNewLine(&ListCnt, false);
-							hal_fs_seek(hal_fds[fnbr], -(off_t)(strlen(buff)+2), HAL_FS_SEEK_CUR);
-							break;
-						} else {
-							ListCnt=printWrappedText(buff,Option.Width-1,ListCnt,false);
-						}
-					}
-				}
-			}
-		}
-	FileClose(fnbr);
-	}
+        if (matches > 0) {
+            int ListCnt = CurrentY / (FontTable[gui_font >> 4][1] * (gui_font & 0b1111)) + 2;
+            for (const char * const * pp = help_repl_cmds; *pp; pp++) {
+                const char * line = *pp;
+                if (!*line) continue;
+                char uline[160];
+                int ll = (int)strlen(line);
+                if (ll >= (int)sizeof(uline)) ll = (int)sizeof(uline) - 1;
+                for (int i = 0; i < ll; i++) uline[i] = (char)toupper((unsigned char)line[i]);
+                uline[ll] = 0;
+                if (strstr(uline, upper)) {
+                    MMPrintString((char *)line);
+                    ListNewLine(&ListCnt, 0);
+                }
+            }
+            return;
+        }
+    }
+    if (!ExistsFile("A:/help.txt")) error("A:/help.txt not found");
+    {
+        int fnbr = FindFreeFileNbr();
+        char * buff = GetTempMemory(STRINGSIZE);
+        BasicFileOpen("A:/help.txt", fnbr, FA_READ);
+        int ListCnt = CurrentY / (FontTable[gui_font >> 4][1] * (gui_font & 0b1111)) + 2;
+        char * p = (char *)getCstring(argv[0]);
+        bool end = false;
+        while (!FileEOF(fnbr)) { // while waiting for the end of file
+            memset(buff, 0, STRINGSIZE);
+            char * in = buff;
+            while (1) {
+                if (FileEOF(fnbr)) {
+                    end = true;
+                    break;
+                }
+                char c = FileGetChar(fnbr);
+                if (c == '\n') break;
+                if (c == '\r') continue;
+                *in++ = c;
+            }
+            if (end) break;
+            skipspace(p);
+            if (buff[0] == '~') {
+                if (pattern_matching(p, &buff[1], 0, 0)) {
+                    while (1) { //loop through all lines for the command
+                        memset(buff, 0, STRINGSIZE);
+                        char * in = buff;
+                        while (1) { //get this line
+                            if (FileEOF(fnbr)) {
+                                end = true;
+                                break;
+                            }
+                            char c = FileGetChar(fnbr);
+                            if (c == '\n') break;
+                            if (c == '\r') continue;
+                            *in++ = c;
+                        }
+                        if (end) break;
+                        if (buff[0] == '~') { //now we need to rewind the file to check this line
+                            ListNewLine(&ListCnt, false);
+                            hal_fs_seek(hal_fds[fnbr], -(off_t)(strlen(buff) + 2), HAL_FS_SEEK_CUR);
+                            break;
+                        } else {
+                            ListCnt = printWrappedText(buff, Option.Width - 1, ListCnt, false);
+                        }
+                    }
+                }
+            }
+        }
+        FileClose(fnbr);
+    }
 }
-void MIPS16 cmd_run(void){
-	do_run(cmdline,false);
+void MIPS16 cmd_run(void) {
+    do_run(cmdline, false);
 }
 
-void MIPS16 cmd_RunCMM2(void){
-	do_run(cmdline,true);
+void MIPS16 cmd_RunCMM2(void) {
+    do_run(cmdline, true);
 }
 
-void  MIPS16 cmd_continue(void) {
-    if(*cmdline == tokenFOR) {
-        if(g_forindex == 0) error("No FOR loop is in effect");
+void MIPS16 cmd_continue(void) {
+    if (*cmdline == tokenFOR) {
+        if (g_forindex == 0) error("No FOR loop is in effect");
         nextstmt = g_forstack[g_forindex - 1].nextptr;
         return;
     }
-    if(checkstring(cmdline, (unsigned char *)"DO")) {
-        if(g_doindex == 0) error("No DO loop is in effect");
+    if (checkstring(cmdline, (unsigned char *)"DO")) {
+        if (g_doindex == 0) error("No DO loop is in effect");
         nextstmt = g_dostack[g_doindex - 1].loopptr;
         return;
     }
     // must be a normal CONTINUE
-	checkend(cmdline);
-	if(CurrentLinePtr) error("Invalid in a program");
-	if(ContinuePoint == NULL) error("Cannot continue");
-//    IgnorePIN = false;
-	nextstmt = ContinuePoint;
+    checkend(cmdline);
+    if (CurrentLinePtr) error("Invalid in a program");
+    if (ContinuePoint == NULL) error("Cannot continue");
+    //    IgnorePIN = false;
+    nextstmt = ContinuePoint;
 }
 
 void MIPS16 cmd_new(void) {
-	closeframebuffer('A');
-	checkend(cmdline);
-	ClearProgram(true);
-	FlashLoad=0;
-	uSec(250000);
+    closeframebuffer('A');
+    checkend(cmdline);
+    ClearProgram(true);
+    FlashLoad = 0;
+    uSec(250000);
     FlashWriteInit(PROGRAM_FLASH);
     hal_flash_erase(realflashpointer, MAX_PROG_SIZE);
-    FlashWriteByte(0); FlashWriteByte(0); FlashWriteByte(0);    // terminate the program in flash
+    FlashWriteByte(0);
+    FlashWriteByte(0);
+    FlashWriteByte(0); // terminate the program in flash
     FlashWriteClose();
-	/* setmode is a no-op on non-VGA ports (drivers/vga_pio/
+    /* setmode is a no-op on non-VGA ports (drivers/vga_pio/
 	 * vga_ops_stub.c); DISPLAY_TYPE is never a SCREENMODE there. */
-	{
-		int mode = DISPLAY_TYPE-SCREENMODE1+1;
-		setmode(mode, true);
-	}
-    memset(inpbuf,0,STRINGSIZE);
-	longjmp(mark, 1);							                    // jump back to the input prompt
+    {
+        int mode = DISPLAY_TYPE - SCREENMODE1 + 1;
+        setmode(mode, true);
+    }
+    memset(inpbuf, 0, STRINGSIZE);
+    longjmp(mark, 1); // jump back to the input prompt
 }
-
 
 void MIPS16 cmd_erase(void) {
-	int i,j,k, len;
-	char p[MAXVARLEN + 1], *s, *x;
+    int i, j, k, len;
+    char p[MAXVARLEN + 1], *s, *x;
 
-	getargs(&cmdline, (MAX_ARG_COUNT * 2) - 1, (unsigned char *)",");				// getargs macro must be the first executable stmt in a block
-	if((argc & 0x01) == 0) error("Argument count");
-	for(i = 0; i < argc; i += 2) {
-		strcpy((char *)p, (char *)argv[i]);
-		if(*argv[i] & 0x80)error("You can't erase an in-built function");
-        while(!isnamechar(p[strlen(p) - 1])) p[strlen(p) - 1] = 0;
-		makeupper((unsigned char *)p);
-		for(j = MAXVARS/2; j < MAXVARS; j++) {
-            s = p;  x = (char *)g_vartbl[j].name; len = strlen(p);
-            while(len > 0 && *s == *x) {                            // compare the variable to the name that we have
-                len--; s++; x++;
+    getargs(&cmdline, (MAX_ARG_COUNT * 2) - 1, (unsigned char *)","); // getargs macro must be the first executable stmt in a block
+    if ((argc & 0x01) == 0) error("Argument count");
+    for (i = 0; i < argc; i += 2) {
+        strcpy((char *)p, (char *)argv[i]);
+        if (*argv[i] & 0x80) error("You can't erase an in-built function");
+        while (!isnamechar(p[strlen(p) - 1])) p[strlen(p) - 1] = 0;
+        makeupper((unsigned char *)p);
+        for (j = MAXVARS / 2; j < MAXVARS; j++) {
+            s = p;
+            x = (char *)g_vartbl[j].name;
+            len = strlen(p);
+            while (len > 0 && *s == *x) { // compare the variable to the name that we have
+                len--;
+                s++;
+                x++;
             }
-            if(!(len == 0 && (*x == 0 || strlen(p) == MAXVARLEN))) continue;
-    		// found the variable
-			if(((g_vartbl[j].type & (T_STR | T_STRUCT)) || g_vartbl[j].dims[0] != 0) && !(g_vartbl[j].type & T_PTR)) {
-				// Struct members live inline inside val.s (a single GetMemory allocation);
-				// freeing the backing buffer releases all T_STR members too.  See
-				// docs/type-struct-port-plan.md Phase 2 for why no per-member walk is needed.
-				FreeMemorySafe((void **)&g_vartbl[j].val.s);                        // free any memory (if allocated)
-				g_vartbl[j].val.s=NULL;
-			}
-			k=j+1;
-			if(k==MAXVARS)k=MAXVARS/2;
-			if(g_vartbl[k].type){
-				g_vartbl[j].name[0]='~';
-				g_vartbl[j].type=T_BLOCKED;
-			} else {
-				g_vartbl[j].name[0]=0;
-				g_vartbl[j].type=T_NOTYPE;
-			}
-			g_vartbl[j].dims[0] = 0;                                    // and again
-			g_vartbl[j].level = 0;
-			g_Globalvarcnt--;
-			break;
-		}
-		if(j == MAXVARS) error("Cannot find $", p);
-	}
+            if (!(len == 0 && (*x == 0 || strlen(p) == MAXVARLEN))) continue;
+            // found the variable
+            if (((g_vartbl[j].type & (T_STR | T_STRUCT)) || g_vartbl[j].dims[0] != 0) && !(g_vartbl[j].type & T_PTR)) {
+                // Struct members live inline inside val.s (a single GetMemory allocation);
+                // freeing the backing buffer releases all T_STR members too.  See
+                // docs/type-struct-port-plan.md Phase 2 for why no per-member walk is needed.
+                FreeMemorySafe((void **)&g_vartbl[j].val.s); // free any memory (if allocated)
+                g_vartbl[j].val.s = NULL;
+            }
+            k = j + 1;
+            if (k == MAXVARS) k = MAXVARS / 2;
+            if (g_vartbl[k].type) {
+                g_vartbl[j].name[0] = '~';
+                g_vartbl[j].type = T_BLOCKED;
+            } else {
+                g_vartbl[j].name[0] = 0;
+                g_vartbl[j].type = T_NOTYPE;
+            }
+            g_vartbl[j].dims[0] = 0; // and again
+            g_vartbl[j].level = 0;
+            g_Globalvarcnt--;
+            break;
+        }
+        if (j == MAXVARS) error("Cannot find $", p);
+    }
 }
 void MIPS16 cmd_clear(void) {
-	checkend(cmdline);
-	if(g_LocalIndex)error("Invalid in a subroutine");
-	ClearVars(0,true);
+    checkend(cmdline);
+    if (g_LocalIndex) error("Invalid in a subroutine");
+    ClearVars(0, true);
 }
-
 
 void cmd_goto(void) {
-	if(isnamestart(*cmdline))
-		nextstmt = findlabel(cmdline);								// must be a label
-	else
-		nextstmt = findline(getinteger(cmdline), true);				// try for a line number
-	CurrentLinePtr = nextstmt;
+    if (isnamestart(*cmdline))
+        nextstmt = findlabel(cmdline); // must be a label
+    else
+        nextstmt = findline(getinteger(cmdline), true); // try for a line number
+    CurrentLinePtr = nextstmt;
 }
 
-
-
 void MIPS16 MMB_DISPATCH_FUNC(cmd_if)(void) {
- 	int r, i, testgoto, testelseif;
-	unsigned char ss[3];														// this will be used to split up the argument line
-	unsigned char *p, *tp;
-	unsigned char *rp = NULL;
+    int r, i, testgoto, testelseif;
+    unsigned char ss[3]; // this will be used to split up the argument line
+    unsigned char *p, *tp;
+    unsigned char * rp = NULL;
 
-	ss[0] = tokenTHEN;
-	ss[1] = tokenELSE;
-	ss[2] = 0;
+    ss[0] = tokenTHEN;
+    ss[1] = tokenELSE;
+    ss[2] = 0;
 
-	testgoto = false;
-	testelseif = false;
+    testgoto = false;
+    testelseif = false;
 
-retest_an_if:
-	{																// start a new block
-		getargs(&cmdline, 20, ss);									// getargs macro must be the first executable stmt in a block
+retest_an_if: {                // start a new block
+    getargs(&cmdline, 20, ss); // getargs macro must be the first executable stmt in a block
 
-		if(testelseif && argc > 2) error("Unexpected text");
+    if (testelseif && argc > 2) error("Unexpected text");
 
-		// if there is no THEN token retry the test with a GOTO.  If that fails flag an error
-		if(argc < 2 || *argv[1] != ss[0]) {
-			if(testgoto) error("IF without THEN");
-			ss[0] = tokenGOTO;
-			testgoto = true;
-			goto retest_an_if;
-		}
+    // if there is no THEN token retry the test with a GOTO.  If that fails flag an error
+    if (argc < 2 || *argv[1] != ss[0]) {
+        if (testgoto) error("IF without THEN");
+        ss[0] = tokenGOTO;
+        testgoto = true;
+        goto retest_an_if;
+    }
 
+    // allow for IF statements embedded inside this IF
+    if (argc >= 3 && commandtbl_decode(argv[2]) == cmdIF) argc = 3; // this is IF xx=yy THEN IF ... so we want to evaluate only the first 3
+    if (argc >= 5 && commandtbl_decode(argv[4]) == cmdIF) argc = 5; // this is IF xx=yy THEN cmd ELSE IF ... so we want to evaluate only the first 5
 
-		// allow for IF statements embedded inside this IF
-		if (argc >= 3 && commandtbl_decode(argv[2]) == cmdIF) argc = 3;  // this is IF xx=yy THEN IF ... so we want to evaluate only the first 3
-		if (argc >= 5 && commandtbl_decode(argv[4]) == cmdIF) argc = 5;  // this is IF xx=yy THEN cmd ELSE IF ... so we want to evaluate only the first 5
+    if (argc == 4 || (argc == 5 && *argv[3] != ss[1])) error("Syntax");
 
-		if(argc == 4 || (argc == 5 && *argv[3] != ss[1])) error("Syntax");
+    r = (getnumber(argv[0]) != 0); // evaluate the expression controlling the if statement
 
-		r = (getnumber(argv[0]) != 0);								// evaluate the expression controlling the if statement
+    if (r) {
+        // the test returned TRUE
+        // first check if it is a multiline IF (ie, only 2 args)
+        if (argc == 2) {
+            // if multiline do nothing, control will fall through to the next line (which is what we want to execute next)
+            ;
+        } else {
+            // This is a standard single line IF statement
+            // Because the test was TRUE we are just interested in the THEN cmd stage.
+            if (*argv[1] == tokenGOTO) {
+                cmdline = argv[2];
+                cmd_goto();
+                return;
+            } else if (isdigit(*argv[2])) {
+                nextstmt = findline(getinteger(argv[2]), true);
+            } else {
+                if (argc == 5) {
+                    // this is a full IF THEN ELSE and the statement we want to execute is between the THEN & ELSE
+                    // this is handled by a special routine
+                    execute_one_command(argv[2]);
+                } else {
+                    // easy - there is no ELSE clause so just point the next statement pointer to the byte after the THEN token
+                    for (p = cmdline; *p && *p != ss[0]; p++); // search for the token
+                    nextstmt = p + 1;                          // and point to the byte after
+                }
+            }
+        }
+    } else {
+        // the test returned FALSE so we are just interested in the ELSE stage (if present)
+        // first check if it is a multiline IF (ie, only 2 args)
+        if (argc == 2) {
+            // search for the next ELSE, or ENDIF and pass control to the following line
+            // if an ELSEIF is found re execute this function to evaluate the condition following the ELSEIF
+            i = 1;
+            p = nextstmt;
+            while (1) {
+                p = GetNextCommand(p, &rp, (unsigned char *)"No matching ENDIF");
+                CommandToken tkn = commandtbl_decode(p);
+                if (tkn == cmdtoken) {
+                    // found a nested IF command, we now need to determine if it is a single or multiline IF
+                    // search for a THEN, then check if only white space follows.  If so, it is multiline.
+                    tp = p + sizeof(CommandToken);
+                    while (*tp && *tp != ss[0]) tp++;
+                    if (*tp) tp++; // step over the THEN
+                    skipspace(tp);
+                    if (*tp == 0 || *tp == '\'') // yes, only whitespace follows
+                        i++;                     // count it as a nested IF
+                    else                         // no, it is a single line IF
+                        skipelement(p);          // skip to the end so that we avoid an ELSE
+                    continue;
+                }
 
-		if(r) {
-			// the test returned TRUE
-			// first check if it is a multiline IF (ie, only 2 args)
-			if(argc == 2) {
-				// if multiline do nothing, control will fall through to the next line (which is what we want to execute next)
-				;
-			}
-			else {
-				// This is a standard single line IF statement
-				// Because the test was TRUE we are just interested in the THEN cmd stage.
-				if(*argv[1] == tokenGOTO) {
-					cmdline = argv[2];
-					cmd_goto();
-					return;
-				} else if(isdigit(*argv[2])) {
-					nextstmt = findline(getinteger(argv[2]), true);
-				} else {
-					if(argc == 5) {
-						// this is a full IF THEN ELSE and the statement we want to execute is between the THEN & ELSE
-						// this is handled by a special routine
-						execute_one_command(argv[2]);
-					} else {
-						// easy - there is no ELSE clause so just point the next statement pointer to the byte after the THEN token
-						for(p = cmdline; *p && *p != ss[0]; p++);	// search for the token
-						nextstmt = p + 1;							// and point to the byte after
-					}
-				}
-			}
-		} else {
-			// the test returned FALSE so we are just interested in the ELSE stage (if present)
-			// first check if it is a multiline IF (ie, only 2 args)
-			if(argc == 2) {
-				// search for the next ELSE, or ENDIF and pass control to the following line
-				// if an ELSEIF is found re execute this function to evaluate the condition following the ELSEIF
-				i = 1; p = nextstmt;
-				while(1) {
-                    p = GetNextCommand(p, &rp, (unsigned char *)"No matching ENDIF");
-        			CommandToken tkn=commandtbl_decode(p);
-					if(tkn == cmdtoken) {
-						// found a nested IF command, we now need to determine if it is a single or multiline IF
-						// search for a THEN, then check if only white space follows.  If so, it is multiline.
-						tp = p + sizeof(CommandToken);
-						while(*tp && *tp != ss[0]) tp++;
-						if(*tp) tp++;								// step over the THEN
-						skipspace(tp);
-						if(*tp == 0 || *tp == '\'')					// yes, only whitespace follows
-							i++;									// count it as a nested IF
-						else										// no, it is a single line IF
-							skipelement(p);							// skip to the end so that we avoid an ELSE
-						continue;
-					}
+                if (tkn == cmdELSE && i == 1) {
+                    // found an ELSE at the same level as this IF.  Step over it and continue with the statement after it
+                    skipelement(p);
+                    nextstmt = p;
+                    break;
+                }
 
-					if(tkn == cmdELSE && i == 1) {
-						// found an ELSE at the same level as this IF.  Step over it and continue with the statement after it
-						skipelement(p);
-						nextstmt = p;
-						break;
-					}
+                if ((tkn == cmdELSEIF || tkn == cmdELSE_IF) && i == 1) {
+                    // we have found an ELSEIF statement at the same level as our IF statement
+                    // setup the environment to make this function evaluate the test following ELSEIF and jump back
+                    // to the start of the function.  This is not very clean (it uses the dreaded goto for a start) but it works
+                    p += sizeof(CommandToken); // step over the token
+                    skipspace(p);
+                    CurrentLinePtr = rp;
+                    if (*p == 0) error("Syntax"); // there must be a test after the elseif
+                    cmdline = p;
+                    skipelement(p);
+                    nextstmt = p;
+                    testgoto = false;
+                    testelseif = true;
+                    goto retest_an_if;
+                }
 
-					if((tkn == cmdELSEIF || tkn==cmdELSE_IF) && i == 1) {
-						// we have found an ELSEIF statement at the same level as our IF statement
-						// setup the environment to make this function evaluate the test following ELSEIF and jump back
-						// to the start of the function.  This is not very clean (it uses the dreaded goto for a start) but it works
-						p+=sizeof(CommandToken);                                        // step over the token
-						skipspace(p);
-						CurrentLinePtr = rp;
-						if(*p == 0) error("Syntax");        // there must be a test after the elseif
-						cmdline = p;
-						skipelement(p);
-						nextstmt = p;
-						testgoto = false;
-						testelseif = true;
-						goto retest_an_if;
-					}
-
-					if(tkn == cmdENDIF || tkn==cmdEND_IF) i--;						// found an ENDIF so decrement our nested counter
-					if(i == 0) {
-						// found our matching ENDIF stmt.  Step over it and continue with the statement after it
-						skipelement(p);
-						nextstmt = p;
-						break;
-					}
-				}
-			}
-			else {
-				// this must be a single line IF statement
-				// check if there is an ELSE on the same line
-				if(argc == 5) {
-					// there is an ELSE command
-					if(isdigit(*argv[4]))
-						// and it is just a number, so get it and find the line
-						nextstmt = findline(getinteger(argv[4]), true);
-					else {
-/*						// there is a statement after the ELSE clause  so just point to it (the byte after the ELSE token)
+                if (tkn == cmdENDIF || tkn == cmdEND_IF) i--; // found an ENDIF so decrement our nested counter
+                if (i == 0) {
+                    // found our matching ENDIF stmt.  Step over it and continue with the statement after it
+                    skipelement(p);
+                    nextstmt = p;
+                    break;
+                }
+            }
+        } else {
+            // this must be a single line IF statement
+            // check if there is an ELSE on the same line
+            if (argc == 5) {
+                // there is an ELSE command
+                if (isdigit(*argv[4]))
+                    // and it is just a number, so get it and find the line
+                    nextstmt = findline(getinteger(argv[4]), true);
+                else {
+                    /*						// there is a statement after the ELSE clause  so just point to it (the byte after the ELSE token)
 						for(p = cmdline; *p && *p != ss[1]; p++);	// search for the token
 						nextstmt = p + 1;							// and point to the byte after
 */
-		                // IF <condition> THEN <statement1> ELSE <statement2>
-						// Find and read the THEN function token.
-						for(p = cmdline; *p && *p != ss[0]; p++){}
-						// Skip the command that <statement1> must start with.
-						p++;
-						skipspace(p);
-						p += sizeof(CommandToken);
-						// Find and read the ELSE function token.
-						for(; *p && *p != ss[1]; p++);
-		                nextstmt = p+1;  // The statement after the ELSE token.
-					}
-				} else {
-					// no ELSE on a single line IF statement, so just continue with the next statement
-					skipline(cmdline);
-					nextstmt = cmdline;
-				}
-			}
-		}
-	}
+                    // IF <condition> THEN <statement1> ELSE <statement2>
+                    // Find and read the THEN function token.
+                    for (p = cmdline; *p && *p != ss[0]; p++) {
+                    }
+                    // Skip the command that <statement1> must start with.
+                    p++;
+                    skipspace(p);
+                    p += sizeof(CommandToken);
+                    // Find and read the ELSE function token.
+                    for (; *p && *p != ss[1]; p++);
+                    nextstmt = p + 1; // The statement after the ELSE token.
+                }
+            } else {
+                // no ELSE on a single line IF statement, so just continue with the next statement
+                skipline(cmdline);
+                nextstmt = cmdline;
+            }
+        }
+    }
 }
-
-
+}
 
 void MIPS16 MMB_DISPATCH_FUNC(cmd_else)(void) {
-	int i;
-	unsigned char *p, *tp;
+    int i;
+    unsigned char *p, *tp;
 
-	// search for the next ENDIF and pass control to the following line
-	i = 1; p = nextstmt;
+    // search for the next ENDIF and pass control to the following line
+    i = 1;
+    p = nextstmt;
 
-	if(cmdtoken ==  cmdELSE) checkend(cmdline);
+    if (cmdtoken == cmdELSE) checkend(cmdline);
 
-	while(1) {
+    while (1) {
         p = GetNextCommand(p, NULL, (unsigned char *)"No matching ENDIF");
-        CommandToken tkn=commandtbl_decode(p);
-		if(tkn == cmdIF) {
-			// found a nested IF command, we now need to determine if it is a single or multiline IF
-			// search for a THEN, then check if only white space follows.  If so, it is multiline.
-			tp = p + sizeof(CommandToken);
-			while(*tp && *tp != tokenTHEN) tp++;
-			if(*tp) tp++;											// step over the THEN
-			skipspace(tp);
-			if(*tp == 0 || *tp == '\'')								// yes, only whitespace follows
-				i++;												// count it as a nested IF
-		}
-		if(tkn == cmdENDIF || tkn==cmdEND_IF) i--;				    // found an ENDIF so decrement our nested counter
-		if(i == 0) break;											// found our matching ENDIF stmt
-	}
-	// found a matching ENDIF.  Step over it and continue with the statement after it
-	skipelement(p);
-	nextstmt = p;
+        CommandToken tkn = commandtbl_decode(p);
+        if (tkn == cmdIF) {
+            // found a nested IF command, we now need to determine if it is a single or multiline IF
+            // search for a THEN, then check if only white space follows.  If so, it is multiline.
+            tp = p + sizeof(CommandToken);
+            while (*tp && *tp != tokenTHEN) tp++;
+            if (*tp) tp++; // step over the THEN
+            skipspace(tp);
+            if (*tp == 0 || *tp == '\'') // yes, only whitespace follows
+                i++;                     // count it as a nested IF
+        }
+        if (tkn == cmdENDIF || tkn == cmdEND_IF) i--; // found an ENDIF so decrement our nested counter
+        if (i == 0) break;                            // found our matching ENDIF stmt
+    }
+    // found a matching ENDIF.  Step over it and continue with the statement after it
+    skipelement(p);
+    nextstmt = p;
 }
-
-
 
 void do_end(bool ecmd) {
     hal_display_merge_abort();
-if(Option.SerialConsole)while(ConsoleTxBufHead!=ConsoleTxBufTail)routinechecks();
-		fflush(stdout);
-	if(ecmd){
-		getargs(&cmdline,1,(unsigned char *)",");
-		if(argc==1){
-			if(FindSubFun((unsigned char *)"MM.END", 0) >= 0 && checkstring(argv[0],(unsigned char *)"NOEND")==NULL) {
-				ExecuteProgram((unsigned char *)"MM.END\0");
-				if(Option.SerialConsole)while(ConsoleTxBufHead!=ConsoleTxBufTail)routinechecks();
-				fflush(stdout);
-				memset(inpbuf,0,STRINGSIZE);
-			} else {
-				unsigned char *cmd_args = (unsigned char *)"";
-				cmd_args = getCstring(argv[0]);
-				void *ptr = findvar((unsigned char *)"MM.ENDLINE$", T_STR| V_NOFIND_NULL);
-				if(ptr==NULL)ptr = findvar((unsigned char *)"MM.ENDLINE$", V_FIND |V_DIM_VAR);
-				strcpy(ptr, (char *)cmd_args ); // *** THW 16/4/23
-				CtoM(ptr);
-			}
-		} else if(FindSubFun((unsigned char *)"MM.END", 0) >= 0) {
-			ExecuteProgram((unsigned char *)"MM.END\0");
-			if(Option.SerialConsole)while(ConsoleTxBufHead!=ConsoleTxBufTail)routinechecks();
-			fflush(stdout);
-			memset(inpbuf,0,STRINGSIZE);
-		}
-	}
-    if(!(MMerrno == 16)) hal_watchdog_disable();
+    if (Option.SerialConsole)
+        while (ConsoleTxBufHead != ConsoleTxBufTail) routinechecks();
+    fflush(stdout);
+    if (ecmd) {
+        getargs(&cmdline, 1, (unsigned char *)",");
+        if (argc == 1) {
+            if (FindSubFun((unsigned char *)"MM.END", 0) >= 0 && checkstring(argv[0], (unsigned char *)"NOEND") == NULL) {
+                ExecuteProgram((unsigned char *)"MM.END\0");
+                if (Option.SerialConsole)
+                    while (ConsoleTxBufHead != ConsoleTxBufTail) routinechecks();
+                fflush(stdout);
+                memset(inpbuf, 0, STRINGSIZE);
+            } else {
+                unsigned char * cmd_args = (unsigned char *)"";
+                cmd_args = getCstring(argv[0]);
+                void * ptr = findvar((unsigned char *)"MM.ENDLINE$", T_STR | V_NOFIND_NULL);
+                if (ptr == NULL) ptr = findvar((unsigned char *)"MM.ENDLINE$", V_FIND | V_DIM_VAR);
+                strcpy(ptr, (char *)cmd_args); // *** THW 16/4/23
+                CtoM(ptr);
+            }
+        } else if (FindSubFun((unsigned char *)"MM.END", 0) >= 0) {
+            ExecuteProgram((unsigned char *)"MM.END\0");
+            if (Option.SerialConsole)
+                while (ConsoleTxBufHead != ConsoleTxBufTail) routinechecks();
+            fflush(stdout);
+            memset(inpbuf, 0, STRINGSIZE);
+        }
+    }
+    if (!(MMerrno == 16)) hal_watchdog_disable();
     port_runtime_abort_dma();
-	for(int i=0; i< NBRSETTICKS;i++){
-		TickPeriod[i]=0;
-		TickTimer[i]=0;
-		TickInt[i]=NULL;
-		TickActive[i]=0;
-	}
-	InterruptUsed=0;
-    InterruptReturn = NULL ;
-    memset(inpbuf,0,STRINGSIZE);
-	CloseAudio(1);
-	CloseAllFiles();
-    ADCDualBuffering=0;
-	WatchdogSet = false;
+    for (int i = 0; i < NBRSETTICKS; i++) {
+        TickPeriod[i] = 0;
+        TickTimer[i] = 0;
+        TickInt[i] = NULL;
+        TickActive[i] = 0;
+    }
+    InterruptUsed = 0;
+    InterruptReturn = NULL;
+    memset(inpbuf, 0, STRINGSIZE);
+    CloseAudio(1);
+    CloseAllFiles();
+    ADCDualBuffering = 0;
+    WatchdogSet = false;
     WDTimer = 0;
-	hal_watchdog_disable();
-	_excep_code=0;
-	dmarunning = false;
-    multi=false;
-	WAVInterrupt = NULL;
-	WAVcomplete = 0;
-	if(g_myrand)FreeMemory((void *)g_myrand);
-	g_myrand=NULL;
-	OptionConsole=3;
-	{
-		int mode = DISPLAY_TYPE-SCREENMODE1+1;
-		setmode(mode,false);
-	}
-	SSPrintString("\033[?25h"); //in case application has turned the cursor off
-	ApplyPromptConsoleColours();
-	close_tcpclient();
-	cleanserver();
-	{
-		extern volatile bool TCPreceived;
-		extern char *TCPreceiveInterrupt;
-		TCPreceived = 0;
-		TCPreceiveInterrupt = NULL;
-	}
-	CurrentLinePtr = NULL;
-	if(mouse0==false && Option.MOUSE_CLOCK)initMouse0(0);
-	/* NEXTGEN refresh auto-enable — DISPLAY_TYPE is never >= NEXTGEN
+    hal_watchdog_disable();
+    _excep_code = 0;
+    dmarunning = false;
+    multi = false;
+    WAVInterrupt = NULL;
+    WAVcomplete = 0;
+    if (g_myrand) FreeMemory((void *)g_myrand);
+    g_myrand = NULL;
+    OptionConsole = 3;
+    {
+        int mode = DISPLAY_TYPE - SCREENMODE1 + 1;
+        setmode(mode, false);
+    }
+    SSPrintString("\033[?25h"); //in case application has turned the cursor off
+    ApplyPromptConsoleColours();
+    close_tcpclient();
+    cleanserver();
+    {
+        extern volatile bool TCPreceived;
+        extern char * TCPreceiveInterrupt;
+        TCPreceived = 0;
+        TCPreceiveInterrupt = NULL;
+    }
+    CurrentLinePtr = NULL;
+    if (mouse0 == false && Option.MOUSE_CLOCK) initMouse0(0);
+    /* NEXTGEN refresh auto-enable — DISPLAY_TYPE is never >= NEXTGEN
 	 * outside rp2350 PICOMITE so this is a runtime no-op elsewhere. */
-	if(Option.DISPLAY_TYPE>=NEXTGEN)Option.Refresh=1;
+    if (Option.DISPLAY_TYPE >= NEXTGEN) Option.Refresh = 1;
 }
 void cmd_end(void) {
-	do_end(true);
-	longjmp(mark, 1);												// jump back to the input prompt
+    do_end(true);
+    longjmp(mark, 1); // jump back to the input prompt
 }
-extern unsigned int mmap[HEAP_MEMORY_SIZE/ PAGESIZE / PAGESPERWORD];
+extern unsigned int mmap[HEAP_MEMORY_SIZE / PAGESIZE / PAGESPERWORD];
 /* psmap is the PSRAM heap page-bitmap. Real size lives in
  * drivers/psram_heap/psram_heap_real.c (ports that expose PSRAM to
  * MMBasic) or psram_heap_stub.c (1-word stub everywhere else). Use
@@ -1510,209 +1559,228 @@ extern unsigned int mmap[HEAP_MEMORY_SIZE/ PAGESIZE / PAGESPERWORD];
  * because the extern has an incomplete array bound here. */
 extern unsigned int psmap[];
 extern const unsigned int psmap_size_bytes;
-extern struct s_hash g_hashlist[MAXVARS/2];
+extern struct s_hash g_hashlist[MAXVARS / 2];
 extern int g_hashlistpointer;
 extern short g_StrTmpIndex;
 extern bool g_TempMemoryIsChanged;
-extern volatile char *g_StrTmp[MAXTEMPSTRINGS];                                       // used to track temporary string space on the heap
-extern volatile char g_StrTmpLocalIndex[MAXTEMPSTRINGS];                              // used to track the g_LocalIndex for each temporary string space on the heap
+extern volatile char * g_StrTmp[MAXTEMPSTRINGS];         // used to track temporary string space on the heap
+extern volatile char g_StrTmpLocalIndex[MAXTEMPSTRINGS]; // used to track the g_LocalIndex for each temporary string space on the heap
 extern void hal_psram_save_settings(void);
 
-static uint8_t *psram_context_align(uint8_t *p) {
-	uintptr_t v = (uintptr_t)p;
-	return (uint8_t *)((v + 3u) & ~(uintptr_t)3u);
+static uint8_t * psram_context_align(uint8_t * p) {
+    uintptr_t v = (uintptr_t)p;
+    return (uint8_t *)((v + 3u) & ~(uintptr_t)3u);
 }
 
-static uint8_t *psram_context_base(void) {
-	return (uint8_t *)PSRAMbase + PSRAMsize;
+static uint8_t * psram_context_base(void) {
+    return (uint8_t *)PSRAMbase + PSRAMsize;
 }
 
-static void psram_context_write(uint8_t **dst, const void *src, size_t n) {
-	const uint8_t *s = (const uint8_t *)src;
-	uint8_t *p = psram_context_align(*dst);
-	size_t words_since_clean = 0;
-	while(n) {
-		uint32_t word = 0;
-		size_t chunk = n < sizeof(word) ? n : sizeof(word);
-		uint8_t *w = (uint8_t *)&word;
-		for(size_t i = 0; i < chunk; i++) w[i] = s[i];
-		*(volatile uint32_t *)p = word;
-		p += sizeof(word);
-		s += chunk;
-		n -= chunk;
-		if(++words_since_clean == 1024) {
-			hal_psram_save_settings();
-			words_since_clean = 0;
-		}
-	}
-	hal_psram_save_settings();
-	*dst = p;
+static void psram_context_write(uint8_t ** dst, const void * src, size_t n) {
+    const uint8_t * s = (const uint8_t *)src;
+    uint8_t * p = psram_context_align(*dst);
+    size_t words_since_clean = 0;
+    while (n) {
+        uint32_t word = 0;
+        size_t chunk = n < sizeof(word) ? n : sizeof(word);
+        uint8_t * w = (uint8_t *)&word;
+        for (size_t i = 0; i < chunk; i++) w[i] = s[i];
+        *(volatile uint32_t *)p = word;
+        p += sizeof(word);
+        s += chunk;
+        n -= chunk;
+        if (++words_since_clean == 1024) {
+            hal_psram_save_settings();
+            words_since_clean = 0;
+        }
+    }
+    hal_psram_save_settings();
+    *dst = p;
 }
 
-static void psram_context_read(void *dst, uint8_t **src, size_t n) {
-	uint8_t *d = (uint8_t *)dst;
-	uint8_t *p = psram_context_align(*src);
-	while(n) {
-		uint32_t word = *(volatile uint32_t *)p;
-		size_t chunk = n < sizeof(word) ? n : sizeof(word);
-		uint8_t *w = (uint8_t *)&word;
-		for(size_t i = 0; i < chunk; i++) d[i] = w[i];
-		p += sizeof(word);
-		d += chunk;
-		n -= chunk;
-	}
-	*src = p;
+static void psram_context_read(void * dst, uint8_t ** src, size_t n) {
+    uint8_t * d = (uint8_t *)dst;
+    uint8_t * p = psram_context_align(*src);
+    while (n) {
+        uint32_t word = *(volatile uint32_t *)p;
+        size_t chunk = n < sizeof(word) ? n : sizeof(word);
+        uint8_t * w = (uint8_t *)&word;
+        for (size_t i = 0; i < chunk; i++) d[i] = w[i];
+        p += sizeof(word);
+        d += chunk;
+        n -= chunk;
+    }
+    *src = p;
 }
 
-void SaveContext(void){
-	CloseAudio(1);
-	/* PSRAM-backed fast save (rp2350 non-WEB). On every other target
+void SaveContext(void) {
+    CloseAudio(1);
+    /* PSRAM-backed fast save (rp2350 non-WEB). On every other target
 	 * PSRAMsize==0 so this falls through to the LFS save path below.
 	 * The closing } + else + LFS block + final } all collapse to a
 	 * plain C if/else with no preprocessor gates. */
-	if(PSRAMsize){
-		ClearTempMemory();
-		uint8_t *p=psram_context_base();
-		#define PSRAM_CTX_WRITE_SCALAR(v) do { psram_context_write(&p, &(v), sizeof(v)); } while(0)
-		#define PSRAM_CTX_WRITE_ARRAY(v)  do { psram_context_write(&p, (const void *)(v), sizeof(v)); } while(0)
-		#define PSRAM_CTX_WRITE_BLOCK(v, n) do { psram_context_write(&p, (const void *)(v), (n)); } while(0)
-		PSRAM_CTX_WRITE_SCALAR(g_StrTmpIndex);
-		PSRAM_CTX_WRITE_SCALAR(g_TempMemoryIsChanged);
-		PSRAM_CTX_WRITE_ARRAY(g_StrTmp);
-		PSRAM_CTX_WRITE_ARRAY(g_StrTmpLocalIndex);
-		PSRAM_CTX_WRITE_SCALAR(g_LocalIndex);
-		PSRAM_CTX_WRITE_SCALAR(g_OptionBase);
-		PSRAM_CTX_WRITE_SCALAR(g_DimUsed);
-		PSRAM_CTX_WRITE_SCALAR(g_varcnt);
-		PSRAM_CTX_WRITE_SCALAR(g_Globalvarcnt);
-		PSRAM_CTX_WRITE_SCALAR(g_Localvarcnt);
-		PSRAM_CTX_WRITE_SCALAR(g_hashlistpointer);
-		PSRAM_CTX_WRITE_SCALAR(g_forindex);
-		PSRAM_CTX_WRITE_SCALAR(g_doindex);
-		PSRAM_CTX_WRITE_BLOCK(g_forstack, sizeof(struct s_forstack)*MAXFORLOOPS);
-		PSRAM_CTX_WRITE_BLOCK(g_dostack, sizeof(struct s_dostack)*MAXDOLOOPS);
-		PSRAM_CTX_WRITE_BLOCK(g_vartbl, sizeof(struct s_vartbl)*MAXVARS);
-		PSRAM_CTX_WRITE_BLOCK(g_hashlist, sizeof(struct s_hash)*MAXVARS/2);
-		PSRAM_CTX_WRITE_BLOCK(MMHeap, heap_memory_size+256);
-		PSRAM_CTX_WRITE_ARRAY(mmap);
-		PSRAM_CTX_WRITE_BLOCK(psmap, psmap_size_bytes);
-		#undef PSRAM_CTX_WRITE_SCALAR
-		#undef PSRAM_CTX_WRITE_ARRAY
-		#undef PSRAM_CTX_WRITE_BLOCK
-	} else {
-		lfs_file_t lfs_file;
-        struct lfs_info lfsinfo={0};
+    if (PSRAMsize) {
+        ClearTempMemory();
+        uint8_t * p = psram_context_base();
+#define PSRAM_CTX_WRITE_SCALAR(v)                 \
+    do {                                          \
+        psram_context_write(&p, &(v), sizeof(v)); \
+    } while (0)
+#define PSRAM_CTX_WRITE_ARRAY(v)                               \
+    do {                                                       \
+        psram_context_write(&p, (const void *)(v), sizeof(v)); \
+    } while (0)
+#define PSRAM_CTX_WRITE_BLOCK(v, n)                      \
+    do {                                                 \
+        psram_context_write(&p, (const void *)(v), (n)); \
+    } while (0)
+        PSRAM_CTX_WRITE_SCALAR(g_StrTmpIndex);
+        PSRAM_CTX_WRITE_SCALAR(g_TempMemoryIsChanged);
+        PSRAM_CTX_WRITE_ARRAY(g_StrTmp);
+        PSRAM_CTX_WRITE_ARRAY(g_StrTmpLocalIndex);
+        PSRAM_CTX_WRITE_SCALAR(g_LocalIndex);
+        PSRAM_CTX_WRITE_SCALAR(g_OptionBase);
+        PSRAM_CTX_WRITE_SCALAR(g_DimUsed);
+        PSRAM_CTX_WRITE_SCALAR(g_varcnt);
+        PSRAM_CTX_WRITE_SCALAR(g_Globalvarcnt);
+        PSRAM_CTX_WRITE_SCALAR(g_Localvarcnt);
+        PSRAM_CTX_WRITE_SCALAR(g_hashlistpointer);
+        PSRAM_CTX_WRITE_SCALAR(g_forindex);
+        PSRAM_CTX_WRITE_SCALAR(g_doindex);
+        PSRAM_CTX_WRITE_BLOCK(g_forstack, sizeof(struct s_forstack) * MAXFORLOOPS);
+        PSRAM_CTX_WRITE_BLOCK(g_dostack, sizeof(struct s_dostack) * MAXDOLOOPS);
+        PSRAM_CTX_WRITE_BLOCK(g_vartbl, sizeof(struct s_vartbl) * MAXVARS);
+        PSRAM_CTX_WRITE_BLOCK(g_hashlist, sizeof(struct s_hash) * MAXVARS / 2);
+        PSRAM_CTX_WRITE_BLOCK(MMHeap, heap_memory_size + 256);
+        PSRAM_CTX_WRITE_ARRAY(mmap);
+        PSRAM_CTX_WRITE_BLOCK(psmap, psmap_size_bytes);
+#undef PSRAM_CTX_WRITE_SCALAR
+#undef PSRAM_CTX_WRITE_ARRAY
+#undef PSRAM_CTX_WRITE_BLOCK
+    } else {
+        lfs_file_t lfs_file;
+        struct lfs_info lfsinfo = {0};
         FSerror = lfs_stat(&lfs, "/.vars", &lfsinfo);
-        if(lfsinfo.type==LFS_TYPE_REG)lfs_remove(&lfs, "/.vars");
-		int sizeneeded= sizeof(g_StrTmpIndex)+ sizeof(g_TempMemoryIsChanged)+sizeof(g_StrTmp)+sizeof(g_StrTmpLocalIndex)+sizeof(g_Localvarcnt)+
-		sizeof(g_LocalIndex)+sizeof(g_OptionBase)+sizeof(g_DimUsed)+sizeof(g_varcnt)+sizeof(g_Globalvarcnt)+
-		sizeof(g_hashlistpointer)+sizeof(g_forindex)+sizeof(g_doindex)+sizeof(struct s_forstack)*MAXFORLOOPS+sizeof(struct s_dostack)*MAXDOLOOPS+
-		sizeof(struct s_vartbl)*MAXVARS+sizeof(struct s_hash)*MAXVARS/2+heap_memory_size+256+sizeof(mmap);
-		if(sizeneeded>=Option.FlashSize-(Option.modbuff ? 1024*Option.modbuffsize : 0)-RoundUpK4(TOP_OF_SYSTEM_FLASH)-lfs_fs_size(&lfs)*4096)error("Not enough free space on A: drive: % needed",sizeneeded);
-		lfs_file_open(&lfs, &lfs_file, ".vars", LFS_O_RDWR | LFS_O_CREAT);;
-//		int dt=get_fattime();
-		ClearTempMemory();
-//		lfs_setattr(&lfs, ".vars", 'A', &dt,   4);
-		lfs_file_write(&lfs, &lfs_file, &g_StrTmpIndex, sizeof(g_StrTmpIndex));
-		lfs_file_write(&lfs, &lfs_file, &g_TempMemoryIsChanged, sizeof(g_TempMemoryIsChanged));
-		lfs_file_write(&lfs, &lfs_file, (void *)g_StrTmp, sizeof(g_StrTmp));
-		lfs_file_write(&lfs, &lfs_file, (void *)g_StrTmpLocalIndex, sizeof(g_StrTmpLocalIndex));
-		lfs_file_write(&lfs, &lfs_file, &g_LocalIndex, sizeof(g_LocalIndex));
-		lfs_file_write(&lfs, &lfs_file, &g_OptionBase, sizeof(g_OptionBase));
-		lfs_file_write(&lfs, &lfs_file, &g_DimUsed, sizeof(g_DimUsed));
-		lfs_file_write(&lfs, &lfs_file, &g_varcnt, sizeof(g_varcnt));
-		lfs_file_write(&lfs, &lfs_file, &g_Globalvarcnt, sizeof(g_Globalvarcnt));
-		lfs_file_write(&lfs, &lfs_file, &g_Localvarcnt, sizeof(g_Globalvarcnt));
-		lfs_file_write(&lfs, &lfs_file, &g_hashlistpointer, sizeof(g_hashlistpointer));
-		lfs_file_write(&lfs, &lfs_file, &g_forindex, sizeof(g_forindex));
-		lfs_file_write(&lfs, &lfs_file, &g_doindex, sizeof(g_doindex));
-		lfs_file_write(&lfs, &lfs_file, g_forstack, sizeof(struct s_forstack)*MAXFORLOOPS);
-		lfs_file_write(&lfs, &lfs_file, g_dostack, sizeof(struct s_dostack)*MAXDOLOOPS);
-		lfs_file_write(&lfs, &lfs_file, g_vartbl, sizeof(struct s_vartbl)*MAXVARS);
-		lfs_file_write(&lfs, &lfs_file, g_hashlist, sizeof(struct s_hash)*MAXVARS/2);
-		lfs_file_write(&lfs, &lfs_file, MMHeap, heap_memory_size+256);
-		lfs_file_write(&lfs, &lfs_file, mmap, sizeof(mmap));
-		lfs_file_close(&lfs, &lfs_file);
-	}
+        if (lfsinfo.type == LFS_TYPE_REG) lfs_remove(&lfs, "/.vars");
+        int sizeneeded = sizeof(g_StrTmpIndex) + sizeof(g_TempMemoryIsChanged) + sizeof(g_StrTmp) + sizeof(g_StrTmpLocalIndex) + sizeof(g_Localvarcnt) +
+                         sizeof(g_LocalIndex) + sizeof(g_OptionBase) + sizeof(g_DimUsed) + sizeof(g_varcnt) + sizeof(g_Globalvarcnt) +
+                         sizeof(g_hashlistpointer) + sizeof(g_forindex) + sizeof(g_doindex) + sizeof(struct s_forstack) * MAXFORLOOPS + sizeof(struct s_dostack) * MAXDOLOOPS +
+                         sizeof(struct s_vartbl) * MAXVARS + sizeof(struct s_hash) * MAXVARS / 2 + heap_memory_size + 256 + sizeof(mmap);
+        if (sizeneeded >= Option.FlashSize - (Option.modbuff ? 1024 * Option.modbuffsize : 0) - RoundUpK4(TOP_OF_SYSTEM_FLASH) - lfs_fs_size(&lfs) * 4096) error("Not enough free space on A: drive: % needed", sizeneeded);
+        lfs_file_open(&lfs, &lfs_file, ".vars", LFS_O_RDWR | LFS_O_CREAT);
+        ;
+        //		int dt=get_fattime();
+        ClearTempMemory();
+        //		lfs_setattr(&lfs, ".vars", 'A', &dt,   4);
+        lfs_file_write(&lfs, &lfs_file, &g_StrTmpIndex, sizeof(g_StrTmpIndex));
+        lfs_file_write(&lfs, &lfs_file, &g_TempMemoryIsChanged, sizeof(g_TempMemoryIsChanged));
+        lfs_file_write(&lfs, &lfs_file, (void *)g_StrTmp, sizeof(g_StrTmp));
+        lfs_file_write(&lfs, &lfs_file, (void *)g_StrTmpLocalIndex, sizeof(g_StrTmpLocalIndex));
+        lfs_file_write(&lfs, &lfs_file, &g_LocalIndex, sizeof(g_LocalIndex));
+        lfs_file_write(&lfs, &lfs_file, &g_OptionBase, sizeof(g_OptionBase));
+        lfs_file_write(&lfs, &lfs_file, &g_DimUsed, sizeof(g_DimUsed));
+        lfs_file_write(&lfs, &lfs_file, &g_varcnt, sizeof(g_varcnt));
+        lfs_file_write(&lfs, &lfs_file, &g_Globalvarcnt, sizeof(g_Globalvarcnt));
+        lfs_file_write(&lfs, &lfs_file, &g_Localvarcnt, sizeof(g_Globalvarcnt));
+        lfs_file_write(&lfs, &lfs_file, &g_hashlistpointer, sizeof(g_hashlistpointer));
+        lfs_file_write(&lfs, &lfs_file, &g_forindex, sizeof(g_forindex));
+        lfs_file_write(&lfs, &lfs_file, &g_doindex, sizeof(g_doindex));
+        lfs_file_write(&lfs, &lfs_file, g_forstack, sizeof(struct s_forstack) * MAXFORLOOPS);
+        lfs_file_write(&lfs, &lfs_file, g_dostack, sizeof(struct s_dostack) * MAXDOLOOPS);
+        lfs_file_write(&lfs, &lfs_file, g_vartbl, sizeof(struct s_vartbl) * MAXVARS);
+        lfs_file_write(&lfs, &lfs_file, g_hashlist, sizeof(struct s_hash) * MAXVARS / 2);
+        lfs_file_write(&lfs, &lfs_file, MMHeap, heap_memory_size + 256);
+        lfs_file_write(&lfs, &lfs_file, mmap, sizeof(mmap));
+        lfs_file_close(&lfs, &lfs_file);
+    }
 }
-void RestoreContext(bool keep){
-	CloseAudio(1);
-	/* PSRAM-backed fast restore (rp2350 non-WEB); LFS fallback otherwise. */
-	if(PSRAMsize){
-		uint8_t *p=psram_context_base();
-		#define PSRAM_CTX_READ_SCALAR(v) do { psram_context_read(&(v), &p, sizeof(v)); } while(0)
-		#define PSRAM_CTX_READ_ARRAY(v)  do { psram_context_read((void *)(v), &p, sizeof(v)); } while(0)
-		#define PSRAM_CTX_READ_BLOCK(v, n) do { psram_context_read((void *)(v), &p, (n)); } while(0)
-		PSRAM_CTX_READ_SCALAR(g_StrTmpIndex);
-		PSRAM_CTX_READ_SCALAR(g_TempMemoryIsChanged);
-		PSRAM_CTX_READ_ARRAY(g_StrTmp);
-		PSRAM_CTX_READ_ARRAY(g_StrTmpLocalIndex);
-		PSRAM_CTX_READ_SCALAR(g_LocalIndex);
-		PSRAM_CTX_READ_SCALAR(g_OptionBase);
-		PSRAM_CTX_READ_SCALAR(g_DimUsed);
-		PSRAM_CTX_READ_SCALAR(g_varcnt);
-		PSRAM_CTX_READ_SCALAR(g_Globalvarcnt);
-		PSRAM_CTX_READ_SCALAR(g_Localvarcnt);
-		PSRAM_CTX_READ_SCALAR(g_hashlistpointer);
-		PSRAM_CTX_READ_SCALAR(g_forindex);
-		PSRAM_CTX_READ_SCALAR(g_doindex);
-		PSRAM_CTX_READ_BLOCK(g_forstack, sizeof(struct s_forstack)*MAXFORLOOPS);
-		PSRAM_CTX_READ_BLOCK(g_dostack, sizeof(struct s_dostack)*MAXDOLOOPS);
-		PSRAM_CTX_READ_BLOCK(g_vartbl, sizeof(struct s_vartbl)*MAXVARS);
-		PSRAM_CTX_READ_BLOCK(g_hashlist, sizeof(struct s_hash)*MAXVARS/2);
-		PSRAM_CTX_READ_BLOCK(MMHeap, heap_memory_size+256);
-		PSRAM_CTX_READ_ARRAY(mmap);
-		PSRAM_CTX_READ_BLOCK(psmap, psmap_size_bytes);
-		#undef PSRAM_CTX_READ_SCALAR
-		#undef PSRAM_CTX_READ_ARRAY
-		#undef PSRAM_CTX_READ_BLOCK
-	} else {
-		lfs_file_t lfs_file;
-        struct lfs_info lfsinfo={0};
+void RestoreContext(bool keep) {
+    CloseAudio(1);
+    /* PSRAM-backed fast restore (rp2350 non-WEB); LFS fallback otherwise. */
+    if (PSRAMsize) {
+        uint8_t * p = psram_context_base();
+#define PSRAM_CTX_READ_SCALAR(v)                 \
+    do {                                         \
+        psram_context_read(&(v), &p, sizeof(v)); \
+    } while (0)
+#define PSRAM_CTX_READ_ARRAY(v)                         \
+    do {                                                \
+        psram_context_read((void *)(v), &p, sizeof(v)); \
+    } while (0)
+#define PSRAM_CTX_READ_BLOCK(v, n)                \
+    do {                                          \
+        psram_context_read((void *)(v), &p, (n)); \
+    } while (0)
+        PSRAM_CTX_READ_SCALAR(g_StrTmpIndex);
+        PSRAM_CTX_READ_SCALAR(g_TempMemoryIsChanged);
+        PSRAM_CTX_READ_ARRAY(g_StrTmp);
+        PSRAM_CTX_READ_ARRAY(g_StrTmpLocalIndex);
+        PSRAM_CTX_READ_SCALAR(g_LocalIndex);
+        PSRAM_CTX_READ_SCALAR(g_OptionBase);
+        PSRAM_CTX_READ_SCALAR(g_DimUsed);
+        PSRAM_CTX_READ_SCALAR(g_varcnt);
+        PSRAM_CTX_READ_SCALAR(g_Globalvarcnt);
+        PSRAM_CTX_READ_SCALAR(g_Localvarcnt);
+        PSRAM_CTX_READ_SCALAR(g_hashlistpointer);
+        PSRAM_CTX_READ_SCALAR(g_forindex);
+        PSRAM_CTX_READ_SCALAR(g_doindex);
+        PSRAM_CTX_READ_BLOCK(g_forstack, sizeof(struct s_forstack) * MAXFORLOOPS);
+        PSRAM_CTX_READ_BLOCK(g_dostack, sizeof(struct s_dostack) * MAXDOLOOPS);
+        PSRAM_CTX_READ_BLOCK(g_vartbl, sizeof(struct s_vartbl) * MAXVARS);
+        PSRAM_CTX_READ_BLOCK(g_hashlist, sizeof(struct s_hash) * MAXVARS / 2);
+        PSRAM_CTX_READ_BLOCK(MMHeap, heap_memory_size + 256);
+        PSRAM_CTX_READ_ARRAY(mmap);
+        PSRAM_CTX_READ_BLOCK(psmap, psmap_size_bytes);
+#undef PSRAM_CTX_READ_SCALAR
+#undef PSRAM_CTX_READ_ARRAY
+#undef PSRAM_CTX_READ_BLOCK
+    } else {
+        lfs_file_t lfs_file;
+        struct lfs_info lfsinfo = {0};
         FSerror = lfs_stat(&lfs, "/.vars", &lfsinfo);
-        if(lfsinfo.type!=LFS_TYPE_REG)error("Internal error");
-		lfs_file_open(&lfs, &lfs_file, "/.vars", LFS_O_RDONLY);
-		lfs_file_read(&lfs, &lfs_file, &g_StrTmpIndex, sizeof(g_StrTmpIndex));
-		lfs_file_read(&lfs, &lfs_file, &g_TempMemoryIsChanged, sizeof(g_TempMemoryIsChanged));
-		lfs_file_read(&lfs, &lfs_file, (void *)g_StrTmp, sizeof(g_StrTmp));
-		lfs_file_read(&lfs, &lfs_file, (void *)g_StrTmpLocalIndex, sizeof(g_StrTmpLocalIndex));
-		lfs_file_read(&lfs, &lfs_file, &g_LocalIndex, sizeof(g_LocalIndex));
-		lfs_file_read(&lfs, &lfs_file, &g_OptionBase, sizeof(g_OptionBase));
-		lfs_file_read(&lfs, &lfs_file, &g_DimUsed, sizeof(g_DimUsed));
-		lfs_file_read(&lfs, &lfs_file, &g_varcnt, sizeof(g_varcnt));
-		lfs_file_read(&lfs, &lfs_file, &g_Globalvarcnt, sizeof(g_Globalvarcnt));
-		lfs_file_read(&lfs, &lfs_file, &g_Localvarcnt, sizeof(g_Globalvarcnt));
-		lfs_file_read(&lfs, &lfs_file, &g_hashlistpointer, sizeof(g_hashlistpointer));
-		lfs_file_read(&lfs, &lfs_file, &g_forindex, sizeof(g_forindex));
-		lfs_file_read(&lfs, &lfs_file, &g_doindex, sizeof(g_doindex));
-		lfs_file_read(&lfs, &lfs_file, g_forstack, sizeof(struct s_forstack)*MAXFORLOOPS);
-		lfs_file_read(&lfs, &lfs_file, g_dostack, sizeof(struct s_dostack)*MAXDOLOOPS);
-		lfs_file_read(&lfs, &lfs_file, g_vartbl, sizeof(struct s_vartbl)*MAXVARS);
-		lfs_file_read(&lfs, &lfs_file, g_hashlist, sizeof(struct s_hash)*MAXVARS/2);
-		lfs_file_read(&lfs, &lfs_file, MMHeap, heap_memory_size+256);
-		lfs_file_read(&lfs, &lfs_file, mmap, sizeof(mmap));
-		lfs_file_close(&lfs, &lfs_file);
-		if(!keep)lfs_remove(&lfs, "/.vars");
-	}
+        if (lfsinfo.type != LFS_TYPE_REG) error("Internal error");
+        lfs_file_open(&lfs, &lfs_file, "/.vars", LFS_O_RDONLY);
+        lfs_file_read(&lfs, &lfs_file, &g_StrTmpIndex, sizeof(g_StrTmpIndex));
+        lfs_file_read(&lfs, &lfs_file, &g_TempMemoryIsChanged, sizeof(g_TempMemoryIsChanged));
+        lfs_file_read(&lfs, &lfs_file, (void *)g_StrTmp, sizeof(g_StrTmp));
+        lfs_file_read(&lfs, &lfs_file, (void *)g_StrTmpLocalIndex, sizeof(g_StrTmpLocalIndex));
+        lfs_file_read(&lfs, &lfs_file, &g_LocalIndex, sizeof(g_LocalIndex));
+        lfs_file_read(&lfs, &lfs_file, &g_OptionBase, sizeof(g_OptionBase));
+        lfs_file_read(&lfs, &lfs_file, &g_DimUsed, sizeof(g_DimUsed));
+        lfs_file_read(&lfs, &lfs_file, &g_varcnt, sizeof(g_varcnt));
+        lfs_file_read(&lfs, &lfs_file, &g_Globalvarcnt, sizeof(g_Globalvarcnt));
+        lfs_file_read(&lfs, &lfs_file, &g_Localvarcnt, sizeof(g_Globalvarcnt));
+        lfs_file_read(&lfs, &lfs_file, &g_hashlistpointer, sizeof(g_hashlistpointer));
+        lfs_file_read(&lfs, &lfs_file, &g_forindex, sizeof(g_forindex));
+        lfs_file_read(&lfs, &lfs_file, &g_doindex, sizeof(g_doindex));
+        lfs_file_read(&lfs, &lfs_file, g_forstack, sizeof(struct s_forstack) * MAXFORLOOPS);
+        lfs_file_read(&lfs, &lfs_file, g_dostack, sizeof(struct s_dostack) * MAXDOLOOPS);
+        lfs_file_read(&lfs, &lfs_file, g_vartbl, sizeof(struct s_vartbl) * MAXVARS);
+        lfs_file_read(&lfs, &lfs_file, g_hashlist, sizeof(struct s_hash) * MAXVARS / 2);
+        lfs_file_read(&lfs, &lfs_file, MMHeap, heap_memory_size + 256);
+        lfs_file_read(&lfs, &lfs_file, mmap, sizeof(mmap));
+        lfs_file_close(&lfs, &lfs_file);
+        if (!keep) lfs_remove(&lfs, "/.vars");
+    }
 }
-void MIPS16 do_chain(unsigned char *cmdline){
+void MIPS16 do_chain(unsigned char * cmdline) {
     unsigned char *filename = (unsigned char *)"", *cmd_args = (unsigned char *)"";
-	unsigned char *cmdbuf=GetMemory(256);
-	memcpy(cmdbuf,cmdline,STRINGSIZE);
+    unsigned char * cmdbuf = GetMemory(256);
+    memcpy(cmdbuf, cmdline, STRINGSIZE);
     getargs(&cmdbuf, 3, (unsigned char *)",");
-	    switch (argc) {
-        case 0:
-            break;
-        case 1:
-            filename = getCstring(argv[0]);
-            break;
-        case 2:
-            cmd_args = getCstring(argv[1]);
-            break;
-        default:
-            filename = getCstring(argv[0]);
-            if(*argv[2])cmd_args = getCstring(argv[2]);
-            break;
+    switch (argc) {
+    case 0:
+        break;
+    case 1:
+        filename = getCstring(argv[0]);
+        break;
+    case 2:
+        cmd_args = getCstring(argv[1]);
+        break;
+    default:
+        filename = getCstring(argv[0]);
+        if (*argv[2]) cmd_args = getCstring(argv[2]);
+        break;
     }
 
     // The memory allocated by getCstring() is not preserved across
@@ -1722,72 +1790,77 @@ void MIPS16 do_chain(unsigned char *cmdline){
     if (snprintf((char *)buf, MAXSTRLEN + 1, "\"%s\",%s", filename, cmd_args) > MAXSTRLEN) {
         error("RUN command line too long");
     }
-	FreeMemory(cmdbuf);
-    unsigned char *pcmd_args = buf + strlen((char *)filename) + 3; // *** THW 16/4/23
-    *cmdline=0;
-	do_end(false);
-	SaveContext();
-	ClearVars(0,false);
-	InitHeap(false);
-	if (*buf && !FileLoadProgram(buf, true)) return;
+    FreeMemory(cmdbuf);
+    unsigned char * pcmd_args = buf + strlen((char *)filename) + 3; // *** THW 16/4/23
+    *cmdline = 0;
+    do_end(false);
+    SaveContext();
+    ClearVars(0, false);
+    InitHeap(false);
+    if (*buf && !FileLoadProgram(buf, true)) return;
     ClearRuntime(false);
     PrepareProgram(true);
-	RestoreContext(false);
-    if(Option.DISPLAY_CONSOLE && (SPIREAD  || Option.NoScroll)){ClearScreen(gui_bcolour);CurrentX=0;CurrentY=0;}
+    RestoreContext(false);
+    if (Option.DISPLAY_CONSOLE && (SPIREAD || Option.NoScroll)) {
+        ClearScreen(gui_bcolour);
+        CurrentX = 0;
+        CurrentY = 0;
+    }
     // Create a global constant MM.CMDLINE$ containing 'cmd_args'.
-//    void *ptr = findvar((unsigned char *)"MM.CMDLINE$", V_NOFIND_ERR);
+    //    void *ptr = findvar((unsigned char *)"MM.CMDLINE$", V_NOFIND_ERR);
     CtoM(pcmd_args);
-//    memcpy(cmdlinebuff, pcmd_args, *pcmd_args + 1); // *** THW 16/4/23
-	Mstrcpy(cmdlinebuff, pcmd_args);
+    //    memcpy(cmdlinebuff, pcmd_args, *pcmd_args + 1); // *** THW 16/4/23
+    Mstrcpy(cmdlinebuff, pcmd_args);
     IgnorePIN = false;
-    if(Option.LIBRARY_FLASH_SIZE == MAX_PROG_SIZE) ExecuteProgram(LibMemory );       // run anything that might be in the library
-    if(*ProgMemory != T_NEWLINE) return;                             // no program to run
-	cleanserver();
+    if (Option.LIBRARY_FLASH_SIZE == MAX_PROG_SIZE) ExecuteProgram(LibMemory); // run anything that might be in the library
+    if (*ProgMemory != T_NEWLINE) return;                                      // no program to run
+    cleanserver();
     /* initMouse0 is a no-op stub on USB builds (drivers/usb_host_kbd/
      * USBKeyboard.c) since Option.MOUSE_CLOCK is never set there. */
-    if(mouse0==false && Option.MOUSE_CLOCK)initMouse0(0);
-	nextstmt = ProgMemory;
+    if (mouse0 == false && Option.MOUSE_CLOCK) initMouse0(0);
+    nextstmt = ProgMemory;
 }
-void cmd_chain(void){
-	do_chain(cmdline);
+void cmd_chain(void) {
+    do_chain(cmdline);
 }
 
 void cmd_select(void) {
     int i, type;
     unsigned char *p, *rp = NULL, *SaveCurrentLinePtr;
-    void *v;
+    void * v;
     MMFLOAT f = 0;
-    int64_t  i64 = 0;
+    int64_t i64 = 0;
     unsigned char s[STRINGSIZE];
 
     // these are the tokens that we will be searching for
     // they are cached the first time this command is called
 
     type = T_NOTYPE;
-    v = DoExpression(cmdline, &type);                               // evaluate the select case value
+    v = DoExpression(cmdline, &type); // evaluate the select case value
     type = TypeMask(type);
-    if(type & T_NBR) f = *(MMFLOAT *)v;
-    if(type & T_INT) i64 = *(int64_t  *)v;
-    if(type & T_STR) Mstrcpy((unsigned char *)s, (unsigned char *)v);
+    if (type & T_NBR) f = *(MMFLOAT *)v;
+    if (type & T_INT) i64 = *(int64_t *)v;
+    if (type & T_STR) Mstrcpy((unsigned char *)s, (unsigned char *)v);
 
     // now search through the program looking for a matching CASE statement
     // i tracks the nesting level of any nested SELECT CASE commands
-    SaveCurrentLinePtr = CurrentLinePtr;                            // save where we are because we will have to fake CurrentLinePtr to get errors reported correctly
-    i = 1; p = nextstmt;
-    while(1) {
+    SaveCurrentLinePtr = CurrentLinePtr; // save where we are because we will have to fake CurrentLinePtr to get errors reported correctly
+    i = 1;
+    p = nextstmt;
+    while (1) {
         p = GetNextCommand(p, &rp, (unsigned char *)"No matching END SELECT");
-        CommandToken tkn=commandtbl_decode(p);
+        CommandToken tkn = commandtbl_decode(p);
 
-        if(tkn == cmdSELECT_CASE) i++;                                  // found a nested SELECT CASE command, increase the nested count and carry on searching
+        if (tkn == cmdSELECT_CASE) i++; // found a nested SELECT CASE command, increase the nested count and carry on searching
         // is this a CASE stmt at the same level as this SELECT CASE.
-        if(tkn == cmdCASE && i == 1) {
+        if (tkn == cmdCASE && i == 1) {
             int t;
             MMFLOAT ft, ftt;
-            int64_t  i64t, i64tt;
+            int64_t i64t, i64tt;
             unsigned char *st, *stt;
 
-            CurrentLinePtr = rp;                                    // and report errors at the line we are on
-			p++; //step past rest of command token
+            CurrentLinePtr = rp; // and report errors at the line we are on
+            p++;                 //step past rest of command token
             // loop through the comparison elements on the CASE line.  Each element is separated by a comma
             do {
                 p++;
@@ -1795,25 +1868,25 @@ void cmd_select(void) {
                 t = type;
                 // check for CASE IS,  eg  CASE IS > 5  -or-  CASE > 5  and process it if it is
                 // an operator can be >, <>, etc but it can also be a prefix + or - so we must not catch them
-                if((SaveCurrentLinePtr = checkstring(p, (unsigned char *)"IS")) || ((tokentype(*p) & T_OPER) && !(*p == GetTokenValue((unsigned char *)"+") || *p == GetTokenValue((unsigned char *)"-")))) {
+                if ((SaveCurrentLinePtr = checkstring(p, (unsigned char *)"IS")) || ((tokentype(*p) & T_OPER) && !(*p == GetTokenValue((unsigned char *)"+") || *p == GetTokenValue((unsigned char *)"-")))) {
                     int o;
-                    if(SaveCurrentLinePtr) p += 2;
+                    if (SaveCurrentLinePtr) p += 2;
                     skipspace(p);
-                    if(tokentype(*p) & T_OPER)
-                        o = *p++ - C_BASETOKEN;                     // get the operator
+                    if (tokentype(*p) & T_OPER)
+                        o = *p++ - C_BASETOKEN; // get the operator
                     else
                         error("Syntax");
-                    if(type & T_NBR) ft = f;
-                    if(type & T_INT) i64t = i64;
-                    if(type & T_STR) st = s;
-                    while(o != E_END) p = doexpr(p, &ft, &i64t, &st, &o, &t); // get the right hand side of the expression and evaluate the operator in o
-                    if(!(t & T_INT)) error("Syntax");     // comparisons must always return an integer
-                    if(i64t) {                                      // evaluates to true
+                    if (type & T_NBR) ft = f;
+                    if (type & T_INT) i64t = i64;
+                    if (type & T_STR) st = s;
+                    while (o != E_END) p = doexpr(p, &ft, &i64t, &st, &o, &t); // get the right hand side of the expression and evaluate the operator in o
+                    if (!(t & T_INT)) error("Syntax");                         // comparisons must always return an integer
+                    if (i64t) {                                                // evaluates to true
                         skipelement(p);
                         nextstmt = p;
                         CurrentLinePtr = SaveCurrentLinePtr;
-                        return;                                     // if we have a match just return to the interpreter and let it execute the code
-                    } else {                                        // evaluates to false
+                        return; // if we have a match just return to the interpreter and let it execute the code
+                    } else {    // evaluates to false
                         skipspace(p);
                         continue;
                     }
@@ -1823,38 +1896,38 @@ void cmd_select(void) {
                 // evaluate the first value
                 p = evaluate(p, &ft, &i64t, &st, &t, true);
                 skipspace(p);
-                if(*p == tokenTO) {                      // is there is a TO keyword?
+                if (*p == tokenTO) { // is there is a TO keyword?
                     p++;
                     t = type;
                     p = evaluate(p, &ftt, &i64tt, &stt, &t, false); // evaluate the right hand side of the TO expression
-                    if(((type & T_NBR) && f >= ft && f <= ftt) || ((type & T_INT) && i64 >= i64t && i64 <= i64tt) || (((type & T_STR) && Mstrcmp(s, st) >= 0) && (Mstrcmp(s, stt) <= 0))) {
+                    if (((type & T_NBR) && f >= ft && f <= ftt) || ((type & T_INT) && i64 >= i64t && i64 <= i64tt) || (((type & T_STR) && Mstrcmp(s, st) >= 0) && (Mstrcmp(s, stt) <= 0))) {
                         skipelement(p);
                         nextstmt = p;
                         CurrentLinePtr = SaveCurrentLinePtr;
-                        return;                                     // if we have a match just return to the interpreter and let it execute the code
+                        return; // if we have a match just return to the interpreter and let it execute the code
                     } else {
                         skipspace(p);
-                        continue;                                   // otherwise continue searching
+                        continue; // otherwise continue searching
                     }
                 }
 
                 // if we got to here the element must be just a single match.  So make the test
-                if(((type & T_NBR) && f == ft) ||  ((type & T_INT) && i64 == i64t) ||  ((type & T_STR) && Mstrcmp(s, st) == 0)) {
+                if (((type & T_NBR) && f == ft) || ((type & T_INT) && i64 == i64t) || ((type & T_STR) && Mstrcmp(s, st) == 0)) {
                     skipelement(p);
                     nextstmt = p;
                     CurrentLinePtr = SaveCurrentLinePtr;
-                    return;                                         // if we have a match just return to the interpreter and let it execute the code
+                    return; // if we have a match just return to the interpreter and let it execute the code
                 }
                 skipspace(p);
-            } while(*p == ',');                                     // keep looping through the elements on the CASE line
+            } while (*p == ','); // keep looping through the elements on the CASE line
             checkend(p);
             CurrentLinePtr = SaveCurrentLinePtr;
         }
 
         // test if we have found a CASE ELSE statement at the same level as this SELECT CASE
         // if true it means that we did not find a matching CASE - so execute this code
-        if(tkn == cmdCASE_ELSE && i == 1) {
-            p+=sizeof(CommandToken);                                                    // step over the token
+        if (tkn == cmdCASE_ELSE && i == 1) {
+            p += sizeof(CommandToken); // step over the token
             checkend(p);
             skipelement(p);
             nextstmt = p;
@@ -1862,9 +1935,12 @@ void cmd_select(void) {
             return;
         }
 
-        if(tkn == cmdEND_SELECT) {i--;  p++;}                             // found an END SELECT so decrement our nested counter
+        if (tkn == cmdEND_SELECT) {
+            i--;
+            p++;
+        } // found an END SELECT so decrement our nested counter
 
-        if(i == 0) {
+        if (i == 0) {
             // found our matching END SELECT stmt.  Step over it and continue with the statement after it
             skipelement(p);
             nextstmt = p;
@@ -1874,21 +1950,21 @@ void cmd_select(void) {
     }
 }
 
-
 // if we have hit a CASE or CASE ELSE we must search for a END SELECT at this level and resume at that point
 void cmd_case(void) {
     int i;
-    unsigned char *p;
+    unsigned char * p;
 
     // search through the program looking for a END SELECT statement
     // i tracks the nesting level of any nested SELECT CASE commands
-    i = 1; p = nextstmt;
-    while(1) {
+    i = 1;
+    p = nextstmt;
+    while (1) {
         p = GetNextCommand(p, NULL, (unsigned char *)"No matching END SELECT");
-        CommandToken tkn=commandtbl_decode(p);
-        if(tkn == cmdSELECT_CASE) i++;                               // found a nested SELECT CASE command, we now need to search for its END CASE
-        if(tkn == cmdEND_SELECT) i--;                                // found an END SELECT so decrement our nested counter
-        if(i == 0) {
+        CommandToken tkn = commandtbl_decode(p);
+        if (tkn == cmdSELECT_CASE) i++; // found a nested SELECT CASE command, we now need to search for its END CASE
+        if (tkn == cmdEND_SELECT) i--;  // found an END SELECT so decrement our nested counter
+        if (i == 0) {
             // found our matching END SELECT stmt.  Step over it and continue with the statement after it
             skipelement(p);
             nextstmt = p;
@@ -1897,446 +1973,423 @@ void cmd_case(void) {
     }
 }
 
-
 void cmd_input(void) {
-	unsigned char s[STRINGSIZE];
-	unsigned char *p, *sp, *tp;
-	int i, fnbr;
-	getargs(&cmdline, (MAX_ARG_COUNT * 2) - 1, (unsigned char *)",;");				// this is a macro and must be the first executable stmt
+    unsigned char s[STRINGSIZE];
+    unsigned char *p, *sp, *tp;
+    int i, fnbr;
+    getargs(&cmdline, (MAX_ARG_COUNT * 2) - 1, (unsigned char *)",;"); // this is a macro and must be the first executable stmt
 
-	// is the first argument a file number specifier?  If so, get it
-	if(argc >= 3 && *argv[0] == '#') {
-		argv[0]++;
-		fnbr = getinteger(argv[0]);
-		i = 2;
-	}
-	else {
-		fnbr = 0;
-		// is the first argument a prompt?
-		// if so, print it followed by an optional question mark
-		if(argc >= 3 && *argv[0] == '"' && (*argv[1] == ',' || *argv[1] == ';')) {
-			*(argv[0] + strlen((char *)argv[0]) - 1) = 0;
-			argv[0]++;
-			MMPrintString((char *)argv[0]);
-			if(*argv[1] == ';') MMPrintString((char *)"? ");
-			i = 2;
-		} else {
-			MMPrintString((char *)"? ");									// no prompt?  then just print the question mark
-			i = 0;
-		}
-	}
+    // is the first argument a file number specifier?  If so, get it
+    if (argc >= 3 && *argv[0] == '#') {
+        argv[0]++;
+        fnbr = getinteger(argv[0]);
+        i = 2;
+    } else {
+        fnbr = 0;
+        // is the first argument a prompt?
+        // if so, print it followed by an optional question mark
+        if (argc >= 3 && *argv[0] == '"' && (*argv[1] == ',' || *argv[1] == ';')) {
+            *(argv[0] + strlen((char *)argv[0]) - 1) = 0;
+            argv[0]++;
+            MMPrintString((char *)argv[0]);
+            if (*argv[1] == ';') MMPrintString((char *)"? ");
+            i = 2;
+        } else {
+            MMPrintString((char *)"? "); // no prompt?  then just print the question mark
+            i = 0;
+        }
+    }
 
-	if(argc - i < 1) error("Syntax");						// no variable to input to
-	*inpbuf = 0;													// start with an empty buffer
-	MMgetline(fnbr, (char *)inpbuf);									    // get the line
-	p = inpbuf;
+    if (argc - i < 1) error("Syntax"); // no variable to input to
+    *inpbuf = 0;                       // start with an empty buffer
+    MMgetline(fnbr, (char *)inpbuf);   // get the line
+    p = inpbuf;
 
-	// step through the variables listed for the input statement
-	// and find the next item on the line and assign it to the variable
-	for(; i < argc; i++) {
-		sp = s;														// sp is a temp pointer into s[]
-		if(*argv[i] == ',' || *argv[i] == ';') continue;
-		skipspace(p);
-		if(*p != 0) {
-			if(*p == '"') {											// if it is a quoted string
-				p++;												// step over the quote
-				while(*p && *p != '"')  *sp++ = *p++;				// and copy everything upto the next quote
-				while(*p && *p != ',') p++;							// then find the next comma
-			} else {												// otherwise it is a normal string of characters
-				while(*p && *p != ',') *sp++ = *p++;				// copy up to the comma
-				while(sp > s && sp[-1] == ' ') sp--;				// and trim trailing whitespace
-			}
-		}
-		*sp = 0;													// terminate the string
-		tp = findvar(argv[i], V_FIND);								// get the variable and save its new value
-        if(g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
-		if(g_vartbl[g_VarIndex].type & T_STR) {
-    		if(strlen((char *)s) > g_vartbl[g_VarIndex].size) error("String too long");
-			strcpy((char *)tp, (char *)s);
-			CtoM(tp);												// convert to a MMBasic string
-		} else
-		if(g_vartbl[g_VarIndex].type & T_INT) {
-    		*((int64_t  *)tp) = strtoll((char *)s, (char **)&sp, 10);			// convert to an integer
-		}
-		else
-			*((MMFLOAT *)tp) = (MMFLOAT)atof((char *)s);
-		if(*p == ',') p++;
-	}
+    // step through the variables listed for the input statement
+    // and find the next item on the line and assign it to the variable
+    for (; i < argc; i++) {
+        sp = s; // sp is a temp pointer into s[]
+        if (*argv[i] == ',' || *argv[i] == ';') continue;
+        skipspace(p);
+        if (*p != 0) {
+            if (*p == '"') {                          // if it is a quoted string
+                p++;                                  // step over the quote
+                while (*p && *p != '"') *sp++ = *p++; // and copy everything upto the next quote
+                while (*p && *p != ',') p++;          // then find the next comma
+            } else {                                  // otherwise it is a normal string of characters
+                while (*p && *p != ',') *sp++ = *p++; // copy up to the comma
+                while (sp > s && sp[-1] == ' ') sp--; // and trim trailing whitespace
+            }
+        }
+        *sp = 0;                       // terminate the string
+        tp = findvar(argv[i], V_FIND); // get the variable and save its new value
+        if (g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
+        if (g_vartbl[g_VarIndex].type & T_STR) {
+            if (strlen((char *)s) > g_vartbl[g_VarIndex].size) error("String too long");
+            strcpy((char *)tp, (char *)s);
+            CtoM(tp); // convert to a MMBasic string
+        } else if (g_vartbl[g_VarIndex].type & T_INT) {
+            *((int64_t *)tp) = strtoll((char *)s, (char **)&sp, 10); // convert to an integer
+        } else
+            *((MMFLOAT *)tp) = (MMFLOAT)atof((char *)s);
+        if (*p == ',') p++;
+    }
 }
 
-
 void MIPS16 cmd_trace(void) {
-    if(checkstring(cmdline, (unsigned char *)"ON"))
-    	TraceOn = true;
-    else if(checkstring(cmdline, (unsigned char *)"OFF"))
+    if (checkstring(cmdline, (unsigned char *)"ON"))
+        TraceOn = true;
+    else if (checkstring(cmdline, (unsigned char *)"OFF"))
         TraceOn = false;
-    else if(checkstring(cmdline, (unsigned char *)"LIST")) {
+    else if (checkstring(cmdline, (unsigned char *)"LIST")) {
         int i;
         cmdline += 4;
         skipspace(cmdline);
-        if(*cmdline == 0 || *cmdline ==(unsigned char)'\'')  //'
-        	i = TRACE_BUFF_SIZE - 1;
+        if (*cmdline == 0 || *cmdline == (unsigned char)'\'') //'
+            i = TRACE_BUFF_SIZE - 1;
         else
-        	i = getint(cmdline, 0, TRACE_BUFF_SIZE - 1);
+            i = getint(cmdline, 0, TRACE_BUFF_SIZE - 1);
         i = TraceBuffIndex - i;
-        if(i < 0) i += TRACE_BUFF_SIZE;
-        while(i != TraceBuffIndex) {
-			if(TraceBuff[i] >= ProgMemory && TraceBuff[i] <= ProgMemory+MAX_PROG_SIZE){
-           		 inpbuf[0] = '[';
-            	IntToStr((char *)inpbuf + 1, CountLines(TraceBuff[i]), 10);
-            	strcat((char *)inpbuf, "]");
-			}else if(TraceBuff[i]){
+        if (i < 0) i += TRACE_BUFF_SIZE;
+        while (i != TraceBuffIndex) {
+            if (TraceBuff[i] >= ProgMemory && TraceBuff[i] <= ProgMemory + MAX_PROG_SIZE) {
+                inpbuf[0] = '[';
+                IntToStr((char *)inpbuf + 1, CountLines(TraceBuff[i]), 10);
+                strcat((char *)inpbuf, "]");
+            } else if (TraceBuff[i]) {
                 strcpy((char *)inpbuf, "[Lib]");
-			}else{
-			    inpbuf[0] = 0;
-			}
+            } else {
+                inpbuf[0] = 0;
+            }
             MMPrintString((char *)inpbuf);
-            if(++i >= TRACE_BUFF_SIZE) i = 0;
+            if (++i >= TRACE_BUFF_SIZE) i = 0;
         }
-    }
-    else error("Unknown command");
+    } else
+        error("Unknown command");
 }
-
-
 
 // FOR command
 void MIPS16 MMB_DISPATCH_FUNC(cmd_for)(void) {
-	int i, t, vlen, test;
-	unsigned char ss[4];														// this will be used to split up the argument line
-	unsigned char *p, *tp, *xp;
-	void *vptr;
-	unsigned char *vname, vtype;
-//	static unsigned char fortoken, nexttoken;
+    int i, t, vlen, test;
+    unsigned char ss[4]; // this will be used to split up the argument line
+    unsigned char *p, *tp, *xp;
+    void * vptr;
+    unsigned char *vname, vtype;
+    //	static unsigned char fortoken, nexttoken;
 
     // cache these tokens for speed
-//	if(!fortoken) fortoken = GetCommandValue((unsigned char *)"For");
-//	if(!nexttoken) nexttoken = GetCommandValue((unsigned char *)"Next");
+    //	if(!fortoken) fortoken = GetCommandValue((unsigned char *)"For");
+    //	if(!nexttoken) nexttoken = GetCommandValue((unsigned char *)"Next");
 
-	ss[0] = tokenEQUAL;
-	ss[1] = tokenTO;
-	ss[2] = tokenSTEP;
-	ss[3] = 0;
-	{																// start a new block
-		getargs(&cmdline, 7, ss);									// getargs macro must be the first executable stmt in a block
-		if(argc < 5 || argc == 6 || *argv[1] != ss[0] || *argv[3] != ss[1]) error("FOR with misplaced = or TO");
-		if(argc == 6 || (argc == 7 && *argv[5] != ss[2])) error("Syntax");
+    ss[0] = tokenEQUAL;
+    ss[1] = tokenTO;
+    ss[2] = tokenSTEP;
+    ss[3] = 0;
+    {                             // start a new block
+        getargs(&cmdline, 7, ss); // getargs macro must be the first executable stmt in a block
+        if (argc < 5 || argc == 6 || *argv[1] != ss[0] || *argv[3] != ss[1]) error("FOR with misplaced = or TO");
+        if (argc == 6 || (argc == 7 && *argv[5] != ss[2])) error("Syntax");
 
-		// get the variable name and trim any spaces
-		vname = argv[0];
-		if(*vname && *vname == ' ') vname++;
-		while(*vname && vname[strlen((char *)vname) - 1] == ' ') vname[strlen((char *)vname) - 1] = 0;
-		vlen = strlen((char *)vname);
-		vptr = findvar(argv[0], V_FIND);					        // create the variable
-        if(g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
+        // get the variable name and trim any spaces
+        vname = argv[0];
+        if (*vname && *vname == ' ') vname++;
+        while (*vname && vname[strlen((char *)vname) - 1] == ' ') vname[strlen((char *)vname) - 1] = 0;
+        vlen = strlen((char *)vname);
+        vptr = findvar(argv[0], V_FIND); // create the variable
+        if (g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
         vtype = TypeMask(g_vartbl[g_VarIndex].type);
-		if(vtype & T_STR) error("Invalid variable");                // sanity check
+        if (vtype & T_STR) error("Invalid variable"); // sanity check
 
-		// check if the FOR variable is already in the stack and remove it if it is
-		// this is necessary as the program can jump out of the loop without hitting
-		// the NEXT statement and this will eventually result in a stack overflow
-		for(i = 0; i < g_forindex ;i++) {
-			if(g_forstack[i].var == vptr && g_forstack[i].level == g_LocalIndex) {
-				while(i < g_forindex - 1) {
-					g_forstack[i].forptr = g_forstack[i+1].forptr;
-					g_forstack[i].nextptr = g_forstack[i+1].nextptr;
-					g_forstack[i].var = g_forstack[i+1].var;
-					g_forstack[i].vartype = g_forstack[i+1].vartype;
-					g_forstack[i].level = g_forstack[i+1].level;
-					g_forstack[i].tovalue.i = g_forstack[i+1].tovalue.i;
-					g_forstack[i].stepvalue.i = g_forstack[i+1].stepvalue.i;
-					i++;
-				}
-				g_forindex--;
-				break;
-			}
-		}
+        // check if the FOR variable is already in the stack and remove it if it is
+        // this is necessary as the program can jump out of the loop without hitting
+        // the NEXT statement and this will eventually result in a stack overflow
+        for (i = 0; i < g_forindex; i++) {
+            if (g_forstack[i].var == vptr && g_forstack[i].level == g_LocalIndex) {
+                while (i < g_forindex - 1) {
+                    g_forstack[i].forptr = g_forstack[i + 1].forptr;
+                    g_forstack[i].nextptr = g_forstack[i + 1].nextptr;
+                    g_forstack[i].var = g_forstack[i + 1].var;
+                    g_forstack[i].vartype = g_forstack[i + 1].vartype;
+                    g_forstack[i].level = g_forstack[i + 1].level;
+                    g_forstack[i].tovalue.i = g_forstack[i + 1].tovalue.i;
+                    g_forstack[i].stepvalue.i = g_forstack[i + 1].stepvalue.i;
+                    i++;
+                }
+                g_forindex--;
+                break;
+            }
+        }
 
-        if(g_forindex == MAXFORLOOPS) error("Too many nested FOR loops");
+        if (g_forindex == MAXFORLOOPS) error("Too many nested FOR loops");
 
-		g_forstack[g_forindex].var = vptr;								// save the variable index
-		g_forstack[g_forindex].vartype = vtype;							// save the type of the variable
-		g_forstack[g_forindex].level = g_LocalIndex;						// save the level of the variable in terms of sub/funs
-        g_forindex++;                                                 // incase functions use for loops
-        if(vtype & T_NBR) {
-            *(MMFLOAT *)vptr = getnumber(argv[2]);					// get the starting value for a float and save
-            g_forstack[g_forindex - 1].tovalue.f = getnumber(argv[4]);		// get the to value and save
-            if(argc == 7)
-                g_forstack[g_forindex - 1].stepvalue.f = getnumber(argv[6]);// get the step value for a float and save
+        g_forstack[g_forindex].var = vptr;           // save the variable index
+        g_forstack[g_forindex].vartype = vtype;      // save the type of the variable
+        g_forstack[g_forindex].level = g_LocalIndex; // save the level of the variable in terms of sub/funs
+        g_forindex++;                                // incase functions use for loops
+        if (vtype & T_NBR) {
+            *(MMFLOAT *)vptr = getnumber(argv[2]);                     // get the starting value for a float and save
+            g_forstack[g_forindex - 1].tovalue.f = getnumber(argv[4]); // get the to value and save
+            if (argc == 7)
+                g_forstack[g_forindex - 1].stepvalue.f = getnumber(argv[6]); // get the step value for a float and save
             else
-                g_forstack[g_forindex - 1].stepvalue.f = 1.0;				// default is +1
+                g_forstack[g_forindex - 1].stepvalue.f = 1.0; // default is +1
         } else {
-            *(int64_t  *)vptr = getinteger(argv[2]);			// get the starting value for an integer and save
-            g_forstack[g_forindex - 1].tovalue.i = getinteger(argv[4]);		// get the to value and save
-            if(argc == 7)
-                g_forstack[g_forindex - 1].stepvalue.i = getinteger(argv[6]);// get the step value for an integer and save
+            *(int64_t *)vptr = getinteger(argv[2]);                     // get the starting value for an integer and save
+            g_forstack[g_forindex - 1].tovalue.i = getinteger(argv[4]); // get the to value and save
+            if (argc == 7)
+                g_forstack[g_forindex - 1].stepvalue.i = getinteger(argv[6]); // get the step value for an integer and save
             else
-                g_forstack[g_forindex - 1].stepvalue.i = 1;					// default is +1
+                g_forstack[g_forindex - 1].stepvalue.i = 1; // default is +1
         }
         g_forindex--;
 
-		g_forstack[g_forindex].forptr = nextstmt + 1;					// return to here when looping
+        g_forstack[g_forindex].forptr = nextstmt + 1; // return to here when looping
 
-		// now find the matching NEXT command
-        t = 1; p = nextstmt;
-        while(1) {
-              p = GetNextCommand(p, &tp, (unsigned char *)"No matching NEXT");
-//            if(*p == fortoken) t++;                                 // count the FOR
-//            if(*p == nexttoken) {                                   // is it NEXT
-        	CommandToken tkn=commandtbl_decode(p);
+        // now find the matching NEXT command
+        t = 1;
+        p = nextstmt;
+        while (1) {
+            p = GetNextCommand(p, &tp, (unsigned char *)"No matching NEXT");
+            //            if(*p == fortoken) t++;                                 // count the FOR
+            //            if(*p == nexttoken) {                                   // is it NEXT
+            CommandToken tkn = commandtbl_decode(p);
 
-            if(tkn == cmdFOR) t++;                                 // count the FOR
+            if (tkn == cmdFOR) t++; // count the FOR
 
-            if(tkn == cmdNEXT) {                                   // is it NEXT
-				xp = p + sizeof(CommandToken);											// point to after the NEXT token
-				while(*xp && mystrncasecmp(xp, vname, vlen)) xp++;	// step through looking for our variable
-				if(*xp && !isnamechar(xp[vlen]))					// is it terminated correctly?
-					t = 0;											// yes, found the matching NEXT
-				else
-					t--;											// no luck, just decrement our stack counter
-			}
-			if(t == 0) {											// found the matching NEXT
-				g_forstack[g_forindex].nextptr = p;					// pointer to the start of the NEXT command
-				break;
-			}
-		}
+            if (tkn == cmdNEXT) {                                   // is it NEXT
+                xp = p + sizeof(CommandToken);                      // point to after the NEXT token
+                while (*xp && mystrncasecmp(xp, vname, vlen)) xp++; // step through looking for our variable
+                if (*xp && !isnamechar(xp[vlen]))                   // is it terminated correctly?
+                    t = 0;                                          // yes, found the matching NEXT
+                else
+                    t--; // no luck, just decrement our stack counter
+            }
+            if (t == 0) {                           // found the matching NEXT
+                g_forstack[g_forindex].nextptr = p; // pointer to the start of the NEXT command
+                break;
+            }
+        }
 
         // test the loop value at the start
-        if(g_forstack[g_forindex].vartype & T_INT)
-            test = (g_forstack[g_forindex].stepvalue.i >= 0 && *(int64_t  *)vptr > g_forstack[g_forindex].tovalue.i) || (g_forstack[g_forindex].stepvalue.i < 0 && *(int64_t  *)vptr < g_forstack[g_forindex].tovalue.i) ;
+        if (g_forstack[g_forindex].vartype & T_INT)
+            test = (g_forstack[g_forindex].stepvalue.i >= 0 && *(int64_t *)vptr > g_forstack[g_forindex].tovalue.i) || (g_forstack[g_forindex].stepvalue.i < 0 && *(int64_t *)vptr < g_forstack[g_forindex].tovalue.i);
         else
-            test = (g_forstack[g_forindex].stepvalue.f >= 0 && *(MMFLOAT *)vptr > g_forstack[g_forindex].tovalue.f) || (g_forstack[g_forindex].stepvalue.f < 0 && *(MMFLOAT *)vptr < g_forstack[g_forindex].tovalue.f) ;
+            test = (g_forstack[g_forindex].stepvalue.f >= 0 && *(MMFLOAT *)vptr > g_forstack[g_forindex].tovalue.f) || (g_forstack[g_forindex].stepvalue.f < 0 && *(MMFLOAT *)vptr < g_forstack[g_forindex].tovalue.f);
 
-        if(test) {
-			// loop is invalid at the start, so go to the end of the NEXT command
-			skipelement(p);            // find the command after the NEXT command
-			nextstmt = p;              // this is where we will continue
-		} else {
-			g_forindex++;					// save the loop data and continue on with the command after the FOR statement
+        if (test) {
+            // loop is invalid at the start, so go to the end of the NEXT command
+            skipelement(p); // find the command after the NEXT command
+            nextstmt = p;   // this is where we will continue
+        } else {
+            g_forindex++; // save the loop data and continue on with the command after the FOR statement
         }
-	}
+    }
 }
-
-
 
 void MIPS16 MMB_DISPATCH_FUNC(cmd_next)(void) {
-	int i, vindex, test;
-	void *vtbl[MAXFORLOOPS];
-	int vcnt;
-	unsigned char *p;
-	getargs(&cmdline, MAXFORLOOPS * 2, (unsigned char *)",");						// getargs macro must be the first executable stmt in a block
+    int i, vindex, test;
+    void * vtbl[MAXFORLOOPS];
+    int vcnt;
+    unsigned char * p;
+    getargs(&cmdline, MAXFORLOOPS * 2, (unsigned char *)","); // getargs macro must be the first executable stmt in a block
 
-	vindex = 0;														// keep lint happy
+    vindex = 0; // keep lint happy
 
-	for(vcnt = i = 0; i < argc; i++) {
-		if(i & 0x01) {
-			if(*argv[i] != ',') error("Syntax");
-		} else
-			vtbl[vcnt++] = findvar(argv[i], V_FIND | V_NOFIND_ERR); // find the variable and error if not found
-	}
+    for (vcnt = i = 0; i < argc; i++) {
+        if (i & 0x01) {
+            if (*argv[i] != ',') error("Syntax");
+        } else
+            vtbl[vcnt++] = findvar(argv[i], V_FIND | V_NOFIND_ERR); // find the variable and error if not found
+    }
 
-	loopback:
-	// first search the for stack for a loop with the same variable specified on the NEXT's line
-	if(vcnt) {
-		for(i = g_forindex - 1; i >= 0; i--)
-			for(vindex = vcnt - 1; vindex >= 0 ; vindex--)
-				if(g_forstack[i].var == vtbl[vindex])
-					goto breakout;
-	} else {
-		// if no variables specified search the for stack looking for an entry with the same program position as
-		// this NEXT statement. This cheats by using the cmdline as an identifier and may not work inside an IF THEN ELSE
-        for(i = 0; i < g_forindex; i++) {
+loopback:
+    // first search the for stack for a loop with the same variable specified on the NEXT's line
+    if (vcnt) {
+        for (i = g_forindex - 1; i >= 0; i--)
+            for (vindex = vcnt - 1; vindex >= 0; vindex--)
+                if (g_forstack[i].var == vtbl[vindex])
+                    goto breakout;
+    } else {
+        // if no variables specified search the for stack looking for an entry with the same program position as
+        // this NEXT statement. This cheats by using the cmdline as an identifier and may not work inside an IF THEN ELSE
+        for (i = 0; i < g_forindex; i++) {
             p = g_forstack[i].nextptr + sizeof(CommandToken);
             skipspace(p);
-            if(p == cmdline) goto breakout;
+            if (p == cmdline) goto breakout;
         }
-	}
+    }
 
-	error("Cannot find a matching FOR");
+    error("Cannot find a matching FOR");
 
-	breakout:
+breakout:
 
-	// found a match
-	// apply the STEP value to the variable and test against the TO value
-    if(g_forstack[i].vartype & T_INT) {
-        *(int64_t  *)g_forstack[i].var += g_forstack[i].stepvalue.i;
-	    test = (g_forstack[i].stepvalue.i >= 0 && *(int64_t  *)g_forstack[i].var > g_forstack[i].tovalue.i) || (g_forstack[i].stepvalue.i < 0 && *(int64_t  *)g_forstack[i].var < g_forstack[i].tovalue.i) ;
+    // found a match
+    // apply the STEP value to the variable and test against the TO value
+    if (g_forstack[i].vartype & T_INT) {
+        *(int64_t *)g_forstack[i].var += g_forstack[i].stepvalue.i;
+        test = (g_forstack[i].stepvalue.i >= 0 && *(int64_t *)g_forstack[i].var > g_forstack[i].tovalue.i) || (g_forstack[i].stepvalue.i < 0 && *(int64_t *)g_forstack[i].var < g_forstack[i].tovalue.i);
     } else {
         *(MMFLOAT *)g_forstack[i].var += g_forstack[i].stepvalue.f;
-	    test = (g_forstack[i].stepvalue.f >= 0 && *(MMFLOAT *)g_forstack[i].var > g_forstack[i].tovalue.f) || (g_forstack[i].stepvalue.f < 0 && *(MMFLOAT *)g_forstack[i].var < g_forstack[i].tovalue.f) ;
+        test = (g_forstack[i].stepvalue.f >= 0 && *(MMFLOAT *)g_forstack[i].var > g_forstack[i].tovalue.f) || (g_forstack[i].stepvalue.f < 0 && *(MMFLOAT *)g_forstack[i].var < g_forstack[i].tovalue.f);
     }
 
-    if(test) {
-		// the loop has terminated
-		// remove the entry in the table, then skip forward to the next element and continue on from there
-		while(i < g_forindex - 1) {
-			g_forstack[i].forptr = g_forstack[i+1].forptr;
-			g_forstack[i].nextptr = g_forstack[i+1].nextptr;
-			g_forstack[i].var = g_forstack[i+1].var;
-			g_forstack[i].vartype = g_forstack[i+1].vartype;
-			g_forstack[i].level = g_forstack[i+1].level;
-			g_forstack[i].tovalue.i = g_forstack[i+1].tovalue.i;
-			g_forstack[i].stepvalue.i = g_forstack[i+1].stepvalue.i;
-			i++;
-		}
-		g_forindex--;
-		if(vcnt > 0) {
-			// remove that entry from our FOR stack
-			for(; vindex < vcnt - 1; vindex++) vtbl[vindex] = vtbl[vindex + 1];
-			vcnt--;
-			if(vcnt > 0)
-				goto loopback;
-			else
-				return;
-		}
+    if (test) {
+        // the loop has terminated
+        // remove the entry in the table, then skip forward to the next element and continue on from there
+        while (i < g_forindex - 1) {
+            g_forstack[i].forptr = g_forstack[i + 1].forptr;
+            g_forstack[i].nextptr = g_forstack[i + 1].nextptr;
+            g_forstack[i].var = g_forstack[i + 1].var;
+            g_forstack[i].vartype = g_forstack[i + 1].vartype;
+            g_forstack[i].level = g_forstack[i + 1].level;
+            g_forstack[i].tovalue.i = g_forstack[i + 1].tovalue.i;
+            g_forstack[i].stepvalue.i = g_forstack[i + 1].stepvalue.i;
+            i++;
+        }
+        g_forindex--;
+        if (vcnt > 0) {
+            // remove that entry from our FOR stack
+            for (; vindex < vcnt - 1; vindex++) vtbl[vindex] = vtbl[vindex + 1];
+            vcnt--;
+            if (vcnt > 0)
+                goto loopback;
+            else
+                return;
+        }
 
-	} else {
-		// we have not reached the terminal value yet, so go back and loop again
-		nextstmt = g_forstack[i].forptr;
-	}
+    } else {
+        // we have not reached the terminal value yet, so go back and loop again
+        nextstmt = g_forstack[i].forptr;
+    }
 }
-
-
-
 
 void MIPS16 MMB_DISPATCH_FUNC(cmd_do)(void) {
-	int i;
-	unsigned char *p, *tp, *evalp;
-    if(cmdtoken==cmdWHILE)error("Unknown command");
-	// if it is a DO loop find the WHILE token and (if found) get a pointer to its expression
-	while(*cmdline && *cmdline != tokenWHILE && *cmdline != tokenUNTIL) cmdline++;
-	if(*cmdline == tokenUNTIL)error("Syntax");
-	if(*cmdline == tokenWHILE) {
-			evalp = ++cmdline;
-		}
-		else
-			evalp = NULL;
-	// check if this loop is already in the stack and remove it if it is
-	// this is necessary as the program can jump out of the loop without hitting
-	// the LOOP or WEND stmt and this will eventually result in a stack overflow
-	for(i = 0; i < g_doindex ;i++) {
-		if(g_dostack[i].doptr == nextstmt) {
-			while(i < g_doindex - 1) {
-				g_dostack[i].evalptr = g_dostack[i+1].evalptr;
-				g_dostack[i].loopptr = g_dostack[i+1].loopptr;
-				g_dostack[i].doptr = g_dostack[i+1].doptr;
-				g_dostack[i].level = g_dostack[i+1].level;
-				i++;
-			}
-			g_doindex--;
-			break;
-		}
-	}
-
-	// add our pointers to the top of the stack
-	if(g_doindex == MAXDOLOOPS) error("Too many nested DO or WHILE loops");
-	g_dostack[g_doindex].evalptr = evalp;
-	g_dostack[g_doindex].doptr = nextstmt;
-	g_dostack[g_doindex].level = g_LocalIndex;
-
-	// now find the matching LOOP command
-	i = 1; p = nextstmt;
-	while(1) {
-        p = GetNextCommand(p, &tp, (unsigned char *)"No matching LOOP");
-        CommandToken tkn=commandtbl_decode(p);
-		if(tkn == cmdtoken) i++;                                     // entered a nested DO or WHILE loop
-		if(tkn == cmdLOOP) i--;									// exited a nested loop
-
-		if(i == 0) {												// found our matching LOOP or WEND stmt
-			g_dostack[g_doindex].loopptr = p;
-			break;
-		}
-	}
-
-    if(g_dostack[g_doindex].evalptr != NULL) {
-		// if this is a DO WHILE ... LOOP statement
-		// search the LOOP statement for a WHILE or UNTIL token (p is pointing to the matching LOOP statement)
-		p+=sizeof(CommandToken);
-		while(*p && *p < 0x80) p++;
-		if(*p == tokenWHILE) error("LOOP has a WHILE test");
-		if(*p == tokenUNTIL) error("LOOP has an UNTIL test");
-	}
-
-	g_doindex++;
-
-    // do the evaluation (if there is something to evaluate) and if false go straight to the command after the LOOP or WEND statement
-    if(g_dostack[g_doindex - 1].evalptr != NULL && getnumber(g_dostack[g_doindex - 1].evalptr) == 0) {
-        g_doindex--;                                                  // remove the entry in the table
-        nextstmt = g_dostack[g_doindex].loopptr;                        // point to the LOOP or WEND statement
-        skipelement(nextstmt);                                      // skip to the next command
+    int i;
+    unsigned char *p, *tp, *evalp;
+    if (cmdtoken == cmdWHILE) error("Unknown command");
+    // if it is a DO loop find the WHILE token and (if found) get a pointer to its expression
+    while (*cmdline && *cmdline != tokenWHILE && *cmdline != tokenUNTIL) cmdline++;
+    if (*cmdline == tokenUNTIL) error("Syntax");
+    if (*cmdline == tokenWHILE) {
+        evalp = ++cmdline;
+    } else
+        evalp = NULL;
+    // check if this loop is already in the stack and remove it if it is
+    // this is necessary as the program can jump out of the loop without hitting
+    // the LOOP or WEND stmt and this will eventually result in a stack overflow
+    for (i = 0; i < g_doindex; i++) {
+        if (g_dostack[i].doptr == nextstmt) {
+            while (i < g_doindex - 1) {
+                g_dostack[i].evalptr = g_dostack[i + 1].evalptr;
+                g_dostack[i].loopptr = g_dostack[i + 1].loopptr;
+                g_dostack[i].doptr = g_dostack[i + 1].doptr;
+                g_dostack[i].level = g_dostack[i + 1].level;
+                i++;
+            }
+            g_doindex--;
+            break;
+        }
     }
 
+    // add our pointers to the top of the stack
+    if (g_doindex == MAXDOLOOPS) error("Too many nested DO or WHILE loops");
+    g_dostack[g_doindex].evalptr = evalp;
+    g_dostack[g_doindex].doptr = nextstmt;
+    g_dostack[g_doindex].level = g_LocalIndex;
+
+    // now find the matching LOOP command
+    i = 1;
+    p = nextstmt;
+    while (1) {
+        p = GetNextCommand(p, &tp, (unsigned char *)"No matching LOOP");
+        CommandToken tkn = commandtbl_decode(p);
+        if (tkn == cmdtoken) i++; // entered a nested DO or WHILE loop
+        if (tkn == cmdLOOP) i--;  // exited a nested loop
+
+        if (i == 0) { // found our matching LOOP or WEND stmt
+            g_dostack[g_doindex].loopptr = p;
+            break;
+        }
+    }
+
+    if (g_dostack[g_doindex].evalptr != NULL) {
+        // if this is a DO WHILE ... LOOP statement
+        // search the LOOP statement for a WHILE or UNTIL token (p is pointing to the matching LOOP statement)
+        p += sizeof(CommandToken);
+        while (*p && *p < 0x80) p++;
+        if (*p == tokenWHILE) error("LOOP has a WHILE test");
+        if (*p == tokenUNTIL) error("LOOP has an UNTIL test");
+    }
+
+    g_doindex++;
+
+    // do the evaluation (if there is something to evaluate) and if false go straight to the command after the LOOP or WEND statement
+    if (g_dostack[g_doindex - 1].evalptr != NULL && getnumber(g_dostack[g_doindex - 1].evalptr) == 0) {
+        g_doindex--;                             // remove the entry in the table
+        nextstmt = g_dostack[g_doindex].loopptr; // point to the LOOP or WEND statement
+        skipelement(nextstmt);                   // skip to the next command
+    }
 }
-
-
-
 
 void MIPS16 MMB_HOT_FUNC(cmd_loop)(void) {
-    unsigned char *p;
-	int tst = 0;                                                    // initialise tst to stop the compiler from complaining
-	int i;
+    unsigned char * p;
+    int tst = 0; // initialise tst to stop the compiler from complaining
+    int i;
 
-	// search the do table looking for an entry with the same program position as this LOOP statement
-	for(i = 0; i < g_doindex ;i++) {
+    // search the do table looking for an entry with the same program position as this LOOP statement
+    for (i = 0; i < g_doindex; i++) {
         p = g_dostack[i].loopptr + sizeof(CommandToken);
         skipspace(p);
-        if(p == cmdline) {
-			// found a match
-			// first check if the DO statement had a WHILE component
-			// if not find the WHILE statement here and evaluate it
-			if(g_dostack[i].evalptr == NULL) {						// if it was a DO without a WHILE
-				if(*cmdline >= 0x80) {								// if there is something
-					if(*cmdline == tokenWHILE)
-						tst = (getnumber(++cmdline) != 0);			// evaluate the expression
-					else if(*cmdline == tokenUNTIL)
-						tst = (getnumber(++cmdline) == 0);			// evaluate the expression
-					else
-						error("Syntax");
-				}
-				else {
-					tst = 1;										// and loop forever
-					checkend(cmdline);								// make sure that there is nothing else
-				}
-			}
-			else {													// if was DO WHILE
-				tst = (getnumber(g_dostack[i].evalptr) != 0);			// evaluate its expression
-				checkend(cmdline);									// make sure that there is nothing else
-			}
+        if (p == cmdline) {
+            // found a match
+            // first check if the DO statement had a WHILE component
+            // if not find the WHILE statement here and evaluate it
+            if (g_dostack[i].evalptr == NULL) { // if it was a DO without a WHILE
+                if (*cmdline >= 0x80) {         // if there is something
+                    if (*cmdline == tokenWHILE)
+                        tst = (getnumber(++cmdline) != 0); // evaluate the expression
+                    else if (*cmdline == tokenUNTIL)
+                        tst = (getnumber(++cmdline) == 0); // evaluate the expression
+                    else
+                        error("Syntax");
+                } else {
+                    tst = 1;           // and loop forever
+                    checkend(cmdline); // make sure that there is nothing else
+                }
+            } else {                                          // if was DO WHILE
+                tst = (getnumber(g_dostack[i].evalptr) != 0); // evaluate its expression
+                checkend(cmdline);                            // make sure that there is nothing else
+            }
 
-			// test the expression value and reset the program pointer if we are still looping
-			// otherwise remove this entry from the do stack
-			if(tst)
-				nextstmt = g_dostack[i].doptr;						// loop again
-			else {
-				// the loop has terminated
-				// remove the entry in the table, then just let the default nextstmt run and continue on from there
+            // test the expression value and reset the program pointer if we are still looping
+            // otherwise remove this entry from the do stack
+            if (tst)
+                nextstmt = g_dostack[i].doptr; // loop again
+            else {
+                // the loop has terminated
+                // remove the entry in the table, then just let the default nextstmt run and continue on from there
                 g_doindex = i;
-				// just let the default nextstmt run
-			}
-			return;
-		}
-	}
-	error("LOOP without a matching DO");
+                // just let the default nextstmt run
+            }
+            return;
+        }
+    }
+    error("LOOP without a matching DO");
 }
-
-
 
 void cmd_exitfor(void) {
-	if(g_forindex == 0) error("No FOR loop is in effect");
-	nextstmt = g_forstack[--g_forindex].nextptr;
-	checkend(cmdline);
-	skipelement(nextstmt);
+    if (g_forindex == 0) error("No FOR loop is in effect");
+    nextstmt = g_forstack[--g_forindex].nextptr;
+    checkend(cmdline);
+    skipelement(nextstmt);
 }
-
-
 
 void cmd_exit(void) {
-	if(g_doindex == 0) error("No DO loop is in effect");
-	nextstmt = g_dostack[--g_doindex].loopptr;
-	checkend(cmdline);
-	skipelement(nextstmt);
+    if (g_doindex == 0) error("No DO loop is in effect");
+    nextstmt = g_dostack[--g_doindex].loopptr;
+    checkend(cmdline);
+    skipelement(nextstmt);
 }
-
-
 
 /*void cmd_error(void) {
 	unsigned char *s;
@@ -2356,175 +2409,178 @@ void cmd_exit(void) {
 		error("");
 }*/
 void cmd_error(void) {
-	unsigned char *s;
-	if(*cmdline && *cmdline != '\'') {
-		s = getCstring(cmdline);
-		// CurrentLinePtr = NULL;                                      // suppress printing the line that caused the issue
-		error((char *) s);
-	}
-	else
-		error("");
+    unsigned char * s;
+    if (*cmdline && *cmdline != '\'') {
+        s = getCstring(cmdline);
+        // CurrentLinePtr = NULL;                                      // suppress printing the line that caused the issue
+        error((char *)s);
+    } else
+        error("");
 }
-
 
 /* RANDOMIZE seeds libc's rand() state. Ports whose hal_random_u32() uses
  * hardware entropy may ignore this seed semantically, but the command is
  * still accepted for source compatibility. */
 void cmd_randomize(void) {
-	int i;
-	getargs(&cmdline,1,(unsigned char *)",");
-	if(argc==1)i = getinteger(argv[0]);
-	else i=(uint32_t)hal_time_us_64();
-	if(i < 0) error("Number out of bounds");
-	srand(i);
+    int i;
+    getargs(&cmdline, 1, (unsigned char *)",");
+    if (argc == 1)
+        i = getinteger(argv[0]);
+    else
+        i = (uint32_t)hal_time_us_64();
+    if (i < 0) error("Number out of bounds");
+    srand(i);
 }
 
 // this is the Sub or Fun command
 // it simply skips over text until it finds the end of it
 void cmd_subfun(void) {
-	unsigned char *p;
-	unsigned short returntoken, errtoken;
+    unsigned char * p;
+    unsigned short returntoken, errtoken;
 
-    if(gosubindex != 0) error("No matching END declaration");       // we have hit a SUB/FUN while in another SUB or FUN
-	if(cmdtoken == cmdSUB) {
-	    returntoken = cmdENDSUB;
-	    errtoken = cmdENDFUNCTION;
-	} else {
-	    returntoken = cmdENDFUNCTION;
-	    errtoken = cmdENDSUB;
+    if (gosubindex != 0) error("No matching END declaration"); // we have hit a SUB/FUN while in another SUB or FUN
+    if (cmdtoken == cmdSUB) {
+        returntoken = cmdENDSUB;
+        errtoken = cmdENDFUNCTION;
+    } else {
+        returntoken = cmdENDFUNCTION;
+        errtoken = cmdENDSUB;
     }
-	p = nextstmt;
-	while(1) {
+    p = nextstmt;
+    while (1) {
         p = GetNextCommand(p, NULL, (unsigned char *)"No matching END declaration");
-        CommandToken tkn=commandtbl_decode(p);
-        if(tkn == cmdSUB || tkn == cmdFUN || tkn == errtoken) error("No matching END declaration");
-		if(tkn == returntoken) {                                     // found the next return
-    		skipelement(p);
-    		nextstmt = p;                                           // point to the next command
-    		break;
+        CommandToken tkn = commandtbl_decode(p);
+        if (tkn == cmdSUB || tkn == cmdFUN || tkn == errtoken) error("No matching END declaration");
+        if (tkn == returntoken) { // found the next return
+            skipelement(p);
+            nextstmt = p; // point to the next command
+            break;
         }
     }
 }
 // this is the Sub or Fun command
 // it simply skips over text until it finds the end of it
 void cmd_comment(void) {
-	unsigned char *p;
-	unsigned short returntoken;
+    unsigned char * p;
+    unsigned short returntoken;
 
-	returntoken = GetCommandValue((unsigned char *)"*/");
-//	errtoken = cmdENDSUB;
-	p = nextstmt;
-	while(1) {
+    returntoken = GetCommandValue((unsigned char *)"*/");
+    //	errtoken = cmdENDSUB;
+    p = nextstmt;
+    while (1) {
         p = GetNextCommand(p, NULL, (unsigned char *)"No matching END declaration");
-        CommandToken tkn=commandtbl_decode(p);
-        if(tkn == cmdComment) error("No matching END declaration");
-		if(tkn == returntoken) {                                     // found the next return
-    		skipelement(p);
-    		nextstmt = p;                                           // point to the next command
-    		break;
+        CommandToken tkn = commandtbl_decode(p);
+        if (tkn == cmdComment) error("No matching END declaration");
+        if (tkn == returntoken) { // found the next return
+            skipelement(p);
+            nextstmt = p; // point to the next command
+            break;
         }
     }
 }
-void cmd_endcomment(void){
-
+void cmd_endcomment(void) {
 }
-
 
 void cmd_gosub(void) {
-   if(gosubindex >= MAXGOSUB) error("Too many nested GOSUB");
-   char *return_to = (char *)nextstmt;
-   if(isnamestart(*cmdline))
-       nextstmt = findlabel(cmdline);
-   else
-       nextstmt = findline(getinteger(cmdline), true);
-   IgnorePIN = false;
+    if (gosubindex >= MAXGOSUB) error("Too many nested GOSUB");
+    char * return_to = (char *)nextstmt;
+    if (isnamestart(*cmdline))
+        nextstmt = findlabel(cmdline);
+    else
+        nextstmt = findline(getinteger(cmdline), true);
+    IgnorePIN = false;
 
-   errorstack[gosubindex] = CurrentLinePtr;
-   gosubstack[gosubindex++] = (unsigned char *)return_to;
-   g_LocalIndex++;
-   CurrentLinePtr = nextstmt;
+    errorstack[gosubindex] = CurrentLinePtr;
+    gosubstack[gosubindex++] = (unsigned char *)return_to;
+    g_LocalIndex++;
+    CurrentLinePtr = nextstmt;
 }
 
-void cmd_mid(void){
-	unsigned char *p;
-	getargs(&cmdline,5,(unsigned char *)",");
-	findvar(argv[0], V_NOFIND_ERR);
-    if(g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
-	if(!(g_vartbl[g_VarIndex].type & T_STR)) error("Not a string");
-	int size=g_vartbl[g_VarIndex].size;
-	char *sourcestring=(char *)getstring(argv[0]);
-	int start=getint(argv[2],1,sourcestring[0]);
-	int num=0;
-	if(argc==5)num=getint(argv[4],1,sourcestring[0]);
-	if(start+num-1>sourcestring[0])error("Selection exceeds length of string");
-	while(*cmdline && tokenfunction(*cmdline) != op_equal) cmdline++;
-	if(!*cmdline) error("Syntax");
-	++cmdline;
-	if(!*cmdline) error("Syntax");
-	char *value = (char *)getstring(cmdline);
-	if(num==0)num=value[0];
-	p=(unsigned char *)&value[1];
-	if(num==value[0]) memcpy(&sourcestring[start],p,num);
-	else {
-		int change=value[0]-num;
-		if(sourcestring[0]+change>size)error("String too long");
-		memmove(&sourcestring[start+value[0]],&sourcestring[start+num],sourcestring[0]-(start+num-1));
-		sourcestring[0]+=change;
-		memcpy(&sourcestring[start],p,value[0]);
-	}
+void cmd_mid(void) {
+    unsigned char * p;
+    getargs(&cmdline, 5, (unsigned char *)",");
+    findvar(argv[0], V_NOFIND_ERR);
+    if (g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
+    if (!(g_vartbl[g_VarIndex].type & T_STR)) error("Not a string");
+    int size = g_vartbl[g_VarIndex].size;
+    char * sourcestring = (char *)getstring(argv[0]);
+    int start = getint(argv[2], 1, sourcestring[0]);
+    int num = 0;
+    if (argc == 5) num = getint(argv[4], 1, sourcestring[0]);
+    if (start + num - 1 > sourcestring[0]) error("Selection exceeds length of string");
+    while (*cmdline && tokenfunction(*cmdline) != op_equal) cmdline++;
+    if (!*cmdline) error("Syntax");
+    ++cmdline;
+    if (!*cmdline) error("Syntax");
+    char * value = (char *)getstring(cmdline);
+    if (num == 0) num = value[0];
+    p = (unsigned char *)&value[1];
+    if (num == value[0])
+        memcpy(&sourcestring[start], p, num);
+    else {
+        int change = value[0] - num;
+        if (sourcestring[0] + change > size) error("String too long");
+        memmove(&sourcestring[start + value[0]], &sourcestring[start + num], sourcestring[0] - (start + num - 1));
+        sourcestring[0] += change;
+        memcpy(&sourcestring[start], p, value[0]);
+    }
 }
-void cmd_byte(void){
-	getargs(&cmdline,3,(unsigned char *)",");
-	findvar(argv[0], V_NOFIND_ERR);
-    if(g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
-	if(!(g_vartbl[g_VarIndex].type & T_STR)) error("Not a string");
-	unsigned char *sourcestring=(unsigned char *)getstring(argv[0]);
-	int start=getint(argv[2],1,sourcestring[0]);
-	while(*cmdline && tokenfunction(*cmdline) != op_equal) cmdline++;
-	if(!*cmdline) error("Syntax");
-	++cmdline;
-	if(!*cmdline) error("Syntax");
-	int value = getint(cmdline,0,255);
-	sourcestring[start]=value;
+void cmd_byte(void) {
+    getargs(&cmdline, 3, (unsigned char *)",");
+    findvar(argv[0], V_NOFIND_ERR);
+    if (g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
+    if (!(g_vartbl[g_VarIndex].type & T_STR)) error("Not a string");
+    unsigned char * sourcestring = (unsigned char *)getstring(argv[0]);
+    int start = getint(argv[2], 1, sourcestring[0]);
+    while (*cmdline && tokenfunction(*cmdline) != op_equal) cmdline++;
+    if (!*cmdline) error("Syntax");
+    ++cmdline;
+    if (!*cmdline) error("Syntax");
+    int value = getint(cmdline, 0, 255);
+    sourcestring[start] = value;
 }
-void cmd_bit(void){
-	getargs(&cmdline,3,(unsigned char *)",");
-	uint64_t *source=(uint64_t *)findvar(argv[0], V_NOFIND_ERR);
-    if(g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
-	if(!(g_vartbl[g_VarIndex].type & T_INT)) error("Not an integer");
-	uint64_t bit=(uint64_t)1<<(uint64_t)getint(argv[2],0,63);
-	while(*cmdline && tokenfunction(*cmdline) != op_equal) cmdline++;
-	if(!*cmdline) error("Syntax");
-	++cmdline;
-	if(!*cmdline) error("Syntax");
-	int value = getint(cmdline,0,1);
-	if(value)*source|=bit;
-	else *source&=(~bit);
+void cmd_bit(void) {
+    getargs(&cmdline, 3, (unsigned char *)",");
+    uint64_t * source = (uint64_t *)findvar(argv[0], V_NOFIND_ERR);
+    if (g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
+    if (!(g_vartbl[g_VarIndex].type & T_INT)) error("Not an integer");
+    uint64_t bit = (uint64_t)1 << (uint64_t)getint(argv[2], 0, 63);
+    while (*cmdline && tokenfunction(*cmdline) != op_equal) cmdline++;
+    if (!*cmdline) error("Syntax");
+    ++cmdline;
+    if (!*cmdline) error("Syntax");
+    int value = getint(cmdline, 0, 1);
+    if (value)
+        *source |= bit;
+    else
+        *source &= (~bit);
 }
 void cmd_flags(void) {
-	while(*cmdline && tokenfunction(*cmdline) != op_equal) cmdline++;
-	if(!*cmdline) error("Syntax");
-	g_flag=getinteger(++cmdline);
+    while (*cmdline && tokenfunction(*cmdline) != op_equal) cmdline++;
+    if (!*cmdline) error("Syntax");
+    g_flag = getinteger(++cmdline);
 }
 
-void cmd_flag(void){
-	getargs(&cmdline,1,(unsigned char *)",");
-	uint64_t bit=(uint64_t)1<<(uint64_t)getint(argv[0],0,63);
-	while(*cmdline && tokenfunction(*cmdline) != op_equal) cmdline++;
-	if(!*cmdline) error("Syntax");
-	++cmdline;
-	if(!*cmdline) error("Syntax");
-	int value = getint(cmdline,0,1);
-	if(value)g_flag |=bit;
-	else g_flag &=~bit;
+void cmd_flag(void) {
+    getargs(&cmdline, 1, (unsigned char *)",");
+    uint64_t bit = (uint64_t)1 << (uint64_t)getint(argv[0], 0, 63);
+    while (*cmdline && tokenfunction(*cmdline) != op_equal) cmdline++;
+    if (!*cmdline) error("Syntax");
+    ++cmdline;
+    if (!*cmdline) error("Syntax");
+    int value = getint(cmdline, 0, 1);
+    if (value)
+        g_flag |= bit;
+    else
+        g_flag &= ~bit;
 }
 
 void MIPS16 MMB_HOT_FUNC(cmd_return)(void) {
- 	checkend(cmdline);
-	if(gosubindex == 0 || gosubstack[gosubindex - 1] == NULL) error("Nothing to return to");
-    ClearVars(g_LocalIndex--, true);                                        // delete any local variables
-    g_TempMemoryIsChanged = true;                                     // signal that temporary memory should be checked
-	nextstmt = gosubstack[--gosubindex];                            // return to the caller
+    checkend(cmdline);
+    if (gosubindex == 0 || gosubstack[gosubindex - 1] == NULL) error("Nothing to return to");
+    ClearVars(g_LocalIndex--, true);     // delete any local variables
+    g_TempMemoryIsChanged = true;        // signal that temporary memory should be checked
+    nextstmt = gosubstack[--gosubindex]; // return to the caller
     CurrentLinePtr = errorstack[gosubindex];
 }
 /*frame
@@ -2884,212 +2940,218 @@ void cmd_frame(void){
 	}
 }*/
 
-
 void cmd_endfun(void) {
- 	checkend(cmdline);
-	if(gosubindex == 0 || gosubstack[gosubindex - 1] != NULL) error("Nothing to return to");
-	nextstmt = (unsigned char *)"\0\0\0";                                            // now terminate this run of ExecuteProgram()
+    checkend(cmdline);
+    if (gosubindex == 0 || gosubstack[gosubindex - 1] != NULL) error("Nothing to return to");
+    nextstmt = (unsigned char *)"\0\0\0"; // now terminate this run of ExecuteProgram()
 }
-
-
 
 void MIPS16 cmd_read(void) {
     int i, j, k, len, card;
     unsigned char *p, *lineptr = NULL, *ptr;
-	unsigned short  datatoken;
-    int vcnt, vidx, num_to_read=0;
-	if (checkstring(cmdline, (unsigned char*)"SAVE")) {
-		if(restorepointer== MAXRESTORE - 1)error((char*)"Too many saves");
-		datastore[restorepointer].SaveNextDataLine = NextDataLine;
-		datastore[restorepointer].SaveNextData = NextData;
-		restorepointer++;
-		return;
-	}
-	if (checkstring(cmdline, (unsigned char*)"RESTORE")) {
-		if (!restorepointer)error((char*)"Nothing to restore");
-		restorepointer--;
-		NextDataLine = datastore[restorepointer].SaveNextDataLine;
-		NextData = datastore[restorepointer].SaveNextData;
-		return;
-	}
-    getargs(&cmdline, (MAX_ARG_COUNT * 2) - 1, (unsigned char *)",");                // getargs macro must be the first executable stmt in a block
-    if(argc == 0) error("Syntax");
-	// first count the elements and do the syntax checking
-    for(vcnt = i = 0; i < argc; i++) {
-        if(i & 0x01) {
-            if(*argv[i] != ',') error("Syntax");
+    unsigned short datatoken;
+    int vcnt, vidx, num_to_read = 0;
+    if (checkstring(cmdline, (unsigned char *)"SAVE")) {
+        if (restorepointer == MAXRESTORE - 1) error((char *)"Too many saves");
+        datastore[restorepointer].SaveNextDataLine = NextDataLine;
+        datastore[restorepointer].SaveNextData = NextData;
+        restorepointer++;
+        return;
+    }
+    if (checkstring(cmdline, (unsigned char *)"RESTORE")) {
+        if (!restorepointer) error((char *)"Nothing to restore");
+        restorepointer--;
+        NextDataLine = datastore[restorepointer].SaveNextDataLine;
+        NextData = datastore[restorepointer].SaveNextData;
+        return;
+    }
+    getargs(&cmdline, (MAX_ARG_COUNT * 2) - 1, (unsigned char *)","); // getargs macro must be the first executable stmt in a block
+    if (argc == 0) error("Syntax");
+    // first count the elements and do the syntax checking
+    for (vcnt = i = 0; i < argc; i++) {
+        if (i & 0x01) {
+            if (*argv[i] != ',') error("Syntax");
         } else {
-			findvar(argv[i], V_FIND | V_EMPTY_OK);
-			if(g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
-			card=1;
-			if(emptyarray){ //empty array
-				for(k=0;k<MAXDIM;k++){
-					j=(g_vartbl[g_VarIndex].dims[k] - g_OptionBase + 1);
-					if(j)card *= j;
-				}
-			}
-			num_to_read+=card;
-		}
-	}
-    char **vtbl=GetTempMemory(num_to_read * sizeof (char *));
-    int *vtype=GetTempMemory(num_to_read * sizeof (int));
-    int *vsize=GetTempMemory(num_to_read * sizeof (int));
+            findvar(argv[i], V_FIND | V_EMPTY_OK);
+            if (g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
+            card = 1;
+            if (emptyarray) { //empty array
+                for (k = 0; k < MAXDIM; k++) {
+                    j = (g_vartbl[g_VarIndex].dims[k] - g_OptionBase + 1);
+                    if (j) card *= j;
+                }
+            }
+            num_to_read += card;
+        }
+    }
+    char ** vtbl = GetTempMemory(num_to_read * sizeof(char *));
+    int * vtype = GetTempMemory(num_to_read * sizeof(int));
+    int * vsize = GetTempMemory(num_to_read * sizeof(int));
     // step through the arguments and save the pointer and type
-    for(vcnt = i = 0; i < argc; i+=2) {
-		ptr = findvar(argv[i], V_FIND | V_EMPTY_OK);
-		vtbl[vcnt] = (char *)ptr;
-		card=1;
-		if(emptyarray){ //empty array
-			for(k=0;k<MAXDIM;k++){
-				j=(g_vartbl[g_VarIndex].dims[k] - g_OptionBase + 1);
-				if(j)card *= j;
-			}
-		}
-		for(k=0;k<card;k++){
-			if(k){
-				if(g_vartbl[g_VarIndex].type & (T_INT | T_NBR))ptr+=8;
-				else ptr+=g_vartbl[g_VarIndex].size+1;
-				vtbl[vcnt]=(char *)ptr;
-			}
-			vtype[vcnt] = TypeMask(g_vartbl[g_VarIndex].type);
-			vsize[vcnt] = g_vartbl[g_VarIndex].size;
-			vcnt++;
-		}
+    for (vcnt = i = 0; i < argc; i += 2) {
+        ptr = findvar(argv[i], V_FIND | V_EMPTY_OK);
+        vtbl[vcnt] = (char *)ptr;
+        card = 1;
+        if (emptyarray) { //empty array
+            for (k = 0; k < MAXDIM; k++) {
+                j = (g_vartbl[g_VarIndex].dims[k] - g_OptionBase + 1);
+                if (j) card *= j;
+            }
+        }
+        for (k = 0; k < card; k++) {
+            if (k) {
+                if (g_vartbl[g_VarIndex].type & (T_INT | T_NBR))
+                    ptr += 8;
+                else
+                    ptr += g_vartbl[g_VarIndex].size + 1;
+                vtbl[vcnt] = (char *)ptr;
+            }
+            vtype[vcnt] = TypeMask(g_vartbl[g_VarIndex].type);
+            vsize[vcnt] = g_vartbl[g_VarIndex].size;
+            vcnt++;
+        }
     }
 
     // setup for a search through the whole memory
     vidx = 0;
     datatoken = GetCommandValue((unsigned char *)"Data");
     p = lineptr = NextDataLine;
-    if(*p == 0xff) error("No DATA to read");                        // error if there is no program
+    if (*p == 0xff) error("No DATA to read"); // error if there is no program
 
-  // search looking for a DATA statement.  We keep returning to this point until all the data is found
+    // search looking for a DATA statement.  We keep returning to this point until all the data is found
 search_again:
-    while(1) {
-        if(*p == 0) p++;                                            // if it is at the end of an element skip the zero marker
-        if(*p == 0/* || *p == 0xff*/) error("No DATA to read");         // end of the program and we still need more data
-        if(*p == T_NEWLINE) lineptr = p++;
-        if(*p == T_LINENBR) p += 3;
+    while (1) {
+        if (*p == 0) p++;                                         // if it is at the end of an element skip the zero marker
+        if (*p == 0 /* || *p == 0xff*/) error("No DATA to read"); // end of the program and we still need more data
+        if (*p == T_NEWLINE) lineptr = p++;
+        if (*p == T_LINENBR) p += 3;
         skipspace(p);
-        if(*p == T_LABEL) {                                         // if there is a label here
-            p += p[1] + 2;                                          // skip over the label
-            skipspace(p);                                           // and any following spaces
+        if (*p == T_LABEL) { // if there is a label here
+            p += p[1] + 2;   // skip over the label
+            skipspace(p);    // and any following spaces
         }
-        CommandToken tkn=commandtbl_decode(p);
-        if(tkn == datatoken) break;                                  // found a DATA statement
-        while(*p) p++;                                              // look for the zero marking the start of the next element
+        CommandToken tkn = commandtbl_decode(p);
+        if (tkn == datatoken) break; // found a DATA statement
+        while (*p) p++;              // look for the zero marking the start of the next element
     }
     NextDataLine = lineptr;
-    p+=sizeof(CommandToken);                                                            // step over the token
+    p += sizeof(CommandToken); // step over the token
     skipspace(p);
-    if(!*p || *p == '\'') { CurrentLinePtr = lineptr; error("No DATA to read"); }
+    if (!*p || *p == '\'') {
+        CurrentLinePtr = lineptr;
+        error("No DATA to read");
+    }
 
-        // we have a DATA statement, first split the line into arguments
-        {                                                           // new block, the getargs macro must be the first executable stmt in a block
+    // we have a DATA statement, first split the line into arguments
+    { // new block, the getargs macro must be the first executable stmt in a block
         getargs(&p, (MAX_ARG_COUNT * 2) - 1, (unsigned char *)",");
-        if((argc & 1) == 0) { CurrentLinePtr = lineptr; error("Syntax"); }
+        if ((argc & 1) == 0) {
+            CurrentLinePtr = lineptr;
+            error("Syntax");
+        }
         // now step through the variables on the READ line and get their new values from the argument list
         // we set the line number to the number of the DATA stmt so that any errors are reported correctly
-        while(vidx < vcnt) {
+        while (vidx < vcnt) {
             // check that there is some data to read if not look for another DATA stmt
-            if(NextData > argc) {
+            if (NextData > argc) {
                 skipline(p);
                 NextData = 0;
                 goto search_again;
             }
             CurrentLinePtr = lineptr;
-            if(vtype[vidx] & T_STR) {
+            if (vtype[vidx] & T_STR) {
                 char *p1, *p2;
-                if(*argv[NextData] == '"') {                               // if quoted string
-                  	int toggle=0;
-                    for(len = 0, p1 = vtbl[vidx], p2 = (char *)argv[NextData] + 1; *p2 && *p2 != '"'; len++) {
-                    	if(*p2=='\\' && p2[1]!='"' && OptionEscape)toggle^=1;
-	                    if(toggle){
-	                        if(*p2=='\\' && isdigit((unsigned char)p2[1]) && isdigit((unsigned char)p2[2]) && isdigit((unsigned char)p2[3])){
-	                            p2++;
-	                            i=(*p2++)-48;
-	                            i*=10;
-	                            i+=(*p2++)-48;
-	                            i*=10;
-	                            i+=(*p2++)-48;
-                                if(i==0)error("Null character \\000 in escape sequence - use CHR$(0)","$");
-	                            *p1++=i;
-	                        } else {
-	                            p2++;
-	                            switch(*p2){
-	                                case '\\':
-	                                    *p1++='\\';
-	                                    p2++;
-	                                    break;
-	                                case 'a':
-	                                    *p1++='\a';
-	                                    p2++;
-	                                    break;
-	                                case 'b':
-	                                    *p1++='\b';
-	                                    p2++;
-	                                    break;
-	                                case 'e':
-	                                    *p1++='\e';
-	                                    p2++;
-	                                    break;
-	                                case 'f':
-	                                    *p1++='\f';
-	                                    p2++;
-	                                    break;
-	                                case 'n':
-	                                    *p1++='\n';
-	                                    p2++;
-	                                    break;
-	                                case 'q':
-	                                    *p1++='\"';
-	                                    p2++;
-	                                    break;
-	                                case 'r':
-	                                    *p1++='\r';
-	                                    p2++;
-	                                    break;
-	                                case 't':
-	                                    *p1++='\t';
-	                                    p2++;
-	                                    break;
-	                                case 'v':
-	                                    *p1++='\v';
-	                                    p2++;
-	                                    break;
-	                                case '&':
-	                                    p2++;
-	                                    if(isxdigit((unsigned char)*p2) && isxdigit((unsigned char)p2[1])){
-	                                        i=0;
-	                                        i = (i << 4) | ((mytoupper(*p2) >= 'A') ? mytoupper(*p2) - 'A' + 10 : *p2 - '0');
-	                                        p++;
-	                                        i = (i << 4) | ((mytoupper(*p2) >= 'A') ? mytoupper(*p2) - 'A' + 10 : *p2 - '0');
-                                			if(i==0)error("Null character \\&00 in escape sequence - use CHR$(0)","$");
-	                                        p2++;
-	                                        *p1++=i;
-	                                    } else *p1++='x';
-	                                    break;
-	                                default:
-	                                    *p1++=*p2++;
-	                            }
-	                        }
-	                        toggle=0;
-	                    } else *p1++ = *p2++;
+                if (*argv[NextData] == '"') { // if quoted string
+                    int toggle = 0;
+                    for (len = 0, p1 = vtbl[vidx], p2 = (char *)argv[NextData] + 1; *p2 && *p2 != '"'; len++) {
+                        if (*p2 == '\\' && p2[1] != '"' && OptionEscape) toggle ^= 1;
+                        if (toggle) {
+                            if (*p2 == '\\' && isdigit((unsigned char)p2[1]) && isdigit((unsigned char)p2[2]) && isdigit((unsigned char)p2[3])) {
+                                p2++;
+                                i = (*p2++) - 48;
+                                i *= 10;
+                                i += (*p2++) - 48;
+                                i *= 10;
+                                i += (*p2++) - 48;
+                                if (i == 0) error("Null character \\000 in escape sequence - use CHR$(0)", "$");
+                                *p1++ = i;
+                            } else {
+                                p2++;
+                                switch (*p2) {
+                                case '\\':
+                                    *p1++ = '\\';
+                                    p2++;
+                                    break;
+                                case 'a':
+                                    *p1++ = '\a';
+                                    p2++;
+                                    break;
+                                case 'b':
+                                    *p1++ = '\b';
+                                    p2++;
+                                    break;
+                                case 'e':
+                                    *p1++ = '\e';
+                                    p2++;
+                                    break;
+                                case 'f':
+                                    *p1++ = '\f';
+                                    p2++;
+                                    break;
+                                case 'n':
+                                    *p1++ = '\n';
+                                    p2++;
+                                    break;
+                                case 'q':
+                                    *p1++ = '\"';
+                                    p2++;
+                                    break;
+                                case 'r':
+                                    *p1++ = '\r';
+                                    p2++;
+                                    break;
+                                case 't':
+                                    *p1++ = '\t';
+                                    p2++;
+                                    break;
+                                case 'v':
+                                    *p1++ = '\v';
+                                    p2++;
+                                    break;
+                                case '&':
+                                    p2++;
+                                    if (isxdigit((unsigned char)*p2) && isxdigit((unsigned char)p2[1])) {
+                                        i = 0;
+                                        i = (i << 4) | ((mytoupper(*p2) >= 'A') ? mytoupper(*p2) - 'A' + 10 : *p2 - '0');
+                                        p++;
+                                        i = (i << 4) | ((mytoupper(*p2) >= 'A') ? mytoupper(*p2) - 'A' + 10 : *p2 - '0');
+                                        if (i == 0) error("Null character \\&00 in escape sequence - use CHR$(0)", "$");
+                                        p2++;
+                                        *p1++ = i;
+                                    } else
+                                        *p1++ = 'x';
+                                    break;
+                                default:
+                                    *p1++ = *p2++;
+                                }
+                            }
+                            toggle = 0;
+                        } else
+                            *p1++ = *p2++;
                     }
-                } else {                                            // else if not quoted
-                    for(len = 0, p1 = vtbl[vidx], p2 = (char *)argv[NextData]; *p2 && *p2 != '\'' ; len++, p1++, p2++) {
-                        if(*p2 < 0x20 || *p2 >= 0x7f) error("Invalid character");
-                        *p1 = *p2;                                  // copy up to the comma
+                } else { // else if not quoted
+                    for (len = 0, p1 = vtbl[vidx], p2 = (char *)argv[NextData]; *p2 && *p2 != '\''; len++, p1++, p2++) {
+                        if (*p2 < 0x20 || *p2 >= 0x7f) error("Invalid character");
+                        *p1 = *p2; // copy up to the comma
                     }
                 }
-                if(len > vsize[vidx]) error("String too long");
-                *p1 = 0;                                            // terminate the string
-                CtoM((unsigned char *)vtbl[vidx]);                                   // convert to a MMBasic string
-            }
-            else if(vtype[vidx] & T_INT)
+                if (len > vsize[vidx]) error("String too long");
+                *p1 = 0;                           // terminate the string
+                CtoM((unsigned char *)vtbl[vidx]); // convert to a MMBasic string
+            } else if (vtype[vidx] & T_INT)
                 *((int64_t *)vtbl[vidx]) = getinteger(argv[NextData]); // much easier if integer variable
             else
-                *((MMFLOAT *)vtbl[vidx]) = getnumber(argv[NextData]);      // same for numeric variable
+                *((MMFLOAT *)vtbl[vidx]) = getnumber(argv[NextData]); // same for numeric variable
 
             vidx++;
             NextData += 2;
@@ -3097,191 +3159,183 @@ search_again:
     }
 }
 
-void cmd_call(void){
-	int i;
-	unsigned char *p=getCstring(cmdline); //get the command we want to call
-    unsigned char *q = skipexpression(cmdline);
-	if(*q==',')q++;
-	i = FindSubFun(p, false);                   // it could be a defined command
-	strcat((char *)p," ");
-	strcat((char *)p,(char *)q);
-	if(i >= 0) {                                // >= 0 means it is a user defined command
-		DefinedSubFun(false, p, i, NULL, NULL, NULL, NULL);
-	}
-	else
-		error("Unknown user subroutine");
+void cmd_call(void) {
+    int i;
+    unsigned char * p = getCstring(cmdline); //get the command we want to call
+    unsigned char * q = skipexpression(cmdline);
+    if (*q == ',') q++;
+    i = FindSubFun(p, false); // it could be a defined command
+    strcat((char *)p, " ");
+    strcat((char *)p, (char *)q);
+    if (i >= 0) { // >= 0 means it is a user defined command
+        DefinedSubFun(false, p, i, NULL, NULL, NULL, NULL);
+    } else
+        error("Unknown user subroutine");
 }
-
-
 
 void MIPS16 cmd_restore(void) {
-   if(*cmdline == 0 || *cmdline == '\'') {
-       if(CurrentLinePtr >= ProgMemory && CurrentLinePtr < ProgMemory + MAX_PROG_SIZE )
-           NextDataLine = ProgMemory;
-       else
-           NextDataLine = LibMemory;
-       NextData = 0;
-	} else {
-		skipspace(cmdline);
-		if(*cmdline=='"') {
-			NextDataLine = findlabel(getCstring(cmdline));
-			NextData = 0;
-		}
-		else if(isdigit(*cmdline) || *cmdline==GetTokenValue((unsigned char *)"+") || *cmdline==GetTokenValue((unsigned char *)"-")  || *cmdline=='.'){
-			NextDataLine = findline(getinteger(cmdline), true); // try for a line number
-			NextData = 0;
-		} else {
-			void *ptr=findvar(cmdline,V_NOFIND_NULL);
-			if(ptr){
-				if(g_vartbl[g_VarIndex].type & T_NBR) {
-					if(g_vartbl[g_VarIndex].dims[0] > 0) { // Not an array
-						error("Syntax");
-					}
-					NextDataLine = findline(getinteger(cmdline), true);
-				} else if(g_vartbl[g_VarIndex].type & T_INT) {
-					if(g_vartbl[g_VarIndex].dims[0] > 0) { // Not an array
-						error("Syntax");
-					}
-					NextDataLine = findline(getinteger(cmdline), true);
-				} else {
-					NextDataLine = findlabel(getCstring(cmdline));    // must be a label
-				}
-			} else if(isnamestart(*cmdline)) {
-				NextDataLine = findlabel(cmdline);    // must be a label
-			}
-			NextData = 0;
-		}
-	}
+    if (*cmdline == 0 || *cmdline == '\'') {
+        if (CurrentLinePtr >= ProgMemory && CurrentLinePtr < ProgMemory + MAX_PROG_SIZE)
+            NextDataLine = ProgMemory;
+        else
+            NextDataLine = LibMemory;
+        NextData = 0;
+    } else {
+        skipspace(cmdline);
+        if (*cmdline == '"') {
+            NextDataLine = findlabel(getCstring(cmdline));
+            NextData = 0;
+        } else if (isdigit(*cmdline) || *cmdline == GetTokenValue((unsigned char *)"+") || *cmdline == GetTokenValue((unsigned char *)"-") || *cmdline == '.') {
+            NextDataLine = findline(getinteger(cmdline), true); // try for a line number
+            NextData = 0;
+        } else {
+            void * ptr = findvar(cmdline, V_NOFIND_NULL);
+            if (ptr) {
+                if (g_vartbl[g_VarIndex].type & T_NBR) {
+                    if (g_vartbl[g_VarIndex].dims[0] > 0) { // Not an array
+                        error("Syntax");
+                    }
+                    NextDataLine = findline(getinteger(cmdline), true);
+                } else if (g_vartbl[g_VarIndex].type & T_INT) {
+                    if (g_vartbl[g_VarIndex].dims[0] > 0) { // Not an array
+                        error("Syntax");
+                    }
+                    NextDataLine = findline(getinteger(cmdline), true);
+                } else {
+                    NextDataLine = findlabel(getCstring(cmdline)); // must be a label
+                }
+            } else if (isnamestart(*cmdline)) {
+                NextDataLine = findlabel(cmdline); // must be a label
+            }
+            NextData = 0;
+        }
+    }
 }
-
-
 
 void cmd_lineinput(void) {
-	unsigned char *vp;
-	int i, fnbr;
-	getargs(&cmdline, 3, (unsigned char *)",;");										// this is a macro and must be the first executable stmt
-	if(argc == 0 || argc == 2) error("Syntax");
+    unsigned char * vp;
+    int i, fnbr;
+    getargs(&cmdline, 3, (unsigned char *)",;"); // this is a macro and must be the first executable stmt
+    if (argc == 0 || argc == 2) error("Syntax");
 
-	i = 0;
-	fnbr = 0;
-	if(argc == 3) {
-		// is the first argument a file number specifier?  If so, get it
-		if(*argv[0] == '#' && *argv[1] == ',') {
-			argv[0]++;
-			fnbr = getinteger(argv[0]);
-		}
-		else {
-			// is the first argument a prompt?  if so, print it otherwise there are too many arguments
-			if(*argv[1] != ',' && *argv[1] != ';') error("Syntax");
-			MMfputs((unsigned char *)getstring(argv[0]), 0);
-		}
-	i = 2;
-	}
+    i = 0;
+    fnbr = 0;
+    if (argc == 3) {
+        // is the first argument a file number specifier?  If so, get it
+        if (*argv[0] == '#' && *argv[1] == ',') {
+            argv[0]++;
+            fnbr = getinteger(argv[0]);
+        } else {
+            // is the first argument a prompt?  if so, print it otherwise there are too many arguments
+            if (*argv[1] != ',' && *argv[1] != ';') error("Syntax");
+            MMfputs((unsigned char *)getstring(argv[0]), 0);
+        }
+        i = 2;
+    }
 
-	if(argc - i != 1) error("Syntax");
-	vp = findvar(argv[i], V_FIND);
-    if(g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
-	if(!(g_vartbl[g_VarIndex].type & T_STR)) error("Invalid variable");
-	MMgetline(fnbr, (char *)inpbuf);									    // get the input line
-	if(strlen((char *)inpbuf) > g_vartbl[g_VarIndex].size) error("String too long");
-	strcpy((char *)vp, (char *)inpbuf);
-	CtoM(vp);														// convert to a MMBasic string
+    if (argc - i != 1) error("Syntax");
+    vp = findvar(argv[i], V_FIND);
+    if (g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
+    if (!(g_vartbl[g_VarIndex].type & T_STR)) error("Invalid variable");
+    MMgetline(fnbr, (char *)inpbuf); // get the input line
+    if (strlen((char *)inpbuf) > g_vartbl[g_VarIndex].size) error("String too long");
+    strcpy((char *)vp, (char *)inpbuf);
+    CtoM(vp); // convert to a MMBasic string
 }
 
-
 void cmd_on(void) {
-	int r;
-	unsigned char ss[4];													    // this will be used to split up the argument line
-    unsigned char *p;
-	// first check if this is:   ON KEY location
-	p = checkstring(cmdline, (unsigned char *)"PS2");
-	if(p){
-		getargs(&p,1,(unsigned char *)",");
-		if(*argv[0] == '0' && !isdigit(*(argv[0]+1))){
-			OnPS2GOSUB = NULL;                                      // the program wants to turn the interrupt off
-		} else {
-			OnPS2GOSUB = GetIntAddress(argv[0]);						    // get a pointer to the interrupt routine
-			InterruptUsed = true;
-		}
-		return;
-	}
-	p = checkstring(cmdline, (unsigned char *)"KEY");
-	if(p) {
-		getargs(&p,3,(unsigned char *)",");
-		if(argc==1){
-			if(*argv[0] == '0' && !isdigit(*(argv[0]+1))){
-				OnKeyGOSUB = NULL;                                      // the program wants to turn the interrupt off
-			} else {
-				OnKeyGOSUB = GetIntAddress(argv[0]);						    // get a pointer to the interrupt routine
-				InterruptUsed = true;
-			}
-			return;
-		} else {
-			keyselect=getint(argv[0],0,255);
-			if(keyselect==0){
-				KeyInterrupt = NULL;                                      // the program wants to turn the interrupt off
-			} else {
-				if(*argv[2] == '0' && !isdigit(*(argv[2]+1))){
-					KeyInterrupt = NULL;                                      // the program wants to turn the interrupt off
-				} else {
-					KeyInterrupt = (char *)GetIntAddress(argv[2]);						    // get a pointer to the interrupt routine
-					InterruptUsed = true;
-				}
-			}
-			return;
-		}
-	}
+    int r;
+    unsigned char ss[4]; // this will be used to split up the argument line
+    unsigned char * p;
+    // first check if this is:   ON KEY location
+    p = checkstring(cmdline, (unsigned char *)"PS2");
+    if (p) {
+        getargs(&p, 1, (unsigned char *)",");
+        if (*argv[0] == '0' && !isdigit(*(argv[0] + 1))) {
+            OnPS2GOSUB = NULL; // the program wants to turn the interrupt off
+        } else {
+            OnPS2GOSUB = GetIntAddress(argv[0]); // get a pointer to the interrupt routine
+            InterruptUsed = true;
+        }
+        return;
+    }
+    p = checkstring(cmdline, (unsigned char *)"KEY");
+    if (p) {
+        getargs(&p, 3, (unsigned char *)",");
+        if (argc == 1) {
+            if (*argv[0] == '0' && !isdigit(*(argv[0] + 1))) {
+                OnKeyGOSUB = NULL; // the program wants to turn the interrupt off
+            } else {
+                OnKeyGOSUB = GetIntAddress(argv[0]); // get a pointer to the interrupt routine
+                InterruptUsed = true;
+            }
+            return;
+        } else {
+            keyselect = getint(argv[0], 0, 255);
+            if (keyselect == 0) {
+                KeyInterrupt = NULL; // the program wants to turn the interrupt off
+            } else {
+                if (*argv[2] == '0' && !isdigit(*(argv[2] + 1))) {
+                    KeyInterrupt = NULL; // the program wants to turn the interrupt off
+                } else {
+                    KeyInterrupt = (char *)GetIntAddress(argv[2]); // get a pointer to the interrupt routine
+                    InterruptUsed = true;
+                }
+            }
+            return;
+        }
+    }
     p = checkstring(cmdline, (unsigned char *)"ERROR");
-	if(p) {
-		if(checkstring(p, (unsigned char *)"ABORT")) {
+    if (p) {
+        if (checkstring(p, (unsigned char *)"ABORT")) {
             OptionErrorSkip = 0;
             return;
         }
-        MMerrno = 0;                                                // clear the error flags
+        MMerrno = 0; // clear the error flags
         *MMErrMsg = 0;
-        if(checkstring(p, (unsigned char *)"CLEAR")) return;
-		if(checkstring(p, (unsigned char *)"IGNORE")) {
+        if (checkstring(p, (unsigned char *)"CLEAR")) return;
+        if (checkstring(p, (unsigned char *)"IGNORE")) {
             OptionErrorSkip = -1;
             return;
         }
-		if((p = checkstring(p, (unsigned char *)"SKIP"))) {
-            if(*p == 0 || *p == (unsigned char)'\'')
+        if ((p = checkstring(p, (unsigned char *)"SKIP"))) {
+            if (*p == 0 || *p == (unsigned char)'\'')
                 OptionErrorSkip = 2;
             else
                 OptionErrorSkip = getint(p, 1, 10000) + 1;
             return;
         }
         error("Syntax");
-	}
+    }
 
-	// if we got here the command must be the traditional:  ON nbr GOTO|GOSUB line1, line2,... etc
+    // if we got here the command must be the traditional:  ON nbr GOTO|GOSUB line1, line2,... etc
 
-	ss[0] = tokenGOTO;
-	ss[1] = tokenGOSUB;
-	ss[2] = ',';
-	ss[3] = 0;
-	{																// start a new block
-		getargs(&cmdline, (MAX_ARG_COUNT * 2) - 1, ss);				// getargs macro must be the first executable stmt in a block
-		if(argc < 3 || !(*argv[1] == ss[0] || *argv[1] == ss[1])) error("Syntax");
-		if(argc%2 == 0) error("Syntax");
+    ss[0] = tokenGOTO;
+    ss[1] = tokenGOSUB;
+    ss[2] = ',';
+    ss[3] = 0;
+    {                                                   // start a new block
+        getargs(&cmdline, (MAX_ARG_COUNT * 2) - 1, ss); // getargs macro must be the first executable stmt in a block
+        if (argc < 3 || !(*argv[1] == ss[0] || *argv[1] == ss[1])) error("Syntax");
+        if (argc % 2 == 0) error("Syntax");
 
-		r = getint(argv[0], 0, 255);									// evaluate the expression controlling the statement
-		if(r == 0 || r > argc/2) return;							// microsoft say that we just go on to the next line
+        r = getint(argv[0], 0, 255);        // evaluate the expression controlling the statement
+        if (r == 0 || r > argc / 2) return; // microsoft say that we just go on to the next line
 
-		if(*argv[1] == ss[1]) {
-			// this is a GOSUB, same as a GOTO but we need to first push the return pointer
-			if(gosubindex >= MAXGOSUB) error("Too many nested GOSUB");
+        if (*argv[1] == ss[1]) {
+            // this is a GOSUB, same as a GOTO but we need to first push the return pointer
+            if (gosubindex >= MAXGOSUB) error("Too many nested GOSUB");
             errorstack[gosubindex] = CurrentLinePtr;
-			gosubstack[gosubindex++] = nextstmt;
-        	g_LocalIndex++;
-		}
+            gosubstack[gosubindex++] = nextstmt;
+            g_LocalIndex++;
+        }
 
-		if(isnamestart(*argv[r*2]))
-			nextstmt = findlabel(argv[r*2]);						// must be a label
-		else
-			nextstmt = findline(getinteger(argv[r*2]), true);		// try for a line number
-	}
-//    IgnorePIN = false;
+        if (isnamestart(*argv[r * 2]))
+            nextstmt = findlabel(argv[r * 2]); // must be a label
+        else
+            nextstmt = findline(getinteger(argv[r * 2]), true); // try for a line number
+    }
+    //    IgnorePIN = false;
 }
 
 /**
@@ -3290,16 +3344,16 @@ void cmd_on(void) {
  */
 // utility routine used by DoDim() below and other places in the interpreter
 // checks if the type has been explicitly specified as in DIM FLOAT A, B, ... etc
-unsigned char *CheckIfTypeSpecified(unsigned char *p, int *type, int AllowDefaultType) {
-    unsigned char *tp;
+unsigned char * CheckIfTypeSpecified(unsigned char * p, int * type, int AllowDefaultType) {
+    unsigned char * tp;
 
-    g_StructArg = -1;                                               // consumed by cmd_dim when we return T_STRUCT
+    g_StructArg = -1; // consumed by cmd_dim when we return T_STRUCT
 
-    if((tp = checkstring(p, (unsigned char *)"INTEGER")) != NULL)
+    if ((tp = checkstring(p, (unsigned char *)"INTEGER")) != NULL)
         *type = T_INT | T_IMPLIED;
-    else if((tp = checkstring(p, (unsigned char *)"STRING")) != NULL)
+    else if ((tp = checkstring(p, (unsigned char *)"STRING")) != NULL)
         *type = T_STR | T_IMPLIED;
-    else if((tp = checkstring(p, (unsigned char *)"FLOAT")) != NULL)
+    else if ((tp = checkstring(p, (unsigned char *)"FLOAT")) != NULL)
         *type = T_NBR | T_IMPLIED;
     else {
         // Named struct type, e.g. `AS Point`.  Accept only a pre-registered type
@@ -3315,111 +3369,110 @@ unsigned char *CheckIfTypeSpecified(unsigned char *p, int *type, int AllowDefaul
             skipspace(tp);
             return tp;
         }
-        if(!AllowDefaultType) error("Variable type");
+        if (!AllowDefaultType) error("Variable type");
         tp = p;
-        *type = DefaultType;                                        // if the type is not specified use the default
+        *type = DefaultType; // if the type is not specified use the default
     }
     return tp;
 }
 
-
-
-unsigned char *SetValue(unsigned char *p, int t, void *v) {
+unsigned char * SetValue(unsigned char * p, int t, void * v) {
     MMFLOAT f;
-    int64_t  i64;
-    unsigned char *s;
+    int64_t i64;
+    unsigned char * s;
     char TempCurrentSubFunName[MAXVARLEN + 1];
-    strcpy(TempCurrentSubFunName, (char *)CurrentSubFunName);			    // save the current sub/fun name
-	if(t & T_STR) {
-		p = evaluate(p, &f, &i64, &s, &t, true);
-		Mstrcpy(v, s);
-	}
-	else if(t & T_NBR) {
-		p = evaluate(p, &f, &i64, &s, &t, false);
-		if(t & T_NBR)
+    strcpy(TempCurrentSubFunName, (char *)CurrentSubFunName); // save the current sub/fun name
+    if (t & T_STR) {
+        p = evaluate(p, &f, &i64, &s, &t, true);
+        Mstrcpy(v, s);
+    } else if (t & T_NBR) {
+        p = evaluate(p, &f, &i64, &s, &t, false);
+        if (t & T_NBR)
             (*(MMFLOAT *)v) = f;
         else
             (*(MMFLOAT *)v) = (MMFLOAT)i64;
-	} else {
-		p = evaluate(p, &f, &i64, &s, &t, false);
-		if(t & T_INT)
-            (*(int64_t  *)v) = i64;
+    } else {
+        p = evaluate(p, &f, &i64, &s, &t, false);
+        if (t & T_INT)
+            (*(int64_t *)v) = i64;
         else
-            (*(int64_t  *)v) = FloatToInt64(f);
-	}
-	strcpy((char *)CurrentSubFunName, TempCurrentSubFunName);			    // restore the current sub/fun name
+            (*(int64_t *)v) = FloatToInt64(f);
+    }
+    strcpy((char *)CurrentSubFunName, TempCurrentSubFunName); // restore the current sub/fun name
     return p;
 }
 
 /** @endcond */
 
-
 // define a variable
 // DIM [AS INTEGER|FLOAT|STRING] var[(d1 [,d2,...]] [AS INTEGER|FLOAT|STRING] [, ..., ...]
 // LOCAL also uses this function the routines only differ in that LOCAL can only be used in a sub/fun
 void MIPS16 cmd_dim(void) {
-	int i, j, k, type, typeSave, ImpliedType = 0, VIndexSave, StaticVar = false;
+    int i, j, k, type, typeSave, ImpliedType = 0, VIndexSave, StaticVar = false;
     unsigned char *p, chSave, *chPosit;
     unsigned char VarName[(MAXVARLEN * 2) + 1];
     void *v, *tv;
 
-    if(*cmdline == tokenAS) cmdline++;                              // this means that we can use DIM AS INTEGER a, b, etc
-    p = CheckIfTypeSpecified(cmdline, &type, true);                 // check for DIM FLOAT A, B, ...
+    if (*cmdline == tokenAS) cmdline++;             // this means that we can use DIM AS INTEGER a, b, etc
+    p = CheckIfTypeSpecified(cmdline, &type, true); // check for DIM FLOAT A, B, ...
     ImpliedType = type;
-    {                                                               // getargs macro must be the first executable stmt in a block
+    { // getargs macro must be the first executable stmt in a block
         getargs(&p, (MAX_ARG_COUNT * 2) - 1, (unsigned char *)",");
-        if((argc & 0x01) == 0) error("Syntax");
+        if ((argc & 0x01) == 0) error("Syntax");
 
-        for(i = 0; i < argc; i += 2) {
-            p = skipvar(argv[i], false);                            // point to after the variable
-            while(!(*p == 0 || *p == tokenAS || *p == (unsigned char)'\'' || *p == tokenEQUAL))
-                p++;                                                // skip over a LENGTH keyword if there and see if we can find "AS"
-            chSave = *p; chPosit = p; *p = 0;                       // save the char then terminate the string so that LENGTH is evaluated correctly
-            if(chSave == tokenAS) {                                 // are we using Microsoft syntax (eg, AS INTEGER)?
-                if(ImpliedType & T_IMPLIED) error("Type specified twice");
-                p++;                                                // step over the AS token
-                p = CheckIfTypeSpecified(p, &type, true);           // and get the type
-                if(!(type & T_IMPLIED)) error("Variable type");
+        for (i = 0; i < argc; i += 2) {
+            p = skipvar(argv[i], false); // point to after the variable
+            while (!(*p == 0 || *p == tokenAS || *p == (unsigned char)'\'' || *p == tokenEQUAL))
+                p++; // skip over a LENGTH keyword if there and see if we can find "AS"
+            chSave = *p;
+            chPosit = p;
+            *p = 0;                  // save the char then terminate the string so that LENGTH is evaluated correctly
+            if (chSave == tokenAS) { // are we using Microsoft syntax (eg, AS INTEGER)?
+                if (ImpliedType & T_IMPLIED) error("Type specified twice");
+                p++;                                      // step over the AS token
+                p = CheckIfTypeSpecified(p, &type, true); // and get the type
+                if (!(type & T_IMPLIED)) error("Variable type");
             }
 
-            if(cmdtoken == cmdLOCAL) {
-                if(g_LocalIndex == 0) error("Invalid here");
-                type |= V_LOCAL;                                    // local if defined in a sub/fun
+            if (cmdtoken == cmdLOCAL) {
+                if (g_LocalIndex == 0) error("Invalid here");
+                type |= V_LOCAL; // local if defined in a sub/fun
             }
 
-            if(cmdtoken == cmdSTATIC) {
-                if(g_LocalIndex == 0) error("Invalid here");
+            if (cmdtoken == cmdSTATIC) {
+                if (g_LocalIndex == 0) error("Invalid here");
                 // create a unique global name
-                if(*CurrentInterruptName)
-                    strcpy((char *)VarName, CurrentInterruptName);          // we must be in an interrupt sub
+                if (*CurrentInterruptName)
+                    strcpy((char *)VarName, CurrentInterruptName); // we must be in an interrupt sub
                 else
-                    strcpy((char *)VarName, CurrentSubFunName);             // normal sub/fun
-                for(k = 1; k <= MAXVARLEN; k++) if(!isnamechar(VarName[k])) {
-                    VarName[k] = 0;                                 // terminate the string on a non valid char
-                    break;
-                }
-				strcat((char *)VarName,".");
-                strcat((char *)VarName, (char *)argv[i]);					        // by prefixing the var name with the sub/fun name
-            	StaticVar = true;
+                    strcpy((char *)VarName, CurrentSubFunName); // normal sub/fun
+                for (k = 1; k <= MAXVARLEN; k++)
+                    if (!isnamechar(VarName[k])) {
+                        VarName[k] = 0; // terminate the string on a non valid char
+                        break;
+                    }
+                strcat((char *)VarName, ".");
+                strcat((char *)VarName, (char *)argv[i]); // by prefixing the var name with the sub/fun name
+                StaticVar = true;
             } else
-            	strcpy((char *)VarName, (char *)argv[i]);
+                strcpy((char *)VarName, (char *)argv[i]);
 
-            v = findvar(VarName, type | V_NOFIND_NULL);             // check if the variable exists
+            v = findvar(VarName, type | V_NOFIND_NULL); // check if the variable exists
             typeSave = type;
             VIndexSave = g_VarIndex;
-			if(v == NULL) {											// if not found
-                v = findvar(VarName, type | V_FIND | V_DIM_VAR);    // create the variable
+            if (v == NULL) {                                     // if not found
+                v = findvar(VarName, type | V_FIND | V_DIM_VAR); // create the variable
                 type = TypeMask(g_vartbl[g_VarIndex].type);
                 VIndexSave = g_VarIndex;
-                *chPosit = chSave;                                  // restore the char previously removed
-                if(g_vartbl[g_VarIndex].dims[0] == -1) error("Array dimensions");
-                if(g_vartbl[g_VarIndex].dims[0] > 0) {
-                    g_DimUsed = true;                                 // prevent OPTION BASE from being used
+                *chPosit = chSave; // restore the char previously removed
+                if (g_vartbl[g_VarIndex].dims[0] == -1) error("Array dimensions");
+                if (g_vartbl[g_VarIndex].dims[0] > 0) {
+                    g_DimUsed = true; // prevent OPTION BASE from being used
                     v = g_vartbl[g_VarIndex].val.s;
                 }
-                while(*p && *p != '\'' && tokenfunction(*p) != op_equal) p++;	// search through the line looking for the equals sign
-            	if(tokenfunction(*p) == op_equal) {
-                    p++;                                            // step over the equals sign
+                while (*p && *p != '\'' && tokenfunction(*p) != op_equal) p++; // search through the line looking for the equals sign
+                if (tokenfunction(*p) == op_equal) {
+                    p++; // step over the equals sign
                     skipspace(p);
                     // Phase 17: `DIM s AS MyType = (v1, v2, ...)` initializer.
                     // Ported from upstream Commands.c:6355-6494 (@04f81d0).
@@ -3430,9 +3483,9 @@ void MIPS16 cmd_dim(void) {
                         if (*p != '(') error("Expected '(' for structure initialisation");
 
                         int struct_idx = (int)g_vartbl[VIndexSave].size;
-                        struct s_structdef *sd = g_structtbl[struct_idx];
+                        struct s_structdef * sd = g_structtbl[struct_idx];
                         int struct_size = sd->total_size;
-                        unsigned char *struct_ptr = (unsigned char *)v;
+                        unsigned char * struct_ptr = (unsigned char *)v;
 
                         int num_elements = 1;
                         if (g_vartbl[VIndexSave].dims[0] > 0) {
@@ -3440,13 +3493,13 @@ void MIPS16 cmd_dim(void) {
                                 num_elements *= (g_vartbl[VIndexSave].dims[k] + 1 - g_OptionBase);
                         }
 
-                        p++;                                        // step over opening '('
+                        p++; // step over opening '('
                         skipspace(p);
 
                         for (int elem = 0; elem < num_elements; elem++) {
                             for (int m = 0; m < sd->num_members; m++) {
-                                struct s_structmember *member = &sd->members[m];
-                                unsigned char *member_ptr = struct_ptr + member->offset;
+                                struct s_structmember * member = &sd->members[m];
+                                unsigned char * member_ptr = struct_ptr + member->offset;
 
                                 int member_elements = 1;
                                 if (member->dims[0] != 0) {
@@ -3460,17 +3513,23 @@ void MIPS16 cmd_dim(void) {
                                         error("Not enough initialisation values");
 
                                     int elem_size;
-                                    if (member->type & T_STR)       elem_size = member->size + 1;
-                                    else if (member->type & T_NBR)  elem_size = sizeof(MMFLOAT);
-                                    else if (member->type & T_INT)  elem_size = sizeof(int64_t);
-                                    else                            error("Unsupported member type in initialisation");
+                                    if (member->type & T_STR)
+                                        elem_size = member->size + 1;
+                                    else if (member->type & T_NBR)
+                                        elem_size = sizeof(MMFLOAT);
+                                    else if (member->type & T_INT)
+                                        elem_size = sizeof(int64_t);
+                                    else
+                                        error("Unsupported member type in initialisation");
 
                                     p = SetValue(p, member->type, member_ptr);
                                     member_ptr += elem_size;
 
                                     skipspace(p);
-                                    if (*p == ',')      p++;
-                                    else if (*p != ')') error("Expected ',' or ')' in structure initialisation");
+                                    if (*p == ',')
+                                        p++;
+                                    else if (*p != ')')
+                                        error("Expected ',' or ')' in structure initialisation");
                                 }
                             }
                             struct_ptr += struct_size;
@@ -3478,83 +3537,80 @@ void MIPS16 cmd_dim(void) {
 
                         skipspace(p);
                         if (*p != ')') error("Expected ')' at end of structure initialisation");
-                    } else
-                    if(g_vartbl[g_VarIndex].dims[0] > 0 && *p == '(') {
+                    } else if (g_vartbl[g_VarIndex].dims[0] > 0 && *p == '(') {
                         // calculate the overall size of the array
-                        for(j = 1, k = 0; k < MAXDIM && g_vartbl[VIndexSave].dims[k]; k++) {
+                        for (j = 1, k = 0; k < MAXDIM && g_vartbl[VIndexSave].dims[k]; k++) {
                             j *= (g_vartbl[VIndexSave].dims[k] + 1 - g_OptionBase);
                         }
                         do {
-                            p++;                                    // step over the opening bracket or terminating comma
+                            p++; // step over the opening bracket or terminating comma
                             p = SetValue(p, type, v);
-                            if(type & T_STR) v = (char *)v + g_vartbl[VIndexSave].size + 1;
-                            if(type & T_NBR) v = (char *)v + sizeof(MMFLOAT);
-                            if(type & T_INT) v = (char *)v + sizeof(int64_t);
-                            skipspace(p); j--;
-                        } while(j > 0 && *p == ',');
-                        if(*p != ')') error("Number of initialising values");
-                        if(j != 0) error("Number of initialising values");
+                            if (type & T_STR) v = (char *)v + g_vartbl[VIndexSave].size + 1;
+                            if (type & T_NBR) v = (char *)v + sizeof(MMFLOAT);
+                            if (type & T_INT) v = (char *)v + sizeof(int64_t);
+                            skipspace(p);
+                            j--;
+                        } while (j > 0 && *p == ',');
+                        if (*p != ')') error("Number of initialising values");
+                        if (j != 0) error("Number of initialising values");
                     } else
                         SetValue(p, type, v);
                 }
                 type = ImpliedType;
-             } else {
-             	if(!StaticVar) error("$ already declared", VarName);
-             }
+            } else {
+                if (!StaticVar) error("$ already declared", VarName);
+            }
 
-
-			 // if it is a STATIC var create a local var pointing to the global var
-             if(StaticVar) {
-                tv = findvar(argv[i], typeSave | V_LOCAL | V_NOFIND_NULL);    						// check if the local variable exists
-                if(tv != NULL) error("$ already declared", argv[i]);
-                tv = findvar(argv[i], typeSave | V_LOCAL | V_FIND | V_DIM_VAR);         			// create the variable
-                if(g_vartbl[VIndexSave].dims[0] > 0 || (g_vartbl[VIndexSave].type & (T_STR | T_STRUCT))) {
-                    FreeMemorySafe((void **)&tv);                                                                 // we don't need the memory allocated to the local
-                    g_vartbl[g_VarIndex].val.s = g_vartbl[VIndexSave].val.s;                              // point to the memory of the global variable
+            // if it is a STATIC var create a local var pointing to the global var
+            if (StaticVar) {
+                tv = findvar(argv[i], typeSave | V_LOCAL | V_NOFIND_NULL); // check if the local variable exists
+                if (tv != NULL) error("$ already declared", argv[i]);
+                tv = findvar(argv[i], typeSave | V_LOCAL | V_FIND | V_DIM_VAR); // create the variable
+                if (g_vartbl[VIndexSave].dims[0] > 0 || (g_vartbl[VIndexSave].type & (T_STR | T_STRUCT))) {
+                    FreeMemorySafe((void **)&tv);                            // we don't need the memory allocated to the local
+                    g_vartbl[g_VarIndex].val.s = g_vartbl[VIndexSave].val.s; // point to the memory of the global variable
                 } else
-                    g_vartbl[g_VarIndex].val.ia = &(g_vartbl[VIndexSave].val.i);                    		// point to the data of the variable
-                g_vartbl[g_VarIndex].type = g_vartbl[VIndexSave].type | T_PTR;           					// set the type to a pointer
-                g_vartbl[g_VarIndex].size = g_vartbl[VIndexSave].size;                   					// just in case it is a string copy the size
-                for(j = 0; j < MAXDIM; j++) g_vartbl[g_VarIndex].dims[j] = g_vartbl[VIndexSave].dims[j];  // just in case it is an array copy the dimensions
-			}
+                    g_vartbl[g_VarIndex].val.ia = &(g_vartbl[VIndexSave].val.i);                          // point to the data of the variable
+                g_vartbl[g_VarIndex].type = g_vartbl[VIndexSave].type | T_PTR;                            // set the type to a pointer
+                g_vartbl[g_VarIndex].size = g_vartbl[VIndexSave].size;                                    // just in case it is a string copy the size
+                for (j = 0; j < MAXDIM; j++) g_vartbl[g_VarIndex].dims[j] = g_vartbl[VIndexSave].dims[j]; // just in case it is an array copy the dimensions
+            }
         }
     }
 }
 
-
-
-
-void  cmd_const(void) {
-    unsigned char *p;
-    void *v;
+void cmd_const(void) {
+    unsigned char * p;
+    void * v;
     int i, type;
 
-	getargs(&cmdline, (MAX_ARG_COUNT * 2) - 1, (unsigned char *)",");				// getargs macro must be the first executable stmt in a block
-	if((argc & 0x01) == 0) error("Syntax");
+    getargs(&cmdline, (MAX_ARG_COUNT * 2) - 1, (unsigned char *)","); // getargs macro must be the first executable stmt in a block
+    if ((argc & 0x01) == 0) error("Syntax");
 
-    for(i = 0; i < argc; i += 2) {
-        p = skipvar(argv[i], false);                                // point to after the variable
+    for (i = 0; i < argc; i += 2) {
+        p = skipvar(argv[i], false); // point to after the variable
         skipspace(p);
-        if(tokenfunction(*p) != op_equal) error("Syntax");  // must be followed by an equals sign
-        p++;                                                        // step over the equals sign
+        if (tokenfunction(*p) != op_equal) error("Syntax"); // must be followed by an equals sign
+        p++;                                                // step over the equals sign
         type = T_NOTYPE;
-        v = DoExpression(p, &type);                                 // evaluate the constant's value
+        v = DoExpression(p, &type); // evaluate the constant's value
         type = TypeMask(type);
         type |= V_FIND | V_DIM_VAR | T_CONST | T_IMPLIED;
-        if(g_LocalIndex != 0) type |= V_LOCAL;                        // local if defined in a sub/fun
-        findvar(argv[i], type);                                     // create the variable
-        if(g_vartbl[g_VarIndex].dims[0] != 0) error("Invalid constant");
-        if(TypeMask(g_vartbl[g_VarIndex].type) != TypeMask(type)) error("Invalid constant");
+        if (g_LocalIndex != 0) type |= V_LOCAL; // local if defined in a sub/fun
+        findvar(argv[i], type);                 // create the variable
+        if (g_vartbl[g_VarIndex].dims[0] != 0) error("Invalid constant");
+        if (TypeMask(g_vartbl[g_VarIndex].type) != TypeMask(type))
+            error("Invalid constant");
         else {
-            if(type & T_NBR) g_vartbl[g_VarIndex].val.f = *(MMFLOAT *)v;           // and set its value
-            if(type & T_INT) g_vartbl[g_VarIndex].val.i = *(int64_t  *)v;
-            if(type & T_STR) {
-				if((unsigned char)*(unsigned char *)v<(MAXDIM-1)*sizeof(g_vartbl[g_VarIndex].dims[1])){
-					FreeMemorySafe((void **)&g_vartbl[g_VarIndex].val.s);
-					g_vartbl[g_VarIndex].val.s=(void *)&g_vartbl[g_VarIndex].dims[1];
-				}
-				Mstrcpy((unsigned char *)g_vartbl[g_VarIndex].val.s, (unsigned char *)v);
-			}
+            if (type & T_NBR) g_vartbl[g_VarIndex].val.f = *(MMFLOAT *)v; // and set its value
+            if (type & T_INT) g_vartbl[g_VarIndex].val.i = *(int64_t *)v;
+            if (type & T_STR) {
+                if ((unsigned char)*(unsigned char *)v < (MAXDIM - 1) * sizeof(g_vartbl[g_VarIndex].dims[1])) {
+                    FreeMemorySafe((void **)&g_vartbl[g_VarIndex].val.s);
+                    g_vartbl[g_VarIndex].val.s = (void *)&g_vartbl[g_VarIndex].dims[1];
+                }
+                Mstrcpy((unsigned char *)g_vartbl[g_VarIndex].val.s, (unsigned char *)v);
+            }
         }
     }
 }
@@ -3568,7 +3624,7 @@ void  cmd_const(void) {
 
 // Walks a single "name [ (dims) ] AS TYPE" member line and appends to sd.
 // Returns NULL on success or a static error string on failure.
-const char *ParseStructMember(unsigned char *p, struct s_structdef *sd) {
+const char * ParseStructMember(unsigned char * p, struct s_structdef * sd) {
     unsigned char name[MAXVARLEN + 1];
     int namelen = 0;
     int type = T_NOTYPE;
@@ -3609,7 +3665,10 @@ const char *ParseStructMember(unsigned char *p, struct s_structdef *sd) {
             dims[ndims++] = (short)dim;
             array_elements *= (dim + 1 - g_OptionBase);
             skipspace(p);
-            if (*p == ',') { p++; skipspace(p); }
+            if (*p == ',') {
+                p++;
+                skipspace(p);
+            }
         }
         if (*p == ')') p++;
         skipspace(p);
@@ -3626,19 +3685,28 @@ const char *ParseStructMember(unsigned char *p, struct s_structdef *sd) {
     }
     skipspace(p);
 
-    unsigned char *tp;
+    unsigned char * tp;
     if ((tp = checkstring(p, (unsigned char *)"INTEGER")) != NULL ||
         (tp = checkstring(p, (unsigned char *)"INT")) != NULL) {
-        type = T_INT; size = sizeof(int64_t); p = tp;
+        type = T_INT;
+        size = sizeof(int64_t);
+        p = tp;
     } else if ((tp = checkstring(p, (unsigned char *)"FLOAT")) != NULL) {
-        type = T_NBR; size = sizeof(MMFLOAT); p = tp;
+        type = T_NBR;
+        size = sizeof(MMFLOAT);
+        p = tp;
     } else if ((tp = checkstring(p, (unsigned char *)"STRING")) != NULL) {
-        type = T_STR; p = tp;
+        type = T_STR;
+        p = tp;
         skipspace(p);
         if ((tp = checkstring(p, (unsigned char *)"LENGTH")) != NULL) {
-            p = tp; skipspace(p);
+            p = tp;
+            skipspace(p);
             size = 0;
-            while (*p >= '0' && *p <= '9') { size = size * 10 + (*p - '0'); p++; }
+            while (*p >= '0' && *p <= '9') {
+                size = size * 10 + (*p - '0');
+                p++;
+            }
             if (size < 1) size = 1;
             if (size > MAXSTRLEN) size = MAXSTRLEN;
         } else {
@@ -3648,7 +3716,7 @@ const char *ParseStructMember(unsigned char *p, struct s_structdef *sd) {
         // Possibly a previously-declared TYPE name → nested struct member.
         unsigned char typename[MAXVARLEN + 1];
         int tl = 0;
-        unsigned char *tp2 = p;
+        unsigned char * tp2 = p;
         while (isnamechar(*tp2) && tl < MAXVARLEN) {
             typename[tl++] = mytoupper(*tp2++);
         }
@@ -3665,7 +3733,7 @@ const char *ParseStructMember(unsigned char *p, struct s_structdef *sd) {
         }
         if (nested_idx < 0) return "Unknown type in TYPE definition";
         type = T_STRUCT;
-        size = nested_idx;                      // struct-type index lives in size
+        size = nested_idx; // struct-type index lives in size
         p = tp2;
     }
 
@@ -3675,7 +3743,7 @@ const char *ParseStructMember(unsigned char *p, struct s_structdef *sd) {
         offset = ((offset / 8) + 1) * 8;
     }
 
-    struct s_structmember *sm = &sd->members[sd->num_members];
+    struct s_structmember * sm = &sd->members[sd->num_members];
     memcpy(sm->name, name, namelen + 1);
     sm->type = (unsigned char)type;
     sm->size = (unsigned char)size;
@@ -3685,7 +3753,7 @@ const char *ParseStructMember(unsigned char *p, struct s_structdef *sd) {
     sd->num_members++;
 
     if (type == T_STR) {
-        sd->total_size = offset + (size + 1) * array_elements;      // +1 length byte/elem
+        sd->total_size = offset + (size + 1) * array_elements; // +1 length byte/elem
     } else if (type == T_STRUCT) {
         int nested_size = g_structtbl[size]->total_size;
         sd->total_size = offset + nested_size * array_elements;
@@ -3696,7 +3764,7 @@ const char *ParseStructMember(unsigned char *p, struct s_structdef *sd) {
     return NULL;
 }
 
-int FindStructType(unsigned char *name) {
+int FindStructType(unsigned char * name) {
     unsigned char uname[MAXVARLEN + 1];
     int namelen = 0;
     while (isnamechar(*name) && *name != '.' && namelen < MAXVARLEN) {
@@ -3710,9 +3778,9 @@ int FindStructType(unsigned char *name) {
     return -1;
 }
 
-int FindStructMember(int struct_idx, unsigned char *membername,
-                     int *member_type, int *member_offset, int *member_size,
-                     short *member_dims) {
+int FindStructMember(int struct_idx, unsigned char * membername,
+                     int * member_type, int * member_offset, int * member_size,
+                     short * member_dims) {
     if (struct_idx < 0 || struct_idx >= g_structcnt || g_structtbl[struct_idx] == NULL)
         return -1;
 
@@ -3724,12 +3792,12 @@ int FindStructMember(int struct_idx, unsigned char *membername,
     }
     uname[namelen] = 0;
 
-    struct s_structdef *sd = g_structtbl[struct_idx];
+    struct s_structdef * sd = g_structtbl[struct_idx];
     for (int i = 0; i < sd->num_members; i++) {
         if (strcmp((char *)uname, (char *)sd->members[i].name) == 0) {
-            if (member_type)   *member_type   = sd->members[i].type;
+            if (member_type) *member_type = sd->members[i].type;
             if (member_offset) *member_offset = sd->members[i].offset;
-            if (member_size)   *member_size   = sd->members[i].size;
+            if (member_size) *member_size = sd->members[i].size;
             if (member_dims) {
                 for (int j = 0; j < MAXDIM; j++) member_dims[j] = sd->members[i].dims[j];
             }
@@ -3742,7 +3810,7 @@ int FindStructMember(int struct_idx, unsigned char *membername,
 // TYPE <name> ... END TYPE — at runtime we just skip to END TYPE; the shape
 // was registered in g_structtbl by PrepareProgramExt before execution began.
 void MIPS16 cmd_type(void) {
-    unsigned char *p = nextstmt;
+    unsigned char * p = nextstmt;
     while (1) {
         p = GetNextCommand(p, NULL, (unsigned char *)"No matching END TYPE");
         CommandToken tkn = commandtbl_decode(p);
@@ -3769,7 +3837,7 @@ void MIPS16 cmd_endtype(void) {
 // replace the error arm rather than reshuffle the whole function.
 // ----------------------------------------------------------------------------
 void MIPS16 cmd_struct(void) {
-    unsigned char *p;
+    unsigned char * p;
 
     if ((p = checkstring(cmdline, (unsigned char *)"COPY")) != NULL) {
         // STRUCT COPY source TO destination
@@ -3789,7 +3857,7 @@ void MIPS16 cmd_struct(void) {
         src_struct_type = (int)g_vartbl[src_idx].size;
 
         if (g_vartbl[src_idx].dims[0] != 0) {
-            unsigned char *paren = (unsigned char *)strchr((char *)p, '(');
+            unsigned char * paren = (unsigned char *)strchr((char *)p, '(');
             if (paren) {
                 paren++;
                 skipspace(paren);
@@ -3816,7 +3884,7 @@ void MIPS16 cmd_struct(void) {
         dst_struct_type = (int)g_vartbl[dst_idx].size;
 
         if (g_vartbl[dst_idx].dims[0] != 0) {
-            unsigned char *paren = (unsigned char *)strchr((char *)tp, '(');
+            unsigned char * paren = (unsigned char *)strchr((char *)tp, '(');
             if (paren) {
                 paren++;
                 skipspace(paren);
@@ -3837,14 +3905,13 @@ void MIPS16 cmd_struct(void) {
 
         int struct_size = g_structtbl[src_struct_type]->total_size;
         memcpy(dst_ptr, src_ptr, struct_size * src_num_elements);
-    }
-    else if ((p = checkstring(cmdline, (unsigned char *)"SORT")) != NULL) {
+    } else if ((p = checkstring(cmdline, (unsigned char *)"SORT")) != NULL) {
         // STRUCT SORT array().membername [, flags]
         // flags: bit0=reverse, bit1=case-insensitive (strings), bit2=empty-at-end (strings)
         int arr_idx, struct_type, num_elements, struct_size;
         int member_type, member_offset;
         int flags = 0;
-        unsigned char *tp;
+        unsigned char * tp;
 
         skipspace(p);
         findvar(p, V_FIND | V_NOFIND_ERR | V_EMPTY_OK);
@@ -3856,7 +3923,7 @@ void MIPS16 cmd_struct(void) {
         if (g_StructMemberType == 0)
             error("Expected structarray().membername syntax");
 
-        member_type   = g_StructMemberType;
+        member_type = g_StructMemberType;
         member_offset = g_StructMemberOffset;
         if (member_type == T_STRUCT)
             error("Cannot sort by nested structure member");
@@ -3876,12 +3943,12 @@ void MIPS16 cmd_struct(void) {
             flags = (int)getint(tp, 0, 7);
         }
 
-        unsigned char *base_ptr = g_vartbl[arr_idx].val.s;
-        unsigned char *temp = GetTempMemory(struct_size);
+        unsigned char * base_ptr = g_vartbl[arr_idx].val.s;
+        unsigned char * temp = GetTempMemory(struct_size);
 
-        int reverse          = flags & 1;
+        int reverse = flags & 1;
         int case_insensitive = flags & 2;
-        int empty_at_end     = flags & 4;
+        int empty_at_end = flags & 4;
 
         // Shell sort — upstream's algorithm, kept verbatim.
         int gap, i, j;
@@ -3889,19 +3956,21 @@ void MIPS16 cmd_struct(void) {
             for (i = gap; i < num_elements; i++) {
                 memcpy(temp, base_ptr + i * struct_size, struct_size);
                 for (j = i; j >= gap; j -= gap) {
-                    unsigned char *elem_j_gap = base_ptr + (j - gap) * struct_size;
-                    unsigned char *val_a = elem_j_gap + member_offset;
-                    unsigned char *val_b = temp + member_offset;
+                    unsigned char * elem_j_gap = base_ptr + (j - gap) * struct_size;
+                    unsigned char * val_a = elem_j_gap + member_offset;
+                    unsigned char * val_b = temp + member_offset;
                     int cmp = 0;
 
                     if (member_type & T_INT) {
                         int64_t a = *(int64_t *)val_a;
                         int64_t b = *(int64_t *)val_b;
-                        cmp = (a < b) ? -1 : (a > b) ? 1 : 0;
+                        cmp = (a < b) ? -1 : (a > b) ? 1
+                                                     : 0;
                     } else if (member_type & T_NBR) {
                         MMFLOAT a = *(MMFLOAT *)val_a;
                         MMFLOAT b = *(MMFLOAT *)val_b;
-                        cmp = (a < b) ? -1 : (a > b) ? 1 : 0;
+                        cmp = (a < b) ? -1 : (a > b) ? 1
+                                                     : 0;
                     } else if (member_type & T_STR) {
                         int len_a = *val_a;
                         int len_b = *val_b;
@@ -3910,17 +3979,25 @@ void MIPS16 cmd_struct(void) {
                         int b_empty_a_not = (len_a != 0 && len_b == 0);
 
                         if (empty_at_end && (a_empty_b_not || b_empty_a_not || both_empty)) {
-                            cmp = a_empty_b_not ? 1 : b_empty_a_not ? -1 : 0;
+                            cmp = a_empty_b_not ? 1 : b_empty_a_not ? -1
+                                                                    : 0;
                         } else {
                             int minlen = (len_a < len_b) ? len_a : len_b;
                             for (int k = 1; k <= minlen; k++) {
                                 int ca = case_insensitive ? toupper(val_a[k]) : val_a[k];
                                 int cb = case_insensitive ? toupper(val_b[k]) : val_b[k];
-                                if (ca < cb) { cmp = -1; break; }
-                                if (ca > cb) { cmp =  1; break; }
+                                if (ca < cb) {
+                                    cmp = -1;
+                                    break;
+                                }
+                                if (ca > cb) {
+                                    cmp = 1;
+                                    break;
+                                }
                             }
                             if (cmp == 0)
-                                cmp = (len_a < len_b) ? -1 : (len_a > len_b) ? 1 : 0;
+                                cmp = (len_a < len_b) ? -1 : (len_a > len_b) ? 1
+                                                                             : 0;
                         }
                     }
 
@@ -3934,10 +4011,9 @@ void MIPS16 cmd_struct(void) {
                 memcpy(base_ptr + j * struct_size, temp, struct_size);
             }
         }
-    }
-    else if ((p = checkstring(cmdline, (unsigned char *)"CLEAR")) != NULL) {
+    } else if ((p = checkstring(cmdline, (unsigned char *)"CLEAR")) != NULL) {
         // STRUCT CLEAR var  or  STRUCT CLEAR array()
-        unsigned char *var_ptr;
+        unsigned char * var_ptr;
         int var_idx, struct_type, struct_size, num_elements = 1;
 
         skipspace(p);
@@ -3955,14 +4031,13 @@ void MIPS16 cmd_struct(void) {
                 num_elements *= (g_vartbl[var_idx].dims[d] + 1 - g_OptionBase);
         }
         memset(var_ptr, 0, struct_size * num_elements);
-    }
-    else if ((p = checkstring(cmdline, (unsigned char *)"PRINT")) != NULL) {
+    } else if ((p = checkstring(cmdline, (unsigned char *)"PRINT")) != NULL) {
         // STRUCT PRINT var | array() | array(n)
         // Debug-oriented pretty-print — structure type name, then each
         // member (with nested-struct recursion up to one level).
         int var_idx, struct_type, struct_size;
-        unsigned char *var_ptr;
-        struct s_structdef *sd;
+        unsigned char * var_ptr;
+        struct s_structdef * sd;
 
         skipspace(p);
         var_ptr = findvar(p, V_FIND | V_NOFIND_ERR | V_EMPTY_OK);
@@ -3980,7 +4055,7 @@ void MIPS16 cmd_struct(void) {
         int is_array = (g_vartbl[var_idx].dims[0] != 0);
         int single_element = 0;
 
-        unsigned char *paren = (unsigned char *)strchr((char *)p, '(');
+        unsigned char * paren = (unsigned char *)strchr((char *)p, '(');
         if (paren && is_array) {
             paren++;
             skipspace(paren);
@@ -4005,7 +4080,7 @@ void MIPS16 cmd_struct(void) {
         }
 
         for (int elem = 0; elem < num_elements; elem++) {
-            unsigned char *elem_ptr = var_ptr + (elem * struct_size);
+            unsigned char * elem_ptr = var_ptr + (elem * struct_size);
 
             if (is_array && !single_element) {
                 char buf[32];
@@ -4014,8 +4089,8 @@ void MIPS16 cmd_struct(void) {
             }
 
             for (int m = 0; m < sd->num_members; m++) {
-                struct s_structmember *sm = &sd->members[m];
-                unsigned char *member_ptr = elem_ptr + sm->offset;
+                struct s_structmember * sm = &sd->members[m];
+                unsigned char * member_ptr = elem_ptr + sm->offset;
                 char buf[STRINGSIZE];
 
                 int member_elements = 1;
@@ -4023,13 +4098,13 @@ void MIPS16 cmd_struct(void) {
                     member_elements *= (sm->dims[d] + 1 - g_OptionBase);
 
                 if (sm->type == T_STRUCT) {
-                    struct s_structdef *nested_sd = g_structtbl[sm->size];
+                    struct s_structdef * nested_sd = g_structtbl[sm->size];
                     sprintf(buf, "  .%s = %s:\r\n", sm->name, nested_sd->name);
                     MMPrintString(buf);
 
                     for (int nm = 0; nm < nested_sd->num_members; nm++) {
-                        struct s_structmember *nsm = &nested_sd->members[nm];
-                        unsigned char *nested_ptr = member_ptr + nsm->offset;
+                        struct s_structmember * nsm = &nested_sd->members[nm];
+                        unsigned char * nested_ptr = member_ptr + nsm->offset;
 
                         sprintf(buf, "    .%s = ", nsm->name);
                         MMPrintString(buf);
@@ -4055,8 +4130,7 @@ void MIPS16 cmd_struct(void) {
                         }
                         MMPrintString("\r\n");
                     }
-                }
-                else if (member_elements == 1) {
+                } else if (member_elements == 1) {
                     sprintf(buf, "  .%s = ", sm->name);
                     MMPrintString(buf);
 
@@ -4078,8 +4152,7 @@ void MIPS16 cmd_struct(void) {
                         MMPrintString("\"");
                     }
                     MMPrintString("\r\n");
-                }
-                else {
+                } else {
                     // Array member
                     sprintf(buf, "  .%s() = ", sm->name);
                     MMPrintString(buf);
@@ -4087,7 +4160,7 @@ void MIPS16 cmd_struct(void) {
                     int elem_size = (sm->type == T_STR) ? sm->size + 1 : sm->size;
 
                     for (int ai = 0; ai < member_elements; ai++) {
-                        unsigned char *arr_ptr = member_ptr + (ai * elem_size);
+                        unsigned char * arr_ptr = member_ptr + (ai * elem_size);
                         if (ai > 0) MMPrintString(", ");
 
                         if (sm->type == T_INT) {
@@ -4112,8 +4185,7 @@ void MIPS16 cmd_struct(void) {
                 }
             }
         }
-    }
-    else if ((p = checkstring(cmdline, (unsigned char *)"SAVE")) != NULL) {
+    } else if ((p = checkstring(cmdline, (unsigned char *)"SAVE")) != NULL) {
         // STRUCT SAVE #n, var   STRUCT SAVE #n, array()   STRUCT SAVE #n, array(i)
         int fnbr, var_idx, struct_type, struct_size, num_elements = 1;
         unsigned char *var_ptr, *varname;
@@ -4141,7 +4213,7 @@ void MIPS16 cmd_struct(void) {
         struct_type = (int)g_vartbl[var_idx].size;
         struct_size = g_structtbl[struct_type]->total_size;
         if (g_vartbl[var_idx].dims[0] != 0) {
-            unsigned char *paren = (unsigned char *)strchr((char *)varname, '(');
+            unsigned char * paren = (unsigned char *)strchr((char *)varname, '(');
             if (!paren) error("Array variable requires () or (index)");
             paren++;
             skipspace(paren);
@@ -4158,8 +4230,7 @@ void MIPS16 cmd_struct(void) {
         int total = struct_size * num_elements;
         for (int b = 0; b < total; b++)
             FilePutChar((char)var_ptr[b], fnbr);
-    }
-    else if ((p = checkstring(cmdline, (unsigned char *)"LOAD")) != NULL) {
+    } else if ((p = checkstring(cmdline, (unsigned char *)"LOAD")) != NULL) {
         // STRUCT LOAD #n, var   STRUCT LOAD #n, array()   STRUCT LOAD #n, array(i)
         int fnbr, var_idx, struct_type, struct_size, num_elements = 1;
         unsigned char *var_ptr, *varname;
@@ -4187,7 +4258,7 @@ void MIPS16 cmd_struct(void) {
         struct_type = (int)g_vartbl[var_idx].size;
         struct_size = g_structtbl[struct_type]->total_size;
         if (g_vartbl[var_idx].dims[0] != 0) {
-            unsigned char *paren = (unsigned char *)strchr((char *)varname, '(');
+            unsigned char * paren = (unsigned char *)strchr((char *)varname, '(');
             if (!paren) error("Array variable requires () or (index)");
             paren++;
             skipspace(paren);
@@ -4200,8 +4271,7 @@ void MIPS16 cmd_struct(void) {
         int total = struct_size * num_elements;
         for (int b = 0; b < total; b++)
             var_ptr[b] = (unsigned char)FileGetChar(fnbr);
-    }
-    else if ((p = checkstring(cmdline, (unsigned char *)"SWAP")) != NULL) {
+    } else if ((p = checkstring(cmdline, (unsigned char *)"SWAP")) != NULL) {
         // STRUCT SWAP var1, var2
         unsigned char *src_ptr, *dst_ptr, *tp;
         int src_idx, dst_idx, src_struct_type, dst_struct_type;
@@ -4233,12 +4303,11 @@ void MIPS16 cmd_struct(void) {
             error("Structure types must match");
 
         int swap_size = g_structtbl[src_struct_type]->total_size;
-        unsigned char *temp = GetTempMemory(swap_size);
+        unsigned char * temp = GetTempMemory(swap_size);
         memcpy(temp, src_ptr, swap_size);
         memcpy(src_ptr, dst_ptr, swap_size);
         memcpy(dst_ptr, temp, swap_size);
-    }
-    else if ((p = checkstring(cmdline, (unsigned char *)"EXTRACT")) != NULL) {
+    } else if ((p = checkstring(cmdline, (unsigned char *)"EXTRACT")) != NULL) {
         // STRUCT EXTRACT structarray().membername, destarray()
         int src_idx, dst_idx, struct_type, struct_size;
         int member_type, member_offset, member_size;
@@ -4257,9 +4326,9 @@ void MIPS16 cmd_struct(void) {
         if (g_StructMemberType == 0)
             error("Expected structarray().membername syntax");
 
-        member_type   = g_StructMemberType;
+        member_type = g_StructMemberType;
         member_offset = g_StructMemberOffset;
-        member_size   = g_StructMemberSize;
+        member_size = g_StructMemberSize;
         if (member_type == T_STRUCT)
             error("Cannot extract nested structure member");
 
@@ -4297,27 +4366,26 @@ void MIPS16 cmd_struct(void) {
         }
 
         if (member_type == T_INT) {
-            int64_t *dst = (int64_t *)dst_base;
+            int64_t * dst = (int64_t *)dst_base;
             for (int i = 0; i < src_num_elements; i++) {
-                unsigned char *src_elem = src_base + (i * struct_size) + member_offset;
+                unsigned char * src_elem = src_base + (i * struct_size) + member_offset;
                 dst[i] = *(int64_t *)src_elem;
             }
         } else if (member_type == T_NBR) {
-            MMFLOAT *dst = (MMFLOAT *)dst_base;
+            MMFLOAT * dst = (MMFLOAT *)dst_base;
             for (int i = 0; i < src_num_elements; i++) {
-                unsigned char *src_elem = src_base + (i * struct_size) + member_offset;
+                unsigned char * src_elem = src_base + (i * struct_size) + member_offset;
                 dst[i] = *(MMFLOAT *)src_elem;
             }
         } else if (member_type == T_STR) {
-            int str_size = member_size + 1;   // +1 for length byte
+            int str_size = member_size + 1; // +1 for length byte
             for (int i = 0; i < src_num_elements; i++) {
-                unsigned char *src_elem = src_base + (i * struct_size) + member_offset;
-                unsigned char *dst_elem = dst_base + (i * str_size);
+                unsigned char * src_elem = src_base + (i * struct_size) + member_offset;
+                unsigned char * dst_elem = dst_base + (i * str_size);
                 memcpy(dst_elem, src_elem, str_size);
             }
         }
-    }
-    else if ((p = checkstring(cmdline, (unsigned char *)"INSERT")) != NULL) {
+    } else if ((p = checkstring(cmdline, (unsigned char *)"INSERT")) != NULL) {
         // STRUCT INSERT srcarray(), structarray().membername
         int src_idx, dst_idx, struct_type, struct_size;
         int member_type, member_offset, member_size;
@@ -4355,9 +4423,9 @@ void MIPS16 cmd_struct(void) {
         if (g_StructMemberType == 0)
             error("Expected structarray().membername syntax");
 
-        member_type   = g_StructMemberType;
+        member_type = g_StructMemberType;
         member_offset = g_StructMemberOffset;
-        member_size   = g_StructMemberSize;
+        member_size = g_StructMemberSize;
         if (member_type == T_STRUCT)
             error("Cannot insert into nested structure member");
 
@@ -4374,27 +4442,26 @@ void MIPS16 cmd_struct(void) {
             error("String length mismatch");
 
         if (member_type == T_INT) {
-            int64_t *src = (int64_t *)src_base;
+            int64_t * src = (int64_t *)src_base;
             for (int i = 0; i < dst_num_elements; i++) {
-                unsigned char *dst_elem = dst_base + (i * struct_size) + member_offset;
+                unsigned char * dst_elem = dst_base + (i * struct_size) + member_offset;
                 *(int64_t *)dst_elem = src[i];
             }
         } else if (member_type == T_NBR) {
-            MMFLOAT *src = (MMFLOAT *)src_base;
+            MMFLOAT * src = (MMFLOAT *)src_base;
             for (int i = 0; i < dst_num_elements; i++) {
-                unsigned char *dst_elem = dst_base + (i * struct_size) + member_offset;
+                unsigned char * dst_elem = dst_base + (i * struct_size) + member_offset;
                 *(MMFLOAT *)dst_elem = src[i];
             }
         } else if (member_type == T_STR) {
             int str_size = member_size + 1;
             for (int i = 0; i < dst_num_elements; i++) {
-                unsigned char *src_elem = src_base + (i * str_size);
-                unsigned char *dst_elem = dst_base + (i * struct_size) + member_offset;
+                unsigned char * src_elem = src_base + (i * str_size);
+                unsigned char * dst_elem = dst_base + (i * struct_size) + member_offset;
                 memcpy(dst_elem, src_elem, str_size);
             }
         }
-    }
-    else {
+    } else {
         error("Unknown STRUCT subcommand");
     }
 }
@@ -4408,26 +4475,27 @@ void MIPS16 cmd_struct(void) {
 // not yet ported.
 /* Unified `int *dims` parameter; matches the rest of the Commands.c
  * REDIM pipeline after the parseintegerarray signature unification. */
-static void parse_and_strip(char *string, int *dims)
-{
+static void parse_and_strip(char * string, int * dims) {
     for (int i = 0; i < MAXDIM; i++) dims[i] = 0;
-    char *open  = strchr(string, '(');
-    char *close = strchr(string, ')');
+    char * open = strchr(string, '(');
+    char * close = strchr(string, ')');
     if (open && close && close > open) {
         char buffer[256];
         strncpy(buffer, open + 1, close - open - 1);
         buffer[close - open - 1] = '\0';
 
-        unsigned char *p = (unsigned char *)buffer;
+        unsigned char * p = (unsigned char *)buffer;
         int idx = 0;
         while (*p && idx < MAXDIM) {
             skipspace(p);
             if (*p == 0) break;
-            unsigned char *start = p;
+            unsigned char * start = p;
             int paren_depth = 0;
             while (*p && !(*p == ',' && paren_depth == 0)) {
-                if      (*p == '(') paren_depth++;
-                else if (*p == ')') paren_depth--;
+                if (*p == '(')
+                    paren_depth++;
+                else if (*p == ')')
+                    paren_depth--;
                 p++;
             }
             unsigned char saved = *p;
@@ -4444,15 +4512,14 @@ static void parse_and_strip(char *string, int *dims)
 /* array_comp takes the caller's unified `int dims[MAXDIM]` on every
  * target; the two inputs are scratch buffers filled by parseintegerarray
  * / findvar dim copies, not the var-table fields directly. */
-static bool array_comp(int in[MAXDIM], int out[MAXDIM])
-{
+static bool array_comp(int in[MAXDIM], int out[MAXDIM]) {
     int last_in = -1, last_out = -1;
     for (int i = MAXDIM - 1; i >= 0; i--) {
-        if (last_in  == -1 && in[i]  != 0) last_in  = i;
+        if (last_in == -1 && in[i] != 0) last_in = i;
         if (last_out == -1 && out[i] != 0) last_out = i;
     }
     if (last_in != last_out) return false;
-    if (last_in == -1)       return true;
+    if (last_in == -1) return true;
     for (int i = 0; i < MAXDIM; i++) {
         if (i == last_in) continue;
         if (in[i] != out[i]) return false;
@@ -4464,22 +4531,27 @@ static bool array_comp(int in[MAXDIM], int out[MAXDIM])
 // vartbl slot.  If nofree=false, also free the memory; if nofree=true, leave
 // the memory allocated (REDIM ... PRESERVE copies from it before freeing).
 // Returns the old memory pointer (or NULL if the variable had none).
-static void *redim_erase_var(char *p, bool nofree) {
+static void * redim_erase_var(char * p, bool nofree) {
     int j, len;
     char *s, *x;
-    void *addr = NULL;
+    void * addr = NULL;
 
     while (strlen(p) > 0 && !isnamechar(p[strlen(p) - 1]))
         p[strlen(p) - 1] = 0;
     makeupper((unsigned char *)p);
 
     for (j = MAXVARS / 2; j < MAXVARS; j++) {
-        s = p; x = (char *)g_vartbl[j].name; len = strlen(p);
-        while (len > 0 && *s == *x) { len--; s++; x++; }
+        s = p;
+        x = (char *)g_vartbl[j].name;
+        len = strlen(p);
+        while (len > 0 && *s == *x) {
+            len--;
+            s++;
+            x++;
+        }
         if (!(len == 0 && (*x == 0 || strlen(p) == MAXVARLEN))) continue;
 
-        if (((g_vartbl[j].type & T_STR) || g_vartbl[j].dims[0] != 0)
-            && !(g_vartbl[j].type & T_PTR)) {
+        if (((g_vartbl[j].type & T_STR) || g_vartbl[j].dims[0] != 0) && !(g_vartbl[j].type & T_PTR)) {
             addr = g_vartbl[j].val.s;
             if (!nofree) FreeMemorySafe((void **)&g_vartbl[j].val.s);
             g_vartbl[j].val.s = NULL;
@@ -4489,13 +4561,13 @@ static void *redim_erase_var(char *p, bool nofree) {
         if (k == MAXVARS) k = MAXVARS / 2;
         if (g_vartbl[k].type) {
             g_vartbl[j].name[0] = '~';
-            g_vartbl[j].type    = T_BLOCKED;
+            g_vartbl[j].type = T_BLOCKED;
         } else {
             g_vartbl[j].name[0] = 0;
-            g_vartbl[j].type    = T_NOTYPE;
+            g_vartbl[j].type = T_NOTYPE;
         }
         g_vartbl[j].dims[0] = 0;
-        g_vartbl[j].level   = 0;
+        g_vartbl[j].level = 0;
         g_Globalvarcnt--;
         return addr;
     }
@@ -4504,12 +4576,12 @@ static void *redim_erase_var(char *p, bool nofree) {
 }
 
 void cmd_redim(void) {
-    int dims[MAXDIM]    = {0};
+    int dims[MAXDIM] = {0};
     int newdims[MAXDIM] = {0};
     void *oldmemory = NULL, *newmemory = NULL;
     int oldsize = 0, newsize = 0;
-    int length  = -1;
-    unsigned char *tp;
+    int length = -1;
+    unsigned char * tp;
     unsigned char old[MAXVARLEN + 1];
     int preserve = ((tp = checkstring(cmdline, (unsigned char *)"PRESERVE")) ? 1 : 0);
     if (tp == NULL) tp = cmdline;
@@ -4527,7 +4599,7 @@ void cmd_redim(void) {
             int type = TypeMask(g_vartbl[g_VarIndex].type);
             if (g_vartbl[g_VarIndex].dims[0] > 0) {
                 oldmemory = g_vartbl[g_VarIndex].val.s;
-                oldsize   = MemSize(oldmemory);
+                oldsize = MemSize(oldmemory);
                 for (int k = 0; k < MAXDIM; k++)
                     dims[k] = g_vartbl[g_VarIndex].dims[k];
                 if (oldsize == 0 && oldmemory != NULL) {
@@ -4544,9 +4616,12 @@ void cmd_redim(void) {
                             num *= (dims[k] + 1 - g_OptionBase);
                     }
                     int elem_bytes;
-                    if      (type & T_INT) elem_bytes = sizeof(int64_t);
-                    else if (type & T_NBR) elem_bytes = sizeof(MMFLOAT);
-                    else                   elem_bytes = g_vartbl[g_VarIndex].size + 1;
+                    if (type & T_INT)
+                        elem_bytes = sizeof(int64_t);
+                    else if (type & T_NBR)
+                        elem_bytes = sizeof(MMFLOAT);
+                    else
+                        elem_bytes = g_vartbl[g_VarIndex].size + 1;
                     oldsize = num * elem_bytes;
                 }
                 if (!array_comp(dims, newdims) && preserve)
@@ -4554,7 +4629,7 @@ void cmd_redim(void) {
             }
             (void)redim_erase_var((char *)old, preserve ? true : false);
             if (type & T_STR) {
-                unsigned char *newstring = GetTempMemory(STRINGSIZE);
+                unsigned char * newstring = GetTempMemory(STRINGSIZE);
                 strcpy((char *)newstring, (char *)argv[i]);
                 strcat((char *)newstring, " LENGTH ");
                 IntToStr((char *)&newstring[strlen((char *)newstring)], length, 10);
@@ -4563,7 +4638,7 @@ void cmd_redim(void) {
                 findvar(argv[i], type | V_FIND | V_DIM_VAR);
             }
             newmemory = g_vartbl[g_VarIndex].val.s;
-            newsize   = MemSize(newmemory);
+            newsize = MemSize(newmemory);
             if (preserve) {
                 if (newsize < oldsize) oldsize = newsize;
                 memcpy(newmemory, oldmemory, oldsize);
@@ -4580,18 +4655,18 @@ void cmd_redim(void) {
 
 // utility function used by llist() below
 // it copys a command or function honouring the case selected by the user
-void strCopyWithCase(char *d, char *s) {
-    if(Option.Listcase == CONFIG_LOWER) {
-        while(*s) *d++ = tolower(*s++);
-    } else if(Option.Listcase == CONFIG_UPPER) {
-        while(*s) *d++ = mytoupper(*s++);
+void strCopyWithCase(char * d, char * s) {
+    if (Option.Listcase == CONFIG_LOWER) {
+        while (*s) *d++ = tolower(*s++);
+    } else if (Option.Listcase == CONFIG_UPPER) {
+        while (*s) *d++ = mytoupper(*s++);
     } else {
-        while(*s) *d++ = *s++;
+        while (*s) *d++ = *s++;
     }
     *d = 0;
 }
 
-void replaceAlpha(char *str, const char *replacements[MMEND]){
+void replaceAlpha(char * str, const char * replacements[MMEND]) {
     char buffer[STRINGSIZE]; // Buffer to store the modified string
     int bufferIndex = 0;
     int len = strlen(str);
@@ -4599,9 +4674,9 @@ void replaceAlpha(char *str, const char *replacements[MMEND]){
 
     while (i < len) {
         // Check for the pattern "~(X)" where X is an uppercase letter
-        if (i<len-3 && str[i] == '~' && str[i + 1] == '(' && isupper((int)str[i + 2]) && str[i + 3] == ')') {
-            char alpha = str[i + 2]; // Extract the letter 'alpha'
-            const char *replacement = replacements[alpha - 'A']; // Get the replacement string
+        if (i < len - 3 && str[i] == '~' && str[i + 1] == '(' && isupper((int)str[i + 2]) && str[i + 3] == ')') {
+            char alpha = str[i + 2];                              // Extract the letter 'alpha'
+            const char * replacement = replacements[alpha - 'A']; // Get the replacement string
 
             // Copy the replacement string into the buffer
             strcpy(&buffer[bufferIndex], replacement);
@@ -4615,14 +4690,14 @@ void replaceAlpha(char *str, const char *replacements[MMEND]){
     }
 
     buffer[bufferIndex] = '\0'; // Null-terminate the buffer
-    strcpy(str,  buffer); // Copy the buffer back into the original string
+    strcpy(str, buffer);        // Copy the buffer back into the original string
 }
-int format_string(char *c, int n) {
-	int count=0;
-	n-=2;
+int format_string(char * c, int n) {
+    int count = 0;
+    n -= 2;
     int len = strlen(c);
-	if(*c==0)return 0;
-    char *result = GetMemory(len * 2); // Allocate enough space for the modified string
+    if (*c == 0) return 0;
+    char * result = GetMemory(len * 2); // Allocate enough space for the modified string
     int pos = 0, start = 0;
 
     while (start < len) {
@@ -4651,193 +4726,192 @@ int format_string(char *c, int n) {
             result[pos++] = ' ';
             result[pos++] = Option.continuation;
             result[pos++] = '\n';
-			count++;
+            count++;
         }
     }
 
     result[pos] = '\0';
-	strcpy(c,result);
-	FreeMemory((void *)result);
-	return count;
+    strcpy(c, result);
+    FreeMemory((void *)result);
+    return count;
 }
 // list a line into a buffer (b) given a pointer to the beginning of the line (p).
 // the returned string is a C style string (terminated with a zero)
 // this is used by cmd_list(), cmd_edit() and cmd_xmodem()
-unsigned char  *llist(unsigned char *b, unsigned char *p) {
-	int i, firstnonwhite = true;
-    unsigned char *b_start = b;
+unsigned char * llist(unsigned char * b, unsigned char * p) {
+    int i, firstnonwhite = true;
+    unsigned char * b_start = b;
 
-	while(1) {
-        if(*p == T_NEWLINE) {
+    while (1) {
+        if (*p == T_NEWLINE) {
             p++;
             firstnonwhite = true;
             continue;
         }
 
-		if(*p == T_LINENBR) {
-			i = (((p[1]) << 8) | (p[2]));							// get the line number
-			p += 3;													// and step over the number
-                IntToStr((char *)b, i, 10);
-                b += strlen((char *)b);
-				if(*p != ' ') *b++ = ' ';
-			}
+        if (*p == T_LINENBR) {
+            i = (((p[1]) << 8) | (p[2])); // get the line number
+            p += 3;                       // and step over the number
+            IntToStr((char *)b, i, 10);
+            b += strlen((char *)b);
+            if (*p != ' ') *b++ = ' ';
+        }
 
-		if(*p == T_LABEL) {											// got a label
-			for(i = p[1], p += 2; i > 0; i--)
-				*b++ = *p++;										// copy to the buffer
-			*b++ = ':';												// terminate with a colon
-			if(*p && *p != ' ') *b++ = ' ';							// and a space if necessary
-			firstnonwhite = true;
-			}														// this deliberately drops through in case the label is the only thing on the line
+        if (*p == T_LABEL) { // got a label
+            for (i = p[1], p += 2; i > 0; i--)
+                *b++ = *p++;                 // copy to the buffer
+            *b++ = ':';                      // terminate with a colon
+            if (*p && *p != ' ') *b++ = ' '; // and a space if necessary
+            firstnonwhite = true;
+        } // this deliberately drops through in case the label is the only thing on the line
 
-		if(*p >= C_BASETOKEN) {
-			if(firstnonwhite) {
-        		CommandToken tkn=commandtbl_decode(p);
-				if(tkn == GetCommandValue( (unsigned char *)"Let"))
-					*b = 0;											// use nothing if it LET
-				else {
-					strCopyWithCase((char *)b, (char *)commandname(tkn));			// expand the command (if it is not LET)
-					if(*b=='_'){
-						if(!strncasecmp((char *)&b[1],"SIDE SET",8) ||
-							!strncasecmp((char *)&b[1],"END PROGRAM",11) ||
-							!strncasecmp((char *)&b[1],"WRAP",4) ||
-							!strncasecmp((char *)&b[1],"LINE",4) ||
-							!strncasecmp((char *)&b[1],"PROGRAM",7) ||
-							!strncasecmp((char *)&b[1],"LABEL",5)
-						) *b='.';
-						else if(b[1]=='(')*b='&';
-					}
-						b += strlen((char *)b);                                 // update pointer to the end of the buffer
-                    if(isalpha(*(b - 1))) *b++ = ' ';               // add a space to the end of the command name
+        if (*p >= C_BASETOKEN) {
+            if (firstnonwhite) {
+                CommandToken tkn = commandtbl_decode(p);
+                if (tkn == GetCommandValue((unsigned char *)"Let"))
+                    *b = 0; // use nothing if it LET
+                else {
+                    strCopyWithCase((char *)b, (char *)commandname(tkn)); // expand the command (if it is not LET)
+                    if (*b == '_') {
+                        if (!strncasecmp((char *)&b[1], "SIDE SET", 8) ||
+                            !strncasecmp((char *)&b[1], "END PROGRAM", 11) ||
+                            !strncasecmp((char *)&b[1], "WRAP", 4) ||
+                            !strncasecmp((char *)&b[1], "LINE", 4) ||
+                            !strncasecmp((char *)&b[1], "PROGRAM", 7) ||
+                            !strncasecmp((char *)&b[1], "LABEL", 5))
+                            *b = '.';
+                        else if (b[1] == '(')
+                            *b = '&';
+                    }
+                    b += strlen((char *)b);            // update pointer to the end of the buffer
+                    if (isalpha(*(b - 1))) *b++ = ' '; // add a space to the end of the command name
                 }
-				firstnonwhite = false;
-				p+=sizeof(CommandToken);
-			} else {												// not a command so must be a token
-				strCopyWithCase((char *)b, (char *)tokenname(*p));					// expand the token
-                    b += strlen((char *)b);                                 // update pointer to the end of the buffer
-				if(*p == tokenTHEN || *p == tokenELSE)
-					firstnonwhite = true;
-				else
-					firstnonwhite = false;
-				p++;
-			}
-			continue;
-		}
+                firstnonwhite = false;
+                p += sizeof(CommandToken);
+            } else {                                               // not a command so must be a token
+                strCopyWithCase((char *)b, (char *)tokenname(*p)); // expand the token
+                b += strlen((char *)b);                            // update pointer to the end of the buffer
+                if (*p == tokenTHEN || *p == tokenELSE)
+                    firstnonwhite = true;
+                else
+                    firstnonwhite = false;
+                p++;
+            }
+            continue;
+        }
 
-		// hey, an ordinary char, just copy it to the output
-		if(*p) {
-			*b = *p;												// place the char in the buffer
-			if(*p != ' ') firstnonwhite = false;
-			p++;  b++;												// move the pointers
-			continue;
-		}
+        // hey, an ordinary char, just copy it to the output
+        if (*p) {
+            *b = *p; // place the char in the buffer
+            if (*p != ' ') firstnonwhite = false;
+            p++;
+            b++; // move the pointers
+            continue;
+        }
 
         // at this point the char must be a zero
         // zero char can mean both a separator or end of line
-		if(!(p[1] == T_NEWLINE || p[1] == 0)) {
-			*b++ = ':';												// just a separator
-			firstnonwhite = true;
-			p++;
-			continue;
-		}
+        if (!(p[1] == T_NEWLINE || p[1] == 0)) {
+            *b++ = ':'; // just a separator
+            firstnonwhite = true;
+            p++;
+            continue;
+        }
 
-		// must be the end of a line - so return to the caller
-        while(*(b-1) == ' ' && b > b_start) --b;                    // eat any spaces on the end of the line
-		*b = 0;
-		replaceAlpha((char *)b_start, overlaid_functions) ;  //replace the user version of all the MM. functions
-		STR_REPLACE((char *)b_start, "PEEK(INT8", "PEEK(BYTE",0);
-		return ++p;
-	} // end while
+        // must be the end of a line - so return to the caller
+        while (*(b - 1) == ' ' && b > b_start) --b; // eat any spaces on the end of the line
+        *b = 0;
+        replaceAlpha((char *)b_start, overlaid_functions); //replace the user version of all the MM. functions
+        STR_REPLACE((char *)b_start, "PEEK(INT8", "PEEK(BYTE", 0);
+        return ++p;
+    } // end while
 }
 
-
-
-void execute_one_command(unsigned char *p) {
+void execute_one_command(unsigned char * p) {
     int i;
 
-	CheckAbort();
-	targ = T_CMD;
-	skipspace(p);													// skip any whitespace
-	if(p[0]>= C_BASETOKEN && p[1]>=C_BASETOKEN){
-//                    if(*(char*)p >= C_BASETOKEN && *(char*)p - C_BASETOKEN < CommandTableSize - 1 && (commandtbl[*(char*)p - C_BASETOKEN].type & T_CMD)) {
-        CommandToken cmd=commandtbl_decode(p);
-        if(cmd == cmdWHILE || cmd == cmdDO || cmd == cmdFOR) error("Invalid inside THEN ... ELSE") ;
-		cmdtoken=cmd;
-		cmdline = p + sizeof(CommandToken);
+    CheckAbort();
+    targ = T_CMD;
+    skipspace(p); // skip any whitespace
+    if (p[0] >= C_BASETOKEN && p[1] >= C_BASETOKEN) {
+        //                    if(*(char*)p >= C_BASETOKEN && *(char*)p - C_BASETOKEN < CommandTableSize - 1 && (commandtbl[*(char*)p - C_BASETOKEN].type & T_CMD)) {
+        CommandToken cmd = commandtbl_decode(p);
+        if (cmd == cmdWHILE || cmd == cmdDO || cmd == cmdFOR) error("Invalid inside THEN ... ELSE");
+        cmdtoken = cmd;
+        cmdline = p + sizeof(CommandToken);
         skipspace(cmdline);
-		commandtbl[cmd].fptr(); // execute the command
-	} else {
-	    if(!isnamestart(*p)) error("Invalid character");
-        i = FindSubFun(p, false);                                   // it could be a defined command
-        if(i >= 0)                                                  // >= 0 means it is a user defined command
+        commandtbl[cmd].fptr(); // execute the command
+    } else {
+        if (!isnamestart(*p)) error("Invalid character");
+        i = FindSubFun(p, false); // it could be a defined command
+        if (i >= 0)               // >= 0 means it is a user defined command
             DefinedSubFun(false, p, i, NULL, NULL, NULL, NULL);
         else
             error("Unknown command");
-	}
-	ClearTempMemory();											    // at the end of each command we need to clear any temporary string vars
+    }
+    ClearTempMemory(); // at the end of each command we need to clear any temporary string vars
 }
 
-void execute(char* mycmd) {
-	//    char *temp_tknbuf;
-	unsigned char* ttp=NULL;
-	int i = 0, toggle = 0;
-	//    temp_tknbuf = GetTempStrMemory();
-	//    strcpy(temp_tknbuf, tknbuf);
-		// first save the current token buffer in case we are in immediate mode
-		// we have to fool the tokeniser into thinking that it is processing a program line entered at the console
-	skipspace(mycmd);
-	strcpy((char *)inpbuf, (const char *)getCstring((unsigned char *)mycmd));                                      // then copy the argument
-	if (!(toupper(inpbuf[0]) == 'R' && toupper(inpbuf[1]) == 'U' && toupper(inpbuf[2]) == 'N')) { //convert the string to upper case
-		while (inpbuf[i]) {
-			if (inpbuf[i] == 34) {
-				if (toggle == 0)toggle = 1;
-				else toggle = 0;
-			}
-			if (!toggle) {
-				if (inpbuf[i] == ':')error((char *)"Only single statements allowed");
-				inpbuf[i] = toupper(inpbuf[i]);
-			}
-			i++;
-		}
-		multi=false;
-		tokenise(true);                                                 // and tokenise it (the result is in tknbuf)
-		memset(inpbuf, 0, STRINGSIZE);
-		tknbuf[strlen((char *)tknbuf)] = 0;
-		tknbuf[strlen((char*)tknbuf) + 1] = 0;
-		if(CurrentLinePtr)ttp = nextstmt;                                                 // save the globals used by commands
-		ScrewUpTimer = 1000;
-		ExecuteProgram(tknbuf);                                              // execute the function's code
-		ScrewUpTimer = 0;
-		// g_TempMemoryIsChanged = true;                                     // signal that temporary memory should be checked
-		if(CurrentLinePtr)nextstmt = ttp;
-		return;
-	}
-	else {
-		unsigned char* p = inpbuf;
-//		char* q;
-//		char fn[STRINGSIZE] = { 0 };
-        unsigned short tkn=GetCommandValue((unsigned char *)"RUN");
-        tknbuf[0] = (tkn & 0x7f ) + C_BASETOKEN;
+void execute(char * mycmd) {
+    //    char *temp_tknbuf;
+    unsigned char * ttp = NULL;
+    int i = 0, toggle = 0;
+    //    temp_tknbuf = GetTempStrMemory();
+    //    strcpy(temp_tknbuf, tknbuf);
+    // first save the current token buffer in case we are in immediate mode
+    // we have to fool the tokeniser into thinking that it is processing a program line entered at the console
+    skipspace(mycmd);
+    strcpy((char *)inpbuf, (const char *)getCstring((unsigned char *)mycmd));                     // then copy the argument
+    if (!(toupper(inpbuf[0]) == 'R' && toupper(inpbuf[1]) == 'U' && toupper(inpbuf[2]) == 'N')) { //convert the string to upper case
+        while (inpbuf[i]) {
+            if (inpbuf[i] == 34) {
+                if (toggle == 0)
+                    toggle = 1;
+                else
+                    toggle = 0;
+            }
+            if (!toggle) {
+                if (inpbuf[i] == ':') error((char *)"Only single statements allowed");
+                inpbuf[i] = toupper(inpbuf[i]);
+            }
+            i++;
+        }
+        multi = false;
+        tokenise(true); // and tokenise it (the result is in tknbuf)
+        memset(inpbuf, 0, STRINGSIZE);
+        tknbuf[strlen((char *)tknbuf)] = 0;
+        tknbuf[strlen((char *)tknbuf) + 1] = 0;
+        if (CurrentLinePtr) ttp = nextstmt; // save the globals used by commands
+        ScrewUpTimer = 1000;
+        ExecuteProgram(tknbuf); // execute the function's code
+        ScrewUpTimer = 0;
+        // g_TempMemoryIsChanged = true;                                     // signal that temporary memory should be checked
+        if (CurrentLinePtr) nextstmt = ttp;
+        return;
+    } else {
+        unsigned char * p = inpbuf;
+        //		char* q;
+        //		char fn[STRINGSIZE] = { 0 };
+        unsigned short tkn = GetCommandValue((unsigned char *)"RUN");
+        tknbuf[0] = (tkn & 0x7f) + C_BASETOKEN;
         tknbuf[1] = (tkn >> 7) + C_BASETOKEN; //tokens can be 14-bit
-		p[0] = (tkn & 0x7f ) + C_BASETOKEN;
-		p[1] = (tkn >> 7) + C_BASETOKEN; //tokens can be 14-bit
-		memmove(&p[2], &p[4], strlen((char *)p) - 4);
-/*		if ((q = strchr((char *)p, ':'))) {
+        p[0] = (tkn & 0x7f) + C_BASETOKEN;
+        p[1] = (tkn >> 7) + C_BASETOKEN; //tokens can be 14-bit
+        memmove(&p[2], &p[4], strlen((char *)p) - 4);
+        /*		if ((q = strchr((char *)p, ':'))) {
 			q--;
 			*q = '0';
 		}*/
-		p[strlen((char*)p) - 2] = 0;
-//		MMPrintString(fn); PRet();
-//		CloseAudio(1);
-		strcpy((char *)tknbuf, (char*)inpbuf);
-		if (CurrentlyPlaying != P_NOTHING)CloseAudio(1);
-		longjmp(jmprun, 1);
-	}
+        p[strlen((char *)p) - 2] = 0;
+        //		MMPrintString(fn); PRet();
+        //		CloseAudio(1);
+        strcpy((char *)tknbuf, (char *)inpbuf);
+        if (CurrentlyPlaying != P_NOTHING) CloseAudio(1);
+        longjmp(jmprun, 1);
+    }
 }
 /** @endcond */
 
 void cmd_execute(void) {
-	execute((char*)cmdline);
+    execute((char *)cmdline);
 }
-
-

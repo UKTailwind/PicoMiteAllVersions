@@ -12,9 +12,8 @@ enum {
     AUDIO_OPTION_SLICE_NONE = 99
 };
 
-static inline int audio_option_parse_gp_pin(unsigned char *arg)
-{
-    unsigned char *p = arg;
+static inline int audio_option_parse_gp_pin(unsigned char * arg) {
+    unsigned char * p = arg;
     skipspace(p);
     if ((p[0] == 'G' || p[0] == 'g') &&
         (p[1] == 'P' || p[1] == 'p') &&
@@ -23,8 +22,7 @@ static inline int audio_option_parse_gp_pin(unsigned char *arg)
     return getinteger(p);
 }
 
-static inline int audio_option_parse_mmbasic_pin(unsigned char **arg)
-{
+static inline int audio_option_parse_mmbasic_pin(unsigned char ** arg) {
     unsigned char code;
     if (!(code = codecheck(*arg))) *arg += 2;
     int pin = getinteger(*arg);
@@ -32,8 +30,7 @@ static inline int audio_option_parse_mmbasic_pin(unsigned char **arg)
     return pin;
 }
 
-static inline void audio_option_clear_common_fields(int audio_slice)
-{
+static inline void audio_option_clear_common_fields(int audio_slice) {
     Option.AUDIO_L = 0;
     Option.AUDIO_R = 0;
     Option.AUDIO_CLK_PIN = 0;
@@ -48,16 +45,14 @@ static inline void audio_option_clear_common_fields(int audio_slice)
     Option.AUDIO_SLICE = audio_slice;
 }
 
-static inline int audio_option_i2s_lrck_pin(void)
-{
+static inline int audio_option_i2s_lrck_pin(void) {
     if (IsInvalidPin(Option.audio_i2s_bclk)) return 0;
     int gp = PinDef[Option.audio_i2s_bclk].GPno + 1;
     if (gp < 0 || gp > 100) return 0;
     return PINMAP[gp];
 }
 
-static inline int audio_option_pin_matches_current(int pin)
-{
+static inline int audio_option_pin_matches_current(int pin) {
     if (IsInvalidPin(pin)) return 0;
     if (pin == Option.AUDIO_L || pin == Option.AUDIO_R) return 1;
     if (pin == Option.AUDIO_CLK_PIN || pin == Option.AUDIO_MOSI_PIN ||
@@ -69,8 +64,7 @@ static inline int audio_option_pin_matches_current(int pin)
     return 0;
 }
 
-static inline void audio_option_require_pin_available(int pin)
-{
+static inline void audio_option_require_pin_available(int pin) {
     if (ExtCurrentConfig[pin] != EXT_NOT_CONFIG &&
         !audio_option_pin_matches_current(pin))
         error("Pin %/| is in use", pin, pin);

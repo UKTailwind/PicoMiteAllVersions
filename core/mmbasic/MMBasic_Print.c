@@ -11,10 +11,10 @@
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 
-void PRet(void){
+void PRet(void) {
     MMPrintString("\r\n");
 }
-void SRet(void){
+void SRet(void) {
     SSPrintString("\r\n");
 }
 
@@ -30,11 +30,13 @@ void SInt(int64_t n) {
 }
 
 void SIntComma(int64_t n) {
-    SSPrintString(", "); SInt(n);
+    SSPrintString(", ");
+    SInt(n);
 }
 
 void PIntComma(int64_t n) {
-    MMPrintString(", "); PInt(n);
+    MMPrintString(", ");
+    PInt(n);
 }
 
 void PIntH(unsigned long long int n) {
@@ -48,17 +50,20 @@ void PIntB(unsigned long long int n) {
     MMPrintString(s);
 }
 void PIntHC(unsigned long long int n) {
-    MMPrintString(", "); PIntH(n);
+    MMPrintString(", ");
+    PIntH(n);
 }
 void PIntBC(unsigned long long int n) {
-    MMPrintString(", "); PIntB(n);
+    MMPrintString(", ");
+    PIntB(n);
 }
 
-void PFlt(MMFLOAT flt){
-	   char s[20];
-	   FloatToStr(s, flt, 4,4, ' ');
-	    MMPrintString(s);
+void PFlt(MMFLOAT flt) {
+    char s[20];
+    FloatToStr(s, flt, 4, 4, ' ');
+    MMPrintString(s);
 }
 void PFltComma(MMFLOAT n) {
-    MMPrintString(", "); PFlt(n);
+    MMPrintString(", ");
+    PFlt(n);
 }

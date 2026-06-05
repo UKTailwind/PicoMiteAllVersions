@@ -22,20 +22,21 @@
 
 static int failures = 0;
 
-#define EXPECT_TRUE(expr) do { \
-    if (!(expr)) { \
-        fprintf(stderr, "FAIL %s:%d: %s\n", __FILE__, __LINE__, #expr); \
-        failures++; \
-    } \
-} while (0)
+#define EXPECT_TRUE(expr)                                                   \
+    do {                                                                    \
+        if (!(expr)) {                                                      \
+            fprintf(stderr, "FAIL %s:%d: %s\n", __FILE__, __LINE__, #expr); \
+            failures++;                                                     \
+        }                                                                   \
+    } while (0)
 
 typedef struct {
     int listen_fd;
     int result;
 } server_ctx_t;
 
-static int send_all(int fd, const void *buf, size_t len) {
-    const uint8_t *p = (const uint8_t *)buf;
+static int send_all(int fd, const void * buf, size_t len) {
+    const uint8_t * p = (const uint8_t *)buf;
     while (len) {
         ssize_t n = send(fd, p, len, 0);
         if (n < 0) {
@@ -48,8 +49,8 @@ static int send_all(int fd, const void *buf, size_t len) {
     return 1;
 }
 
-static int recv_all(int fd, void *buf, size_t len) {
-    uint8_t *p = (uint8_t *)buf;
+static int recv_all(int fd, void * buf, size_t len) {
+    uint8_t * p = (uint8_t *)buf;
     while (len) {
         ssize_t n = recv(fd, p, len, 0);
         if (n < 0) {
@@ -63,7 +64,7 @@ static int recv_all(int fd, void *buf, size_t len) {
     return 1;
 }
 
-static int recv_http_request(int fd, char *buf, size_t buf_len, size_t *len) {
+static int recv_http_request(int fd, char * buf, size_t buf_len, size_t * len) {
     *len = 0;
     while (*len + 1u < buf_len) {
         ssize_t n = recv(fd, buf + *len, 1, 0);
@@ -81,10 +82,10 @@ static int recv_http_request(int fd, char *buf, size_t buf_len, size_t *len) {
     return 0;
 }
 
-static size_t make_client_frame(uint8_t opcode, const uint8_t *payload,
-                                size_t payload_len, uint8_t *out,
+static size_t make_client_frame(uint8_t opcode, const uint8_t * payload,
+                                size_t payload_len, uint8_t * out,
                                 size_t out_len) {
-    const uint8_t mask[] = { 0xa5, 0x5a, 0xc3, 0x3c };
+    const uint8_t mask[] = {0xa5, 0x5a, 0xc3, 0x3c};
     size_t pos = 2;
     if (payload_len > 125u || out_len < 6u + payload_len) return 0;
     out[0] = 0x80u | (opcode & 0x0fu);
@@ -97,8 +98,8 @@ static size_t make_client_frame(uint8_t opcode, const uint8_t *payload,
     return pos + payload_len;
 }
 
-static int server_read_frame(int fd, mm_net_ws_frame_t *frame,
-                             uint8_t *payload, size_t payload_len) {
+static int server_read_frame(int fd, mm_net_ws_frame_t * frame,
+                             uint8_t * payload, size_t payload_len) {
     uint8_t header[4];
     uint8_t buf[256];
     if (!recv_all(fd, header, 2)) return 0;
@@ -121,8 +122,8 @@ static int server_read_frame(int fd, mm_net_ws_frame_t *frame,
            consumed == header_len + 4u + wire_len;
 }
 
-static int client_read_server_frame(int fd, uint8_t *opcode, uint8_t *payload,
-                                    size_t payload_cap, size_t *payload_len) {
+static int client_read_server_frame(int fd, uint8_t * opcode, uint8_t * payload,
+                                    size_t payload_cap, size_t * payload_len) {
     uint8_t header[4];
     if (!recv_all(fd, header, 2)) return 0;
     if ((header[1] & 0x80u) != 0) return 0;
@@ -140,8 +141,8 @@ static int client_read_server_frame(int fd, uint8_t *opcode, uint8_t *payload,
     return 1;
 }
 
-static void *server_thread(void *arg) {
-    server_ctx_t *ctx = (server_ctx_t *)arg;
+static void * server_thread(void * arg) {
+    server_ctx_t * ctx = (server_ctx_t *)arg;
     int fd = accept(ctx->listen_fd, NULL, NULL);
     if (fd < 0) {
         ctx->result = 1;
@@ -197,7 +198,7 @@ static void *server_thread(void *arg) {
         return NULL;
     }
 
-    const uint8_t binary_reply[] = { 0x42, 0x24, 0x7e };
+    const uint8_t binary_reply[] = {0x42, 0x24, 0x7e};
     if (mm_net_ws_encode_frame(MM_NET_WS_OPCODE_BINARY, binary_reply,
                                sizeof(binary_reply), out, sizeof(out),
                                &written) != MM_NET_WS_OK ||
@@ -292,7 +293,7 @@ static int run_client(uint16_t port) {
         return 5;
     }
 
-    const uint8_t close_payload[] = { 0x03, 0xe8 };
+    const uint8_t close_payload[] = {0x03, 0xe8};
     n = make_client_frame(MM_NET_WS_OPCODE_CLOSE, close_payload,
                           sizeof(close_payload), frame, sizeof(frame));
     if (!n || !send_all(fd, frame, n) ||

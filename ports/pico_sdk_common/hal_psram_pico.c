@@ -32,16 +32,14 @@ static uint32_t m1_timing, m1_rfmt, m1_rcmd, m1_wfmt, m1_wcmd;
 static uint32_t m0_timing, m0_rfmt, m0_rcmd;
 #endif
 
-void hal_psram_cache_sync(void)
-{
+void hal_psram_cache_sync(void) {
 #ifdef rp2350
     xip_cache_clean_all();
     xip_cache_invalidate_all();
 #endif
 }
 
-uint8_t *hal_psram_nocache_alias(uint8_t *base)
-{
+uint8_t * hal_psram_nocache_alias(uint8_t * base) {
 #ifdef rp2350
     if (base == NULL) return NULL;
     /* XIP_NOCACHE region is XIP_BASE + 0x04000000; bypasses the cache. */
@@ -52,35 +50,33 @@ uint8_t *hal_psram_nocache_alias(uint8_t *base)
 #endif
 }
 
-void hal_psram_save_settings(void)
-{
+void hal_psram_save_settings(void) {
 #ifdef rp2350
     /* RP2350 PSRAM writes go through the XIP cache. Use the SDK helper:
      * it includes the RP2350-E11 maintenance-window workaround and the
      * barriers needed before flash/QMI state changes or PSRAM restore. */
     xip_cache_clean_all();
     m1_timing = qmi_hw->m[1].timing;
-    m1_rfmt   = qmi_hw->m[1].rfmt;
-    m1_rcmd   = qmi_hw->m[1].rcmd;
-    m1_wfmt   = qmi_hw->m[1].wfmt;
-    m1_wcmd   = qmi_hw->m[1].wcmd;
+    m1_rfmt = qmi_hw->m[1].rfmt;
+    m1_rcmd = qmi_hw->m[1].rcmd;
+    m1_wfmt = qmi_hw->m[1].wfmt;
+    m1_wcmd = qmi_hw->m[1].wcmd;
     m0_timing = qmi_hw->m[0].timing;
-    m0_rfmt   = qmi_hw->m[0].rfmt;
-    m0_rcmd   = qmi_hw->m[0].rcmd;
+    m0_rfmt = qmi_hw->m[0].rfmt;
+    m0_rcmd = qmi_hw->m[0].rcmd;
 #endif
 }
 
-void hal_psram_restore_settings(void)
-{
+void hal_psram_restore_settings(void) {
 #ifdef rp2350
     qmi_hw->m[1].timing = m1_timing;
-    qmi_hw->m[1].rfmt   = m1_rfmt;
-    qmi_hw->m[1].rcmd   = m1_rcmd;
-    qmi_hw->m[1].wfmt   = m1_wfmt;
-    qmi_hw->m[1].wcmd   = m1_wcmd;
+    qmi_hw->m[1].rfmt = m1_rfmt;
+    qmi_hw->m[1].rcmd = m1_rcmd;
+    qmi_hw->m[1].wfmt = m1_wfmt;
+    qmi_hw->m[1].wcmd = m1_wcmd;
     qmi_hw->m[0].timing = m0_timing;
-    qmi_hw->m[0].rfmt   = m0_rfmt;
-    qmi_hw->m[0].rcmd   = m0_rcmd;
+    qmi_hw->m[0].rfmt = m0_rfmt;
+    qmi_hw->m[0].rcmd = m0_rcmd;
     hw_set_bits(&xip_ctrl_hw->ctrl, XIP_CTRL_WRITABLE_M1_BITS);
 #endif
 }

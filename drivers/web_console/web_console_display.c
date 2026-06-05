@@ -22,12 +22,12 @@ static int clamp_int(int v, int lo, int hi) {
     return v;
 }
 
-static void put_u16_le(uint8_t *dst, uint16_t v) {
+static void put_u16_le(uint8_t * dst, uint16_t v) {
     dst[0] = (uint8_t)(v & 0xffu);
     dst[1] = (uint8_t)((v >> 8) & 0xffu);
 }
 
-static void put_i16_le(uint8_t *dst, int16_t v) {
+static void put_i16_le(uint8_t * dst, int16_t v) {
     put_u16_le(dst, (uint16_t)v);
 }
 
@@ -38,15 +38,15 @@ static uint8_t rgb332(uint32_t c) {
     return (uint8_t)((r & 0xe0u) | ((g & 0xe0u) >> 3) | (b >> 6));
 }
 
-static size_t rgb332_rle_len(const web_console_display_t *d,
+static size_t rgb332_rle_len(const web_console_display_t * d,
                              int x1, int y1, int x2, int y2) {
     size_t len = 0;
     uint8_t last = 0;
     uint16_t run = 0;
 
     for (int yy = y1; yy <= y2; ++yy) {
-        const uint32_t *row = d->pixels + (size_t)yy * (size_t)d->width +
-                              (size_t)x1;
+        const uint32_t * row = d->pixels + (size_t)yy * (size_t)d->width +
+                               (size_t)x1;
         for (int xx = x1; xx <= x2; ++xx) {
             uint8_t c = rgb332(row[xx - x1]);
             if (run && c == last && run < 65535u) {
@@ -62,14 +62,14 @@ static size_t rgb332_rle_len(const web_console_display_t *d,
     return len;
 }
 
-static uint8_t *pack_rgb332_rle(uint8_t *p, const web_console_display_t *d,
-                                int x1, int y1, int x2, int y2) {
+static uint8_t * pack_rgb332_rle(uint8_t * p, const web_console_display_t * d,
+                                 int x1, int y1, int x2, int y2) {
     uint8_t last = 0;
     uint16_t run = 0;
 
     for (int yy = y1; yy <= y2; ++yy) {
-        const uint32_t *row = d->pixels + (size_t)yy * (size_t)d->width +
-                              (size_t)x1;
+        const uint32_t * row = d->pixels + (size_t)yy * (size_t)d->width +
+                               (size_t)x1;
         for (int xx = x1; xx <= x2; ++xx) {
             uint8_t c = rgb332(row[xx - x1]);
             if (run && c == last && run < 65535u) {
@@ -93,15 +93,23 @@ static uint8_t *pack_rgb332_rle(uint8_t *p, const web_console_display_t *d,
     return p;
 }
 
-static int in_bounds(const web_console_display_t *d, int x, int y) {
+static int in_bounds(const web_console_display_t * d, int x, int y) {
     return d && x >= 0 && y >= 0 && x < d->width && y < d->height;
 }
 
-static void mark_dirty(web_console_display_t *d,
+static void mark_dirty(web_console_display_t * d,
                        int x1, int y1, int x2, int y2) {
     if (!d || !d->pixels) return;
-    if (x1 > x2) { int t = x1; x1 = x2; x2 = t; }
-    if (y1 > y2) { int t = y1; y1 = y2; y2 = t; }
+    if (x1 > x2) {
+        int t = x1;
+        x1 = x2;
+        x2 = t;
+    }
+    if (y1 > y2) {
+        int t = y1;
+        y1 = y2;
+        y2 = t;
+    }
     x1 = clamp_int(x1, 0, d->width - 1);
     x2 = clamp_int(x2, 0, d->width - 1);
     y1 = clamp_int(y1, 0, d->height - 1);
@@ -121,8 +129,8 @@ static void mark_dirty(web_console_display_t *d,
     if (y2 > d->dirty_y2) d->dirty_y2 = y2;
 }
 
-int web_console_display_init(web_console_display_t *d, int width, int height,
-                             uint32_t *pixels, size_t pixel_count, int bg) {
+int web_console_display_init(web_console_display_t * d, int width, int height,
+                             uint32_t * pixels, size_t pixel_count, int bg) {
     if (!d || width <= 0 || height <= 0 || !pixels) return 0;
     size_t need = (size_t)width * (size_t)height;
     if (pixel_count < need) return 0;
@@ -138,13 +146,13 @@ int web_console_display_init(web_console_display_t *d, int width, int height,
     return 1;
 }
 
-const uint32_t *web_console_display_pixels(const web_console_display_t *d,
-                                           size_t *pixel_count) {
+const uint32_t * web_console_display_pixels(const web_console_display_t * d,
+                                            size_t * pixel_count) {
     if (pixel_count) *pixel_count = d ? d->pixel_count : 0;
     return d ? d->pixels : NULL;
 }
 
-void web_console_display_clear(web_console_display_t *d, int colour) {
+void web_console_display_clear(web_console_display_t * d, int colour) {
     if (!d || !d->pixels) return;
     uint32_t c = colour24(colour);
     for (size_t i = 0; i < d->pixel_count; ++i) d->pixels[i] = c;
@@ -152,7 +160,7 @@ void web_console_display_clear(web_console_display_t *d, int colour) {
     mark_dirty(d, 0, 0, d->width - 1, d->height - 1);
 }
 
-void web_console_display_pixel(web_console_display_t *d,
+void web_console_display_pixel(web_console_display_t * d,
                                int x, int y, int colour) {
     if (!in_bounds(d, x, y)) return;
     d->pixels[(size_t)y * (size_t)d->width + (size_t)x] = colour24(colour);
@@ -160,11 +168,19 @@ void web_console_display_pixel(web_console_display_t *d,
     mark_dirty(d, x, y, x, y);
 }
 
-void web_console_display_rect(web_console_display_t *d,
+void web_console_display_rect(web_console_display_t * d,
                               int x1, int y1, int x2, int y2, int colour) {
     if (!d || !d->pixels) return;
-    if (x1 > x2) { int t = x1; x1 = x2; x2 = t; }
-    if (y1 > y2) { int t = y1; y1 = y2; y2 = t; }
+    if (x1 > x2) {
+        int t = x1;
+        x1 = x2;
+        x2 = t;
+    }
+    if (y1 > y2) {
+        int t = y1;
+        y1 = y2;
+        y2 = t;
+    }
     x1 = clamp_int(x1, 0, d->width - 1);
     x2 = clamp_int(x2, 0, d->width - 1);
     y1 = clamp_int(y1, 0, d->height - 1);
@@ -173,17 +189,17 @@ void web_console_display_rect(web_console_display_t *d,
 
     uint32_t c = colour24(colour);
     for (int y = y1; y <= y2; ++y) {
-        uint32_t *row = d->pixels + (size_t)y * (size_t)d->width;
+        uint32_t * row = d->pixels + (size_t)y * (size_t)d->width;
         for (int x = x1; x <= x2; ++x) row[x] = c;
     }
     d->generation++;
     mark_dirty(d, x1, y1, x2, y2);
 }
 
-void web_console_display_bitmap(web_console_display_t *d,
+void web_console_display_bitmap(web_console_display_t * d,
                                 int x, int y, int width, int height,
                                 int scale, int fc, int bc,
-                                const unsigned char *bitmap) {
+                                const unsigned char * bitmap) {
     if (!d || !bitmap || width <= 0 || height <= 0) return;
     if (scale < 1) scale = 1;
     int total_bits = width * height;
@@ -202,13 +218,14 @@ void web_console_display_bitmap(web_console_display_t *d,
 
         int touched = 0;
         for (int py = by1; py <= by2; ++py) {
-            uint32_t *dst = d->pixels + (size_t)py * (size_t)d->width;
+            uint32_t * dst = d->pixels + (size_t)py * (size_t)d->width;
             int row = py - y;
             for (int px = bx1; px <= bx2; ++px) {
                 int col = px - x;
                 int bit = row * width + col;
                 int on = (bitmap[bit / 8] >>
-                          ((total_bits - bit - 1) % 8)) & 1;
+                          ((total_bits - bit - 1) % 8)) &
+                         1;
                 if (on) {
                     dst[px] = fg;
                     touched = 1;
@@ -240,7 +257,7 @@ void web_console_display_bitmap(web_console_display_t *d,
             for (int sy = 0; sy < scale; ++sy) {
                 int py = y + row * scale + sy;
                 if (py < 0 || py >= d->height) continue;
-                uint32_t *dst = d->pixels + (size_t)py * (size_t)d->width;
+                uint32_t * dst = d->pixels + (size_t)py * (size_t)d->width;
                 for (int sx = 0; sx < scale; ++sx) {
                     int px = x + col * scale + sx;
                     if (px < 0 || px >= d->width) continue;
@@ -261,12 +278,20 @@ void web_console_display_bitmap(web_console_display_t *d,
     }
 }
 
-void web_console_display_draw_buffer(web_console_display_t *d,
+void web_console_display_draw_buffer(web_console_display_t * d,
                                      int x1, int y1, int x2, int y2,
-                                     const unsigned char *bgr) {
+                                     const unsigned char * bgr) {
     if (!d || !bgr) return;
-    if (x1 > x2) { int t = x1; x1 = x2; x2 = t; }
-    if (y1 > y2) { int t = y1; y1 = y2; y2 = t; }
+    if (x1 > x2) {
+        int t = x1;
+        x1 = x2;
+        x2 = t;
+    }
+    if (y1 > y2) {
+        int t = y1;
+        y1 = y2;
+        y2 = t;
+    }
     int src_w = x2 - x1 + 1;
     int bx1 = x1 < 0 ? 0 : x1;
     int by1 = y1 < 0 ? 0 : y1;
@@ -275,9 +300,9 @@ void web_console_display_draw_buffer(web_console_display_t *d,
     if (bx1 > bx2 || by1 > by2) return;
 
     for (int y = by1; y <= by2; ++y) {
-        uint32_t *dst = d->pixels + (size_t)y * (size_t)d->width;
-        const unsigned char *src = bgr +
-            ((size_t)(y - y1) * (size_t)src_w + (size_t)(bx1 - x1)) * 3u;
+        uint32_t * dst = d->pixels + (size_t)y * (size_t)d->width;
+        const unsigned char * src = bgr +
+                                    ((size_t)(y - y1) * (size_t)src_w + (size_t)(bx1 - x1)) * 3u;
         for (int x = bx1; x <= bx2; ++x) {
             dst[x] = ((uint32_t)src[2] << 16) |
                      ((uint32_t)src[1] << 8) |
@@ -289,16 +314,23 @@ void web_console_display_draw_buffer(web_console_display_t *d,
     mark_dirty(d, bx1, by1, bx2, by2);
 }
 
-void web_console_display_read_buffer(const web_console_display_t *d,
+void web_console_display_read_buffer(const web_console_display_t * d,
                                      int x1, int y1, int x2, int y2,
-                                     unsigned char *bgr) {
+                                     unsigned char * bgr) {
     if (!d || !bgr) return;
-    if (x1 > x2) { int t = x1; x1 = x2; x2 = t; }
-    if (y1 > y2) { int t = y1; y1 = y2; y2 = t; }
+    if (x1 > x2) {
+        int t = x1;
+        x1 = x2;
+        x2 = t;
+    }
+    if (y1 > y2) {
+        int t = y1;
+        y1 = y2;
+        y2 = t;
+    }
     for (int y = y1; y <= y2; ++y) {
         for (int x = x1; x <= x2; ++x) {
-            uint32_t c = in_bounds(d, x, y) ?
-                d->pixels[(size_t)y * (size_t)d->width + (size_t)x] : 0;
+            uint32_t c = in_bounds(d, x, y) ? d->pixels[(size_t)y * (size_t)d->width + (size_t)x] : 0;
             *bgr++ = (unsigned char)(c & 0xffu);
             *bgr++ = (unsigned char)((c >> 8) & 0xffu);
             *bgr++ = (unsigned char)((c >> 16) & 0xffu);
@@ -306,7 +338,7 @@ void web_console_display_read_buffer(const web_console_display_t *d,
     }
 }
 
-void web_console_display_scroll(web_console_display_t *d, int lines, int bg) {
+void web_console_display_scroll(web_console_display_t * d, int lines, int bg) {
     if (!d || !d->pixels || lines == 0) return;
     int abs_lines = lines < 0 ? -lines : lines;
     uint32_t fill = colour24(bg);
@@ -318,7 +350,7 @@ void web_console_display_scroll(web_console_display_t *d, int lines, int bg) {
     if (lines > 0) {
         memmove(d->pixels, d->pixels + (size_t)lines * row,
                 (size_t)(d->height - lines) * row * sizeof(*d->pixels));
-        uint32_t *tail = d->pixels + (size_t)(d->height - lines) * row;
+        uint32_t * tail = d->pixels + (size_t)(d->height - lines) * row;
         for (size_t i = 0; i < (size_t)lines * row; ++i) tail[i] = fill;
     } else {
         memmove(d->pixels + (size_t)abs_lines * row, d->pixels,
@@ -329,18 +361,18 @@ void web_console_display_scroll(web_console_display_t *d, int lines, int bg) {
     mark_dirty(d, 0, 0, d->width - 1, d->height - 1);
 }
 
-int web_console_display_take_resync(web_console_display_t *d) {
+int web_console_display_take_resync(web_console_display_t * d) {
     if (!d || !d->needs_resync) return 0;
     d->needs_resync = 0;
     return 1;
 }
 
-void web_console_display_request_resync(web_console_display_t *d) {
+void web_console_display_request_resync(web_console_display_t * d) {
     if (d) d->needs_resync = 1;
 }
 
-int web_console_display_dirty_bounds(const web_console_display_t *d,
-                                     int *x1, int *y1, int *x2, int *y2) {
+int web_console_display_dirty_bounds(const web_console_display_t * d,
+                                     int * x1, int * y1, int * x2, int * y2) {
     if (!d || !d->dirty) return 0;
     if (x1) *x1 = d->dirty_x1;
     if (y1) *y1 = d->dirty_y1;
@@ -349,20 +381,28 @@ int web_console_display_dirty_bounds(const web_console_display_t *d,
     return 1;
 }
 
-void web_console_display_clear_dirty(web_console_display_t *d) {
+void web_console_display_clear_dirty(web_console_display_t * d) {
     if (d) d->dirty = 0;
 }
 
-size_t web_console_display_pack_dirty_blit(const web_console_display_t *d,
-                                           uint8_t *payload,
+size_t web_console_display_pack_dirty_blit(const web_console_display_t * d,
+                                           uint8_t * payload,
                                            size_t payload_cap,
                                            int x1, int y1, int x2, int y2) {
     if (!d || !d->pixels || !payload ||
         payload_cap < WEB_CONSOLE_FRAME_HEADER_LEN + 9u) {
         return 0;
     }
-    if (x1 > x2) { int t = x1; x1 = x2; x2 = t; }
-    if (y1 > y2) { int t = y1; y1 = y2; y2 = t; }
+    if (x1 > x2) {
+        int t = x1;
+        x1 = x2;
+        x2 = t;
+    }
+    if (y1 > y2) {
+        int t = y1;
+        y1 = y2;
+        y2 = t;
+    }
     x1 = clamp_int(x1, 0, d->width - 1);
     x2 = clamp_int(x2, 0, d->width - 1);
     y1 = clamp_int(y1, 0, d->height - 1);
@@ -384,7 +424,7 @@ size_t web_console_display_pack_dirty_blit(const web_console_display_t *d,
     memcpy(payload, "CMDS", 4);
     put_u16_le(payload + 4, (uint16_t)d->width);
     put_u16_le(payload + 6, (uint16_t)d->height);
-    uint8_t *p = payload + WEB_CONSOLE_FRAME_HEADER_LEN;
+    uint8_t * p = payload + WEB_CONSOLE_FRAME_HEADER_LEN;
     *p++ = WEB_CONSOLE_OP_BLIT_RGB332_RLE;
     put_i16_le(p, (int16_t)x1);
     put_i16_le(p + 2, (int16_t)y1);

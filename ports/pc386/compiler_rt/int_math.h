@@ -49,11 +49,11 @@
 #if __has_builtin(__builtin_isfinite)
 #define crt_isfinite(x) __builtin_isfinite((x))
 #elif defined(__GNUC__)
-#define crt_isfinite(x)                                                        \
-  __extension__(({                                                             \
-    __typeof((x)) x_ = (x);                                                    \
-    !crt_isinf(x_) && !crt_isnan(x_);                                          \
-  }))
+#define crt_isfinite(x)                   \
+    __extension__(({                      \
+        __typeof((x)) x_ = (x);           \
+        !crt_isinf(x_) && !crt_isnan(x_); \
+    }))
 #else
 #error "Do not know how to check for infinity"
 #endif // __has_builtin(__builtin_isfinite)
@@ -71,7 +71,7 @@
 #define crt_copysignl(x, y) __builtin_copysignl((x), (y))
 // We define __has_builtin to always return 0 for GCC versions below 10,
 // but __builtin_copysignf128 is available since version 7.
-#if __has_builtin(__builtin_copysignf128) ||                                   \
+#if __has_builtin(__builtin_copysignf128) || \
     (defined(__GNUC__) && __GNUC__ >= 7)
 #define crt_copysignf128(x, y) __builtin_copysignf128((x), (y))
 #elif __has_builtin(__builtin_copysignq)

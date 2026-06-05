@@ -6,7 +6,7 @@
 ;  - bit 0..26 (27 bits) loop counter N
 ;  - bit 27..31 (5 bits) jump address
 
-.program qvga 
+.program qvga
 .side_set	2	; HSYNC and VSYNC output (2 bits)
 .define NOSYNC	0	; no sync, output image or blanking
 .define HSYNC	1	; HSYNC pulse (or CSYNC pulse)

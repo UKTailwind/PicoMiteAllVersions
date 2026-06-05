@@ -10,7 +10,7 @@
 
 typedef struct {
     bool present;
-    const char *chip_name;
+    const char * chip_name;
     uint8_t raw_cr27;
     uint8_t device_id;
     uint16_t memory_kb;
@@ -39,7 +39,7 @@ typedef struct {
 
 bool cirrus_gd542x_probe(void);
 CirrusGd542xState cirrus_gd542x_read_state(void);
-const CirrusGd542xModeInfo *cirrus_gd542x_mode_info(uint16_t vesa_mode);
+const CirrusGd542xModeInfo * cirrus_gd542x_mode_info(uint16_t vesa_mode);
 bool cirrus_gd542x_mode_supported(uint16_t vesa_mode);
 bool cirrus_gd542x_set_mode(uint16_t vesa_mode);
 void cirrus_gd542x_select_single_window(void);

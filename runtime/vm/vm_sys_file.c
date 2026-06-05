@@ -11,12 +11,11 @@
 
 #include "vm_sys_file_internal.h"
 
-
 typedef struct {
     unsigned char source;
     unsigned char mode;
-    FIL *fat;
-    lfs_file_t *flash;
+    FIL * fat;
+    lfs_file_t * flash;
 } VMFileHandle;
 
 static VMFileHandle vm_files[MAXOPENFILES + 1];
@@ -30,7 +29,7 @@ static void vm_file_check_number(int fnbr) {
     if (fnbr < 1 || fnbr > MAXOPENFILES) error("File number");
 }
 
-static void vm_file_error(int err, const char *msg) {
+static void vm_file_error(int err, const char * msg) {
     FSerror = err;
     error((char *)msg);
 }
@@ -50,14 +49,14 @@ static int vm_file_current_fs(void) {
  *    is determined by FatFSFileSystem, not by the path string.
  *  - Drive prefixes like "B:" are stripped before passing to f_open/f_opendir.
  */
-static void vm_file_resolve_path(const char *filename, int *fs_out, char *path) {
+static void vm_file_resolve_path(const char * filename, int * fs_out, char * path) {
     int fs = vm_file_current_fs();
-    const char *name = filename;
+    const char * name = filename;
 
     /* Handle drive spec: "A:file" or "B:file" */
     if (vm_file_is_drive_spec(filename)) {
         fs = vm_file_drive_index(filename);
-        name = filename + 2;  /* skip "X:" */
+        name = filename + 2; /* skip "X:" */
     }
     if (*name == '\0') {
         /* bare drive spec like "B:" → resolve to root */
@@ -74,7 +73,7 @@ static void vm_file_resolve_path(const char *filename, int *fs_out, char *path) 
         /* Relative path — prepend CWD.
          * filepath[fs] has format "X:/subdir", strip the "X:" prefix
          * to get the bare path that FatFS/LFS expects. */
-        const char *base = filepath[fs];
+        const char * base = filepath[fs];
         /* Skip drive prefix if present */
         if (base[0] && base[1] == ':') base += 2;
         if (*base == '\0') base = "/";
@@ -92,37 +91,37 @@ static void vm_file_resolve_path(const char *filename, int *fs_out, char *path) 
 
 static int vm_file_lfs_mode(int mode) {
     switch (mode) {
-        case VM_FILE_MODE_INPUT:
-            return LFS_O_RDONLY;
-        case VM_FILE_MODE_OUTPUT:
-            return LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC;
-        case VM_FILE_MODE_APPEND:
-            return LFS_O_WRONLY | LFS_O_CREAT | LFS_O_APPEND;
-        case VM_FILE_MODE_RANDOM:
-            return LFS_O_RDWR | LFS_O_CREAT;
-        default:
-            error("File access mode");
-            return 0;
+    case VM_FILE_MODE_INPUT:
+        return LFS_O_RDONLY;
+    case VM_FILE_MODE_OUTPUT:
+        return LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC;
+    case VM_FILE_MODE_APPEND:
+        return LFS_O_WRONLY | LFS_O_CREAT | LFS_O_APPEND;
+    case VM_FILE_MODE_RANDOM:
+        return LFS_O_RDWR | LFS_O_CREAT;
+    default:
+        error("File access mode");
+        return 0;
     }
 }
 
 static int vm_file_fat_mode(int mode) {
     switch (mode) {
-        case VM_FILE_MODE_INPUT:
-            return FA_READ;
-        case VM_FILE_MODE_OUTPUT:
-            return FA_WRITE | FA_CREATE_ALWAYS;
-        case VM_FILE_MODE_APPEND:
-            return FA_WRITE | FA_OPEN_APPEND;
-        case VM_FILE_MODE_RANDOM:
-            return FA_WRITE | FA_OPEN_APPEND | FA_READ;
-        default:
-            error("File access mode");
-            return 0;
+    case VM_FILE_MODE_INPUT:
+        return FA_READ;
+    case VM_FILE_MODE_OUTPUT:
+        return FA_WRITE | FA_CREATE_ALWAYS;
+    case VM_FILE_MODE_APPEND:
+        return FA_WRITE | FA_OPEN_APPEND;
+    case VM_FILE_MODE_RANDOM:
+        return FA_WRITE | FA_OPEN_APPEND | FA_READ;
+    default:
+        error("File access mode");
+        return 0;
     }
 }
 
-static int vm_file_lfs_exists_dir(const char *path) {
+static int vm_file_lfs_exists_dir(const char * path) {
     lfs_dir_t dir;
     int rc = lfs_dir_open(&lfs, &dir, path);
     if (rc < 0) return 0;
@@ -130,12 +129,12 @@ static int vm_file_lfs_exists_dir(const char *path) {
     return 1;
 }
 
-static void vm_file_set_current_path(int fs, const char *path) {
+static void vm_file_set_current_path(int fs, const char * path) {
     strncpy(filepath[fs], path, FF_MAX_LFN - 1);
     filepath[fs][FF_MAX_LFN - 1] = '\0';
 }
 
-void vm_sys_file_open(const char *filename, int fnbr, int mode) {
+void vm_sys_file_open(const char * filename, int fnbr, int mode) {
     char path[FF_MAX_LFN] = {0};
     int fs;
 
@@ -208,7 +207,7 @@ void vm_sys_file_reset(void) {
     }
 }
 
-void vm_sys_file_print_buf(int fnbr, const char *buf, int len) {
+void vm_sys_file_print_buf(int fnbr, const char * buf, int len) {
     unsigned int wrote = 0;
     int rc;
 
@@ -227,7 +226,7 @@ void vm_sys_file_print_buf(int fnbr, const char *buf, int len) {
     }
 }
 
-void vm_sys_file_print_str(int fnbr, const uint8_t *mstr) {
+void vm_sys_file_print_str(int fnbr, const uint8_t * mstr) {
     vm_sys_file_print_buf(fnbr, (const char *)mstr + 1, mstr[0]);
 }
 
@@ -268,7 +267,7 @@ int vm_sys_file_getc(int fnbr) {
     return rc == 1 ? (unsigned char)ch : -1;
 }
 
-void vm_sys_file_line_input(int fnbr, uint8_t *dest) {
+void vm_sys_file_line_input(int fnbr, uint8_t * dest) {
     int len = 0;
     int ch;
     vm_file_check_number(fnbr);
@@ -283,7 +282,7 @@ void vm_sys_file_line_input(int fnbr, uint8_t *dest) {
     dest[0] = (uint8_t)len;
 }
 
-void vm_sys_file_drive(const char *drive) {
+void vm_sys_file_drive(const char * drive) {
     FatFSFileSystem = vm_file_drive_index(drive);
 }
 
@@ -300,7 +299,7 @@ void vm_sys_file_seek(int fnbr, int position) {
     }
 }
 
-void vm_sys_file_mkdir(const char *path) {
+void vm_sys_file_mkdir(const char * path) {
     int fs;
     char full[FF_MAX_LFN] = {0};
     vm_file_resolve_path(path, &fs, full);
@@ -314,7 +313,7 @@ void vm_sys_file_mkdir(const char *path) {
     }
 }
 
-void vm_sys_file_chdir(const char *path) {
+void vm_sys_file_chdir(const char * path) {
     int fs;
     char full[FF_MAX_LFN] = {0};
     vm_file_resolve_path(path, &fs, full);
@@ -331,7 +330,7 @@ void vm_sys_file_chdir(const char *path) {
     vm_file_set_current_path(fs, full);
 }
 
-void vm_sys_file_rmdir(const char *path) {
+void vm_sys_file_rmdir(const char * path) {
     int fs;
     char full[FF_MAX_LFN] = {0};
     vm_file_resolve_path(path, &fs, full);
@@ -345,11 +344,11 @@ void vm_sys_file_rmdir(const char *path) {
     }
 }
 
-void vm_sys_file_kill(const char *path) {
+void vm_sys_file_kill(const char * path) {
     vm_sys_file_rmdir(path);
 }
 
-void vm_sys_file_rename(const char *old_name, const char *new_name) {
+void vm_sys_file_rename(const char * old_name, const char * new_name) {
     int old_fs, new_fs;
     char old_full[FF_MAX_LFN] = {0};
     char new_full[FF_MAX_LFN] = {0};
@@ -366,7 +365,7 @@ void vm_sys_file_rename(const char *old_name, const char *new_name) {
     }
 }
 
-void vm_sys_file_copy(const char *from_name, const char *to_name, int mode) {
+void vm_sys_file_copy(const char * from_name, const char * to_name, int mode) {
     int from_fs, to_fs;
     char from_full[FF_MAX_LFN] = {0};
     char to_full[FF_MAX_LFN] = {0};
@@ -379,7 +378,7 @@ void vm_sys_file_copy(const char *from_name, const char *to_name, int mode) {
     vm_file_resolve_path(from_name, &from_fs, from_full);
     vm_file_resolve_path(to_name, &to_fs, to_full);
 
-    if (from_fs && to_fs) {  /* both SD */
+    if (from_fs && to_fs) { /* both SD */
         if (!InitSDCard()) error("SD Card not found");
         FSerror = f_open(&fat_src, from_full, FA_READ);
         if (FSerror) vm_file_error(FSerror, "File error");
@@ -401,7 +400,7 @@ void vm_sys_file_copy(const char *from_name, const char *to_name, int mode) {
         return;
     }
 
-    if (!from_fs && !to_fs) {  /* both flash */
+    if (!from_fs && !to_fs) { /* both flash */
         lrc = lfs_file_open(&lfs, &lfs_src, from_full, LFS_O_RDONLY);
         if (lrc < 0) vm_file_error(lrc, "File error");
         lrc = lfs_file_open(&lfs, &lfs_dst, to_full, LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC);
@@ -424,7 +423,7 @@ void vm_sys_file_copy(const char *from_name, const char *to_name, int mode) {
         return;
     }
 
-    if (!from_fs && to_fs) {  /* flash → SD */
+    if (!from_fs && to_fs) { /* flash → SD */
         if (!InitSDCard()) error("SD Card not found");
         lrc = lfs_file_open(&lfs, &lfs_src, from_full, LFS_O_RDONLY);
         if (lrc < 0) vm_file_error(lrc, "File error");

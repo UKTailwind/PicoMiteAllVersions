@@ -1,0 +1,50 @@
+name: clang-format
+
+on:
+  pull_request:
+    paths:
+      - '**.c'
+      - '**.h'
+      - '**.cc'
+      - '**.cpp'
+      - '**.cxx'
+      - '**.hh'
+      - '**.hpp'
+      - '**.hxx'
+      - '.clang-format'
+      - '.gitattributes'
+      - '.editorconfig'
+      - 'tools/check_clang_format.sh'
+      - '.github/workflows/clang-format.yml'
+  push:
+    branches: [main]
+    paths:
+      - '**.c'
+      - '**.h'
+      - '**.cc'
+      - '**.cpp'
+      - '**.cxx'
+      - '**.hh'
+      - '**.hpp'
+      - '**.hxx'
+      - '.clang-format'
+      - '.gitattributes'
+      - '.editorconfig'
+      - 'tools/check_clang_format.sh'
+      - '.github/workflows/clang-format.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install clang-format
+        run: python3 -m pip install clang-format==21.1.8
+
+      - name: Check formatting
+        run: bash tools/check_clang_format.sh

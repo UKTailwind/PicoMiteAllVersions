@@ -16,8 +16,8 @@
 
 /* Prompt rendering attributes. Match host_runtime.c's defaults: white
  * foreground, black background, font index 1 (the standard 8x16). */
-int PromptFC   = 0xFFFFFF;
-int PromptBC   = 0;
+int PromptFC = 0xFFFFFF;
+int PromptBC = 0;
 int PromptFont = 1;
 
 /* External-interrupt cleanup helper. ESP32 stdio scope has no GPIO
@@ -33,7 +33,7 @@ void SoftReset(void) {}
 /* Interrupt-source address resolver. This is used by WEB TCP INTERRUPT
  * and the generic MMBasic interrupt machinery to resolve a line number,
  * label, or SUB name into tokenized program memory. */
-unsigned char *GetIntAddress(unsigned char *p) {
+unsigned char * GetIntAddress(unsigned char * p) {
     if (isnamestart((uint8_t)*p)) {
         int i = FindSubFun(p, 0);
         if (i == -1) return findlabel(p);
@@ -45,26 +45,45 @@ unsigned char *GetIntAddress(unsigned char *p) {
 /* Stdio scope doesn't expose hardware register peek/poke. Return zero
  * so BASIC PEEK("...") / POKE paths error out cleanly via their
  * address-zero checks. */
-unsigned int   GetPeekAddr(unsigned char *p)   { (void)p; return 0; }
-unsigned int   GetPokeAddr(unsigned char *p)   { (void)p; return 0; }
+unsigned int GetPeekAddr(unsigned char * p) {
+    (void)p;
+    return 0;
+}
+unsigned int GetPokeAddr(unsigned char * p) {
+    (void)p;
+    return 0;
+}
 
 /* xchg_byte — SPI bit-bang exchange function pointer used by SPI
  * comms over GP pins. Stdio scope has no software SPI exposed; the
  * no-op accepts but discards data, returning 0. */
 typedef unsigned char BYTE;
-static BYTE esp32_xchg_byte_noop(BYTE data_out) { (void)data_out; return 0; }
+static BYTE esp32_xchg_byte_noop(BYTE data_out) {
+    (void)data_out;
+    return 0;
+}
 BYTE (*xchg_byte)(BYTE data_out) = esp32_xchg_byte_noop;
 
 /* Regex stubs — MMBasic's REGEX function. Real impl lives in
  * drivers/regex on Pico, not yet wired on ESP32. Return -1 (failure)
  * so REGEX("...") returns the convention "no match" without crashing. */
-int xregcomp(void *preg, const char *pattern, int cflags) {
-    (void)preg; (void)pattern; (void)cflags; return -1;
+int xregcomp(void * preg, const char * pattern, int cflags) {
+    (void)preg;
+    (void)pattern;
+    (void)cflags;
+    return -1;
 }
-int xregexec(void *preg, const char *string, int nmatch, void *pmatch, int eflags) {
-    (void)preg; (void)string; (void)nmatch; (void)pmatch; (void)eflags; return -1;
+int xregexec(void * preg, const char * string, int nmatch, void * pmatch, int eflags) {
+    (void)preg;
+    (void)string;
+    (void)nmatch;
+    (void)pmatch;
+    (void)eflags;
+    return -1;
 }
-void xregfree(void *preg) { (void)preg; }
+void xregfree(void * preg) {
+    (void)preg;
+}
 
 /* rp2350a chip-detect bool. True only on rp2350a hardware (a Pico-SDK
  * runtime detect); false everywhere else, including ESP32. */
@@ -85,7 +104,7 @@ bool optionlogging = 0;
 
 /* Sensor / timer globals — feature areas not wired in stdio scope. */
 volatile unsigned int AHRSTimer = 0;
-int64_t *ds18b20Timers = NULL;
+int64_t * ds18b20Timers = NULL;
 int last_adc = 0;
 volatile int day_of_week = 0;
 volatile unsigned int diskchecktimer = 0;
@@ -100,8 +119,8 @@ volatile int MMAbort = 0;
 /* SETTICK timer state. NBRSETTICKS slots; each independently programmed
  * by SETTICK n,handler. Stdio scope doesn't drive a 1 ms tick yet — the
  * counters stay at zero and SETTICK handlers won't fire. */
-int          TickPeriod[NBRSETTICKS] = {0};
-volatile int TickTimer [NBRSETTICKS] = {0};
+int TickPeriod[NBRSETTICKS] = {0};
+volatile int TickTimer[NBRSETTICKS] = {0};
 
 /* Watchdog state (BASIC-level — distinct from ESP-IDF's task watchdog,
  * which sdkconfig.defaults disables). 0 = no BASIC WATCHDOG configured. */
@@ -125,7 +144,7 @@ uint32_t _excep_code = 0;
  * armed by SETTICK n,handler_label. Stdio scope doesn't drive a 1 ms
  * tick yet, so handlers stay disarmed. */
 volatile unsigned char TickActive[NBRSETTICKS] = {0};
-unsigned char         *TickInt   [NBRSETTICKS] = {NULL};
+unsigned char * TickInt[NBRSETTICKS] = {NULL};
 
 /* Console behaviour state. BreakKey = ASCII code that triggers MMAbort
  * (default Ctrl-C = 0x03). EchoOption = 1 to echo received chars back

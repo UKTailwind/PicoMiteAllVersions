@@ -26,7 +26,7 @@ int vm_sys_input_keydown(int n) {
  * unit that both builds share. */
 void fun_keydown(void) {
     int n = getint(ep, 0, 8);
-    while (getConsole() != -1);         /* drain any buffered console input */
+    while (getConsole() != -1); /* drain any buffered console input */
     if (n == 8) {
         iret = (int)hal_keyboard_lock_state();
     } else if (n) {

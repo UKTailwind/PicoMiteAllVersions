@@ -124,47 +124,47 @@ static const int dstExpBits = 8;
 // Currently they depend on macros/constants defined above.
 
 static inline src_rep_t extract_sign_from_src(src_rep_t x) {
-  const src_rep_t srcSignMask = SRC_REP_C(1) << (srcBits - 1);
-  return (x & srcSignMask) >> (srcBits - 1);
+    const src_rep_t srcSignMask = SRC_REP_C(1) << (srcBits - 1);
+    return (x & srcSignMask) >> (srcBits - 1);
 }
 
 static inline src_rep_t extract_exp_from_src(src_rep_t x) {
-  const int srcSigBits = srcBits - 1 - srcExpBits;
-  const src_rep_t srcExpMask = ((SRC_REP_C(1) << srcExpBits) - 1) << srcSigBits;
-  return (x & srcExpMask) >> srcSigBits;
+    const int srcSigBits = srcBits - 1 - srcExpBits;
+    const src_rep_t srcExpMask = ((SRC_REP_C(1) << srcExpBits) - 1) << srcSigBits;
+    return (x & srcExpMask) >> srcSigBits;
 }
 
 static inline src_rep_t extract_sig_frac_from_src(src_rep_t x) {
-  const src_rep_t srcSigFracMask = (SRC_REP_C(1) << srcSigFracBits) - 1;
-  return x & srcSigFracMask;
+    const src_rep_t srcSigFracMask = (SRC_REP_C(1) << srcSigFracBits) - 1;
+    return x & srcSigFracMask;
 }
 
 static inline dst_rep_t construct_dst_rep(dst_rep_t sign, dst_rep_t exp, dst_rep_t sigFrac) {
-  dst_rep_t result = (sign << (dstBits - 1)) | (exp << (dstBits - 1 - dstExpBits)) | sigFrac;
-  // Set the explicit integer bit in F80 if present.
-  if (dstBits == 80 && exp) {
-    result |= (DST_REP_C(1) << dstSigFracBits);
-  }
-  return result;
+    dst_rep_t result = (sign << (dstBits - 1)) | (exp << (dstBits - 1 - dstExpBits)) | sigFrac;
+    // Set the explicit integer bit in F80 if present.
+    if (dstBits == 80 && exp) {
+        result |= (DST_REP_C(1) << dstSigFracBits);
+    }
+    return result;
 }
 
 // End of specialization parameters.  Two helper routines for conversion to and
 // from the representation of floating-point data as integer values follow.
 
 static inline src_rep_t srcToRep(src_t x) {
-  const union {
-    src_t f;
-    src_rep_t i;
-  } rep = {.f = x};
-  return rep.i;
+    const union {
+        src_t f;
+        src_rep_t i;
+    } rep = {.f = x};
+    return rep.i;
 }
 
 static inline dst_t dstFromRep(dst_rep_t x) {
-  const union {
-    dst_t f;
-    dst_rep_t i;
-  } rep = {.i = x};
-  return rep.f;
+    const union {
+        dst_t f;
+        dst_rep_t i;
+    } rep = {.i = x};
+    return rep.f;
 }
 
 #endif // FP_TRUNC_HEADER

@@ -8,13 +8,11 @@
 extern jmp_buf mark;
 extern void MMBasic_RunPromptLoop(void);
 
-static void runtime_call(void (*fn)(void))
-{
+static void runtime_call(void (*fn)(void)) {
     if (fn) fn();
 }
 
-int mmbasic_runtime_init_common(const mm_runtime_adapter *port, unsigned flags)
-{
+int mmbasic_runtime_init_common(const mm_runtime_adapter * port, unsigned flags) {
     if (port) {
         runtime_call(port->early_console_init);
         runtime_call(port->memory_backing_init);
@@ -49,10 +47,9 @@ int mmbasic_runtime_init_common(const mm_runtime_adapter *port, unsigned flags)
     return 0;
 }
 
-int mmbasic_runtime_run_source(const mm_runtime_adapter *port,
-                               const char *source,
-                               unsigned flags)
-{
+int mmbasic_runtime_run_source(const mm_runtime_adapter * port,
+                               const char * source,
+                               unsigned flags) {
     unsigned source_flags = flags & MMBASIC_SOURCE_FLAGS_ALL;
 
     if (flags & MMBASIC_RUNTIME_RUN_FLAG_RESET_ERROR) {
@@ -75,19 +72,16 @@ int mmbasic_runtime_run_source(const mm_runtime_adapter *port,
     return MMErrMsg[0] ? 1 : 0;
 }
 
-void mmbasic_runtime_enter_repl(const mm_runtime_adapter *port, unsigned flags)
-{
+void mmbasic_runtime_enter_repl(const mm_runtime_adapter * port, unsigned flags) {
     (void)flags;
     if (port && port->before_prompt_loop) port->before_prompt_loop();
     MMBasic_RunPromptLoop();
 }
 
-int mmbasic_runtime_boot(const mm_runtime_adapter *port)
-{
+int mmbasic_runtime_boot(const mm_runtime_adapter * port) {
     return mmbasic_runtime_init_common(port, port ? port->flags : 0);
 }
 
-void mmbasic_runtime_repl(const mm_runtime_adapter *port, unsigned flags)
-{
+void mmbasic_runtime_repl(const mm_runtime_adapter * port, unsigned flags) {
     mmbasic_runtime_enter_repl(port, flags);
 }

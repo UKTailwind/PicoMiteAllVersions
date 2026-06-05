@@ -37,29 +37,29 @@ typedef struct {
 
 typedef struct {
     void (*before_query)(void);
-    const char *(*tcp_path)(int slot);
+    const char * (*tcp_path)(int slot);
     int (*tcp_request_pending)(int slot);
     int max_connections;
     int tcp_port;
     int udp_port;
-    int (*ip_address)(char *out, size_t out_len);
+    int (*ip_address)(char * out, size_t out_len);
     int (*wifi_status)(void);
     int (*tcpip_status)(void);
 } mm_net_info_hooks_t;
 
-void mm_net_parse_server_port_option(unsigned char *arg,
-                                     mm_net_server_port_option_t *out);
-int mm_net_parse_web_messages_option(unsigned char *arg, bool *suppress_status);
-int mm_net_parse_telnet_console_option(unsigned char *arg, int *telnet_mode);
-int mm_net_parse_web_console_option(unsigned char *arg, int *enabled);
-int mm_net_parse_tftp_option(unsigned char *arg, int *disable_tftp);
-mm_net_info_query_t mm_net_parse_info_query(unsigned char *expr, int max_pcb);
-int mm_net_mminfo(unsigned char *expr, int64_t *out_iret,
-                  unsigned char *out_sret, int *out_targ,
-                  const mm_net_info_hooks_t *hooks);
-void mm_net_print_wifi_option(const char *ssid, const char *password,
-                              const char *hostname, const char *ipaddress,
-                              const char *mask, const char *gateway);
+void mm_net_parse_server_port_option(unsigned char * arg,
+                                     mm_net_server_port_option_t * out);
+int mm_net_parse_web_messages_option(unsigned char * arg, bool * suppress_status);
+int mm_net_parse_telnet_console_option(unsigned char * arg, int * telnet_mode);
+int mm_net_parse_web_console_option(unsigned char * arg, int * enabled);
+int mm_net_parse_tftp_option(unsigned char * arg, int * disable_tftp);
+mm_net_info_query_t mm_net_parse_info_query(unsigned char * expr, int max_pcb);
+int mm_net_mminfo(unsigned char * expr, int64_t * out_iret,
+                  unsigned char * out_sret, int * out_targ,
+                  const mm_net_info_hooks_t * hooks);
+void mm_net_print_wifi_option(const char * ssid, const char * password,
+                              const char * hostname, const char * ipaddress,
+                              const char * mask, const char * gateway);
 void mm_net_print_options(int tcp_port, int tcp_response_ms,
                           int udp_port, int udp_response_ms,
                           bool suppress_status);

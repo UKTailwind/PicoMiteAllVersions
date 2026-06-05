@@ -10,40 +10,59 @@
 #include "Hardware_Includes.h"
 #include "hal/hal_editor_console.h"
 
-void hal_editor_tile_save(int xt, int yt, uint16_t *fc_out, uint16_t *bc_out) {
-    (void)xt; (void)yt;
+void hal_editor_tile_save(int xt, int yt, uint16_t * fc_out, uint16_t * bc_out) {
+    (void)xt;
+    (void)yt;
     if (fc_out) *fc_out = 0;
     if (bc_out) *bc_out = 0;
 }
 
 void hal_editor_tile_paint_saved(int xt_start, int xt_end, int yt,
                                  uint16_t fc, uint16_t bc) {
-    (void)xt_start; (void)xt_end; (void)yt; (void)fc; (void)bc;
+    (void)xt_start;
+    (void)xt_end;
+    (void)yt;
+    (void)fc;
+    (void)bc;
 }
 
 void hal_editor_tile_paint_rgb(int xt_start, int xt_end, int yt,
                                int fc_rgb, int bc_rgb) {
-    (void)xt_start; (void)xt_end; (void)yt; (void)fc_rgb; (void)bc_rgb;
+    (void)xt_start;
+    (void)xt_end;
+    (void)yt;
+    (void)fc_rgb;
+    (void)bc_rgb;
 }
 
 void hal_editor_tile_clear_eol(int xt_start, int yt, int fc_rgb, int bc_rgb) {
-    (void)xt_start; (void)yt; (void)fc_rgb; (void)bc_rgb;
+    (void)xt_start;
+    (void)yt;
+    (void)fc_rgb;
+    (void)bc_rgb;
 }
 
 void hal_editor_tile_clear_eos(int yt_start, int fc_rgb, int bc_rgb) {
-    (void)yt_start; (void)fc_rgb; (void)bc_rgb;
+    (void)yt_start;
+    (void)fc_rgb;
+    (void)bc_rgb;
 }
 
 void hal_editor_tile_drawline(int yt, int fc_rgb) {
-    (void)yt; (void)fc_rgb;
+    (void)yt;
+    (void)fc_rgb;
 }
 
 void hal_editor_tile_putchar_bg(int x_pixel, int yt,
                                 int gui_font_width, int bc_rgb, bool r_on) {
-    (void)x_pixel; (void)yt; (void)gui_font_width; (void)bc_rgb; (void)r_on;
+    (void)x_pixel;
+    (void)yt;
+    (void)gui_font_width;
+    (void)bc_rgb;
+    (void)r_on;
 }
 
-void hal_editor_display_enter(hal_editor_display_state_t *st) {
+void hal_editor_display_enter(hal_editor_display_state_t * st) {
     /* Non-VGA: snapshot Option.Refresh so the editor can suppress
      * panel-side autorefresh during full-screen redraws, then turn
      * Refresh off for the duration of the editor session. */
@@ -63,7 +82,7 @@ void hal_editor_display_enter(hal_editor_display_state_t *st) {
     }
 }
 
-void hal_editor_display_exit(const hal_editor_display_state_t *st) {
+void hal_editor_display_exit(const hal_editor_display_state_t * st) {
     Option.Refresh = st->RefreshSave;
 }
 
@@ -71,14 +90,17 @@ void hal_editor_modmode_font_select(void) {
     /* No SCREENMODE1 modmode on non-VGA — nothing to select. */
 }
 
-int hal_editor_mouse_main_pump(int fontinc, int *c_inout) {
-    (void)fontinc; (void)c_inout;
+int hal_editor_mouse_main_pump(int fontinc, int * c_inout) {
+    (void)fontinc;
+    (void)c_inout;
     return 1;
 }
 
-int hal_editor_mouse_mark_pump(int fontinc, int *c_inout, unsigned char **mark_io) {
-    (void)fontinc; (void)c_inout; (void)mark_io;
+int hal_editor_mouse_mark_pump(int fontinc, int * c_inout, unsigned char ** mark_io) {
+    (void)fontinc;
+    (void)c_inout;
+    (void)mark_io;
     return 1;
 }
 
-void hal_editor_mouse_anchor_reset(void) { }
+void hal_editor_mouse_anchor_reset(void) {}

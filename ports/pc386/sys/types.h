@@ -10,7 +10,7 @@
 #ifndef PC386_SYS_TYPES_H
 #define PC386_SYS_TYPES_H
 
-typedef long          off_t;     /* 32-bit signed on i686-elf */
-typedef int           ssize_t;   /* 32-bit signed on i686-elf */
+typedef long off_t;  /* 32-bit signed on i686-elf */
+typedef int ssize_t; /* 32-bit signed on i686-elf */
 
 #endif

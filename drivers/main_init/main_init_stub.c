@@ -11,13 +11,15 @@
 #include "hal/hal_main_init.h"
 #include "hal/hal_option_setters.h"
 
-void port_main_launch_core1(void) { }
+void port_main_launch_core1(void) {}
 
-void port_video_validate_boot_options(void) { }
+void port_video_validate_boot_options(void) {}
 
-unsigned port_video_sys_clock_khz(unsigned cpu_khz) { return cpu_khz; }
+unsigned port_video_sys_clock_khz(unsigned cpu_khz) {
+    return cpu_khz;
+}
 
-void port_video_post_clock_init(void) { }
+void port_video_post_clock_init(void) {}
 
 extern void disable_systemspi(void);
 
@@ -36,7 +38,7 @@ extern void disable_systemspi(void);
 void port_print_display_resolution_hdmi(void) { /* Web: non-VGA. */ }
 
 void port_print_sdcard_system_spi_share(void) { /* Web non-VGA: dedicated SD pins. */ }
-void port_print_vga_pins(void)               { /* Web non-VGA: no VGA pins. */ }
+void port_print_vga_pins(void) { /* Web non-VGA: no VGA pins. */ }
 
 void port_disable_sd_release_system_spi(void) { /* SD has dedicated pins. */ }
 
@@ -45,17 +47,31 @@ void port_setter_sdcard_argc_check(int argc) {
 }
 
 int port_setter_sdcard_via_system_spi(int pin1, int pin2, int pin3) {
-    (void)pin1; (void)pin2; (void)pin3;
+    (void)pin1;
+    (void)pin2;
+    (void)pin3;
     return 0;
 }
 
-int port_setter_hdmi_pins(unsigned char *cmdline)         { (void)cmdline; return 0; }
-int port_setter_keyboard_backlight(unsigned char *cmdline){ (void)cmdline; return 0; }
-int port_setter_scroll_start(int64_t *out_iret)           { (void)out_iret; return 0; }
-int port_setter_screenbuff(int64_t *out_iret)             { (void)out_iret; return 0; }
+int port_setter_hdmi_pins(unsigned char * cmdline) {
+    (void)cmdline;
+    return 0;
+}
+int port_setter_keyboard_backlight(unsigned char * cmdline) {
+    (void)cmdline;
+    return 0;
+}
+int port_setter_scroll_start(int64_t * out_iret) {
+    (void)out_iret;
+    return 0;
+}
+int port_setter_screenbuff(int64_t * out_iret) {
+    (void)out_iret;
+    return 0;
+}
 
-int port_setter_system_lcd_spi(unsigned char *cmdline) {
-    unsigned char *tp = checkstring(cmdline, (unsigned char *)"SYSTEM SPI");
+int port_setter_system_lcd_spi(unsigned char * cmdline) {
+    unsigned char * tp = checkstring(cmdline, (unsigned char *)"SYSTEM SPI");
     if (!tp) return 0;
     int pin1, pin2, pin3;
     if (checkstring(tp, (unsigned char *)"DISABLE")) {

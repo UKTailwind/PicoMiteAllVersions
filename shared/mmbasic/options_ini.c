@@ -18,13 +18,13 @@ typedef enum {
 } mm_options_ini_type_t;
 
 typedef struct {
-    const char *name;
+    const char * name;
     uint16_t off;
     uint16_t len;
     mm_options_ini_type_t type;
 } mm_options_ini_field_t;
 
-#define OPT_FIELD(n, t) { #n, (uint16_t)offsetof(struct option_s, n), (uint16_t)sizeof(((struct option_s *)0)->n), t }
+#define OPT_FIELD(n, t) {#n, (uint16_t)offsetof(struct option_s, n), (uint16_t)sizeof(((struct option_s *)0)->n), t}
 
 static const mm_options_ini_field_t option_fields[] = {
     OPT_FIELD(Magic, MM_OPT_INI_I32),
@@ -174,51 +174,44 @@ static const mm_options_ini_field_t option_fields[] = {
     OPT_FIELD(pc386_sb_dma16, MM_OPT_INI_U8),
 };
 
-static char *trim(char *s)
-{
+static char * trim(char * s) {
     while (*s == ' ' || *s == '\t' || *s == '\r' || *s == '\n') s++;
-    char *e = s + strlen(s);
+    char * e = s + strlen(s);
     while (e > s && (e[-1] == ' ' || e[-1] == '\t' || e[-1] == '\r' || e[-1] == '\n')) *--e = 0;
     return s;
 }
 
-static const mm_options_ini_field_t *find_field(const char *name)
-{
+static const mm_options_ini_field_t * find_field(const char * name) {
     for (unsigned i = 0; i < sizeof(option_fields) / sizeof(option_fields[0]); i++) {
         if (strcasecmp(name, option_fields[i].name) == 0) return &option_fields[i];
     }
     return NULL;
 }
 
-static unsigned long parse_number(const char *s)
-{
+static unsigned long parse_number(const char * s) {
     while (*s == ' ' || *s == '\t') s++;
     if (s[0] == '&' && (s[1] == 'H' || s[1] == 'h')) return strtoul(s + 2, NULL, 16);
     return strtoul(s, NULL, 0);
 }
 
-static int hex_nibble(int c)
-{
+static int hex_nibble(int c) {
     if (c >= '0' && c <= '9') return c - '0';
     if (c >= 'a' && c <= 'f') return c - 'a' + 10;
     if (c >= 'A' && c <= 'F') return c - 'A' + 10;
     return -1;
 }
 
-static void set_scalar(uint8_t *dst, uint16_t len, unsigned long v)
-{
+static void set_scalar(uint8_t * dst, uint16_t len, unsigned long v) {
     for (uint16_t i = 0; i < len; i++) dst[i] = (uint8_t)((v >> (8u * i)) & 0xFFu);
 }
 
-static unsigned long get_scalar(const uint8_t *src, uint16_t len)
-{
+static unsigned long get_scalar(const uint8_t * src, uint16_t len) {
     unsigned long v = 0;
     for (uint16_t i = 0; i < len && i < sizeof(v); i++) v |= ((unsigned long)src[i]) << (8u * i);
     return v;
 }
 
-static void parse_string(char *value, uint8_t *dst, uint16_t len)
-{
+static void parse_string(char * value, uint8_t * dst, uint16_t len) {
     memset(dst, 0, len);
     value = trim(value);
     if (*value == '"') value++;
@@ -226,9 +219,21 @@ static void parse_string(char *value, uint8_t *dst, uint16_t len)
     while (*value && *value != '"' && n + 1 < len) {
         if (*value == '\\') {
             value++;
-            if (*value == 'n') { dst[n++] = '\n'; value++; continue; }
-            if (*value == 'r') { dst[n++] = '\r'; value++; continue; }
-            if (*value == 't') { dst[n++] = '\t'; value++; continue; }
+            if (*value == 'n') {
+                dst[n++] = '\n';
+                value++;
+                continue;
+            }
+            if (*value == 'r') {
+                dst[n++] = '\r';
+                value++;
+                continue;
+            }
+            if (*value == 't') {
+                dst[n++] = '\t';
+                value++;
+                continue;
+            }
             if (*value == 'x' && hex_nibble(value[1]) >= 0 && hex_nibble(value[2]) >= 0) {
                 dst[n++] = (uint8_t)((hex_nibble(value[1]) << 4) | hex_nibble(value[2]));
                 value += 3;
@@ -240,8 +245,7 @@ static void parse_string(char *value, uint8_t *dst, uint16_t len)
     }
 }
 
-static void parse_hex_bytes(char *value, uint8_t *dst, uint16_t len)
-{
+static void parse_hex_bytes(char * value, uint8_t * dst, uint16_t len) {
     memset(dst, 0, len);
     uint16_t n = 0;
     while (*value && n < len) {
@@ -253,8 +257,7 @@ static void parse_hex_bytes(char *value, uint8_t *dst, uint16_t len)
     }
 }
 
-static void append_escaped(char *line, size_t line_len, const uint8_t *src, uint16_t len)
-{
+static void append_escaped(char * line, size_t line_len, const uint8_t * src, uint16_t len) {
     size_t out = strlen(line);
     for (uint16_t i = 0; i < len && src[i]; i++) {
         unsigned char c = src[i];
@@ -263,11 +266,14 @@ static void append_escaped(char *line, size_t line_len, const uint8_t *src, uint
             line[out++] = '\\';
             line[out++] = (char)c;
         } else if (c == '\n') {
-            line[out++] = '\\'; line[out++] = 'n';
+            line[out++] = '\\';
+            line[out++] = 'n';
         } else if (c == '\r') {
-            line[out++] = '\\'; line[out++] = 'r';
+            line[out++] = '\\';
+            line[out++] = 'r';
         } else if (c == '\t') {
-            line[out++] = '\\'; line[out++] = 't';
+            line[out++] = '\\';
+            line[out++] = 't';
         } else if (c >= 32 && c < 127) {
             line[out++] = (char)c;
         } else {
@@ -278,67 +284,66 @@ static void append_escaped(char *line, size_t line_len, const uint8_t *src, uint
     line[out] = 0;
 }
 
-int mm_options_ini_is_sparse(const char *buf)
-{
+int mm_options_ini_is_sparse(const char * buf) {
     return buf && strstr(buf, "Only values that differ") != NULL;
 }
 
-void mm_options_ini_parse(char *buf, uint8_t *option_buf, int sparse_ini,
+void mm_options_ini_parse(char * buf, uint8_t * option_buf, int sparse_ini,
                           mm_options_ini_name_predicate skip_legacy,
-                          void *skip_legacy_ctx)
-{
-    char *line = buf;
+                          void * skip_legacy_ctx) {
+    char * line = buf;
     while (line && *line) {
-        char *next = strchr(line, '\n');
+        char * next = strchr(line, '\n');
         if (next) *next++ = 0;
-        char *s = trim(line);
+        char * s = trim(line);
         if (*s && *s != '#' && *s != ';' && *s != '[') {
-            char *eq = strchr(s, '=');
+            char * eq = strchr(s, '=');
             if (eq) {
                 *eq++ = 0;
-                char *name = trim(s);
-                char *value = trim(eq);
-                const mm_options_ini_field_t *f = find_field(name);
+                char * name = trim(s);
+                char * value = trim(eq);
+                const mm_options_ini_field_t * f = find_field(name);
                 if (f) {
                     if (!sparse_ini && skip_legacy && skip_legacy(name, skip_legacy_ctx)) goto next_line;
-                    uint8_t *dst = option_buf + f->off;
-                    if (f->type == MM_OPT_INI_STR) parse_string(value, dst, f->len);
-                    else if (f->type == MM_OPT_INI_HEX) parse_hex_bytes(value, dst, f->len);
-                    else set_scalar(dst, f->len, parse_number(value));
+                    uint8_t * dst = option_buf + f->off;
+                    if (f->type == MM_OPT_INI_STR)
+                        parse_string(value, dst, f->len);
+                    else if (f->type == MM_OPT_INI_HEX)
+                        parse_hex_bytes(value, dst, f->len);
+                    else
+                        set_scalar(dst, f->len, parse_number(value));
                 }
             }
         }
-next_line:
+    next_line:
         if (!next) break;
         line = next;
     }
 }
 
-int mm_options_ini_has_changes(const uint8_t *option_buf,
-                               const uint8_t *default_option_buf,
+int mm_options_ini_has_changes(const uint8_t * option_buf,
+                               const uint8_t * default_option_buf,
                                mm_options_ini_name_predicate skip_write,
-                               void *skip_write_ctx)
-{
+                               void * skip_write_ctx) {
     for (unsigned i = 0; i < sizeof(option_fields) / sizeof(option_fields[0]); i++) {
-        const mm_options_ini_field_t *f = &option_fields[i];
+        const mm_options_ini_field_t * f = &option_fields[i];
         if (skip_write && skip_write(f->name, skip_write_ctx)) continue;
         if (memcmp(option_buf + f->off, default_option_buf + f->off, f->len) != 0) return 1;
     }
     return 0;
 }
 
-int mm_options_ini_write_changed(const uint8_t *option_buf,
-                                 const uint8_t *default_option_buf,
+int mm_options_ini_write_changed(const uint8_t * option_buf,
+                                 const uint8_t * default_option_buf,
                                  mm_options_ini_name_predicate skip_write,
-                                 void *skip_write_ctx,
+                                 void * skip_write_ctx,
                                  mm_options_ini_write_line write_line,
-                                 void *write_ctx)
-{
+                                 void * write_ctx) {
     for (unsigned i = 0; i < sizeof(option_fields) / sizeof(option_fields[0]); i++) {
-        const mm_options_ini_field_t *f = &option_fields[i];
+        const mm_options_ini_field_t * f = &option_fields[i];
         if (skip_write && skip_write(f->name, skip_write_ctx)) continue;
-        const uint8_t *src = option_buf + f->off;
-        const uint8_t *def = default_option_buf + f->off;
+        const uint8_t * src = option_buf + f->off;
+        const uint8_t * def = default_option_buf + f->off;
         if (memcmp(src, def, f->len) == 0) continue;
 
         char line[512];

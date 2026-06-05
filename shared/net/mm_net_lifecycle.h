@@ -36,7 +36,7 @@ typedef enum {
 } mm_net_lifecycle_service_t;
 
 typedef struct {
-    mm_net_lifecycle_result_t (*apply_wifi)(unsigned char *arg);
+    mm_net_lifecycle_result_t (*apply_wifi)(unsigned char * arg);
     int (*open_tcp_server)(uint16_t port);
     void (*close_tcp_server)(void);
     int (*open_udp_server)(uint16_t port);
@@ -51,19 +51,19 @@ typedef struct {
 } mm_net_lifecycle_hooks_t;
 
 typedef struct {
-    const mm_net_lifecycle_hooks_t *hooks;
-    const char *default_hostname;
+    const mm_net_lifecycle_hooks_t * hooks;
+    const char * default_hostname;
     uint32_t no_ssid_timeout_ms;
-    const char *no_ssid_failure_message;
+    const char * no_ssid_failure_message;
 } mm_net_lifecycle_wifi_connect_t;
 
 typedef void (*mm_net_lifecycle_wifi_validate_t)(
-    const mm_net_wifi_credentials_t *credentials);
+    const mm_net_wifi_credentials_t * credentials);
 
 typedef struct {
     void (*reboot_required)(void);
-    char *unsupported_error;
-    char *apply_error;
+    char * unsupported_error;
+    char * apply_error;
 } mm_net_lifecycle_result_handler_t;
 
 typedef struct {
@@ -93,28 +93,28 @@ enum {
 };
 
 int mm_net_lifecycle_service_supported(mm_net_lifecycle_service_t service);
-const char *mm_net_lifecycle_unsupported_message(
+const char * mm_net_lifecycle_unsupported_message(
     mm_net_lifecycle_service_t service);
 
 mm_net_lifecycle_result_t mm_net_lifecycle_on_network_ready(
-    const mm_net_lifecycle_hooks_t *hooks);
+    const mm_net_lifecycle_hooks_t * hooks);
 void mm_net_lifecycle_on_network_down(
-    const mm_net_lifecycle_hooks_t *hooks);
+    const mm_net_lifecycle_hooks_t * hooks);
 void mm_net_lifecycle_store_wifi_credentials(
-    unsigned char *arg, const char *default_hostname,
+    unsigned char * arg, const char * default_hostname,
     mm_net_lifecycle_wifi_validate_t validate);
 mm_net_lifecycle_result_t mm_net_lifecycle_wifi_connect(
-    const mm_net_lifecycle_wifi_connect_t *connect);
+    const mm_net_lifecycle_wifi_connect_t * connect);
 
 mm_net_lifecycle_result_t mm_net_lifecycle_option_setter(
-    unsigned char *cmdline, const mm_net_lifecycle_hooks_t *hooks);
+    unsigned char * cmdline, const mm_net_lifecycle_hooks_t * hooks);
 int mm_net_lifecycle_handle_option_result(
     mm_net_lifecycle_result_t result,
-    const mm_net_lifecycle_result_handler_t *handler);
+    const mm_net_lifecycle_result_handler_t * handler);
 void mm_net_lifecycle_runtime_reset(
-    const mm_net_lifecycle_runtime_hooks_t *hooks);
+    const mm_net_lifecycle_runtime_hooks_t * hooks);
 void mm_net_lifecycle_poll(
-    const mm_net_lifecycle_poll_hooks_t *hooks, int mode,
+    const mm_net_lifecycle_poll_hooks_t * hooks, int mode,
     int require_network_ready);
 
 #ifdef __cplusplus

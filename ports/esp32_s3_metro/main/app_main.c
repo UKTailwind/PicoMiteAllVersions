@@ -23,7 +23,7 @@
 
 extern jmp_buf mark;
 extern unsigned char flash_prog_buf[];
-extern const uint8_t *flash_progmemory;
+extern const uint8_t * flash_progmemory;
 extern void flash_range_erase(uint32_t off, uint32_t count);
 extern void esp32_console_init(void);
 extern void MMBasic_PrintBanner(void);
@@ -40,20 +40,20 @@ static int esp32_options_valid(void) {
 }
 
 static void esp32_apply_terminal_option_defaults(void) {
-    Option.DISPLAY_CONSOLE = 0;     /* no LCD - REPL is serial-only */
-    Option.Width  = 80;
+    Option.DISPLAY_CONSOLE = 0; /* no LCD - REPL is serial-only */
+    Option.Width = 80;
     Option.Height = 24;
-    Option.Tab    = 4;
+    Option.Tab = 4;
     Option.DefaultFont = 0x01;
     Option.ColourCode = 0;
     Option.DefaultFC = 0x00ff00;
     Option.DefaultBC = 0x000000;
-    Option.Baudrate  = 115200;
-    Option.repeat    = 0;
-    Option.PIN       = 0;
-    Option.Autorun   = 0;
-    Option.Invert    = 0;
-    Option.Listcase  = 0;
+    Option.Baudrate = 115200;
+    Option.repeat = 0;
+    Option.PIN = 0;
+    Option.Autorun = 0;
+    Option.Invert = 0;
+    Option.Listcase = 0;
     Option.continuation = 0;
     Option.audio_i2s_bclk = codemap(HAL_PORT_AUDIO_I2S_BCLK_PIN);
     Option.audio_i2s_data = codemap(HAL_PORT_AUDIO_I2S_DOUT_PIN);
@@ -96,15 +96,15 @@ void app_main(void) {
     }
 
     extern short gui_font_width, gui_font_height;
-    gui_font_width  = 8;
+    gui_font_width = 8;
     gui_font_height = 12;
     ApplyDefaultConsoleColours();
     esp32_flash_storage_init();
 
     mmbasic_runtime_init_common(NULL,
-        MMBASIC_RUNTIME_INIT_FLAG_INIT_BASIC |
-        MMBASIC_RUNTIME_INIT_FLAG_INIT_HEAP |
-        MMBASIC_RUNTIME_INIT_FLAG_CLEAR_ERROR);
+                                MMBASIC_RUNTIME_INIT_FLAG_INIT_BASIC |
+                                    MMBASIC_RUNTIME_INIT_FLAG_INIT_HEAP |
+                                    MMBASIC_RUNTIME_INIT_FLAG_CLEAR_ERROR);
 
     extern void esp32_sd_diskio_reset(void);
     extern void vm_sys_file_reset(void);

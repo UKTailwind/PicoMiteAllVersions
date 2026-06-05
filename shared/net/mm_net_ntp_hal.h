@@ -11,9 +11,9 @@
 extern "C" {
 #endif
 
-int mm_net_ntp_query_unix_seconds(const char *host, uint16_t port,
+int mm_net_ntp_query_unix_seconds(const char * host, uint16_t port,
                                   uint32_t timeout_ms,
-                                  uint32_t *unix_seconds);
+                                  uint32_t * unix_seconds);
 
 #ifdef __cplusplus
 }

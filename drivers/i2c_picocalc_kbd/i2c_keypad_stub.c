@@ -16,24 +16,34 @@
 #include "hal/hal_i2c_keypad.h"
 
 void hal_i2c_keypad_boot_init(void) {}
-int  hal_i2c_keypad_owns_i2c_bus(void) { return 0; }
+int hal_i2c_keypad_owns_i2c_bus(void) {
+    return 0;
+}
 
-int hal_i2c_keypad_translate(uint16_t buff, int *ctrlheld_inout) {
-    if (buff == 0x1203) { *ctrlheld_inout = 0; return -1; }
-    if (buff == 0x1202) { *ctrlheld_inout = 1; return -1; }
+int hal_i2c_keypad_translate(uint16_t buff, int * ctrlheld_inout) {
+    if (buff == 0x1203) {
+        *ctrlheld_inout = 0;
+        return -1;
+    }
+    if (buff == 0x1202) {
+        *ctrlheld_inout = 1;
+        return -1;
+    }
     if ((buff & 0xff) != 1) return -1;
 
     int c = buff >> 8;
-    if (c == 6)    c = ESC;
+    if (c == 6) c = ESC;
     if (c == 0x11) c = F1;
-    if (c == 5)    c = F2;
-    if (c == 0x7)  c = F4;
+    if (c == 5) c = F2;
+    if (c == 0x7) c = F4;
     return c;
 }
 
 void hal_i2c_keypad_print_options(void) {}
 void hal_i2c_keypad_reserve_io(void) {}
-void hal_i2c_keypad_periodic_scan(uint64_t mSecTimer) { (void)mSecTimer; }
+void hal_i2c_keypad_periodic_scan(uint64_t mSecTimer) {
+    (void)mSecTimer;
+}
 void hal_i2c_keypad_apply_spi480_resolution(void) {
     /* HRes / VRes / DisplayHRes / DisplayVRes are all `short`,
      * declared extern in Draw.h (pulled in via Hardware_Includes.h). */
@@ -56,9 +66,9 @@ int hal_i2c_keypad_set_backlight(int level) {
 /* Non-PicoCalc: validate that the current display supports backlight
  * control via PWM / SSD1963 / I²C-OLED. */
 void hal_i2c_keypad_validate_backlight_supported(void) {
-    if(!(((Option.DISPLAY_TYPE>I2C_PANEL && Option.DISPLAY_TYPE<BufferedPanel ) || (Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL) || Option.DISPLAY_TYPE>=NEXTGEN) && Option.DISPLAY_BL) &&
-       !(Option.DISPLAY_TYPE<=I2C_PANEL) &&
-       !(Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL) &&
-       !(Option.DISPLAY_TYPE==SSD1306SPI))
+    if (!(((Option.DISPLAY_TYPE > I2C_PANEL && Option.DISPLAY_TYPE < BufferedPanel) || (Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL) || Option.DISPLAY_TYPE >= NEXTGEN) && Option.DISPLAY_BL) &&
+        !(Option.DISPLAY_TYPE <= I2C_PANEL) &&
+        !(Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL) &&
+        !(Option.DISPLAY_TYPE == SSD1306SPI))
         error("Backlight not set up");
 }

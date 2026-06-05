@@ -18,8 +18,7 @@
 
 #include "hal/hal_fast_timer.h"
 
-bool hal_fast_timer_available(void)
-{
+bool hal_fast_timer_available(void) {
 #ifdef rp2350
     return true;
 #else
@@ -27,8 +26,7 @@ bool hal_fast_timer_available(void)
 #endif
 }
 
-bool hal_fast_timer_configure(uint32_t wrap_count, void (*isr_fn)(void))
-{
+bool hal_fast_timer_configure(uint32_t wrap_count, void (*isr_fn)(void)) {
 #ifdef rp2350
     pwm_config cfg = pwm_get_default_config();
     pwm_config_set_clkdiv_mode(&cfg, PWM_DIV_B_RISING);
@@ -51,8 +49,7 @@ bool hal_fast_timer_configure(uint32_t wrap_count, void (*isr_fn)(void))
 #endif
 }
 
-void hal_fast_timer_disable(void)
-{
+void hal_fast_timer_disable(void) {
 #ifdef rp2350
     pwm_set_irq1_enabled(0, false);
 #endif

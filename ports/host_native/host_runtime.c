@@ -40,16 +40,16 @@
 #include "shared/net/mm_net_interrupts.h"
 
 /* Forward declarations for output capture */
-extern void (*host_output_hook)(const char *text, int len);
-static void host_print(const char *s, int len);
-static void host_prints(const char *s);
+extern void (*host_output_hook)(const char * text, int len);
+static void host_print(const char * s, int len);
+static void host_prints(const char * s);
 
 /* host_sd_root, host_resolve_sd_path, host_append_default_ext, and all
  * POSIX filesystem shims live in host_fs_shims.c. */
-extern const char *host_sd_root;
+extern const char * host_sd_root;
 
 static void host_runtime_check_timeout(void);
-static int host_parse_pin_arg(unsigned char *arg);
+static int host_parse_pin_arg(unsigned char * arg);
 static const mm_runtime_console_adapter host_console_adapter;
 
 /* Framebuffer state (host_framebuffer, dimensions, fastgfx_back) and the
@@ -89,14 +89,14 @@ uint32_t dma_rx_chan2 = 0;
 uint32_t dma_tx_chan = 0;
 uint32_t dma_tx_chan2 = 0;
 bool dmarunning = 0;
-int64_t *ds18b20Timers = NULL;
-const uint8_t *flash_progmemory = NULL;
+int64_t * ds18b20Timers = NULL;
+const uint8_t * flash_progmemory = NULL;
 int GPSchannel = 0;
 /* Display, pin, and filesystem globals live in shared state/FileIO modules. */
 uint8_t I2C0locked = 0;
 uint8_t I2C1locked = 0;
 unsigned char IgnorePIN = 0;
-unsigned char *InterruptReturn = NULL;
+unsigned char * InterruptReturn = NULL;
 int InterruptUsed = 0;
 int last_adc = 0;
 lfs_t lfs;
@@ -104,8 +104,8 @@ int MMCharPos = 0;
 int mmI2Cvalue = 0;
 int mmOWvalue = 0;
 bool mouse0 = 0;
-unsigned char *OnKeyGOSUB = NULL;
-unsigned char *OnPS2GOSUB = NULL;
+unsigned char * OnKeyGOSUB = NULL;
+unsigned char * OnPS2GOSUB = NULL;
 MMFLOAT optionangle = 0;
 bool optionfastaudio = 0;
 bool optionfulltime = 0;
@@ -113,30 +113,86 @@ bool optionlogging = 0;
 int PromptFont = 1;
 int PromptFC = 0xFFFFFF;
 int PromptBC = 0;
-volatile int  PS2code = 0;
-volatile bool PS2int  = false;
+volatile int PS2code = 0;
+volatile bool PS2int = false;
 /* ReadBuffer is a function pointer - defined in function pointers section below */
 /* Simulated erased-flash regions so Memory.c's scan loops terminate on the
  * first iteration instead of segfaulting on NULL. */
 static unsigned char host_saved_vars_flash_buf[32] = {
-    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
 };
 static unsigned char host_cfunction_flash_buf[32] = {
-    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
+    0xff,
 };
-unsigned char *SavedVarsFlash = host_saved_vars_flash_buf;
+unsigned char * SavedVarsFlash = host_saved_vars_flash_buf;
 volatile unsigned int ScrewUpTimer = 0;
 /* ScrollLCDSPISCR is a function - see function stubs below */
 /* ScrollStart now defined in core/state/display_state.c. */
 /* StartEditChar / StartEditPoint are defined in Editor.c now that it is
  * compiled into the host build. */
-unsigned char *TickInt[NBRSETTICKS] = {NULL};
+unsigned char * TickInt[NBRSETTICKS] = {NULL};
 volatile int TickTimer[NBRSETTICKS] = {0};
 int TickPeriod[NBRSETTICKS] = {0};
 volatile unsigned char TickActive[NBRSETTICKS] = {0};
@@ -210,9 +266,9 @@ lfs_dir_t lfs_dir;
 struct lfs_info lfs_info;
 /* lfs_FileFnbr is now defined by FileIO.c. */
 int ScreenSize = 0;
-unsigned char *DisplayBuf = NULL;
-unsigned char *SecondLayer = NULL;
-unsigned char *SecondFrame = NULL;
+unsigned char * DisplayBuf = NULL;
+unsigned char * SecondLayer = NULL;
+unsigned char * SecondFrame = NULL;
 char LCDAttrib = 0;
 /* Interrupt-related */
 volatile int INT0Value = 0, INT0InitTimer = 0, INT0Timer = 0;
@@ -246,21 +302,21 @@ uint8_t slice4 = 0, slice5 = 0, slice6 = 0, slice7 = 0;
 uint8_t SPI0locked = 0, SPI1locked = 0;
 volatile int CallBackEnabled = 0;
 int ADCopen = 0;
-volatile MMFLOAT *volatile a1float = NULL, *volatile a2float = NULL;
-volatile MMFLOAT *volatile a3float = NULL, *volatile a4float = NULL;
+volatile MMFLOAT * volatile a1float = NULL, * volatile a2float = NULL;
+volatile MMFLOAT * volatile a3float = NULL, * volatile a4float = NULL;
 uint32_t ADCmax = 0;
-char *ADCInterrupt = NULL;
-short *ADCbuffer = NULL;
-volatile uint8_t *adcint = NULL;
+char * ADCInterrupt = NULL;
+short * ADCbuffer = NULL;
+volatile uint8_t * adcint = NULL;
 uint8_t *adcint1 = NULL, *adcint2 = NULL;
-unsigned char *KeypadInterrupt = NULL;
+unsigned char * KeypadInterrupt = NULL;
 MMFLOAT ADCscale[4] = {0}, ADCbottom[4] = {0};
 
 /* IR related */
 void *IrDev = NULL, *IrCmd = NULL;
 volatile char IrVarType = 0, IrState = 0, IrGotMsg = 0;
 int IrBits = 0, IrCount = 0;
-unsigned char *IrInterrupt = NULL;
+unsigned char * IrInterrupt = NULL;
 unsigned int CFuncInt1 = 0, CFuncInt2 = 0, CFuncInt3 = 0, CFuncInt4 = 0;
 
 int p100interrupts[NBRPINS + 1] = {0};
@@ -273,7 +329,7 @@ int QVGA_CLKDIV = 0;
 volatile int X_TILE = 0, Y_TILE = 0;
 int CameraSlice = 0, CameraChannel = 0;
 char id_out[256] = {0};
-uint8_t *buff320 = NULL;
+uint8_t * buff320 = NULL;
 uint16_t SD_CLK_PIN = 0, SD_MOSI_PIN = 0, SD_MISO_PIN = 0, SD_CS_PIN = 0;
 bool screen320 = 0;
 
@@ -289,20 +345,26 @@ const uint8_t PINMAP[30] = {0};
 #endif
 
 /* PinFunction */
-const char *PinFunction[64] = {NULL};
+const char * PinFunction[64] = {NULL};
 
 /* Host has no USB host stack — USB hooks return 0 (no devices). The
  * full HID[4] array (≈336 B BSS) lives only in USBKeyboard.c on USB
  * device builds. */
-int port_usb_count(void) { return 0; }
-int port_usb_hid_field(int n, int field) { (void)n; (void)field; return 0; }
+int port_usb_count(void) {
+    return 0;
+}
+int port_usb_hid_field(int n, int field) {
+    (void)n;
+    (void)field;
+    return 0;
+}
 
 /* LFS config is defined by FileIO.c. */
 
 /* Tile color arrays */
 uint8_t map16[16] = {0};
-uint16_t tilefcols[80*40] = {0};
-uint16_t tilebcols[80*40] = {0};
+uint16_t tilefcols[80 * 40] = {0};
+uint16_t tilebcols[80 * 40] = {0};
 
 /* MOUSE_CLOCK, MOUSE_DATA */
 int MOUSE_CLOCK = 0, MOUSE_DATA = 0;
@@ -315,8 +377,8 @@ volatile uint64_t IRoffset = 0;
 #include "hardware/structs/watchdog.h"
 static dma_hw_t _dma_hw_store = {0};
 static watchdog_hw_t _wdog_hw_store = {0};
-dma_hw_t *dma_hw = &_dma_hw_store;
-watchdog_hw_t *watchdog_hw = &_wdog_hw_store;
+dma_hw_t * dma_hw = &_dma_hw_store;
+watchdog_hw_t * watchdog_hw = &_wdog_hw_store;
 
 /* Pixel primitive used by the rest of this file (draw_line, glyph, etc.).
  * Keeps the same signature as the old static inline so call sites are
@@ -335,7 +397,7 @@ int host_sim_active = 0;
 
 /* Thin wrapper around host_fb_write_screenshot that honors the once-per-
  * runtime-session guard; host_runtime_configure resets the flag. */
-static void host_write_screenshot(const char *path) {
+static void host_write_screenshot(const char * path) {
     if (!path || !*path || host_screenshot_written) return;
     host_fb_write_screenshot(path);
     host_screenshot_written = 1;
@@ -344,7 +406,7 @@ static void host_write_screenshot(const char *path) {
 /* host_parse_escaped_char, host_load_key_script, host_keys_ready,
  * host_keydown, host_runtime_configure_keys all moved to host_keys.c. */
 
-void host_runtime_configure(int timeout_ms, const char *screenshot_path) {
+void host_runtime_configure(int timeout_ms, const char * screenshot_path) {
     host_runtime_timeout_ms = timeout_ms;
     host_screenshot_written = 0;
     host_runtime_timed_out_flag = 0;
@@ -461,7 +523,7 @@ extern void ProcessWeb(int mode);
 extern int host_tcp_interrupt_pending(void);
 void (*host_runtime_poll_hook)(void) = NULL;
 
-static inline CommandToken host_commandtbl_decode(const unsigned char *p) {
+static inline CommandToken host_commandtbl_decode(const unsigned char * p) {
     return ((CommandToken)(p[0] & 0x7f)) | ((CommandToken)(p[1] & 0x7f) << 7);
 }
 
@@ -487,12 +549,14 @@ static const mmbasic_runtime_abort_adapter host_abort_adapter = {
 };
 
 /* Hardware interaction */
-void CheckAbort(void) { mmbasic_runtime_checkabort(&host_abort_adapter); }
+void CheckAbort(void) {
+    mmbasic_runtime_checkabort(&host_abort_adapter);
+}
 
 static const mmbasic_runtime_interrupt_dispatch_adapter host_interrupt_dispatch = {
     .service = host_runtime_service,
     .tcp_pending = host_tcp_interrupt_pending,
-    .udp_pending = NULL,  /* host's UDPreceive flag is driven by shared/net */
+    .udp_pending = NULL, /* host's UDPreceive flag is driven by shared/net */
     .commandtbl_decode = host_commandtbl_decode,
     .save_option_error_skip = &host_save_option_error_skip,
     .save_error_message = host_save_error_message,
@@ -512,21 +576,33 @@ int check_interrupt(void) {
 void ClearExternalIO(void) {}
 /* CloseAllFiles is provided by FileIO.c. */
 /* CloseAudio is provided by Audio.c host body. */
-void closeframebuffer(char layer) { host_framebuffer_close(layer); }
+void closeframebuffer(char layer) {
+    host_framebuffer_close(layer);
+}
 void clear320(void) {}
 /* DisplayPutC is now the real one from gfx_console_shared.c. It gates on
  * Option.DISPLAY_CONSOLE and calls through the DrawBitmap / DrawRectangle
  * function pointers set up in mmbasic_runtime_port_begin. */
 /* Flash write-batch hooks are provided by FileIO.c. */
-void initMouse0(int sensitivity) { (void)sensitivity; }
-void restorepanel(void) { WriteBuf = NULL; }
-void routinechecks(void) { mmbasic_runtime_routinechecks(&host_abort_adapter); }
+void initMouse0(int sensitivity) {
+    (void)sensitivity;
+}
+void restorepanel(void) {
+    WriteBuf = NULL;
+}
+void routinechecks(void) {
+    mmbasic_runtime_routinechecks(&host_abort_adapter);
+}
 void SoftReset(void) {}
-void uSec(int us) { (void)us; }
-uint32_t __get_MSP(void) { return 0xFFFFFFFF; }  /* always pass stack overflow check */
+void uSec(int us) {
+    (void)us;
+}
+uint32_t __get_MSP(void) {
+    return 0xFFFFFFFF;
+} /* always pass stack overflow check */
 
 /* Console I/O -- hooks into host_output_hook for output capture */
-extern void (*host_output_hook)(const char *text, int len);
+extern void (*host_output_hook)(const char * text, int len);
 
 /* The bespoke --sim console emulator that once lived here has been
  * removed. Console output now flows through the real device path:
@@ -534,14 +610,16 @@ extern void (*host_output_hook)(const char *text, int len);
  * where DisplayPutC / GUIPrintChar are the shared functions in
  * gfx_console_shared.c and DrawBitmap points at host_draw_bitmap_fn. */
 
-static void host_print(const char *s, int len) {
+static void host_print(const char * s, int len) {
     /* Bypass the console-routing machinery — this is only used by
      * MMfputs(stdout) and output-capture, which want raw stdout only. */
-    if (host_output_hook) host_output_hook(s, len);
-    else fwrite(s, 1, len, stdout);
+    if (host_output_hook)
+        host_output_hook(s, len);
+    else
+        fwrite(s, 1, len, stdout);
 }
 
-static void host_prints(const char *s) {
+static void host_prints(const char * s) {
     if (s) host_print(s, strlen(s));
 }
 
@@ -615,10 +693,16 @@ static const mm_runtime_console_adapter host_console_adapter = {
  * on host) or to FilePutStr/FileGetChar — which themselves shunt through
  * host_fs_posix_* for POSIX-backed files. Console (fnbr==0) still reaches
  * putConsole → MMputchar via the same dispatch, untouched. */
-void MMfopen(unsigned char *fname, unsigned char *mode, int fnbr) { (void)fname; (void)mode; (void)fnbr; }
-void MMfclose(int fnbr) { FileClose(fnbr); }
+void MMfopen(unsigned char * fname, unsigned char * mode, int fnbr) {
+    (void)fname;
+    (void)mode;
+    (void)fnbr;
+}
+void MMfclose(int fnbr) {
+    FileClose(fnbr);
+}
 
-static void host_option_line(const char *name, const char *value) {
+static void host_option_line(const char * name, const char * value) {
     MMPrintString("OPTION ");
     MMPrintString((char *)name);
     MMPrintString(" ");
@@ -626,28 +710,35 @@ static void host_option_line(const char *name, const char *value) {
     MMPrintString("\r\n");
 }
 
-static void host_option_line_int(const char *name, int value) {
+static void host_option_line_int(const char * name, int value) {
     char buf[32];
     snprintf(buf, sizeof buf, "%d", value);
     host_option_line(name, buf);
 }
 
-static const char *host_option_case_name(void) {
+static const char * host_option_case_name(void) {
     switch (Option.Listcase) {
-        case CONFIG_LOWER: return "LOWER";
-        case CONFIG_UPPER: return "UPPER";
-        case CONFIG_TITLE:
-        default: return "TITLE";
+    case CONFIG_LOWER:
+        return "LOWER";
+    case CONFIG_UPPER:
+        return "UPPER";
+    case CONFIG_TITLE:
+    default:
+        return "TITLE";
     }
 }
 
-static const char *host_option_console_name(void) {
+static const char * host_option_console_name(void) {
     switch (OptionConsole) {
-        case 0: return "NONE";
-        case 1: return "SERIAL";
-        case 2: return "SCREEN";
-        case 3:
-        default: return "BOTH";
+    case 0:
+        return "NONE";
+    case 1:
+        return "SERIAL";
+    case 2:
+        return "SCREEN";
+    case 3:
+    default:
+        return "BOTH";
     }
 }
 
@@ -675,7 +766,9 @@ void printoptions(void) {
     port_web_print_options();
 }
 // getConsole lives in runtime/runtime_console_input_noop.c — shared.
-void myprintf(char *s) { host_prints(s); }
+void myprintf(char * s) {
+    host_prints(s);
+}
 char SerialConsolePutC(char c, int flush) {
     /* Host's "serial port" is stdout. Route through host_output_hook
      * when one is installed: SSPrintString (do_end's cursor/SGR reset,
@@ -705,19 +798,22 @@ char SerialConsolePutC(char c, int flush) {
 }
 // kbhitConsole lives in runtime/runtime_console_input_noop.c — shared.
 
-
 /* FlashWrite*, FlashSetAddress, LoadOptions, SaveOptions, ResetAllFlash,
  * ResetOptions, ResetFlashStorage, CheckSDCard, CrunchData, ClearSavedVars,
  * ForceFileClose, ErrorCheck, positionfile, drivecheck, getfullfilename,
  * GetCWD, InitSDCard are now provided by FileIO.c. Flash writes go through
  * flash_range_* (RAM-backed flash_prog_buf); InitSDCard just needs
  * vm_host_fat to be mounted. */
-int64_t CallCFunction(unsigned char *cmd, unsigned char *args, unsigned char *def, unsigned char *caller) {
-    (void)cmd; (void)args; (void)def; (void)caller;
+int64_t CallCFunction(unsigned char * cmd, unsigned char * args, unsigned char * def, unsigned char * caller) {
+    (void)cmd;
+    (void)args;
+    (void)def;
+    (void)caller;
     return 0;
 }
-void CallExecuteProgram(char *p) { (void)p; }
-
+void CallExecuteProgram(char * p) {
+    (void)p;
+}
 
 /* host_repl_mode is still used by other host stubs to branch on "are we
  * running the interactive REPL?". The bespoke EditInputLine previously
@@ -732,8 +828,7 @@ int host_repl_mode = 0;
 /* FileIO.c command-level lifecycle hooks. The device implementations live
  * in ports/pico_sdk_common/cmd_files_hooks.c. */
 
-void cmd_files_save_program_context(void)
-{
+void cmd_files_save_program_context(void) {
     /* Host can't SaveContext + InitHeap mid-FRUN — bc_alloc backs both
      * the heap and the live VMState. The 76 KB FILES sort buffer fits
      * fine in host RAM without the dance. */
@@ -741,16 +836,17 @@ void cmd_files_save_program_context(void)
 
 void cmd_files_restore_program_context(void) {}
 
-void cmd_files_pump_console_key(int *c)
-{
+void cmd_files_pump_console_key(int * c) {
     /* Host has no interrupt-driven ConsoleRxBuf filler — the REPL reads
      * keys via MMInkey (stdin / scripted key queue / --sim websocket).
      * Poll it here so the "PRESS ANY KEY" prompt unblocks on any
      * keypress instead of hanging forever. */
     if (*c == -1) {
         int k = MMInkey();
-        if (k != -1) *c = k;
-        else host_sleep_us(10000);  /* 10ms — don't peg a core */
+        if (k != -1)
+            *c = k;
+        else
+            host_sleep_us(10000); /* 10ms — don't peg a core */
     }
 }
 
@@ -759,8 +855,7 @@ void cmd_files_pump_console_key(int *c)
 
 extern volatile BYTE SDCardStat;
 
-int port_mount_sd_drive(void)
-{
+int port_mount_sd_drive(void) {
     /* Host FatFS is runtime/vm/vm_host_fat.c's in-memory disk (or the POSIX dir
      * walker when host_sd_root is set). No SPI/SD pins to validate —
      * just make sure the RAM disk is mounted. Also clear SDCardStat's
@@ -772,8 +867,7 @@ int port_mount_sd_drive(void)
     return 2;
 }
 
-void port_apply_load_overrides(void)
-{
+void port_apply_load_overrides(void) {
     /* Host has no display/SD/audio pins to override; LoadOptions's flash
      * read into Option already wins. Real per-board overrides for device
      * builds live in ports/pico_sdk_common/port_load_overrides.c. */
@@ -783,8 +877,7 @@ void port_apply_load_overrides(void)
  * runtime/runtime_filesystem_defaults.c — shared with Pico + ESP32.
  * pc386 provides real overrides (DOS drive-letter routing). */
 
-void port_drive_check(char drive)
-{
+void port_drive_check(char drive) {
     /* Host has only one logical disk (B:, backed by POSIX under
      * host_sd_root or the vm_host_fat RAM disk). The A: drive is the
      * device's LittleFS-on-flash filesystem; LFS is stubbed on host,
@@ -798,18 +891,35 @@ void port_drive_check(char drive)
 
 /* PicoCalc HW hooks — error stubs on host. Real impls in
  * ports/pico_sdk_common/picocalc_features_real.c on PicoCalc ports. */
-void port_picocalc_set_keyboard_backlight(int level) { (void)level; error("Not supported on host"); }
-int  port_picocalc_battery_pct(void)                 { error("Not supported on host"); return 0; }
-int  port_picocalc_is_charging(void)                 { error("Not supported on host"); return 0; }
-void port_picocalc_factory_reset_options(void)       { error("Not supported on host"); }
+void port_picocalc_set_keyboard_backlight(int level) {
+    (void)level;
+    error("Not supported on host");
+}
+int port_picocalc_battery_pct(void) {
+    error("Not supported on host");
+    return 0;
+}
+int port_picocalc_is_charging(void) {
+    error("Not supported on host");
+    return 0;
+}
+void port_picocalc_factory_reset_options(void) {
+    error("Not supported on host");
+}
 
 /* CONFIGURE LIST entries — host advertises no factory board profiles. */
 void port_print_supported_boards(void) {}
-int  port_factory_reset_board(unsigned char *p) { (void)p; return 0; }
+int port_factory_reset_board(unsigned char * p) {
+    (void)p;
+    return 0;
+}
 
 /* Display-related OPTION setters (CPUSPEED, AUTOREFRESH, LCDPANEL, TOUCH,
  * RESOLUTION, VGA PINS, DEFAULT MODE) — host has no display hardware. */
-int  port_display_option_setter(unsigned char *cmdline) { (void)cmdline; return 0; }
+int port_display_option_setter(unsigned char * cmdline) {
+    (void)cmdline;
+    return 0;
+}
 
 /* OPTION LIST display-related lines — host has no display hardware. */
 void port_print_display_options(void) {}
@@ -817,54 +927,109 @@ void port_print_lcd_spi(void) {}
 void port_print_keyboard_heartbeat(void) {}
 void port_print_usb_kb_repeat(void) {}
 void port_clear_lcd_spi_if_shares_system(void) {}
-int port_pinno_alias_for_name(const char *name) { (void)name; return 0; }
-int port_pin_is_reserved_alias(int pin) { (void)pin; return 0; }
-const char *port_pin_reserved_label(int pin) { (void)pin; return NULL; }
-int port_lcd320_option_setter(unsigned char *cmdline) { (void)cmdline; return 0; }
+int port_pinno_alias_for_name(const char * name) {
+    (void)name;
+    return 0;
+}
+int port_pin_is_reserved_alias(int pin) {
+    (void)pin;
+    return 0;
+}
+const char * port_pin_reserved_label(int pin) {
+    (void)pin;
+    return NULL;
+}
+int port_lcd320_option_setter(unsigned char * cmdline) {
+    (void)cmdline;
+    return 0;
+}
 
 /* OPTION KEYBOARD setter — host has no keyboard config to set. */
-int port_keyboard_option_setter(unsigned char *cmdline) { (void)cmdline; return 0; }
+int port_keyboard_option_setter(unsigned char * cmdline) {
+    (void)cmdline;
+    return 0;
+}
 
 /* OPTION HDMI PINS / KEYBOARD BACKLIGHT / PSRAM PIN / KEYBOARD REPEAT /
  * PS2 PINS / MOUSE — peripheral pin/feature setters. Host has none. */
-int port_misc_option_setter(unsigned char *cmdline) { (void)cmdline; return 0; }
+int port_misc_option_setter(unsigned char * cmdline) {
+    (void)cmdline;
+    return 0;
+}
 
 /* OPTION PICO ON/OFF (CYW43-shadow pin gating) and OPTION HEARTBEAT
  * (pin selection). Host has neither. */
-int port_pico_pins_option_setter(unsigned char *cmdline) { (void)cmdline; return 0; }
-int port_heartbeat_option_setter(unsigned char *cmdline) { (void)cmdline; return 0; }
+int port_pico_pins_option_setter(unsigned char * cmdline) {
+    (void)cmdline;
+    return 0;
+}
+int port_heartbeat_option_setter(unsigned char * cmdline) {
+    (void)cmdline;
+    return 0;
+}
 
 /* OPTION LCDPANEL CONSOLE color reset — host has no tile-mode console. */
-void port_apply_default_console_colors(int default_fc, int default_bc)
-{ (void)default_fc; (void)default_bc; }
+void port_apply_default_console_colors(int default_fc, int default_bc) {
+    (void)default_fc;
+    (void)default_bc;
+}
 
 /* OPTION SYSTEM SPI / OPTION LCD SPI — host has no SPI peripheral. */
-int port_system_lcd_spi_option_setter(unsigned char *cmdline) { (void)cmdline; return 0; }
+int port_system_lcd_spi_option_setter(unsigned char * cmdline) {
+    (void)cmdline;
+    return 0;
+}
 
 /* OPTION AUDIO I2S — host has no I2S peripheral. */
-int port_audio_i2s_pio_slice(int pin1, int pin2) { (void)pin1; (void)pin2; return 0; }
+int port_audio_i2s_pio_slice(int pin1, int pin2) {
+    (void)pin1;
+    (void)pin2;
+    return 0;
+}
 
 /* MM.INFO INTERRUPTS — host has no NVIC. */
-int port_mminfo_interrupts(int64_t *out_iret) { (void)out_iret; return 0; }
+int port_mminfo_interrupts(int64_t * out_iret) {
+    (void)out_iret;
+    return 0;
+}
 
 /* MM.INFO TOUCH / SCROLL / SCREENBUFF — host has none. */
-int port_mminfo_touch_status(unsigned char *out_sret) { (void)out_sret; return 0; }
-int port_mminfo_scroll_start(int64_t *out_iret) { (void)out_iret; return 0; }
-int port_mminfo_screenbuff(int64_t *out_iret) { (void)out_iret; return 0; }
+int port_mminfo_touch_status(unsigned char * out_sret) {
+    (void)out_sret;
+    return 0;
+}
+int port_mminfo_scroll_start(int64_t * out_iret) {
+    (void)out_iret;
+    return 0;
+}
+int port_mminfo_screenbuff(int64_t * out_iret) {
+    (void)out_iret;
+    return 0;
+}
 
 /* PIO interrupt-poll lookup — host has no PIO. */
 #include "hardware/pio.h"
-PIO port_pio_for_index(int pio_idx) { (void)pio_idx; return NULL; }
+PIO port_pio_for_index(int pio_idx) {
+    (void)pio_idx;
+    return NULL;
+}
 
 /* POKE DISPLAY raw panel write — host has no display panel. */
-int port_poke_display_panel(unsigned char *p) { (void)p; return 0; }
+int port_poke_display_panel(unsigned char * p) {
+    (void)p;
+    return 0;
+}
 
 /* str_replace/STR_REPLACE provided by MATHS.c */
 
 /* bc_debug.c crash-dump port hooks — host has no ARM fault registers. */
-#include "bytecode.h"  /* BCCrashInfo */
-uint32_t port_bc_crash_get_sp(void) { return 0; }
-void port_bc_crash_save_fault_regs(BCCrashInfo *info) { (void)info; }
+#include "bytecode.h" /* BCCrashInfo */
+uint32_t port_bc_crash_get_sp(void) {
+    return 0;
+}
+void port_bc_crash_save_fault_regs(BCCrashInfo * info) {
+    (void)info;
+}
 
 /* MMBasic.c error-prompt-font hook — host has no SetFont / narrow
  * font switch, so the hook is a no-op. Real impls live in
@@ -879,7 +1044,7 @@ void port_clear_runtime_display_reset(void) {}
 /* MMBasic.c error() display hooks — host has no WriteBuf/DisplayBuf
  * or LCD panel, so both stub to no-ops. */
 void port_error_restore_console_surface(void) {}
-void port_error_show_lcd_banner(int line_num, const char *source_line, const char *err_msg) {
+void port_error_show_lcd_banner(int line_num, const char * source_line, const char * err_msg) {
     (void)line_num;
     (void)source_line;
     (void)err_msg;
@@ -887,7 +1052,7 @@ void port_error_show_lcd_banner(int line_num, const char *source_line, const cha
 
 /* MMBasic.c FindSubFun hash-lookup hook — host has no funtbl hash
  * (rp2350-only). Return 0 to fall through to the linear scan. */
-int port_try_find_subfun_hash(unsigned char *p, int *out_index) {
+int port_try_find_subfun_hash(unsigned char * p, int * out_index) {
     (void)p;
     (void)out_index;
     return 0;
@@ -896,11 +1061,13 @@ int port_try_find_subfun_hash(unsigned char *p, int *out_index) {
 /* MMBasic.c PrepareProgram finalize hook — rp2350 rebuilds the
  * funtbl[] hash from subfun[] and runs hashlabels() against
  * ProgMemory + LibMemory. Host has neither, so no-op. */
-void port_prepare_program_finalize_subfun(int ErrAbort) { (void)ErrAbort; }
+void port_prepare_program_finalize_subfun(int ErrAbort) {
+    (void)ErrAbort;
+}
 
 /* MMBasic.c findlabel hash-lookup hook — host has no funtbl label
  * hash (rp2350-only). Return 0 to fall through to the linear scan. */
-int port_try_find_label_hash(unsigned char *labelptr, unsigned char **out_ptr) {
+int port_try_find_label_hash(unsigned char * labelptr, unsigned char ** out_ptr) {
     (void)labelptr;
     (void)out_ptr;
     return 0;
@@ -909,7 +1076,7 @@ int port_try_find_label_hash(unsigned char *labelptr, unsigned char **out_ptr) {
 /* MMBasic.c findvar / sub-fun collision check — rp2350 probes the
  * funtbl[] hash directly. Host has no hash; return 0 so findvar runs
  * its linear subfun[] scan fallback. */
-int port_try_check_var_subfun_collision(const unsigned char *name, int namelen) {
+int port_try_check_var_subfun_collision(const unsigned char * name, int namelen) {
     (void)name;
     (void)namelen;
     return 0;
@@ -920,7 +1087,9 @@ int port_try_check_var_subfun_collision(const unsigned char *name, int namelen) 
  * the linear scan, so the hooks are no-ops. Real impl lives in
  * ports/pico_sdk_common/bc_bridge_pico.c. */
 void port_bc_bridge_clear_subfun_hash(void) {}
-void port_bc_bridge_rehash_subfun(unsigned char **subfun_arr) { (void)subfun_arr; }
+void port_bc_bridge_rehash_subfun(unsigned char ** subfun_arr) {
+    (void)subfun_arr;
+}
 
 /* vm_sys_time port hook — host picks up MMBASIC_HOST_DATE /
  * MMBASIC_HOST_TIME env-var overrides (tests pin deterministic values
@@ -928,30 +1097,30 @@ void port_bc_bridge_rehash_subfun(unsigned char **subfun_arr) { (void)subfun_arr
  * localtime(). vm_sys_time.c formats the result into MMBasic string
  * buffers. Device impl lives in ports/pico_sdk_common/vm_sys_time_pico.c. */
 #include <time.h>
-int port_vm_time_get_tm(struct tm *out) {
+int port_vm_time_get_tm(struct tm * out) {
     /* Start from wall-clock localtime; env-var overrides apply per
      * field so MMBASIC_HOST_DATE affects only DATE$ and
      * MMBASIC_HOST_TIME affects only TIME$, matching the pre-refactor
      * semantics where the two BASIC functions had separate mocks. */
     time_t now = time(NULL);
-    struct tm *lt = localtime(&now);
+    struct tm * lt = localtime(&now);
     if (!lt) return 0;
     *out = *lt;
-    const char *mock_date = getenv("MMBASIC_HOST_DATE");
+    const char * mock_date = getenv("MMBASIC_HOST_DATE");
     if (mock_date && *mock_date) {
         int d = 1, mo = 1, y = 2020;
         sscanf(mock_date, "%d-%d-%d", &d, &mo, &y);
         out->tm_mday = d;
-        out->tm_mon  = mo - 1;
+        out->tm_mon = mo - 1;
         out->tm_year = y - 1900;
     }
-    const char *mock_time = getenv("MMBASIC_HOST_TIME");
+    const char * mock_time = getenv("MMBASIC_HOST_TIME");
     if (mock_time && *mock_time) {
         int h = 0, mi = 0, s = 0;
         sscanf(mock_time, "%d:%d:%d", &h, &mi, &s);
         out->tm_hour = h;
-        out->tm_min  = mi;
-        out->tm_sec  = s;
+        out->tm_min = mi;
+        out->tm_sec = s;
     }
     return 1;
 }

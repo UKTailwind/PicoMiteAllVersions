@@ -21,7 +21,7 @@ extern volatile bool mergedone;
 extern uint32_t mergetimer;
 extern uint32_t _excep_code;
 mutex_t frameBufferMutex;
-extern unsigned char *ShadowBuf;
+extern unsigned char * ShadowBuf;
 extern int fb_dma_chan;
 extern void fastgfx_swap_core1(void);
 
@@ -67,8 +67,14 @@ void hal_display_fast_dma_alloc(unsigned bytes) {
 }
 
 void hal_display_fast_dma_free(void) {
-    if (ShadowBuf) { FreeMemory(ShadowBuf); ShadowBuf = NULL; }
-    if (fb_dma_chan >= 0) { dma_channel_unclaim(fb_dma_chan); fb_dma_chan = -1; }
+    if (ShadowBuf) {
+        FreeMemory(ShadowBuf);
+        ShadowBuf = NULL;
+    }
+    if (fb_dma_chan >= 0) {
+        dma_channel_unclaim(fb_dma_chan);
+        fb_dma_chan = -1;
+    }
 }
 
 void hal_display_nextgen_refresh_rect(int x_lo, int y_lo, int x_hi, int y_hi) {
@@ -82,7 +88,9 @@ void hal_display_nextgen_scroll_reset(void) {
     multicore_fifo_push_blocking((uint32_t)0);
 }
 
-int hal_display_merge_has_pipeline(void) { return 1; }
+int hal_display_merge_has_pipeline(void) {
+    return 1;
+}
 
 void hal_display_merge_sync_wait(void) {
     mergedone = false;
@@ -101,7 +109,7 @@ void hal_display_merge_post_bg(unsigned colour, unsigned timer_us) {
     multicore_fifo_push_blocking((uint32_t)timer_us);
 }
 
-void hal_display_merge_post_copy(const void *src) {
+void hal_display_merge_post_copy(const void * src) {
     multicore_fifo_push_blocking(1);
     multicore_fifo_push_blocking((uint32_t)(uintptr_t)src);
 }
@@ -146,31 +154,38 @@ void __not_in_flash_func(UpdateCore)(void) {
             while (1) {
                 if (multicore_fifo_rvalid()) {
                     int a = multicore_fifo_pop_blocking();
-                    if (a == 0xff) { mergerunning = false; break; }
+                    if (a == 0xff) {
+                        mergerunning = false;
+                        break;
+                    }
                 }
                 if (timer) {
                     busy_wait_until(delaytime);
                     delaytime = time_us_64() + timer;
                 }
-                if (ShadowBuf) merge_optimized(colour);
-                else            merge(colour);
+                if (ShadowBuf)
+                    merge_optimized(colour);
+                else
+                    merge(colour);
             }
         } else if (command == 2) {
             uint8_t colour = (uint8_t)multicore_fifo_pop_blocking();
-            if (ShadowBuf) merge_optimized(colour);
-            else           merge(colour);
+            if (ShadowBuf)
+                merge_optimized(colour);
+            else
+                merge(colour);
         } else if (command == 4) {
             int x1 = multicore_fifo_pop_blocking();
             int y1 = multicore_fifo_pop_blocking();
-            int w  = multicore_fifo_pop_blocking();
-            int h  = multicore_fifo_pop_blocking();
+            int w = multicore_fifo_pop_blocking();
+            int h = multicore_fifo_pop_blocking();
             uint8_t colour = (uint8_t)multicore_fifo_pop_blocking();
             blitmerge(x1, y1, w, h, colour);
         } else if (command == 5) {
             int x1 = multicore_fifo_pop_blocking();
             int y1 = multicore_fifo_pop_blocking();
-            int w  = multicore_fifo_pop_blocking();
-            int h  = multicore_fifo_pop_blocking();
+            int w = multicore_fifo_pop_blocking();
+            int h = multicore_fifo_pop_blocking();
             uint8_t colour = (uint8_t)multicore_fifo_pop_blocking();
             uint32_t timer = (uint32_t)multicore_fifo_pop_blocking();
             uint64_t delaytime = 0;
@@ -179,7 +194,10 @@ void __not_in_flash_func(UpdateCore)(void) {
             while (1) {
                 if (multicore_fifo_rvalid()) {
                     int a = multicore_fifo_pop_blocking();
-                    if (a == 0xff) { mergerunning = false; break; }
+                    if (a == 0xff) {
+                        mergerunning = false;
+                        break;
+                    }
                 }
                 if (timer) {
                     busy_wait_until(delaytime);
@@ -191,8 +209,10 @@ void __not_in_flash_func(UpdateCore)(void) {
         } else if (command == 6) {
             int x_low = (int)multicore_fifo_pop_blocking();
             int y_low = (int)multicore_fifo_pop_blocking();
-            int x_high = x_low >> 16; x_low &= 0xFFFF;
-            int y_high = y_low >> 16; y_low &= 0xFFFF;
+            int x_high = x_low >> 16;
+            x_low &= 0xFFFF;
+            int y_high = y_low >> 16;
+            y_low &= 0xFFFF;
             mutex_enter_blocking(&frameBufferMutex);
             copybuffertoscreen((uint8_t *)ScreenBuffer, x_low, y_low, x_high, y_high);
             mutex_exit(&frameBufferMutex);
@@ -203,7 +223,7 @@ void __not_in_flash_func(UpdateCore)(void) {
             spi_write_data(t);
 #endif
         } else if (command == 1) {
-            uint8_t *s = (uint8_t *)multicore_fifo_pop_blocking();
+            uint8_t * s = (uint8_t *)multicore_fifo_pop_blocking();
             mutex_enter_blocking(&frameBufferMutex);
             copyframetoscreen(s, 0, HRes - 1, 0, VRes - 1, 0);
             mutex_exit(&frameBufferMutex);
@@ -212,7 +232,6 @@ void __not_in_flash_func(UpdateCore)(void) {
         }
     }
 }
-
 
 /* PicoMite SPI-LCD core1 launch — runs UpdateCore (the merge
  * receiver) on core1. SPI-LCD ResetDisplay was already done in the
@@ -227,11 +246,13 @@ void port_main_launch_core1(void) {
     core1stack[0] = 0x12345678;
 }
 
-void port_video_validate_boot_options(void) { }
+void port_video_validate_boot_options(void) {}
 
-unsigned port_video_sys_clock_khz(unsigned cpu_khz) { return cpu_khz; }
+unsigned port_video_sys_clock_khz(unsigned cpu_khz) {
+    return cpu_khz;
+}
 
-void port_video_post_clock_init(void) { }
+void port_video_post_clock_init(void) {}
 
 /* OPTION LIST display section — non-VGA. The real
  * port_print_display_panel_touch / port_print_system_spi /
@@ -261,7 +282,9 @@ void port_setter_sdcard_argc_check(int argc) {
 
 int port_setter_sdcard_via_system_spi(int pin1, int pin2, int pin3) {
     /* Non-VGA: SD always uses dedicated SD_*_PIN. */
-    (void)pin1; (void)pin2; (void)pin3;
+    (void)pin1;
+    (void)pin2;
+    (void)pin3;
     return 0;
 }
 
@@ -272,7 +295,10 @@ extern unsigned char SPIatRisk;
 void port_repl_post_clear_display_refresh(void) {
     SPIatRisk = ((Option.DISPLAY_TYPE > I2C_PANEL && Option.DISPLAY_TYPE < BufferedPanel) &&
                  Option.SD_CLK_PIN == 0);
-    low_x = 0; high_x = HRes - 1; low_y = 0; high_y = VRes - 1;
+    low_x = 0;
+    high_x = HRes - 1;
+    low_y = 0;
+    high_y = VRes - 1;
     if (Option.Refresh) Display_Refresh();
 }
 
@@ -282,11 +308,14 @@ void port_repl_post_clear_display_refresh(void) {
 extern int KeyboardlightSlice, KeyboardlightChannel;
 extern void disable_lcdspi(void);
 extern void disable_systemspi(void);
-int port_setter_hdmi_pins(unsigned char *cmdline) { (void)cmdline; return 0; }
+int port_setter_hdmi_pins(unsigned char * cmdline) {
+    (void)cmdline;
+    return 0;
+}
 
-int port_setter_keyboard_backlight(unsigned char *cmdline) {
+int port_setter_keyboard_backlight(unsigned char * cmdline) {
 #ifdef rp2350
-    unsigned char *tp = checkstring(cmdline, (unsigned char *)"KEYBOARD BACKLIGHT");
+    unsigned char * tp = checkstring(cmdline, (unsigned char *)"KEYBOARD BACKLIGHT");
     if (!tp) return 0;
     if (!Option.LOCAL_KEYBOARD) error("Invalid option");
     Option.KeyboardBrightness = getint(tp, 0, 100);
@@ -299,7 +328,7 @@ int port_setter_keyboard_backlight(unsigned char *cmdline) {
 #endif
 }
 
-int port_setter_scroll_start(int64_t *out_iret) {
+int port_setter_scroll_start(int64_t * out_iret) {
 #if HAL_PORT_HAS_NEXTGEN_DISPLAY
     *out_iret = ScrollStart;
     return 1;
@@ -309,7 +338,7 @@ int port_setter_scroll_start(int64_t *out_iret) {
 #endif
 }
 
-int port_setter_screenbuff(int64_t *out_iret) {
+int port_setter_screenbuff(int64_t * out_iret) {
 #if HAL_PORT_HAS_NEXTGEN_DISPLAY
     *out_iret = (int64_t)(uint32_t)ScreenBuffer;
     return 1;
@@ -319,8 +348,8 @@ int port_setter_screenbuff(int64_t *out_iret) {
 #endif
 }
 
-int port_setter_system_lcd_spi(unsigned char *cmdline) {
-    unsigned char *tp = checkstring(cmdline, (unsigned char *)"SYSTEM SPI");
+int port_setter_system_lcd_spi(unsigned char * cmdline) {
+    unsigned char * tp = checkstring(cmdline, (unsigned char *)"SYSTEM SPI");
     if (tp) {
         int pin1, pin2, pin3;
         if (checkstring(tp, (unsigned char *)"DISABLE")) {

@@ -32,8 +32,6 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * The following section will be excluded from the documentation.
  */
 
-
-
 #define INCLUDE_FUNCTION_DEFINES
 
 #include <stdio.h>
@@ -45,8 +43,8 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #define ASMMAX 6400 // maximum number of bytes that can be copied or set by assembler routines
 #define MAXCPY 3200 // tuned maximum number of bytes to copy using ZCOPY
 
-extern const uint8_t *SavedVarsFlash;
-extern const uint8_t *flash_progmemory;
+extern const uint8_t * SavedVarsFlash;
+extern const uint8_t * flash_progmemory;
 // memory management parameters
 
 /* AllMemory is the unified SRAM slab holding both the MMBasic heap
@@ -65,20 +63,20 @@ extern const uint8_t *flash_progmemory;
  * vga_memory.c (VGA real impl) points FRAMEBUFFER at the trailer;
  * vga_ops_stub.c (non-VGA) points it at NULL. */
 unsigned char __attribute__((aligned(HAL_PORT_ALLMEMORY_ALIGN)))
-    AllMemory[HEAP_MEMORY_SIZE + 256 + HAL_PORT_FRAMEBUFFER_TRAILER_BYTES];
-unsigned char *MMHeap = AllMemory;
+AllMemory[HEAP_MEMORY_SIZE + 256 + HAL_PORT_FRAMEBUFFER_TRAILER_BYTES];
+unsigned char * MMHeap = AllMemory;
 
-uint32_t heap_memory_size=HEAP_MEMORY_SIZE;
+uint32_t heap_memory_size = HEAP_MEMORY_SIZE;
 
 __attribute__((weak)) void port_memory_report_extra(void) {}
 
 /* Last failed allocation diagnostics.  Updated by TryGetMemory on OOM. */
-unsigned int bc_alloc_fail_size    = 0;
-unsigned int bc_alloc_fail_pages   = 0;
-unsigned int bc_alloc_fail_used    = 0;
-unsigned int bc_alloc_fail_free    = 0;
+unsigned int bc_alloc_fail_size = 0;
+unsigned int bc_alloc_fail_pages = 0;
+unsigned int bc_alloc_fail_used = 0;
+unsigned int bc_alloc_fail_free = 0;
 unsigned int bc_alloc_fail_longest = 0;
-unsigned int bc_alloc_fail_total   = 0;
+unsigned int bc_alloc_fail_total = 0;
 /* VGA framebuffer / tile state (tilefcols, HDMIlines, WriteBuf,
  * DisplayBuf, LayerBuf, FrameBuf, SecondLayer, SecondFrame, etc.)
  * live in drivers/vga_pio/vga_memory.c (real) / vga_ops_stub.c
@@ -89,442 +87,446 @@ unsigned int bc_alloc_fail_total   = 0;
  * drivers/gui_controls/gui_controls_real.c (real impl, only linked on
  * GUICONTROLS ports) or .../gui_controls_stub.c (Ctrl=NULL stub). */
 
-unsigned int mmap[HEAP_MEMORY_SIZE/ PAGESIZE / PAGESPERWORD]={0};
+unsigned int mmap[HEAP_MEMORY_SIZE / PAGESIZE / PAGESPERWORD] = {0};
 /* psmap[] + SBitsGet / SBitsSet / GetPSMemory live in
  * drivers/psram_heap/ — see psram_heap_real.c (ports that expose
  * PSRAM to MMBasic) + psram_heap_stub.c (everyone else). Externs in
  * Memory.h. */
 extern unsigned int psmap[];
 extern const unsigned int psmap_size_bytes;
-extern unsigned int SBitsGet(unsigned char *addr);
-extern void SBitsSet(unsigned char *addr, int bits);
-extern void *GetPSMemory(int size);
-static inline unsigned int MBitsGet(unsigned char *addr);
-static inline void MBitsSet(unsigned char *addr, int bits);
-volatile char *g_StrTmp[MAXTEMPSTRINGS];                                       // used to track temporary string space on the heap
-volatile char g_StrTmpLocalIndex[MAXTEMPSTRINGS];                              // used to track the g_LocalIndex for each temporary string space on the heap
+extern unsigned int SBitsGet(unsigned char * addr);
+extern void SBitsSet(unsigned char * addr, int bits);
+extern void * GetPSMemory(int size);
+static inline unsigned int MBitsGet(unsigned char * addr);
+static inline void MBitsSet(unsigned char * addr, int bits);
+volatile char * g_StrTmp[MAXTEMPSTRINGS];         // used to track temporary string space on the heap
+volatile char g_StrTmpLocalIndex[MAXTEMPSTRINGS]; // used to track the g_LocalIndex for each temporary string space on the heap
 
-void *getheap(int size);
+void * getheap(int size);
 unsigned int UsedHeap(void);
-bool g_TempMemoryIsChanged = false;						            // used to prevent unnecessary scanning of strtmp[]
-short g_StrTmpIndex = 0;                                                // index to the next unallocated slot in strtmp[]
-
-
-
-
+bool g_TempMemoryIsChanged = false; // used to prevent unnecessary scanning of strtmp[]
+short g_StrTmpIndex = 0;            // index to the next unallocated slot in strtmp[]
 
 /***********************************************************************************************************************
  MMBasic commands
 ************************************************************************************************************************/
 /*  @endcond */
 void MIPS16 cmd_memory(void) {
-	unsigned char *p,*tp;
+    unsigned char *p, *tp;
     tp = checkstring(cmdline, (unsigned char *)"PACK");
-    if(tp){
-        getargs(&tp,7,(unsigned char *)",");
-        if(argc!=7)error("Syntax");
-        int i,n=getinteger(argv[4]);
-        if(n<=0)return;
-        int size=getint(argv[6],1,32);
-        if(!(size==1 || size==4 || size==8 || size==16 || size==32))error((char *)"Invalid size");
-        int sourcesize,destinationsize;
-        void *top=NULL;
-        uint64_t *from=NULL;
-        if(CheckEmpty((char *)argv[0])){
-            sourcesize=parseintegerarray(argv[0],(int64_t **)&from, 1,1,NULL,false);
-            if(sourcesize<n)error("Source array too small");
-        } else from=(uint64_t *)GetPokeAddr(argv[0]);
-        if(CheckEmpty((char *)argv[2])){
-            destinationsize=parseintegerarray(argv[2],(int64_t **)&top, 2,1,NULL,true);
-            if(destinationsize*64/size<n)error("Destination array too small");
-        } else top=(void *)GetPokeAddr(argv[2]);
-        if((uint32_t)from % 8)error("Source address not divisible by 8");
-        if(size==1){
-            uint8_t *to=(uint8_t *)top;
-            for(i=0;i<n;i++){
-                int s= i % 8;
-                if(s==0)*to=0;
-                *to |= ((*from++) & 0x1)<<s;
-                if(s==7)to++;
-           }
-        } else if(size==4){
-            uint8_t *to=(uint8_t *)top;
-            for(i=0;i<n;i++){
-                if((i & 1) == 0){
-                    *to=(*from++) & 0xF;
+    if (tp) {
+        getargs(&tp, 7, (unsigned char *)",");
+        if (argc != 7) error("Syntax");
+        int i, n = getinteger(argv[4]);
+        if (n <= 0) return;
+        int size = getint(argv[6], 1, 32);
+        if (!(size == 1 || size == 4 || size == 8 || size == 16 || size == 32)) error((char *)"Invalid size");
+        int sourcesize, destinationsize;
+        void * top = NULL;
+        uint64_t * from = NULL;
+        if (CheckEmpty((char *)argv[0])) {
+            sourcesize = parseintegerarray(argv[0], (int64_t **)&from, 1, 1, NULL, false);
+            if (sourcesize < n) error("Source array too small");
+        } else
+            from = (uint64_t *)GetPokeAddr(argv[0]);
+        if (CheckEmpty((char *)argv[2])) {
+            destinationsize = parseintegerarray(argv[2], (int64_t **)&top, 2, 1, NULL, true);
+            if (destinationsize * 64 / size < n) error("Destination array too small");
+        } else
+            top = (void *)GetPokeAddr(argv[2]);
+        if ((uint32_t)from % 8) error("Source address not divisible by 8");
+        if (size == 1) {
+            uint8_t * to = (uint8_t *)top;
+            for (i = 0; i < n; i++) {
+                int s = i % 8;
+                if (s == 0) *to = 0;
+                *to |= ((*from++) & 0x1) << s;
+                if (s == 7) to++;
+            }
+        } else if (size == 4) {
+            uint8_t * to = (uint8_t *)top;
+            for (i = 0; i < n; i++) {
+                if ((i & 1) == 0) {
+                    *to = (*from++) & 0xF;
                 } else {
-                    *to |= ((*from++) & 0xF)<<4;
+                    *to |= ((*from++) & 0xF) << 4;
                     to++;
                 }
-           }
-        } else if(size==8){
-            uint8_t *to=(uint8_t *)top;
-            while(n--){
-            *to++=(uint8_t)*from++;
             }
-        } else if(size==16){
-            uint16_t *to=(uint16_t *)top;
-            if((uint32_t)to % 2)error("Destination address not divisible by 2");
-            while(n--){
-            *to++=(uint16_t)*from++;
+        } else if (size == 8) {
+            uint8_t * to = (uint8_t *)top;
+            while (n--) {
+                *to++ = (uint8_t)*from++;
             }
-        } else if(size==32){
-            uint32_t *to=(uint32_t *)top;
-            if((uint32_t)to % 4)error("Destination address not divisible by 4");
-            while(n--){
-            *to++=(uint32_t)*from++;
+        } else if (size == 16) {
+            uint16_t * to = (uint16_t *)top;
+            if ((uint32_t)to % 2) error("Destination address not divisible by 2");
+            while (n--) {
+                *to++ = (uint16_t)*from++;
+            }
+        } else if (size == 32) {
+            uint32_t * to = (uint32_t *)top;
+            if ((uint32_t)to % 4) error("Destination address not divisible by 4");
+            while (n--) {
+                *to++ = (uint32_t)*from++;
             }
         }
         return;
     }
     tp = checkstring(cmdline, (unsigned char *)"PRINT");
-    if(tp){
-        char *fromp=NULL;
+    if (tp) {
+        char * fromp = NULL;
         int sourcesize;
-        int64_t *aint;
-        getargs(&tp,5,(unsigned char *)",");
-        if(!(argc==5))error("Syntax");
-	    if(*argv[0] == '#') argv[0]++;
-		int fnbr = getint(argv[0],1,MAXOPENFILES);	// get the number
-        int n=getinteger(argv[2]);
-        if(CheckEmpty((char *)argv[4])){
-            sourcesize=parseintegerarray(argv[4],&aint,3,1,NULL,false);
-            if(sourcesize*8<n)error("Source array too small");
-            fromp=(char *)aint;
+        int64_t * aint;
+        getargs(&tp, 5, (unsigned char *)",");
+        if (!(argc == 5)) error("Syntax");
+        if (*argv[0] == '#') argv[0]++;
+        int fnbr = getint(argv[0], 1, MAXOPENFILES); // get the number
+        int n = getinteger(argv[2]);
+        if (CheckEmpty((char *)argv[4])) {
+            sourcesize = parseintegerarray(argv[4], &aint, 3, 1, NULL, false);
+            if (sourcesize * 8 < n) error("Source array too small");
+            fromp = (char *)aint;
         } else {
-            fromp=(char *)GetPeekAddr(argv[4]);
+            fromp = (char *)GetPeekAddr(argv[4]);
         }
-        if (FileTable[fnbr].com > MAXCOMPORTS)
-        {
+        if (FileTable[fnbr].com > MAXCOMPORTS) {
             FilePutStr(n, fromp, fnbr);
-        }
-        else error("File % not open",fnbr);
+        } else
+            error("File % not open", fnbr);
         return;
     }
     tp = checkstring(cmdline, (unsigned char *)"INPUT");
-    if(tp){
-        char *fromp=NULL;
+    if (tp) {
+        char * fromp = NULL;
         int sourcesize;
-        int64_t *aint;
-        getargs(&tp,5,(unsigned char *)",");
-        if(!(argc==5))error("Syntax");
-	    if(*argv[0] == '#') argv[0]++;
-		int fnbr = getint(argv[0],1,MAXOPENFILES);	// get the number
-        int n=getinteger(argv[2]);
-        if(CheckEmpty((char *)argv[4])){
-            sourcesize=parseintegerarray(argv[4],&aint,3,1,NULL,false);
-            if(sourcesize*8<n)error("Source array too small");
-            fromp=(char *)aint;
+        int64_t * aint;
+        getargs(&tp, 5, (unsigned char *)",");
+        if (!(argc == 5)) error("Syntax");
+        if (*argv[0] == '#') argv[0]++;
+        int fnbr = getint(argv[0], 1, MAXOPENFILES); // get the number
+        int n = getinteger(argv[2]);
+        if (CheckEmpty((char *)argv[4])) {
+            sourcesize = parseintegerarray(argv[4], &aint, 3, 1, NULL, false);
+            if (sourcesize * 8 < n) error("Source array too small");
+            fromp = (char *)aint;
         } else {
-            fromp=(char *)GetPokeAddr(argv[4]);
+            fromp = (char *)GetPokeAddr(argv[4]);
         }
-        if (FileTable[fnbr].com > MAXCOMPORTS)
-        {
-            while(!(MMfeof(fnbr)) && n--) *fromp++=FileGetChar(fnbr);
-            if(n)error("End of file");
-        }
-        else error("File % not open",fnbr);
+        if (FileTable[fnbr].com > MAXCOMPORTS) {
+            while (!(MMfeof(fnbr)) && n--) *fromp++ = FileGetChar(fnbr);
+            if (n) error("End of file");
+        } else
+            error("File % not open", fnbr);
         return;
     }
     tp = checkstring(cmdline, (unsigned char *)"UNPACK");
-    if(tp){
-        getargs(&tp,7,(unsigned char *)",");
-        if(argc!=7)error("Syntax");
-        int i,n=getinteger(argv[4]);
-        if(n<=0)return;
-        int size=getint(argv[6],1,32);
-        if(!(size==1 || size==4 || size==8 || size==16 || size==32))error((char *)"Invalid size");
-        int sourcesize,destinationsize;
-        uint64_t *to=NULL;
-        void *fromp=NULL;
-        if(CheckEmpty((char *)argv[0])){
-            sourcesize=parseintegerarray(argv[0],(int64_t **)&fromp, 1,1,NULL,false);
-            if(sourcesize*64/size<n)error("Source array too small");
+    if (tp) {
+        getargs(&tp, 7, (unsigned char *)",");
+        if (argc != 7) error("Syntax");
+        int i, n = getinteger(argv[4]);
+        if (n <= 0) return;
+        int size = getint(argv[6], 1, 32);
+        if (!(size == 1 || size == 4 || size == 8 || size == 16 || size == 32)) error((char *)"Invalid size");
+        int sourcesize, destinationsize;
+        uint64_t * to = NULL;
+        void * fromp = NULL;
+        if (CheckEmpty((char *)argv[0])) {
+            sourcesize = parseintegerarray(argv[0], (int64_t **)&fromp, 1, 1, NULL, false);
+            if (sourcesize * 64 / size < n) error("Source array too small");
         } else {
-            fromp=(void*)GetPokeAddr(argv[0]);
+            fromp = (void *)GetPokeAddr(argv[0]);
         }
-        if(CheckEmpty((char *)argv[2])){
-            destinationsize=parseintegerarray(argv[2],(int64_t **)&to, 2,1,NULL,true);
-            if(n>destinationsize)error("Destination array too small");
-        } else to=(uint64_t *)GetPokeAddr(argv[2]);
-        if((uint32_t)to % 8)error("Source address not divisible by 8");
-        if(size==1){
-            uint8_t *from=(uint8_t *)fromp;
-            for(i=0;i<n;i++){
-                int s= i % 8;
-                *to++ = ((*from & (1<<s)) ? 1 : 0);
-                if(s==7)from++;
-           }
+        if (CheckEmpty((char *)argv[2])) {
+            destinationsize = parseintegerarray(argv[2], (int64_t **)&to, 2, 1, NULL, true);
+            if (n > destinationsize) error("Destination array too small");
+        } else
+            to = (uint64_t *)GetPokeAddr(argv[2]);
+        if ((uint32_t)to % 8) error("Source address not divisible by 8");
+        if (size == 1) {
+            uint8_t * from = (uint8_t *)fromp;
+            for (i = 0; i < n; i++) {
+                int s = i % 8;
+                *to++ = ((*from & (1 << s)) ? 1 : 0);
+                if (s == 7) from++;
+            }
 
-        } else if(size==4){
-            uint8_t *from=(uint8_t *)fromp;
-            for(i=0;i<n;i++){
-                if((i & 1) == 0){
-                    *to++=(*from) & 0xF;
+        } else if (size == 4) {
+            uint8_t * from = (uint8_t *)fromp;
+            for (i = 0; i < n; i++) {
+                if ((i & 1) == 0) {
+                    *to++ = (*from) & 0xF;
                 } else {
                     *to++ = (*from) >> 4;
                     from++;
                 }
-           }
-        } else if(size==8){
-            uint8_t *from=(uint8_t *)fromp;
-            while(n--){
-            *to++=(uint64_t)*from++;
             }
-        } else if(size==16){
-            uint16_t *from=(uint16_t *)fromp;
-            if((uint32_t)from % 2)error("Source address not divisible by 2");
-            while(n--){
-            *to++=(uint64_t)*from++;
+        } else if (size == 8) {
+            uint8_t * from = (uint8_t *)fromp;
+            while (n--) {
+                *to++ = (uint64_t)*from++;
             }
-        } else if(size==32){
-            uint32_t *from=(uint32_t *)fromp;
-            if((uint32_t)from % 4)error("Source address not divisible by 4");
-            while(n--){
-            *to++=(uint64_t)*from++;
+        } else if (size == 16) {
+            uint16_t * from = (uint16_t *)fromp;
+            if ((uint32_t)from % 2) error("Source address not divisible by 2");
+            while (n--) {
+                *to++ = (uint64_t)*from++;
+            }
+        } else if (size == 32) {
+            uint32_t * from = (uint32_t *)fromp;
+            if ((uint32_t)from % 4) error("Source address not divisible by 4");
+            while (n--) {
+                *to++ = (uint64_t)*from++;
             }
         }
         return;
     }
     tp = checkstring(cmdline, (unsigned char *)"COPY");
-    if(tp){
-    	if((p = checkstring(tp, (unsigned char *)"INTEGER"))) {
-    		int stepin=1, stepout=1;
-        	getargs(&p,9,(unsigned char *)",");
-        	if(argc<5)error("Syntax");
-        	int n=getinteger(argv[4]);
-        	if(n<=0)return;
-         	uint64_t *from=(uint64_t *)GetPokeAddr(argv[0]);
-         	uint64_t *to=(uint64_t *)GetPokeAddr(argv[2]);
-        	if((uint32_t)from % 8)error("Address not divisible by 8");
-        	if((uint32_t)to % 8)error("Address not divisible by 8");
-        	if(argc>=7 && *argv[6])stepin=getint(argv[6],0,0xFFFF);
-        	if(argc==9)stepout=getint(argv[8],0,0xFFFF);
-        	if(stepin==1 && stepout==1)memmove(to, from, n*8);
-        	else{
-                if(from<to){
-                    from+=(n-1)*stepin;
-                    to+=(n-1)*stepout;
-                    while(n--){
-                        *to=*from;
-                        to-=stepout;
-                        from-=stepin;
+    if (tp) {
+        if ((p = checkstring(tp, (unsigned char *)"INTEGER"))) {
+            int stepin = 1, stepout = 1;
+            getargs(&p, 9, (unsigned char *)",");
+            if (argc < 5) error("Syntax");
+            int n = getinteger(argv[4]);
+            if (n <= 0) return;
+            uint64_t * from = (uint64_t *)GetPokeAddr(argv[0]);
+            uint64_t * to = (uint64_t *)GetPokeAddr(argv[2]);
+            if ((uint32_t)from % 8) error("Address not divisible by 8");
+            if ((uint32_t)to % 8) error("Address not divisible by 8");
+            if (argc >= 7 && *argv[6]) stepin = getint(argv[6], 0, 0xFFFF);
+            if (argc == 9) stepout = getint(argv[8], 0, 0xFFFF);
+            if (stepin == 1 && stepout == 1)
+                memmove(to, from, n * 8);
+            else {
+                if (from < to) {
+                    from += (n - 1) * stepin;
+                    to += (n - 1) * stepout;
+                    while (n--) {
+                        *to = *from;
+                        to -= stepout;
+                        from -= stepin;
                     }
                 } else {
-                    while(n--){
-                        *to=*from;
-                        to+=stepout;
-                        from+=stepin;
+                    while (n--) {
+                        *to = *from;
+                        to += stepout;
+                        from += stepin;
                     }
                 }
-        	}
-    		return;
-    	}
-    	if((p = checkstring(tp, (unsigned char *)"FLOAT"))) {
-    		int stepin=1, stepout=1;
-        	getargs(&p,9,(unsigned char *)","); //assume byte
-        	if(argc<5)error("Syntax");
-        	int n=getinteger(argv[4]);
-        	if(n<=0)return;
-        	MMFLOAT *from=(MMFLOAT *)GetPokeAddr(argv[0]);
-        	MMFLOAT *to=(MMFLOAT *)GetPokeAddr(argv[2]);
-        	if((uint32_t)from % 8)error("Address not divisible by 8");
-        	if((uint32_t)to % 8)error("Address not divisible by 8");
-        	if(argc>=7 && *argv[6])stepin=getint(argv[6],0,0xFFFF);
-        	if(argc==9)stepout=getint(argv[8],0,0xFFFF);
-        	if(n<=0)return;
-        	if(stepin==1 && stepout==1)memmove(to, from, n*8);
-        	else{
-                if(from<to){
-                    from+=(n-1)*stepin;
-                    to+=(n-1)*stepout;
-                    while(n--){
-                        *to=*from;
-                        to-=stepout;
-                        from-=stepin;
+            }
+            return;
+        }
+        if ((p = checkstring(tp, (unsigned char *)"FLOAT"))) {
+            int stepin = 1, stepout = 1;
+            getargs(&p, 9, (unsigned char *)","); //assume byte
+            if (argc < 5) error("Syntax");
+            int n = getinteger(argv[4]);
+            if (n <= 0) return;
+            MMFLOAT * from = (MMFLOAT *)GetPokeAddr(argv[0]);
+            MMFLOAT * to = (MMFLOAT *)GetPokeAddr(argv[2]);
+            if ((uint32_t)from % 8) error("Address not divisible by 8");
+            if ((uint32_t)to % 8) error("Address not divisible by 8");
+            if (argc >= 7 && *argv[6]) stepin = getint(argv[6], 0, 0xFFFF);
+            if (argc == 9) stepout = getint(argv[8], 0, 0xFFFF);
+            if (n <= 0) return;
+            if (stepin == 1 && stepout == 1)
+                memmove(to, from, n * 8);
+            else {
+                if (from < to) {
+                    from += (n - 1) * stepin;
+                    to += (n - 1) * stepout;
+                    while (n--) {
+                        *to = *from;
+                        to -= stepout;
+                        from -= stepin;
                     }
                 } else {
-                    while(n--){
-                        *to=*from;
-                        to+=stepout;
-                        from+=stepin;
+                    while (n--) {
+                        *to = *from;
+                        to += stepout;
+                        from += stepin;
                     }
                 }
-        	}
-    		return;
-    	}
-        getargs(&tp,9,(unsigned char *)","); //assume byte
-        if(argc<5)error("Syntax");
-        int stepin=1, stepout=1;
-    	char *from=(char *)GetPeekAddr(argv[0]);
-    	char *to=(char *)GetPokeAddr(argv[2]);
-    	int n=getinteger(argv[4]);
-        if(argc>=7 && *argv[6])stepin=getint(argv[6],0,0xFFFF);
-        if(argc==9)stepout=getint(argv[8],0,0xFFFF);
-        if(n<=0)return;
-    	if(stepin==1 && stepout==1)memmove(to, from, n);
+            }
+            return;
+        }
+        getargs(&tp, 9, (unsigned char *)","); //assume byte
+        if (argc < 5) error("Syntax");
+        int stepin = 1, stepout = 1;
+        char * from = (char *)GetPeekAddr(argv[0]);
+        char * to = (char *)GetPokeAddr(argv[2]);
+        int n = getinteger(argv[4]);
+        if (argc >= 7 && *argv[6]) stepin = getint(argv[6], 0, 0xFFFF);
+        if (argc == 9) stepout = getint(argv[8], 0, 0xFFFF);
+        if (n <= 0) return;
+        if (stepin == 1 && stepout == 1)
+            memmove(to, from, n);
         else {
-            if(from<to){
-                from+=(n-1)*stepin;
-                to+=(n-1)*stepout;
-                while(n--){
-                    *to=*from;
-                    to-=stepout;
-                    from-=stepin;
+            if (from < to) {
+                from += (n - 1) * stepin;
+                to += (n - 1) * stepout;
+                while (n--) {
+                    *to = *from;
+                    to -= stepout;
+                    from -= stepin;
                 }
             } else {
-                while(n--){
-                    *to=*from;
-                    to+=stepout;
-                    from+=stepin;
+                while (n--) {
+                    *to = *from;
+                    to += stepout;
+                    from += stepin;
                 }
             }
         }
-    	return;
+        return;
     }
     tp = checkstring(cmdline, (unsigned char *)"SET");
-    if(tp){
-    	unsigned char *p;
-    	if((p = checkstring(tp, (unsigned char *)"BYTE"))) {
-        	getargs(&p,5,(unsigned char *)","); //assume byte
-        	if(argc!=5)error("Syntax");
-         	char *to=(char *)GetPokeAddr(argv[0]);
-         	int val=getint(argv[2],0,255);
-        	int n=getinteger(argv[4]);
-        	if(n<=0)return;
-        	memset(to, val, n);
-    		return;
-    	}
-    	if((p = checkstring(tp, (unsigned char *)"SHORT"))) {
-        	getargs(&p,5,(unsigned char *)","); //assume byte
-        	if(argc!=5)error("Syntax");
-         	short *to=(short *)GetPokeAddr(argv[0]);
-        	if((uint32_t)to % 2)error("Address not divisible by 2");
-        	short *q=to;
-   		    short data=getint(argv[2],0,65535);
-        	int n=getinteger(argv[4]);
-        	if(n<=0)return;
-        	while(n>0){
-                *q++=data;
+    if (tp) {
+        unsigned char * p;
+        if ((p = checkstring(tp, (unsigned char *)"BYTE"))) {
+            getargs(&p, 5, (unsigned char *)","); //assume byte
+            if (argc != 5) error("Syntax");
+            char * to = (char *)GetPokeAddr(argv[0]);
+            int val = getint(argv[2], 0, 255);
+            int n = getinteger(argv[4]);
+            if (n <= 0) return;
+            memset(to, val, n);
+            return;
+        }
+        if ((p = checkstring(tp, (unsigned char *)"SHORT"))) {
+            getargs(&p, 5, (unsigned char *)","); //assume byte
+            if (argc != 5) error("Syntax");
+            short * to = (short *)GetPokeAddr(argv[0]);
+            if ((uint32_t)to % 2) error("Address not divisible by 2");
+            short * q = to;
+            short data = getint(argv[2], 0, 65535);
+            int n = getinteger(argv[4]);
+            if (n <= 0) return;
+            while (n > 0) {
+                *q++ = data;
                 n--;
-        	}
-    		return;
-    	}
-    	if((p = checkstring(tp, (unsigned char *)"WORD"))) {
-        	getargs(&p,5,(unsigned char *)","); //assume byte
-        	if(argc!=5)error("Syntax");
-         	unsigned int *to=(unsigned int *)GetPokeAddr(argv[0]);
-        	if((uint32_t)to % 4)error("Address not divisible by 4");
-        	unsigned int *q=to;
-   		    unsigned int data=getint(argv[2],0,0xFFFFFFFF);
-        	int n=getinteger(argv[4]);
-        	if(n<=0)return;
-        	while(n>0){
-                *q++=data;
+            }
+            return;
+        }
+        if ((p = checkstring(tp, (unsigned char *)"WORD"))) {
+            getargs(&p, 5, (unsigned char *)","); //assume byte
+            if (argc != 5) error("Syntax");
+            unsigned int * to = (unsigned int *)GetPokeAddr(argv[0]);
+            if ((uint32_t)to % 4) error("Address not divisible by 4");
+            unsigned int * q = to;
+            unsigned int data = getint(argv[2], 0, 0xFFFFFFFF);
+            int n = getinteger(argv[4]);
+            if (n <= 0) return;
+            while (n > 0) {
+                *q++ = data;
                 n--;
-        	}
-    		return;
-     	}
-    	if((p = checkstring(tp, (unsigned char *)"INTEGER"))) {
-    		int stepin=1;
-        	getargs(&p,7,(unsigned char *)",");
-        	if(argc<5)error("Syntax");
-         	uint64_t *to=(uint64_t *)GetPokeAddr(argv[0]);
-        	if((uint32_t)to % 8)error("Address not divisible by 8");
-        	int64_t data;
-    		data=getinteger(argv[2]);
-        	int n=getinteger(argv[4]);
-        	if(argc==7)stepin=getint(argv[6],0,0xFFFF);
-        	if(n<=0)return;
-        	if(stepin==1)while(n--)*to++=data;
-        	else{
-            	while(n--){
-            		*to=data;
-            		to+=stepin;
-            	}
-        	}
-    		return;
-    	}
-    	if((p = checkstring(tp, (unsigned char *)"FLOAT"))) {
-    		int stepin=1;
-        	getargs(&p,7,(unsigned char *)","); //assume byte
-        	if(argc<5)error("Syntax");
-        	MMFLOAT *to=(MMFLOAT *)GetPokeAddr(argv[0]);
-        	if((uint32_t)to % 8)error("Address not divisible by 8");
-        	MMFLOAT data;
-    		data=getnumber(argv[2]);
-        	int n=getinteger(argv[4]);
-           	if(argc==7)stepin=getint(argv[6],0,0xFFFF);
-        	if(n<=0)return;
-        	if(stepin==1)while(n--)*to++=data;
-        	else{
-            	while(n--){
-            		*to=data;
-            		to+=stepin;
-            	}
-        	}
-    		return;
-    	}
-    	getargs(&tp,5,(unsigned char *)","); //assume byte
-    	if(argc!=5)error("Syntax");
-     	char *to=(char *)GetPokeAddr(argv[0]);
-     	int val=getint(argv[2],0,255);
-    	int n=getinteger(argv[4]);
-    	if(n<=0)return;
-    	memset(to, val, n);
-    	return;
+            }
+            return;
+        }
+        if ((p = checkstring(tp, (unsigned char *)"INTEGER"))) {
+            int stepin = 1;
+            getargs(&p, 7, (unsigned char *)",");
+            if (argc < 5) error("Syntax");
+            uint64_t * to = (uint64_t *)GetPokeAddr(argv[0]);
+            if ((uint32_t)to % 8) error("Address not divisible by 8");
+            int64_t data;
+            data = getinteger(argv[2]);
+            int n = getinteger(argv[4]);
+            if (argc == 7) stepin = getint(argv[6], 0, 0xFFFF);
+            if (n <= 0) return;
+            if (stepin == 1)
+                while (n--) *to++ = data;
+            else {
+                while (n--) {
+                    *to = data;
+                    to += stepin;
+                }
+            }
+            return;
+        }
+        if ((p = checkstring(tp, (unsigned char *)"FLOAT"))) {
+            int stepin = 1;
+            getargs(&p, 7, (unsigned char *)","); //assume byte
+            if (argc < 5) error("Syntax");
+            MMFLOAT * to = (MMFLOAT *)GetPokeAddr(argv[0]);
+            if ((uint32_t)to % 8) error("Address not divisible by 8");
+            MMFLOAT data;
+            data = getnumber(argv[2]);
+            int n = getinteger(argv[4]);
+            if (argc == 7) stepin = getint(argv[6], 0, 0xFFFF);
+            if (n <= 0) return;
+            if (stepin == 1)
+                while (n--) *to++ = data;
+            else {
+                while (n--) {
+                    *to = data;
+                    to += stepin;
+                }
+            }
+            return;
+        }
+        getargs(&tp, 5, (unsigned char *)","); //assume byte
+        if (argc != 5) error("Syntax");
+        char * to = (char *)GetPokeAddr(argv[0]);
+        int val = getint(argv[2], 0, 255);
+        int n = getinteger(argv[4]);
+        if (n <= 0) return;
+        memset(to, val, n);
+        return;
     }
     //MEMORY Usage
     int i, j, var, nbr, vsize, VarCnt;
     int ProgramSize, ProgramPercent, VarSize, VarPercent, GeneralSize, GeneralPercent, SavedVarSize, SavedVarSizeK, SavedVarPercent, SavedVarCnt;
-    int CFunctSize, CFunctSizeK, CFunctNbr, CFunctPercent, FontSize, FontSizeK, FontNbr, FontPercent, LibrarySizeK, LibraryPercent,LibraryMaxK;
+    int CFunctSize, CFunctSizeK, CFunctNbr, CFunctPercent, FontSize, FontSizeK, FontNbr, FontPercent, LibrarySizeK, LibraryPercent, LibraryMaxK;
     unsigned int CurrentRAM, *pint;
 
     CurrentRAM = heap_memory_size + MAXVARS * sizeof(struct s_vartbl);
     /* PSRAMsize is 0 on targets without PSRAM, so this just adds 0. */
-    CurrentRAM+=PSRAMsize;
+    CurrentRAM += PSRAMsize;
     // calculate the space allocated to variables on the heap
-    for(i = VarCnt = vsize = var = 0; var < MAXVARS; var++) {
-        if(g_vartbl[var].type == T_NOTYPE) continue;
-        VarCnt++;  vsize += sizeof(struct s_vartbl);
-        if(g_vartbl[var].val.s == NULL) continue;
-        if(g_vartbl[var].type & T_PTR) continue;
+    for (i = VarCnt = vsize = var = 0; var < MAXVARS; var++) {
+        if (g_vartbl[var].type == T_NOTYPE) continue;
+        VarCnt++;
+        vsize += sizeof(struct s_vartbl);
+        if (g_vartbl[var].val.s == NULL) continue;
+        if (g_vartbl[var].type & T_PTR) continue;
         nbr = g_vartbl[var].dims[0] + 1 - g_OptionBase;
-        if(g_vartbl[var].dims[0]) {
-            for(j = 1; j < MAXDIM && g_vartbl[var].dims[j]; j++)
+        if (g_vartbl[var].dims[0]) {
+            for (j = 1; j < MAXDIM && g_vartbl[var].dims[j]; j++)
                 nbr *= (g_vartbl[var].dims[j] + 1 - g_OptionBase);
-            if(g_vartbl[var].type & T_NBR)
+            if (g_vartbl[var].type & T_NBR)
                 i += MRoundUp(nbr * sizeof(MMFLOAT));
-            else if(g_vartbl[var].type & T_INT)
+            else if (g_vartbl[var].type & T_INT)
                 i += MRoundUp(nbr * sizeof(int64_t));
             else
                 i += MRoundUp(nbr * (g_vartbl[var].size + 1));
-        } else
-            if(g_vartbl[var].type & T_STR)
-                i += STRINGSIZE;
+        } else if (g_vartbl[var].type & T_STR)
+            i += STRINGSIZE;
     }
-    VarSize = (vsize + i + 512)/1024;                               // this is the memory allocated to variables
-    VarPercent = ((vsize + i) * 100)/CurrentRAM;
-    if(VarCnt && VarSize == 0) VarPercent = VarSize = 1;            // adjust if it is zero and we have some variables
+    VarSize = (vsize + i + 512) / 1024; // this is the memory allocated to variables
+    VarPercent = ((vsize + i) * 100) / CurrentRAM;
+    if (VarCnt && VarSize == 0) VarPercent = VarSize = 1; // adjust if it is zero and we have some variables
     i = UsedHeap() - i;
-    if(i < 0) i = 0;
-    GeneralSize = (i + 512)/1024; GeneralPercent = (i * 100)/CurrentRAM;
+    if (i < 0) i = 0;
+    GeneralSize = (i + 512) / 1024;
+    GeneralPercent = (i * 100) / CurrentRAM;
 
     // count the space used by saved variables (in flash)
     p = (unsigned char *)SavedVarsFlash;
     SavedVarCnt = 0;
-    while(!(*p == 0 || *p == 0xff)) {
+    while (!(*p == 0 || *p == 0xff)) {
         unsigned char type, array;
         SavedVarCnt++;
         type = *p++;
-        array = type & 0x80;  type &= 0x7f;                         // set array to true if it is an array
+        array = type & 0x80;
+        type &= 0x7f; // set array to true if it is an array
         p += strlen((char *)p) + 1;
-        if(array)
-            p += (p[0] | p[1] << 8 | p[2] << 16| p[3] << 24) + 4;
+        if (array)
+            p += (p[0] | p[1] << 8 | p[2] << 16 | p[3] << 24) + 4;
         else {
-            if(type &  T_NBR)
+            if (type & T_NBR)
                 p += sizeof(MMFLOAT);
-            else if(type &  T_INT)
+            else if (type & T_INT)
                 p += sizeof(int64_t);
             else
                 p += *p + 1;
@@ -533,14 +535,14 @@ void MIPS16 cmd_memory(void) {
     SavedVarSize = p - (SavedVarsFlash);
     SavedVarSizeK = (SavedVarSize + 512) / 1024;
     SavedVarPercent = (SavedVarSize * 100) / (/*MAX_PROG_SIZE +*/ SAVEDVARS_FLASH_SIZE);
-    if(SavedVarCnt && SavedVarSizeK == 0) SavedVarPercent = SavedVarSizeK = 1;        // adjust if it is zero and we have some variables
+    if (SavedVarCnt && SavedVarSizeK == 0) SavedVarPercent = SavedVarSizeK = 1; // adjust if it is zero and we have some variables
 
     // count the space used by CFunctions, CSubs and fonts
     CFunctSize = CFunctNbr = FontSize = FontNbr = 0;
     pint = (unsigned int *)CFunctionFlash;
-    while(*pint != 0xffffffff) {
+    while (*pint != 0xffffffff) {
         //if(*pint < FONT_TABLE_SIZE) {
-        if(*pint >> 31 ){
+        if (*pint >> 31) {
             pint++;
             FontNbr++;
             FontSize += *pint + 8;
@@ -556,53 +558,66 @@ void MIPS16 cmd_memory(void) {
      * profile. On device the two are equal (MAX_PROG_SIZE =
      * HEAP_MEMORY_SIZE, heap_memory_size = HEAP_MEMORY_SIZE at init), so
      * device output is unchanged. */
-    CFunctPercent = (CFunctSize * 100) /  (heap_memory_size + SAVEDVARS_FLASH_SIZE);
+    CFunctPercent = (CFunctSize * 100) / (heap_memory_size + SAVEDVARS_FLASH_SIZE);
     CFunctSizeK = (CFunctSize + 512) / 1024;
-    if(CFunctNbr && CFunctSizeK == 0) CFunctPercent = CFunctSizeK = 1;              // adjust if it is zero and we have some functions
-    FontPercent = (FontSize * 100) /  (heap_memory_size /*+ SAVEDVARS_FLASH_SIZE*/);
+    if (CFunctNbr && CFunctSizeK == 0) CFunctPercent = CFunctSizeK = 1; // adjust if it is zero and we have some functions
+    FontPercent = (FontSize * 100) / (heap_memory_size /*+ SAVEDVARS_FLASH_SIZE*/);
     FontSizeK = (FontSize + 512) / 1024;
-    if(FontNbr && FontSizeK == 0) FontPercent = FontSizeK = 1;                      // adjust if it is zero and we have some functions
+    if (FontNbr && FontSizeK == 0) FontPercent = FontSizeK = 1; // adjust if it is zero and we have some functions
 
     // count the number of lines in the program
     p = ProgMemory;
     i = 0;
-	while(*p != 0xff) {                                             // skip if program memory is erased
-        if(*p == 0) p++;                                            // if it is at the end of an element skip the zero marker
-        if(*p == 0) break;                                          // end of the program or module
-        if(*p == T_NEWLINE) {
-            i++;                                                    // count the line
-            p++;                                                    // skip over the newline token
+    while (*p != 0xff) {    // skip if program memory is erased
+        if (*p == 0) p++;   // if it is at the end of an element skip the zero marker
+        if (*p == 0) break; // end of the program or module
+        if (*p == T_NEWLINE) {
+            i++; // count the line
+            p++; // skip over the newline token
         }
-        if(*p == T_LINENBR) p += 3;                                 // skip over the line number
-		skipspace(p);
-		if(p[0] == T_LABEL) p += p[1] + 2;							// skip over the label
-		while(*p) p++;												// look for the zero marking the start of an element
+        if (*p == T_LINENBR) p += 3; // skip over the line number
+        skipspace(p);
+        if (p[0] == T_LABEL) p += p[1] + 2; // skip over the label
+        while (*p) p++;                     // look for the zero marking the start of an element
     }
-    ProgramSize = ((p - ProgMemory) + 512)/1024;
-    ProgramPercent = ((p - ProgMemory) * 100)/(heap_memory_size /*+ SAVEDVARS_FLASH_SIZE*/);
-    if(ProgramPercent > 100) ProgramPercent = 100;
-    if(i && ProgramSize == 0) ProgramPercent = ProgramSize = 1;                                        // adjust if it is zero and we have some lines
+    ProgramSize = ((p - ProgMemory) + 512) / 1024;
+    ProgramPercent = ((p - ProgMemory) * 100) / (heap_memory_size /*+ SAVEDVARS_FLASH_SIZE*/);
+    if (ProgramPercent > 100) ProgramPercent = 100;
+    if (i && ProgramSize == 0) ProgramPercent = ProgramSize = 1; // adjust if it is zero and we have some lines
 
     MMPrintString("Program:\r\n");
-    IntToStrPad((char *)inpbuf, ProgramSize, ' ', 4, 10); strcat((char *)inpbuf, "K (");
-    IntToStrPad((char *)inpbuf + strlen((char *)inpbuf), ProgramPercent, ' ', 2, 10); strcat((char *)inpbuf, "%) Program (");
-    IntToStr((char *)inpbuf + strlen((char *)inpbuf), i, 10); strcat((char *)inpbuf, " lines)\r\n");
-	MMPrintString((char *)inpbuf);
+    IntToStrPad((char *)inpbuf, ProgramSize, ' ', 4, 10);
+    strcat((char *)inpbuf, "K (");
+    IntToStrPad((char *)inpbuf + strlen((char *)inpbuf), ProgramPercent, ' ', 2, 10);
+    strcat((char *)inpbuf, "%) Program (");
+    IntToStr((char *)inpbuf + strlen((char *)inpbuf), i, 10);
+    strcat((char *)inpbuf, " lines)\r\n");
+    MMPrintString((char *)inpbuf);
 
-    if(CFunctNbr) {
-        IntToStrPad((char *)inpbuf, CFunctSizeK, ' ', 4, 10); strcat((char *)inpbuf, "K (");
-        IntToStrPad((char *)inpbuf + strlen((char *)inpbuf), CFunctPercent, ' ', 2, 10); strcat((char *)inpbuf, "%) "); MMPrintString((char *)inpbuf);
-        IntToStr((char *)inpbuf, CFunctNbr, 10); strcat((char *)inpbuf, " Embedded C Routine"); strcat((char *)inpbuf, CFunctNbr == 1 ? "\r\n":"s\r\n");
+    if (CFunctNbr) {
+        IntToStrPad((char *)inpbuf, CFunctSizeK, ' ', 4, 10);
+        strcat((char *)inpbuf, "K (");
+        IntToStrPad((char *)inpbuf + strlen((char *)inpbuf), CFunctPercent, ' ', 2, 10);
+        strcat((char *)inpbuf, "%) ");
+        MMPrintString((char *)inpbuf);
+        IntToStr((char *)inpbuf, CFunctNbr, 10);
+        strcat((char *)inpbuf, " Embedded C Routine");
+        strcat((char *)inpbuf, CFunctNbr == 1 ? "\r\n" : "s\r\n");
         MMPrintString((char *)inpbuf);
     }
 
-    if(FontNbr) {
-        IntToStrPad((char *)inpbuf, FontSizeK, ' ', 4, 10); strcat((char *)inpbuf, "K (");
-        IntToStrPad((char *)inpbuf + strlen((char *)inpbuf), FontPercent, ' ', 2, 10); strcat((char *)inpbuf, "%) "); MMPrintString((char *)inpbuf);
-        IntToStr((char *)inpbuf, FontNbr, 10); strcat((char *)inpbuf, " Embedded Fonts"); strcat((char *)inpbuf, FontNbr == 1 ? "\r\n":"s\r\n");
+    if (FontNbr) {
+        IntToStrPad((char *)inpbuf, FontSizeK, ' ', 4, 10);
+        strcat((char *)inpbuf, "K (");
+        IntToStrPad((char *)inpbuf + strlen((char *)inpbuf), FontPercent, ' ', 2, 10);
+        strcat((char *)inpbuf, "%) ");
+        MMPrintString((char *)inpbuf);
+        IntToStr((char *)inpbuf, FontNbr, 10);
+        strcat((char *)inpbuf, " Embedded Fonts");
+        strcat((char *)inpbuf, FontNbr == 1 ? "\r\n" : "s\r\n");
         MMPrintString((char *)inpbuf);
     }
-/*
+    /*
     if(SavedVarCnt) {
         IntToStrPad(inpbuf, SavedVarSizeK, ' ', 4, 10); strcat((char *)inpbuf, "K (");
         IntToStrPad(inpbuf + strlen(inpbuf), SavedVarPercent, ' ', 2, 10); strcat((char *)inpbuf, "%)");
@@ -612,96 +627,120 @@ void MIPS16 cmd_memory(void) {
     }
 */
 
+    IntToStrPad((char *)inpbuf, ((heap_memory_size /* + SAVEDVARS_FLASH_SIZE*/) + 512) / 1024 - ProgramSize - CFunctSizeK - FontSizeK /*- SavedVarSizeK - LibrarySizeK*/, ' ', 4, 10);
+    strcat((char *)inpbuf, "K (");
+    IntToStrPad((char *)inpbuf + strlen((char *)inpbuf), 100 - ProgramPercent - CFunctPercent - FontPercent /*- SavedVarPercent - LibraryPercent*/, ' ', 2, 10);
+    strcat((char *)inpbuf, "%) Free\r\n");
+    MMPrintString((char *)inpbuf);
 
-
-    IntToStrPad((char *)inpbuf, ((heap_memory_size/* + SAVEDVARS_FLASH_SIZE*/) + 512)/1024 - ProgramSize - CFunctSizeK - FontSizeK /*- SavedVarSizeK - LibrarySizeK*/, ' ', 4, 10); strcat((char *)inpbuf, "K (");
-    IntToStrPad((char *)inpbuf + strlen((char *)inpbuf), 100 - ProgramPercent - CFunctPercent - FontPercent /*- SavedVarPercent - LibraryPercent*/, ' ', 2, 10); strcat((char *)inpbuf, "%) Free\r\n");
-	MMPrintString((char *)inpbuf);
-
-     //Get the library size
+    //Get the library size
     LibrarySizeK = LibraryPercent = 0;
-    LibraryMaxK= MAX_PROG_SIZE/1024;
-    if(Option.LIBRARY_FLASH_SIZE == MAX_PROG_SIZE) {
-           i = 0;
-           // first count the normal program code residing in the Library
-           p = LibMemory;
-           while(!(p[0] == 0 && p[1] == 0)) {
-               	p++; i++;
-           }
-           while(*p == 0){ // the end of the program can have multiple zeros -count them
-               p++;i++;
-           }
-           p++; i++;    //get 0xFF that ends the program and count it
-           while((unsigned int)p & 0b11) { //count to the next word boundary
-           	p++;i++;
-           }
+    LibraryMaxK = MAX_PROG_SIZE / 1024;
+    if (Option.LIBRARY_FLASH_SIZE == MAX_PROG_SIZE) {
+        i = 0;
+        // first count the normal program code residing in the Library
+        p = LibMemory;
+        while (!(p[0] == 0 && p[1] == 0)) {
+            p++;
+            i++;
+        }
+        while (*p == 0) { // the end of the program can have multiple zeros -count them
+            p++;
+            i++;
+        }
+        p++;
+        i++;                             //get 0xFF that ends the program and count it
+        while ((unsigned int)p & 0b11) { //count to the next word boundary
+            p++;
+            i++;
+        }
 
-           //Now add the binary used for CSUB and Fonts
-           if(CFunctionLibrary != NULL) {
-             j=0;
-             pint = (unsigned int *)CFunctionLibrary;
-             while(*pint != 0xffffffff) {
-              pint++;                                      //step over the address or Font No.
-              j += *pint + 8;                              //Read the size
-              pint += (*pint + 4) / sizeof(unsigned int);  //set pointer to start of next CSUB/Font
-             }
-             i=i+j;
-           }
+        //Now add the binary used for CSUB and Fonts
+        if (CFunctionLibrary != NULL) {
+            j = 0;
+            pint = (unsigned int *)CFunctionLibrary;
+            while (*pint != 0xffffffff) {
+                pint++;                                     //step over the address or Font No.
+                j += *pint + 8;                             //Read the size
+                pint += (*pint + 4) / sizeof(unsigned int); //set pointer to start of next CSUB/Font
+            }
+            i = i + j;
+        }
 
+        LibrarySizeK = (i + 512) / 1024;
+        LibraryPercent = (LibrarySizeK * 100) / LibraryMaxK;
+        if (LibrarySizeK == 0) LibrarySizeK = 1;     // adjust if it is zero and we have any library
+        if (LibraryPercent == 0) LibraryPercent = 1; // adjust if it is zero and we have any library
 
-           LibrarySizeK=(i+512)/1024;
-           LibraryPercent = (LibrarySizeK * 100)/LibraryMaxK;
-           if(LibrarySizeK == 0) LibrarySizeK = 1;              // adjust if it is zero and we have any library
-           if(LibraryPercent == 0) LibraryPercent = 1;          // adjust if it is zero and we have any library
+        MMPrintString("\r\nLibrary:\r\n");
 
-           MMPrintString("\r\nLibrary:\r\n");
+        IntToStrPad((char *)inpbuf, LibrarySizeK, ' ', 4, 10);
+        strcat((char *)inpbuf, "K (");
+        //IntToStrPad(inpbuf, (128*1024  + 512)/1024  - LibrarySizeK, ' ', 4, 10); strcat((char *)inpbuf, "K (");
+        IntToStrPad((char *)inpbuf + strlen((char *)inpbuf), LibraryPercent, ' ', 2, 10);
+        strcat((char *)inpbuf, "%) ");
+        strcat((char *)inpbuf, "Library\r\n");
+        IntToStrPad((char *)inpbuf + strlen((char *)inpbuf), LibraryMaxK - LibrarySizeK, ' ', 4, 10);
+        strcat((char *)inpbuf, "K (");
+        IntToStrPad((char *)inpbuf + strlen((char *)inpbuf), 100 - LibraryPercent, ' ', 2, 10);
+        strcat((char *)inpbuf, "%) Free\r\n");
+        MMPrintString((char *)inpbuf);
+    }
 
-           IntToStrPad((char *)inpbuf, LibrarySizeK, ' ', 4, 10); strcat((char *)inpbuf, "K (");
-	       //IntToStrPad(inpbuf, (128*1024  + 512)/1024  - LibrarySizeK, ' ', 4, 10); strcat((char *)inpbuf, "K (");
-	       IntToStrPad((char *)inpbuf + strlen((char *)inpbuf), LibraryPercent, ' ', 2, 10); strcat((char *)inpbuf, "%) "); strcat((char *)inpbuf, "Library\r\n");
-	       IntToStrPad((char *)inpbuf + strlen((char *)inpbuf), LibraryMaxK-LibrarySizeK, ' ', 4, 10); strcat((char *)inpbuf, "K (");
-	       IntToStrPad((char *)inpbuf + strlen((char *)inpbuf), 100 - LibraryPercent, ' ', 2, 10); strcat((char *)inpbuf, "%) Free\r\n");
-	       MMPrintString((char *)inpbuf);
-       }
-
-
-     MMPrintString("\r\nSaved Variables:\r\n");
-	 if(SavedVarCnt) {
-	        IntToStrPad((char *)inpbuf, SavedVarSizeK, ' ', 4, 10); strcat((char *)inpbuf, "K (");
-	        IntToStrPad((char *)inpbuf + strlen((char *)inpbuf), SavedVarPercent, ' ', 2, 10); strcat((char *)inpbuf, "%)");
-	        IntToStrPad((char *)inpbuf + strlen((char *)inpbuf), SavedVarCnt, ' ', 2, 10); strcat((char *)inpbuf, " Saved Variable"); strcat((char *)inpbuf, SavedVarCnt == 1 ? " (":"s (");
-	        IntToStr((char *)inpbuf + strlen((char *)inpbuf), SavedVarSize, 10); strcat((char *)inpbuf, " bytes)\r\n");
-	        MMPrintString((char *)inpbuf);
-	 }
-	 IntToStrPad((char *)inpbuf, (( SAVEDVARS_FLASH_SIZE) + 512)/1024 - SavedVarSizeK, ' ', 4, 10); strcat((char *)inpbuf, "K (");
-	 IntToStrPad((char *)inpbuf + strlen((char *)inpbuf), 100 -  SavedVarPercent, ' ', 2, 10); strcat((char *)inpbuf, "%) Free\r\n");
-	 MMPrintString((char *)inpbuf);
-
+    MMPrintString("\r\nSaved Variables:\r\n");
+    if (SavedVarCnt) {
+        IntToStrPad((char *)inpbuf, SavedVarSizeK, ' ', 4, 10);
+        strcat((char *)inpbuf, "K (");
+        IntToStrPad((char *)inpbuf + strlen((char *)inpbuf), SavedVarPercent, ' ', 2, 10);
+        strcat((char *)inpbuf, "%)");
+        IntToStrPad((char *)inpbuf + strlen((char *)inpbuf), SavedVarCnt, ' ', 2, 10);
+        strcat((char *)inpbuf, " Saved Variable");
+        strcat((char *)inpbuf, SavedVarCnt == 1 ? " (" : "s (");
+        IntToStr((char *)inpbuf + strlen((char *)inpbuf), SavedVarSize, 10);
+        strcat((char *)inpbuf, " bytes)\r\n");
+        MMPrintString((char *)inpbuf);
+    }
+    IntToStrPad((char *)inpbuf, ((SAVEDVARS_FLASH_SIZE) + 512) / 1024 - SavedVarSizeK, ' ', 4, 10);
+    strcat((char *)inpbuf, "K (");
+    IntToStrPad((char *)inpbuf + strlen((char *)inpbuf), 100 - SavedVarPercent, ' ', 2, 10);
+    strcat((char *)inpbuf, "%) Free\r\n");
+    MMPrintString((char *)inpbuf);
 
     MMPrintString("\r\nRAM:\r\n");
-    IntToStrPad((char *)inpbuf, VarSize, ' ', 4, 10); strcat((char *)inpbuf, "K (");
-    IntToStrPad((char *)inpbuf + strlen((char *)inpbuf), VarPercent, ' ', 2, 10); strcat((char *)inpbuf, "%) ");
-    IntToStr((char *)inpbuf + strlen((char *)inpbuf), VarCnt, 10); strcat((char *)inpbuf, " Variable"); strcat((char *)inpbuf, VarCnt == 1 ? "\r\n":"s\r\n");
-	MMPrintString((char *)inpbuf);
+    IntToStrPad((char *)inpbuf, VarSize, ' ', 4, 10);
+    strcat((char *)inpbuf, "K (");
+    IntToStrPad((char *)inpbuf + strlen((char *)inpbuf), VarPercent, ' ', 2, 10);
+    strcat((char *)inpbuf, "%) ");
+    IntToStr((char *)inpbuf + strlen((char *)inpbuf), VarCnt, 10);
+    strcat((char *)inpbuf, " Variable");
+    strcat((char *)inpbuf, VarCnt == 1 ? "\r\n" : "s\r\n");
+    MMPrintString((char *)inpbuf);
 
-    IntToStrPad((char *)inpbuf, GeneralSize, ' ', 4, 10); strcat((char *)inpbuf, "K (");
-    IntToStrPad((char *)inpbuf + strlen((char *)inpbuf), GeneralPercent, ' ', 2, 10); strcat((char *)inpbuf, "%) General\r\n");
-	MMPrintString((char *)inpbuf);
+    IntToStrPad((char *)inpbuf, GeneralSize, ' ', 4, 10);
+    strcat((char *)inpbuf, "K (");
+    IntToStrPad((char *)inpbuf + strlen((char *)inpbuf), GeneralPercent, ' ', 2, 10);
+    strcat((char *)inpbuf, "%) General\r\n");
+    MMPrintString((char *)inpbuf);
 
-    IntToStrPad((char *)inpbuf, (CurrentRAM + 512)/1024 - VarSize - GeneralSize, ' ', 4, 10); strcat((char *)inpbuf, "K (");
-    IntToStrPad((char *)inpbuf + strlen((char *)inpbuf), 100 - VarPercent - GeneralPercent, ' ', 2, 10); strcat((char *)inpbuf, "%) Free\r\n");
-	MMPrintString((char *)inpbuf);
+    IntToStrPad((char *)inpbuf, (CurrentRAM + 512) / 1024 - VarSize - GeneralSize, ' ', 4, 10);
+    strcat((char *)inpbuf, "K (");
+    IntToStrPad((char *)inpbuf + strlen((char *)inpbuf), 100 - VarPercent - GeneralPercent, ' ', 2, 10);
+    strcat((char *)inpbuf, "%) Free\r\n");
+    MMPrintString((char *)inpbuf);
 
     /* VM arena diagnostics — bc_alloc_bytes_* are defined on every
      * target (bc_alloc.c routes to TryGetMemory on device, calloc on
      * host). The "MEMORY" command shows an extra section reporting
      * the VM arena capacity/used/high-water on every target. */
     MMPrintString("\r\nVM arena:\r\n");
-    IntToStrPad((char *)inpbuf, (bc_alloc_bytes_capacity() + 512)/1024, ' ', 4, 10); strcat((char *)inpbuf, "K Capacity\r\n");
+    IntToStrPad((char *)inpbuf, (bc_alloc_bytes_capacity() + 512) / 1024, ' ', 4, 10);
+    strcat((char *)inpbuf, "K Capacity\r\n");
     MMPrintString((char *)inpbuf);
-    IntToStrPad((char *)inpbuf, (bc_alloc_bytes_used() + 512)/1024, ' ', 4, 10); strcat((char *)inpbuf, "K Used\r\n");
+    IntToStrPad((char *)inpbuf, (bc_alloc_bytes_used() + 512) / 1024, ' ', 4, 10);
+    strcat((char *)inpbuf, "K Used\r\n");
     MMPrintString((char *)inpbuf);
-    IntToStrPad((char *)inpbuf, (bc_alloc_bytes_high_water() + 512)/1024, ' ', 4, 10); strcat((char *)inpbuf, "K High water\r\n");
+    IntToStrPad((char *)inpbuf, (bc_alloc_bytes_high_water() + 512) / 1024, ' ', 4, 10);
+    strcat((char *)inpbuf, "K High water\r\n");
     MMPrintString((char *)inpbuf);
     port_memory_report_extra();
 }
@@ -749,48 +788,43 @@ void MIPS16 cmd_memory(void) {
 
 */
 
-
 void m_alloc(int type) {
-    switch(type) {
+    switch (type) {
 
-        case M_PROG:
-                        /* PSRAM clear — no-op on targets without PSRAM
+    case M_PROG:
+        /* PSRAM clear — no-op on targets without PSRAM
                          * (PSRAMsize == 0; PSRAMbase is 0 too on those
                          * ports, but the runtime guard keeps us from
                          * dereferencing). */
-                        if(PSRAMsize)memset((uint8_t *)PSRAMbase,0,PSRAMsize);
-        case M_LIMITED:    // this is called initially in InitBasic() to set the base pointer for program memory
-                        // everytime the program size is adjusted up or down this must be called to check for memory overflow
-                        ProgMemory = (uint8_t *)flash_progmemory;
-                        memset(MMHeap,0,heap_memory_size);
-                        break;
+        if (PSRAMsize) memset((uint8_t *)PSRAMbase, 0, PSRAMsize);
+    case M_LIMITED: // this is called initially in InitBasic() to set the base pointer for program memory
+        // everytime the program size is adjusted up or down this must be called to check for memory overflow
+        ProgMemory = (uint8_t *)flash_progmemory;
+        memset(MMHeap, 0, heap_memory_size);
+        break;
 
-        case M_VAR:     // this must be called to initialises the variable memory pointer
-                        // everytime the variable table is increased this must be called to verify that enough memory is free
-                        memset(g_vartbl,0,MAXVARS * sizeof(struct s_vartbl));
-                        break;
+    case M_VAR: // this must be called to initialises the variable memory pointer
+        // everytime the variable table is increased this must be called to verify that enough memory is free
+        memset(g_vartbl, 0, MAXVARS * sizeof(struct s_vartbl));
+        break;
     }
 }
-
-
 
 // get some memory from the heap
 //void *GetMemory(size_t  msize) {
 //    return getheap(msize);                                          // allocate space
 //}
 
-
 // Get a temporary buffer of any size
 // The space only lasts for the length of the command.
 // A pointer to the space is saved in an array so that it can be returned at the end of the command
-void MMB_HOT_FUNC(*GetTempMemory)(int NbrBytes) {
-    if(g_StrTmpIndex >= MAXTEMPSTRINGS) error("NEM[mem:strtmp] idx=% max=%", g_StrTmpIndex, MAXTEMPSTRINGS);
+void MMB_HOT_FUNC (*GetTempMemory)(int NbrBytes) {
+    if (g_StrTmpIndex >= MAXTEMPSTRINGS) error("NEM[mem:strtmp] idx=% max=%", g_StrTmpIndex, MAXTEMPSTRINGS);
     g_StrTmpLocalIndex[g_StrTmpIndex] = g_LocalIndex;
     g_StrTmp[g_StrTmpIndex] = GetSystemMemory(NbrBytes);
     g_TempMemoryIsChanged = true;
     return (void *)g_StrTmp[g_StrTmpIndex++];
 }
-
 
 // get a temporary string buffer
 // this is used by many BASIC string functions.  The space only lasts for the length of the command.
@@ -798,13 +832,12 @@ void MMB_HOT_FUNC(*GetTempMemory)(int NbrBytes) {
 //    return GetTempMemory(STRINGSIZE);
 //}
 
-
 // clear any temporary string spaces (these last for just the life of a command) and return the memory to the heap
 // this will not clear memory allocated with a local index less than g_LocalIndex, sub/funs will increment g_LocalIndex
 // and this prevents the automatic use of ClearTempMemory from clearing memory allocated before calling the sub/fun
 void MMB_HOT_FUNC(ClearTempMemory)(void) {
-    while(g_StrTmpIndex > 0) {
-        if(g_StrTmpLocalIndex[g_StrTmpIndex - 1] >= g_LocalIndex) {
+    while (g_StrTmpIndex > 0) {
+        if (g_StrTmpLocalIndex[g_StrTmpIndex - 1] >= g_LocalIndex) {
             g_StrTmpIndex--;
             FreeMemory((void *)g_StrTmp[g_StrTmpIndex]);
             g_StrTmp[g_StrTmpIndex] = NULL;
@@ -814,16 +847,14 @@ void MMB_HOT_FUNC(ClearTempMemory)(void) {
     }
 }
 
-
-
-void MIPS16 ClearSpecificTempMemory(void *addr) {
+void MIPS16 ClearSpecificTempMemory(void * addr) {
     int i;
-    for(i = 0; i < g_StrTmpIndex; i++) {
-        if(g_StrTmp[i] == addr) {
+    for (i = 0; i < g_StrTmpIndex; i++) {
+        if (g_StrTmp[i] == addr) {
             FreeMemory(addr);
             g_StrTmp[i] = NULL;
             g_StrTmpIndex--;
-            while(i < g_StrTmpIndex) {
+            while (i < g_StrTmpIndex) {
                 g_StrTmp[i] = g_StrTmp[i + 1];
                 g_StrTmpLocalIndex[i] = g_StrTmpLocalIndex[i + 1];
                 i++;
@@ -833,56 +864,51 @@ void MIPS16 ClearSpecificTempMemory(void *addr) {
     }
 }
 
-
 // test the stack for overflow - this is a NULL function in the DOS version
 void MMB_HOT_FUNC(TestStackOverflow)(void) {
-//    static uint32_t x=0xFFFFFFFF;
-    uint32_t y=__get_MSP();
-//    if(y<x){
-//        x=y;PIntH(x);PRet();
-//    }
-    if(y< HEAPTOP) error("Stack overflow, expression too complex at depth %",g_LocalIndex);
+    //    static uint32_t x=0xFFFFFFFF;
+    uint32_t y = __get_MSP();
+    //    if(y<x){
+    //        x=y;PIntH(x);PRet();
+    //    }
+    if (y < HEAPTOP) error("Stack overflow, expression too complex at depth %", g_LocalIndex);
 }
 
-
-
-void MIPS64 MMB_HOT_FUNC(FreeMemory)(unsigned char *addr) {
-    if(addr == NULL) return;
+void MIPS64 MMB_HOT_FUNC(FreeMemory)(unsigned char * addr) {
+    if (addr == NULL) return;
     int bits;
     /* PSRAM range check — PSRAMsize is 0 on targets without PSRAM, so
      * the PSRAM branch is a runtime no-op everywhere except rp2350
      * non-WEB. The PSRAM bitmap helpers live in drivers/psram_heap/
      * and have no-op stubs on non-PSRAM targets. */
-    if(PSRAMsize &&
-       addr > (unsigned char *)PSRAMbase &&
-       addr < (unsigned char *)(PSRAMbase + PSRAMsize)) {
+    if (PSRAMsize &&
+        addr > (unsigned char *)PSRAMbase &&
+        addr < (unsigned char *)(PSRAMbase + PSRAMsize)) {
         do {
             bits = SBitsGet(addr);
             SBitsSet(addr, 0);
             addr += PAGESIZE;
-        } while(bits != (PUSED | PLAST));
+        } while (bits != (PUSED | PLAST));
     } else {
         do {
             bits = MBitsGet(addr);
             MBitsSet(addr, 0);
             addr += PAGESIZE;
-        } while(bits != (PUSED | PLAST));
+        } while (bits != (PUSED | PLAST));
     }
 }
-
-
 
 extern void vga_memory_init_planes(void);
 void InitHeap(bool all) {
     int i;
-    memset(mmap,0,sizeof(mmap));
-    memset(MMHeap,0,heap_memory_size+256);
+    memset(mmap, 0, sizeof(mmap));
+    memset(MMHeap, 0, heap_memory_size + 256);
     /* psmap is a 1-word stub on non-PSRAM ports (see drivers/psram_heap/
      * psram_heap_stub.c) so the memset is cheap everywhere. Size comes
      * from the driver's `psmap_size_bytes` extern because `psmap` is
      * declared with an incomplete array bound here. */
-    if(all)memset(psmap,0,psmap_size_bytes);
-    for(i = 0; i < MAXTEMPSTRINGS; i++) g_StrTmp[i] = NULL;
+    if (all) memset(psmap, 0, psmap_size_bytes);
+    for (i = 0; i < MAXTEMPSTRINGS; i++) g_StrTmp[i] = NULL;
     /* Rebind VGA framebuffer plane pointers back to the head of the
      * framebuffer. No-op on non-VGA targets (those planes are always
      * NULL — see drivers/vga_pio/vga_ops_stub.c). */
@@ -890,15 +916,12 @@ void InitHeap(bool all) {
     /* Ensure the non-plane pointers (FrameBuf / WriteBuf / LayerBuf)
      * are reset on non-VGA too; on VGA vga_memory_init_planes set
      * them to FRAMEBUFFER above. */
-    if(FRAMEBUFFER == NULL) {
+    if (FRAMEBUFFER == NULL) {
         FrameBuf = NULL;
         WriteBuf = NULL;
         LayerBuf = NULL;
     }
 }
-
-
-
 
 /***********************************************************************************************************************
  Private memory management functions
@@ -908,40 +931,39 @@ void InitHeap(bool all) {
  * (ports that expose PSRAM to MMBasic) or psram_heap_stub.c (everyone
  * else). Memory.c references the symbols via externs in Memory.h. */
 
-static inline __attribute__ ((always_inline)) unsigned int MBitsGet(unsigned char *addr) {
+static inline __attribute__((always_inline)) unsigned int MBitsGet(unsigned char * addr) {
     unsigned int i, *p;
     addr -= (unsigned int)&MMHeap[0];
-    p = &mmap[((unsigned int)addr/PAGESIZE) / PAGESPERWORD];        // point to the word in the memory map
-    i = ((((unsigned int)addr/PAGESIZE)) & (PAGESPERWORD - 1)) * PAGEBITS; // get the position of the bits in the word
-    return (*p >> i) & ((1 << PAGEBITS) -1);
+    p = &mmap[((unsigned int)addr / PAGESIZE) / PAGESPERWORD];               // point to the word in the memory map
+    i = ((((unsigned int)addr / PAGESIZE)) & (PAGESPERWORD - 1)) * PAGEBITS; // get the position of the bits in the word
+    return (*p >> i) & ((1 << PAGEBITS) - 1);
 }
 
-
-
-static inline __attribute__ ((always_inline)) void MBitsSet(unsigned char *addr, int bits) {
+static inline __attribute__((always_inline)) void MBitsSet(unsigned char * addr, int bits) {
     unsigned int i, *p;
     addr -= (unsigned int)&MMHeap[0];
-    p = &mmap[((unsigned int)addr/PAGESIZE) / PAGESPERWORD];        // point to the word in the memory map
-    i = ((((unsigned int)addr/PAGESIZE)) & (PAGESPERWORD - 1)) * PAGEBITS; // get the position of the bits in the word
-    *p = (bits << i) | (*p & (~(((1 << PAGEBITS) -1) << i)));
+    p = &mmap[((unsigned int)addr / PAGESIZE) / PAGESPERWORD];               // point to the word in the memory map
+    i = ((((unsigned int)addr / PAGESIZE)) & (PAGESPERWORD - 1)) * PAGEBITS; // get the position of the bits in the word
+    *p = (bits << i) | (*p & (~(((1 << PAGEBITS) - 1) << i)));
 }
-void MIPS64 MMB_HOT_FUNC(*GetSystemMemory)(int size) { //get memory from the bottom up
-    int n=0, k;
-    unsigned char *addr;
-    k= (size + PAGESIZE - 1)/PAGESIZE;                         // nbr of pages rounded up
-    for(addr = MMHeap; addr < MMHeap + heap_memory_size - PAGESIZE; addr += PAGESIZE) {
-        if(!(MBitsGet(addr) & PUSED)) {
-            if(++n == k) {                                          // found a free slot
+void MIPS64 MMB_HOT_FUNC (*GetSystemMemory)(int size) { //get memory from the bottom up
+    int n = 0, k;
+    unsigned char * addr;
+    k = (size + PAGESIZE - 1) / PAGESIZE; // nbr of pages rounded up
+    for (addr = MMHeap; addr < MMHeap + heap_memory_size - PAGESIZE; addr += PAGESIZE) {
+        if (!(MBitsGet(addr) & PUSED)) {
+            if (++n == k) { // found a free slot
                 k--;
-                MBitsSet(addr , PUSED | PLAST);     // show that this is used and the last in the chain of pages
-                  while(k--){
-                    addr-=PAGESIZE;
-                    MBitsSet(addr,PUSED);
-                  }
-                memset(addr , 0, size);                              // zero the memory
+                MBitsSet(addr, PUSED | PLAST); // show that this is used and the last in the chain of pages
+                while (k--) {
+                    addr -= PAGESIZE;
+                    MBitsSet(addr, PUSED);
+                }
+                memset(addr, 0, size); // zero the memory
                 return (void *)addr;
             }
-        } else n = 0;                                               // not enough space here so reset our count
+        } else
+            n = 0; // not enough space here so reset our count
     }
     /* Main heap exhausted — fall back to PSRAM if the port has it.
      * Mirrors GetMemory()'s fallback (line 992). The bottom-up
@@ -950,19 +972,19 @@ void MIPS64 MMB_HOT_FUNC(*GetSystemMemory)(int size) { //get memory from the bot
      * line brings parity. Per-call SUB/FUN argval buffers (~2.7 KB
      * each from MMBasic.c) can otherwise exhaust the small main heap
      * on high-res ports while 6 MB of PSRAM sits empty. */
-    if(PSRAMsize) return GetPSMemory(size);
+    if (PSRAMsize) return GetPSMemory(size);
     TempStringClearStart = 0;
-    ClearTempMemory();                                               // hopefully this will give us enough to print the prompt
+    ClearTempMemory(); // hopefully this will give us enough to print the prompt
     error("Not enough Heap memory");
-    return NULL;                                                    // keep the compiler happy
+    return NULL; // keep the compiler happy
 }
 /* Scan the MMHeap bitmap.  Returns totals in pages.  Any out-ptr may be NULL. */
-void heap_scan_stats(unsigned int *used_pages,
-                     unsigned int *free_pages,
-                     unsigned int *largest_free_run,
-                     unsigned int *total_pages) {
+void heap_scan_stats(unsigned int * used_pages,
+                     unsigned int * free_pages,
+                     unsigned int * largest_free_run,
+                     unsigned int * total_pages) {
     unsigned int used = 0, free = 0, longest = 0, cur = 0;
-    unsigned char *addr;
+    unsigned char * addr;
     unsigned int total = heap_memory_size / PAGESIZE;
     for (addr = MMHeap; addr < MMHeap + heap_memory_size; addr += PAGESIZE) {
         if (MBitsGet(addr) & PUSED) {
@@ -975,65 +997,67 @@ void heap_scan_stats(unsigned int *used_pages,
         }
     }
     if (cur > longest) longest = cur;
-    if (used_pages)        *used_pages = used;
-    if (free_pages)        *free_pages = free;
-    if (largest_free_run)  *largest_free_run = longest;
-    if (total_pages)       *total_pages = total;
+    if (used_pages) *used_pages = used;
+    if (free_pages) *free_pages = free;
+    if (largest_free_run) *largest_free_run = longest;
+    if (total_pages) *total_pages = total;
 }
 
-void MIPS64 MMB_HOT_FUNC(*GetMemory)(int size) {
+void MIPS64 MMB_HOT_FUNC (*GetMemory)(int size) {
     /* PSRAM fast path on rp2350 non-WEB when the request is large
      * enough to warrant the PSRAM allocator; PSRAMsize is 0 on ports
      * without PSRAM so this branch is a runtime no-op there. */
-    if(PSRAMsize && size> heap_memory_size/2)return GetPSMemory(size);
+    if (PSRAMsize && size > heap_memory_size / 2) return GetPSMemory(size);
     unsigned int j, n, k;
-    unsigned char *addr;
-    j = n = k= (size + PAGESIZE - 1)/PAGESIZE;                         // nbr of pages rounded up
-    for(addr = MMHeap + heap_memory_size - PAGESIZE; addr >= MMHeap; addr -= PAGESIZE) {
-        if(!(MBitsGet(addr) & PUSED)) {
-            if(--n == 0) {                                          // found a free slot
+    unsigned char * addr;
+    j = n = k = (size + PAGESIZE - 1) / PAGESIZE; // nbr of pages rounded up
+    for (addr = MMHeap + heap_memory_size - PAGESIZE; addr >= MMHeap; addr -= PAGESIZE) {
+        if (!(MBitsGet(addr) & PUSED)) {
+            if (--n == 0) { // found a free slot
                 j--;
                 MBitsSet(addr + (j * PAGESIZE), PUSED | PLAST);     // show that this is used and the last in the chain of pages
-                while(j--) MBitsSet(addr + (j * PAGESIZE), PUSED);  // set the other pages to show that they are used
+                while (j--) MBitsSet(addr + (j * PAGESIZE), PUSED); // set the other pages to show that they are used
                 memset(addr, 0, size);                              // zero the memory
                 return (void *)addr;
             }
-        } else n = j;                                               // not enough space here so reset our count
+        } else
+            n = j; // not enough space here so reset our count
     }
     // out of heap — fall back to PSRAM if the port has it
-    if(PSRAMsize)return GetPSMemory(size);
+    if (PSRAMsize) return GetPSMemory(size);
     TempStringClearStart = 0;
-    ClearTempMemory();                                               // hopefully this will give us enough to print the prompt
+    ClearTempMemory(); // hopefully this will give us enough to print the prompt
     {
         unsigned int used, free, longest, total;
         heap_scan_stats(&used, &free, &longest, &total);
         error("NEM[mem:heap] want=% pg=% used=%/% free=% run=%",
               size, (int)k, (int)used, (int)total, (int)free, (int)longest);
     }
-    return NULL;                                                    // keep the compiler happy
+    return NULL; // keep the compiler happy
 }
 
 /*
  * TryGetMemory — same as GetMemory but returns NULL on OOM instead of calling error().
  * Used by the bytecode VM allocator so it can handle failures gracefully.
  */
-void *TryGetMemory(int size) {
+void * TryGetMemory(int size) {
     unsigned int j, n, k;
-    unsigned char *addr;
-    if(PSRAMsize && size > heap_memory_size/2) return GetPSMemory(size);
+    unsigned char * addr;
+    if (PSRAMsize && size > heap_memory_size / 2) return GetPSMemory(size);
     j = n = k = (size + PAGESIZE - 1) / PAGESIZE;
-    for(addr = MMHeap + heap_memory_size - PAGESIZE; addr >= MMHeap; addr -= PAGESIZE) {
-        if(!(MBitsGet(addr) & PUSED)) {
-            if(--n == 0) {
+    for (addr = MMHeap + heap_memory_size - PAGESIZE; addr >= MMHeap; addr -= PAGESIZE) {
+        if (!(MBitsGet(addr) & PUSED)) {
+            if (--n == 0) {
                 j--;
                 MBitsSet(addr + (j * PAGESIZE), PUSED | PLAST);
-                while(j--) MBitsSet(addr + (j * PAGESIZE), PUSED);
+                while (j--) MBitsSet(addr + (j * PAGESIZE), PUSED);
                 memset(addr, 0, size);
                 return (void *)addr;
             }
-        } else n = j;
+        } else
+            n = j;
     }
-    if(PSRAMsize) return GetPSMemory(size);
+    if (PSRAMsize) return GetPSMemory(size);
     /* Record last failed alloc stats for diagnostics */
     bc_alloc_fail_size = size;
     bc_alloc_fail_pages = k;
@@ -1044,105 +1068,111 @@ void *TryGetMemory(int size) {
     return NULL;
 }
 
-void *GetAlignedMemory(int size) {
-   unsigned char *addr=MMHeap;
-    while(((uint32_t)addr & (size-1)) && (!((MBitsGet(addr) & PUSED))) && ((uint32_t)addr<(uint32_t)MMHeap+heap_memory_size))addr+=PAGESIZE;
-    if((uint32_t)addr==(uint32_t)MMHeap+heap_memory_size)error("NEM[mem:align] want=%", size);
-    unsigned char *retaddr=addr;
-    for(;size>0;addr+=PAGESIZE, size-=PAGESIZE){
-         if(!(MBitsGet(addr) & PUSED)){
-            MBitsSet(addr,PUSED);
-         } else error("Not enough Aigned memory");
+void * GetAlignedMemory(int size) {
+    unsigned char * addr = MMHeap;
+    while (((uint32_t)addr & (size - 1)) && (!((MBitsGet(addr) & PUSED))) && ((uint32_t)addr < (uint32_t)MMHeap + heap_memory_size)) addr += PAGESIZE;
+    if ((uint32_t)addr == (uint32_t)MMHeap + heap_memory_size) error("NEM[mem:align] want=%", size);
+    unsigned char * retaddr = addr;
+    for (; size > 0; addr += PAGESIZE, size -= PAGESIZE) {
+        if (!(MBitsGet(addr) & PUSED)) {
+            MBitsSet(addr, PUSED);
+        } else
+            error("Not enough Aigned memory");
     }
-    addr-=PAGESIZE;
+    addr -= PAGESIZE;
     MBitsSet(addr, PUSED | PLAST);
-    return(retaddr);
+    return (retaddr);
 }
-
 
 int FreeSpaceOnHeap(void) {
     unsigned int nbr;
-    unsigned char *addr;
+    unsigned char * addr;
     nbr = 0;
-    for(addr = MMHeap + heap_memory_size - PAGESIZE; addr >= MMHeap; addr -= PAGESIZE)
-        if(!(MBitsGet(addr) & PUSED)) nbr++;
-    if(PSRAMsize){
-        for(addr = (unsigned char*)(PSRAMbase + PSRAMsize - PAGESIZE); addr >= (unsigned char*)PSRAMbase; addr -= PAGESIZE)
-            if(!(SBitsGet(addr) & PUSED)) nbr++;
+    for (addr = MMHeap + heap_memory_size - PAGESIZE; addr >= MMHeap; addr -= PAGESIZE)
+        if (!(MBitsGet(addr) & PUSED)) nbr++;
+    if (PSRAMsize) {
+        for (addr = (unsigned char *)(PSRAMbase + PSRAMsize - PAGESIZE); addr >= (unsigned char *)PSRAMbase; addr -= PAGESIZE)
+            if (!(SBitsGet(addr) & PUSED)) nbr++;
     }
     return nbr * PAGESIZE;
 }
 
 int LargestContiguousHeap(void) {
     unsigned int nbr;
-    unsigned char *addr;
+    unsigned char * addr;
     nbr = 0;
-    for(addr = MMHeap; addr < MMHeap + heap_memory_size - PAGESIZE; addr += PAGESIZE){
-        if(!(MBitsGet(addr) & PUSED)) nbr++;
-        else break;
+    for (addr = MMHeap; addr < MMHeap + heap_memory_size - PAGESIZE; addr += PAGESIZE) {
+        if (!(MBitsGet(addr) & PUSED))
+            nbr++;
+        else
+            break;
     }
     return nbr * PAGESIZE;
 }
-
 
 unsigned int UsedHeap(void) {
     unsigned int nbr;
-    unsigned char *addr;
+    unsigned char * addr;
     nbr = 0;
-    for(addr = MMHeap + heap_memory_size - PAGESIZE; addr >= MMHeap; addr -= PAGESIZE)
-        if(MBitsGet(addr) & PUSED) nbr++;
-    if(PSRAMsize){
-        for(addr = (unsigned char*)(PSRAMbase + PSRAMsize - PAGESIZE); addr >= (unsigned char*)PSRAMbase; addr -= PAGESIZE)
-            if(SBitsGet(addr) & PUSED) nbr++;
+    for (addr = MMHeap + heap_memory_size - PAGESIZE; addr >= MMHeap; addr -= PAGESIZE)
+        if (MBitsGet(addr) & PUSED) nbr++;
+    if (PSRAMsize) {
+        for (addr = (unsigned char *)(PSRAMbase + PSRAMsize - PAGESIZE); addr >= (unsigned char *)PSRAMbase; addr -= PAGESIZE)
+            if (SBitsGet(addr) & PUSED) nbr++;
     }
     return nbr * PAGESIZE;
 }
 
-int MemSize(void *addr){ //returns the amount of heap memory allocated to an address
-    int i=0;
+int MemSize(void * addr) { //returns the amount of heap memory allocated to an address
+    int i = 0;
     int bits;
     /* PSRAM range (rp2350 non-WEB only — PSRAMsize == 0 elsewhere). */
-    if(PSRAMsize &&
-       addr > (void *)PSRAMbase &&
-       addr < (void *)(PSRAMbase + PSRAMsize)) {
+    if (PSRAMsize &&
+        addr > (void *)PSRAMbase &&
+        addr < (void *)(PSRAMbase + PSRAMsize)) {
         do {
             bits = SBitsGet(addr);
             addr += PAGESIZE;
             i += PAGESIZE;
-        } while(bits != (PUSED | PLAST));
+        } while (bits != (PUSED | PLAST));
         return i;
     }
-    if(addr >= (void *)MMHeap && addr < (void *)(MMHeap + heap_memory_size)){
+    if (addr >= (void *)MMHeap && addr < (void *)(MMHeap + heap_memory_size)) {
         do {
             bits = MBitsGet(addr);
             addr += PAGESIZE;
-            i+=PAGESIZE;
-        } while(bits != (PUSED | PLAST));
+            i += PAGESIZE;
+        } while (bits != (PUSED | PLAST));
     }
     return i;
 }
 
-void *ReAllocMemory(void *addr, size_t msize){
-	int size=MemSize(addr);
-	if(msize<=size)return addr;
-	void *newaddr=GetMemory(msize);
-	if(addr!=NULL && size!=0){
-		memcpy(newaddr,addr,MemSize(addr));
-		FreeMemory(addr);
-        addr=NULL;
-
-	}
-	return newaddr;
+void * ReAllocMemory(void * addr, size_t msize) {
+    int size = MemSize(addr);
+    if (msize <= size) return addr;
+    void * newaddr = GetMemory(msize);
+    if (addr != NULL && size != 0) {
+        memcpy(newaddr, addr, MemSize(addr));
+        FreeMemory(addr);
+        addr = NULL;
+    }
+    return newaddr;
 }
-void MMB_HOT_FUNC(FreeMemorySafe)(void **addr){
-	if(*addr!=NULL){
-        if(*addr >= (void *)MMHeap && *addr < (void *)(MMHeap + heap_memory_size)) {FreeMemory(*addr);*addr=NULL;}
+void MMB_HOT_FUNC(FreeMemorySafe)(void ** addr) {
+    if (*addr != NULL) {
+        if (*addr >= (void *)MMHeap && *addr < (void *)(MMHeap + heap_memory_size)) {
+            FreeMemory(*addr);
+            *addr = NULL;
+        }
         /* PSRAM free — PSRAMbase + PSRAMsize are both 0 on targets
          * without PSRAM so the range check is always false there. */
-        if(*addr != NULL &&
-           *addr >= (void *)PSRAMbase &&
-           *addr < (void *)(PSRAMbase + PSRAMsize)) {FreeMemory(*addr);*addr=NULL;}
-	}
+        if (*addr != NULL &&
+            *addr >= (void *)PSRAMbase &&
+            *addr < (void *)(PSRAMbase + PSRAMsize)) {
+            FreeMemory(*addr);
+            *addr = NULL;
+        }
+    }
 }
 
 /*  @endcond */

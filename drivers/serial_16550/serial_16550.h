@@ -21,18 +21,18 @@
 
 #include <stdbool.h>
 
-bool serial_init(void);   /* false if loopback self-test fails */
+bool serial_init(void); /* false if loopback self-test fails */
 void serial_putc(char c);
-void serial_puts(const char *s);
+void serial_puts(const char * s);
 
 /* Non-blocking RX. Returns 0..255 if a byte is waiting (in the IRQ
  * ring after serial_irq_init or in the UART RX register if not), or
  * -1 if nothing's there. */
-int  serial_getc_nonblock(void);
+int serial_getc_nonblock(void);
 
 /* Blocks until a byte is available, then returns it. Spins. Use
  * sparingly — MMgetchar's spin loop is the right pattern. */
-int  serial_getc_blocking(void);
+int serial_getc_blocking(void);
 
 /* Stage 4f: enable IRQ4 RX. Once this returns, incoming COM1 bytes
  * post into a small ring buffer from the ISR; serial_getc_nonblock

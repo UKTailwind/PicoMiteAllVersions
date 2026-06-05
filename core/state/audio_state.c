@@ -21,9 +21,9 @@
 #include "Hardware_Includes.h"
 
 volatile e_CurrentlyPlaying CurrentlyPlaying = P_NOTHING;
-char *WAVInterrupt = NULL;
+char * WAVInterrupt = NULL;
 volatile bool WAVcomplete = 0;
 
 /* usertable points at a BASIC integer array loaded by PLAY LOAD SOUND;
  * read by the synth for the "U" waveform. NULL until loaded. */
-unsigned short *usertable = NULL;
+unsigned short * usertable = NULL;

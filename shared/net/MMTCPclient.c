@@ -31,10 +31,10 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 static hal_net_tcp_client_t pico_tcp_client;
 static int pico_tcp_client_opened;
 static int pico_tcp_stream_active;
-static uint8_t *pico_tcp_stream_buf;
+static uint8_t * pico_tcp_stream_buf;
 static int pico_tcp_stream_size;
-static int64_t *pico_tcp_stream_read;
-static int64_t *pico_tcp_stream_write;
+static int64_t * pico_tcp_stream_read;
+static int64_t * pico_tcp_stream_write;
 
 void close_tcpclient(void) {
     if (pico_tcp_client_opened) {
@@ -70,7 +70,7 @@ void pico_tcp_client_stream_poll(void) {
     }
 }
 
-static void pico_tcp_client_open_cmd(unsigned char *tp) {
+static void pico_tcp_client_open_cmd(unsigned char * tp) {
     mm_net_tcp_client_open_args_t parsed;
     mm_net_tcp_client_parse_open(tp, &parsed);
 
@@ -84,7 +84,7 @@ static void pico_tcp_client_open_cmd(unsigned char *tp) {
     if (!optionsuppressstatus) MMPrintString("Connected\r\n");
 }
 
-static void pico_tcp_client_request_cmd(unsigned char *tp) {
+static void pico_tcp_client_request_cmd(unsigned char * tp) {
     if (!pico_tcp_client_opened) error("No connection");
     if (pico_tcp_stream_active) error("Connection busy");
 
@@ -116,7 +116,7 @@ static void pico_tcp_client_request_cmd(unsigned char *tp) {
     parsed.dest[0] = total;
 }
 
-static void pico_tcp_client_stream_cmd(unsigned char *tp) {
+static void pico_tcp_client_stream_cmd(unsigned char * tp) {
     if (!pico_tcp_client_opened) error("No connection");
 
     mm_net_tcp_client_stream_args_t parsed;
@@ -140,7 +140,7 @@ static void pico_tcp_client_stream_cmd(unsigned char *tp) {
 }
 
 int cmd_tcpclient(void) {
-    unsigned char *tp;
+    unsigned char * tp;
     tp = checkstring(cmdline, (unsigned char *)"OPEN TCP CLIENT");
     if (tp) {
         pico_tcp_client_open_cmd(tp);

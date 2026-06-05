@@ -57,7 +57,7 @@ void port_clear_runtime_display_reset(void) {
 
 void port_error_restore_console_surface(void) {
 #if HAL_PORT_IS_VGA
-    WriteBuf   = (unsigned char *)FRAMEBUFFER;
+    WriteBuf = (unsigned char *)FRAMEBUFFER;
     DisplayBuf = (unsigned char *)FRAMEBUFFER;
 #else
     restorepanel();
@@ -65,17 +65,19 @@ void port_error_restore_console_surface(void) {
 }
 
 /* LCD_error lives in MMBasic.c — no header declares it. */
-extern void LCD_error(int line_num, const char *line_txt, const char *error_msg);
+extern void LCD_error(int line_num, const char * line_txt, const char * error_msg);
 
-void port_error_show_lcd_banner(int line_num, const char *source_line, const char *err_msg) {
+void port_error_show_lcd_banner(int line_num, const char * source_line, const char * err_msg) {
 #if HAL_PORT_IS_VGA
-    (void)line_num; (void)source_line; (void)err_msg;
+    (void)line_num;
+    (void)source_line;
+    (void)err_msg;
 #else
     if (!Option.DISPLAY_CONSOLE && Option.DISPLAY_TYPE > I2C_PANEL) {
-        int width  = Option.Width;
+        int width = Option.Width;
         int height = Option.Height;
         LCD_error(line_num, source_line, err_msg);
-        Option.Width  = width;
+        Option.Width = width;
         Option.Height = height;
     }
 #endif

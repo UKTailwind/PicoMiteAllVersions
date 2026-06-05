@@ -26,15 +26,13 @@ LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON A
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ************************************************************************************************************************/
-#include "port_config.h"   /* HAL_PORT_HAS_* palette must be visible before
+#include "port_config.h" /* HAL_PORT_HAS_* palette must be visible before
                               AllCommands.h / configuration.h consult it. */
 #include <stdint.h>
 #include <stdbool.h>
 #include "AllCommands.h"
 #include "Memory.h"
 #include "lfs.h"
-
-
 
 #if !defined(INCLUDE_COMMAND_TABLE) && !defined(INCLUDE_TOKEN_TABLE)
 #include <stdio.h>
@@ -47,16 +45,16 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 extern int MMerrno;
 //extern int ListCnt;
 extern int MMCharPos;
-extern unsigned char *StartEditPoint;
+extern unsigned char * StartEditPoint;
 extern int StartEditChar;
 extern int OptionErrorSkip;
 extern int ExitMMBasicFlag;
-extern unsigned char *InterruptReturn;
+extern unsigned char * InterruptReturn;
 extern unsigned int _excep_peek;
 extern volatile int64_t mSecTimer;
 extern volatile unsigned int PauseTimer;
 extern volatile unsigned int IntPauseTimer;
-extern volatile unsigned int Timer1, Timer2, Timer3, Timer4, Timer5;		                       //1000Hz decrement timer
+extern volatile unsigned int Timer1, Timer2, Timer3, Timer4, Timer5; //1000Hz decrement timer
 extern volatile unsigned int diskchecktimer;
 extern volatile unsigned int clocktimer;
 extern volatile int ds18b20Timer;
@@ -71,7 +69,7 @@ extern volatile unsigned int I2CTimer;
 extern volatile unsigned int MouseTimer;
 extern void initMouse0(int sensitivity);
 extern bool mouse0;
-extern int MOUSE_CLOCK,MOUSE_DATA;
+extern int MOUSE_CLOCK, MOUSE_DATA;
 //extern volatile int second;
 //extern volatile int minute;
 //extern volatile int hour;
@@ -83,14 +81,14 @@ extern volatile int day_of_week;
 extern unsigned char WatchdogSet;
 extern unsigned char IgnorePIN;
 extern MMFLOAT VCC;
-extern volatile unsigned int WDTimer;                               // used for the watchdog timer
+extern volatile unsigned int WDTimer; // used for the watchdog timer
 extern unsigned char PulsePin[];
 extern unsigned char PulseDirection[];
 extern int PulseCnt[];
 extern int PulseActive;
 extern volatile int ClickTimer;
 extern int calibrate;
-extern volatile unsigned int InkeyTimer;                            // used to delay on an escape character
+extern volatile unsigned int InkeyTimer; // used to delay on an escape character
 extern volatile int DISPLAY_TYPE;
 extern void routinechecks(void);
 extern volatile char ConsoleRxBuf[CONSOLE_RX_BUF_SIZE];
@@ -123,13 +121,13 @@ extern uint32_t PSRAMsize;
 extern uintptr_t PSRAMbase;
 #ifdef rp2350
 extern const uint32_t MAP16DEF[16];
-extern void _Z10copy_wordsPKmPmm(uint32_t *s, uint32_t *d, int n);
+extern void _Z10copy_wordsPKmPmm(uint32_t * s, uint32_t * d, int n);
 #endif
 /* HDMI-only weights / palette tables / scanout state. Declared
  * unconditionally — symbols only resolve on the HDMI driver but the
  * extern is harmless on other ports. */
-extern uint8_t *tilefcols_w;
-extern uint8_t *tilebcols_w;
+extern uint8_t * tilefcols_w;
+extern uint8_t * tilebcols_w;
 extern void settiles(void);
 extern void HDMICore(void);
 extern uint16_t map256[256];
@@ -143,8 +141,8 @@ extern uint8_t map16[16];
  * uses runtime-allocated buffers (pointer); rp2040 uses fixed-size
  * arrays (the storage is in vga_qvga_modes.c). */
 #ifdef rp2350
-extern uint16_t *tilefcols;
-extern uint16_t *tilebcols;
+extern uint16_t * tilefcols;
+extern uint16_t * tilebcols;
 #else
 extern uint16_t tilefcols[];
 extern uint16_t tilebcols[];
@@ -154,48 +152,48 @@ extern void UpdateCore(void);
 extern uint32_t core1stack[];
 extern int QVGA_CLKDIV;
 extern int getslice(int pin);
-extern void setpwm(int pin, int *PWMChannel, int *PWMSlice, MMFLOAT frequency, MMFLOAT duty);
+extern void setpwm(int pin, int * PWMChannel, int * PWMSlice, MMFLOAT frequency, MMFLOAT duty);
 struct s_PinDef {
-	int pin;
-	int GPno;
+    int pin;
+    int GPno;
     char pinname[5];
     uint64_t mode;
     unsigned char ADCpin;
-	unsigned char slice;
+    unsigned char slice;
 };
 typedef struct s_HID {
-	uint8_t Device_address;
-	uint8_t Device_instance;
-	uint8_t Device_type;
-	uint8_t report_rate;
-	int16_t report_timer;
-	uint16_t vid;
-	uint16_t pid;
-	bool active;
-	bool report_requested;
-	bool notfirsttime;
-	uint8_t motorleft;
-	uint8_t motorright;
-	uint8_t r,g,b;
-	uint8_t sendlights;
-	uint8_t report[65];
+    uint8_t Device_address;
+    uint8_t Device_instance;
+    uint8_t Device_type;
+    uint8_t report_rate;
+    int16_t report_timer;
+    uint16_t vid;
+    uint16_t pid;
+    bool active;
+    bool report_requested;
+    bool notfirsttime;
+    uint8_t motorleft;
+    uint8_t motorright;
+    uint8_t r, g, b;
+    uint8_t sendlights;
+    uint8_t report[65];
 } a_HID;
 extern volatile struct s_HID HID[4];
 extern uint32_t _excep_code;
 extern const struct s_PinDef PinDef[NBRPINS + 1];
-#define VCHARS  25					// nbr of lines in the DOS box (used in LIST)
+#define VCHARS 25 // nbr of lines in the DOS box (used in LIST)
 
 #define FILENAME_LENGTH 12
 
 //extern unsigned char *ModuleTable[MAXMODULES];           // list of pointers to modules loaded in memory;
 //extern int NbrModules;                          // the number of modules currently loaded
 extern void mT4IntEnable(int status);
-extern int BasicFileOpen(char *fname, int fnbr, int mode);
+extern int BasicFileOpen(char * fname, int fnbr, int mode);
 extern int kbhitConsole(void);
 extern int InitSDCard(void);
 extern void FileClose(int fnbr);
-extern void *TryGetMemory(int size);
-#define NBRERRMSG 17				// number of file error messages
+extern void * TryGetMemory(int size);
+#define NBRERRMSG 17 // number of file error messages
 extern void PRet(void);
 extern void PInt(int64_t n);
 extern void PIntComma(int64_t n);
@@ -207,24 +205,24 @@ extern void SIntComma(int64_t n);
 extern void PIntH(unsigned long long int n);
 extern void PIntB(unsigned long long int n);
 extern void PIntBC(unsigned long long int n);
-extern void PIntHC(unsigned long long int n) ;
+extern void PIntHC(unsigned long long int n);
 extern void PFlt(MMFLOAT flt);
-extern void PFltComma(MMFLOAT n) ;
+extern void PFltComma(MMFLOAT n);
 extern void putConsole(int c, int flush);
-extern void MMPrintString(char* s);
-extern void SSPrintString(char* s);
-extern void myprintf(char *s);
+extern void MMPrintString(char * s);
+extern void SSPrintString(char * s);
+extern void myprintf(char * s);
 extern int getConsole(void);
 extern void InitReservedIO(void);
 extern char SerialConsolePutC(char c, int flush);
-extern void CallExecuteProgram(char *p);
-extern int64_t *GetReceiveDataBuffer(unsigned char *p, unsigned int *nbr);
+extern void CallExecuteProgram(char * p);
+extern int64_t * GetReceiveDataBuffer(unsigned char * p, unsigned int * nbr);
 extern int ticks_per_second;
 extern volatile unsigned int GPSTimer;
 extern uint16_t AUDIO_L_PIN, AUDIO_R_PIN, AUDIO_SLICE;
 extern uint16_t AUDIO_WRAP;
-extern int PromptFont, PromptFC, PromptBC;                             // the font and colours selected at the prompt
-extern const uint8_t *flash_progmemory;
+extern int PromptFont, PromptFC, PromptBC; // the font and colours selected at the prompt
+extern const uint8_t * flash_progmemory;
 extern lfs_t lfs;
 extern lfs_dir_t lfs_dir;
 extern struct lfs_info lfs_info;
@@ -235,12 +233,12 @@ extern volatile int X_TILE, Y_TILE;
 extern int CameraSlice;
 extern int CameraChannel;
 extern char id_out[];
-extern uint8_t *buff320;
-extern uint16_t SD_CLK_PIN,SD_MOSI_PIN,SD_MISO_PIN, SD_CS_PIN;
+extern uint8_t * buff320;
+extern uint16_t SD_CLK_PIN, SD_MOSI_PIN, SD_MISO_PIN, SD_CS_PIN;
 /* LCD_*_PIN globals are defined unconditionally in mmc_stm32.c. The
  * MEM332 path uses them when the LCD has its own SPI bus; other
  * ports leave them at 0 and the dispatch never references them. */
-extern uint16_t LCD_CLK_PIN,LCD_MOSI_PIN,LCD_MISO_PIN;
+extern uint16_t LCD_CLK_PIN, LCD_MOSI_PIN, LCD_MISO_PIN;
 extern bool screen320;
 extern void clear320(void);
 /* VGA-family scratch globals. Defined unconditionally in PicoMite.c
@@ -256,8 +254,8 @@ extern int MODE5SIZE;
 /* VGA-PIO non-HDMI palette + framebuffer arrays. Defined in the VGA
  * scanout driver; other ports never reference them. */
 extern uint8_t remap[];
-extern uint16_t __attribute__ ((aligned (256))) M_Foreground[16];
-extern uint16_t __attribute__ ((aligned (256))) M_Background[16];
+extern uint16_t __attribute__((aligned(256))) M_Foreground[16];
+extern uint16_t __attribute__((aligned(256))) M_Background[16];
 extern void VGArecovery(int pin);
 /* HDMI palette tables + sync constants. Defined in the HDMI driver. */
 extern uint32_t remap555[];
@@ -266,7 +264,7 @@ extern uint16_t remap256[];
 extern void mapreset(void);
 extern int MODE_H_SYNC_POLARITY, MODE_V_TOTAL_LINES, MODE_ACTIVE_LINES, MODE_ACTIVE_PIXELS;
 extern int MODE_H_ACTIVE_PIXELS, MODE_H_FRONT_PORCH, MODE_H_SYNC_WIDTH, MODE_H_BACK_PORCH;
-extern int MODE_V_SYNC_POLARITY ,MODE_V_ACTIVE_LINES ,MODE_V_FRONT_PORCH, MODE_V_SYNC_WIDTH, MODE_V_BACK_PORCH;
+extern int MODE_V_SYNC_POLARITY, MODE_V_ACTIVE_LINES, MODE_V_FRONT_PORCH, MODE_V_SYNC_WIDTH, MODE_V_BACK_PORCH;
 /* ProcessWeb(): real impl on PICOMITEWEB pumps the lwIP stack. On
  * non-WEB builds a stub in MM_Misc.c no-ops. Declaration is
  * unconditional so core code can call it from loops (cmd_files, LOAD)
@@ -299,7 +297,7 @@ extern bool USBenabled;
 int MMInkey(void);
 int MMgetchar(void);
 char MMputchar(char c, int flush);
-void SaveProgramToFlash(unsigned char *pm, int msg);
+void SaveProgramToFlash(unsigned char * pm, int msg);
 
 void CheckAbort(void);
 void EditInputLine(void);
@@ -307,17 +305,17 @@ void EditInputLine(void);
 void UnloadFont(int);
 #define NBRFONTS 0
 #define STATE_VECTOR_LENGTH 624
-#define STATE_VECTOR_M      397 /* changes to STATE_VECTOR_LENGTH also require changes to this */
+#define STATE_VECTOR_M 397 /* changes to STATE_VECTOR_LENGTH also require changes to this */
 
 typedef struct tagMTRand {
-  unsigned long mt[STATE_VECTOR_LENGTH];
-  int index;
+    unsigned long mt[STATE_VECTOR_LENGTH];
+    int index;
 } MTRand;
 
 void seedRand(unsigned long seed);
-unsigned long genRandLong(MTRand* rand);
-MMFLOAT genRand(MTRand* rand);
-extern struct tagMTRand *g_myrand;
+unsigned long genRandLong(MTRand * rand);
+MMFLOAT genRand(MTRand * rand);
+extern struct tagMTRand * g_myrand;
 #if defined(MSVCC)
 #define mkdir _mkdir
 #define rmdir _rmdir
@@ -330,71 +328,77 @@ extern struct tagMTRand *g_myrand;
 #endif
 #endif
 #define nunaddr 0xA4 / 2
-#define CURSOR_OFF        350              // cursor off time in mS
-#define CURSOR_ON     650                  // cursor on time in mS
-#define RoundUptoInt(a)     (((a) + (32 - 1)) & (~(32 - 1)))// round up to the nearest whole integer
+#define CURSOR_OFF 350                                   // cursor off time in mS
+#define CURSOR_ON 650                                    // cursor on time in mS
+#define RoundUptoInt(a) (((a) + (32 - 1)) & (~(32 - 1))) // round up to the nearest whole integer
 
-#define dp(...) {unsigned char s[140];sprintf((char *)s,  __VA_ARGS__); MMPrintString((char *)s); MMPrintString((char *)"\r\n");}
+#define dp(...)                          \
+    {                                    \
+        unsigned char s[140];            \
+        sprintf((char *)s, __VA_ARGS__); \
+        MMPrintString((char *)s);        \
+        MMPrintString((char *)"\r\n");   \
+    }
 
-#define TAB     	0x9
-#define BKSP    	0x8
-#define ENTER   	0xd
-#define ESC     	0x1b
+#define TAB 0x9
+#define BKSP 0x8
+#define ENTER 0xd
+#define ESC 0x1b
 
 // the values returned by the function keys
-#define F1      	0x91
-#define F2      	0x92
-#define F3      	0x93
-#define F4      	0x94
-#define F5      	0x95
-#define F6      	0x96
-#define F7      	0x97
-#define F8      	0x98
-#define F9      	0x99
-#define F10     	0x9a
-#define F11     	0x9b
-#define F12     	0x9c
+#define F1 0x91
+#define F2 0x92
+#define F3 0x93
+#define F4 0x94
+#define F5 0x95
+#define F6 0x96
+#define F7 0x97
+#define F8 0x98
+#define F9 0x99
+#define F10 0x9a
+#define F11 0x9b
+#define F12 0x9c
 
 // the values returned by special control keys
-#define UP			0x80
-#define DOWN		0x81
-#define LEFT		0x82
-#define RIGHT		0x83
-#define DOWNSEL     0xA1
-#define RIGHTSEL    0xA3
-#define INSERT		0x84
-#define DEL			0x7f
-#define HOME		0x86
-#define END			0x87
-#define PUP			0x88
-#define PDOWN		0x89
-#define NUM_ENT		ENTER
-#define SLOCK		0x8c
-#define ALT			0x8b
-#define	SHIFT_TAB 	0x9F
-#define SHIFT_DEL   0xa0
+#define UP 0x80
+#define DOWN 0x81
+#define LEFT 0x82
+#define RIGHT 0x83
+#define DOWNSEL 0xA1
+#define RIGHTSEL 0xA3
+#define INSERT 0x84
+#define DEL 0x7f
+#define HOME 0x86
+#define END 0x87
+#define PUP 0x88
+#define PDOWN 0x89
+#define NUM_ENT ENTER
+#define SLOCK 0x8c
+#define ALT 0x8b
+#define SHIFT_TAB 0x9F
+#define SHIFT_DEL 0xa0
 #define CTRLKEY(a) (a & 0x1f)
-#define DISPLAY_CLS             1
-#define REVERSE_VIDEO           3
-#define CLEAR_TO_EOL            4
-#define CLEAR_TO_EOS            5
-#define SCROLL_DOWN             6
-#define DRAW_LINE               7
-#define CONFIG_TAB2		0b111
-#define CONFIG_TAB4		0b001
-#define CONFIG_TAB8		0b010
-#define WPN 65   //Framebuffer page no.
+#define DISPLAY_CLS 1
+#define REVERSE_VIDEO 3
+#define CLEAR_TO_EOL 4
+#define CLEAR_TO_EOS 5
+#define SCROLL_DOWN 6
+#define DRAW_LINE 7
+#define CONFIG_TAB2 0b111
+#define CONFIG_TAB4 0b001
+#define CONFIG_TAB8 0b010
+#define WPN 65 //Framebuffer page no.
 #define GPIO_PIN_SET 1
 #define GPIO_PIN_RESET 0
 #define SD_SLOW_SPI_SPEED 0
 #define SD_FAST_SPI_SPEED 1
 #define NONE_SPI_SPEED 4
 
-#define RESET_COMMAND       9999                                    // indicates that the reset was caused by the RESET command
-#define WATCHDOG_TIMEOUT    9998                                    // reset caused by the watchdog timer
-#define PIN_RESTART         9997                                    // reset caused by entering 0 at the PIN prompt
-#define RESTART_NOAUTORUN   9996                                    // reset required after changing the LCD or touch config
-#define RESTART_DOAUTORUN   9995                                    // reset required by OPTION SET (ie, re runs the program)
+#define RESET_COMMAND 9999     // indicates that the reset was caused by the RESET command
+#define WATCHDOG_TIMEOUT 9998  // reset caused by the watchdog timer
+#define PIN_RESTART 9997       // reset caused by entering 0 at the PIN prompt
+#define RESTART_NOAUTORUN 9996 // reset required after changing the LCD or touch config
+#define RESTART_DOAUTORUN 9995 // reset required by OPTION SET (ie, re runs the program)
 #define KEYBOARDCLOCK 11
 #define KEYBOARDDATA 12
 #define ALARM_NUM 0

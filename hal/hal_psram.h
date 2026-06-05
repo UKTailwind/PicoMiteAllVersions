@@ -68,7 +68,7 @@ void hal_psram_cache_sync(void);
  * directly. Returns NULL if the port has no nocache-aliased view
  * (ESP32-S3, etc.); callers translate NULL into the BASIC-visible
  * "NOCACHE not supported on this port" error. */
-uint8_t *hal_psram_nocache_alias(uint8_t *base);
+uint8_t * hal_psram_nocache_alias(uint8_t * base);
 
 /* Save / restore the PSRAM controller's state across an operation that
  * may clobber it (typically a flash erase/program batch on RP2350).
@@ -82,4 +82,4 @@ void hal_psram_restore_settings(void);
 }
 #endif
 
-#endif  /* HAL_PSRAM_H */
+#endif /* HAL_PSRAM_H */

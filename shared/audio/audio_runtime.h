@@ -6,7 +6,7 @@ extern "C" {
 #endif
 
 void audio_runtime_service(void);
-int audio_interrupt_pending(unsigned char **target);
+int audio_interrupt_pending(unsigned char ** target);
 
 #ifdef __cplusplus
 }

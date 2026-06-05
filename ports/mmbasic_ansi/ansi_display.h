@@ -17,7 +17,7 @@
  * next frame emits every cell. Called after SIGWINCH.
  */
 
-int  ansi_display_start(void);
+int ansi_display_start(void);
 void ansi_display_stop(void);
 void ansi_display_force_full_repaint(void);
 
