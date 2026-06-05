@@ -37,6 +37,7 @@
 #include "host_fb.h"
 #include "host_keys.h"
 #include "runtime/runtime.h"
+#include "shared/audio/audio_runtime.h"
 #include "shared/net/mm_net_interrupts.h"
 
 /* Forward declarations for output capture */
@@ -534,6 +535,7 @@ static void host_runtime_network_service(void) {
 static void host_runtime_service(void) {
     static int in_service;
     host_runtime_check_timeout();
+    audio_runtime_service();
     if (host_raw_mode_is_active() && host_poll_break_key(BreakKey)) {
         MMAbort = true;
     }

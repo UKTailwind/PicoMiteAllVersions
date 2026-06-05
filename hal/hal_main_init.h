@@ -57,6 +57,10 @@ void port_repl_post_clear_display_refresh(void);
  * mmc_stm32.c after audio/PWM init. */
 void hal_pwm_mode_shadow_apply(void);
 
+/* Boot-time audio pin/backend setup from Option.*. The RP impl lives
+ * in drivers/audio_rp2_pwm_i2s/; other ports do not call this path. */
+void port_audio_init_from_options(void);
+
 /* Re-enable input drivers on every PIO-eligible pin between
  * cmd_pio configures. Custom.c calls this at the end of each PIO
  * INIT/CONFIGURE setup. The pin upper bound differs by port shape:

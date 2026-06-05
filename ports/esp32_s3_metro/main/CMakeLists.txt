@@ -35,6 +35,16 @@ set(CORE_SRCS
     ${REPO_ROOT}/shared/audio/synth_pcm.c
 )
 
+set(AUDIO_SHARED_CORE_SRCS
+    ${REPO_ROOT}/shared/audio/Audio.c
+    ${REPO_ROOT}/shared/audio/audio_runtime.c
+    ${REPO_ROOT}/shared/audio/audio_stream.c
+)
+
+set(AUDIO_BACKEND_SRCS
+    hal_audio_esp32.c                       # I2S/PDM command/control + PCM sink backend
+)
+
 set(STATE_SRCS
     ${REPO_ROOT}/core/state/display_state.c
     ${REPO_ROOT}/core/state/pin_state.c
@@ -79,8 +89,7 @@ set(DEVICE_FACING_SRCS
     ${REPO_ROOT}/shared/gfx/RGB121.c
     ${REPO_ROOT}/shared/gfx/Tilemap.c
     ${REPO_ROOT}/core/mmbasic/FileIO.c
-    ${REPO_ROOT}/shared/audio/Audio.c
-    ${REPO_ROOT}/shared/audio/audio_stream.c
+    ${AUDIO_SHARED_CORE_SRCS}
     ${REPO_ROOT}/drivers/bmp_decoder/BmpDecoder.c
     ${REPO_ROOT}/third_party/regex/re.c
     ${REPO_ROOT}/third_party/picojpeg/picojpeg.c
@@ -146,7 +155,7 @@ set(PORT_LOCAL_SRCS
     esp32_pin_tables.c                      # Metro GPIO map + GPn codemap
     hal_ws2812_esp32.c                      # WS2812/SK6812 over ESP32 RMT
     esp32_audio_options.c                   # OPTION AUDIO / MM.INFO$(AUDIO) surface
-    hal_audio_esp32.c                       # I2S/PDM backend (shared synth_pcm)
+    ${AUDIO_BACKEND_SRCS}
     hal_vm_framebuffer_esp32_stub.c
     hal_time_esp32.c
     hal_random_esp32.c

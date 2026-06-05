@@ -12,7 +12,8 @@
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 
-#include "hal/hal_audio.h"
+#include "hal/hal_audio_control.h"
+#include "hal/hal_audio_stream.h"
 #include "hal/hal_time.h"
 #include "io.h"
 

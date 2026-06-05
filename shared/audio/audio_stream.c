@@ -19,7 +19,7 @@
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 #include "port_config.h"
-#include "hal/hal_audio.h"
+#include "hal/hal_audio_stream.h"
 #include "audio_stream.h"
 
 #define DRWAV_COPY_MEMORY(dst, src, sz) memcpy((dst), (src), (sz))
@@ -51,7 +51,7 @@ extern int ForceFileClose(int fnbr);
 #define MOD_OUTPUT_RATE (MOD_RENDER_RATE * 2)
 
 static int s_fnbr;
-static int s_active; /* P_NOTHING / P_WAV / P_MP3 / P_FLAC / P_MOD */
+static int s_active = P_NOTHING; /* P_NOTHING / P_WAV / P_MP3 / P_FLAC / P_MOD */
 static int s_channels;
 
 /* All large state lives in work memory (PSRAM on the ESP32), pointed to
@@ -125,6 +125,21 @@ static void release_buffers(void) {
 
 int audio_stream_active(void) {
     return s_active != P_NOTHING;
+}
+
+static int audio_stream_paused(void) {
+    switch (s_active) {
+    case P_WAV:
+        return CurrentlyPlaying == P_PAUSE_WAV;
+    case P_FLAC:
+        return CurrentlyPlaying == P_PAUSE_FLAC;
+    case P_MP3:
+        return CurrentlyPlaying == P_PAUSE_MP3;
+    case P_MOD:
+        return CurrentlyPlaying == P_PAUSE_MOD;
+    default:
+        return 0;
+    }
 }
 
 void audio_stream_stop(void) {
@@ -396,7 +411,7 @@ void audio_stream_service(void) {
     /* Pumped from several idle paths (PAUSE/CheckAbort, MMInkey, MMgetchar);
      * a non-re-entrant decoder must never be entered twice. */
     static int in_service;
-    if (in_service || s_active == P_NOTHING) return;
+    if (in_service || s_active == P_NOTHING || audio_stream_paused()) return;
     in_service = 1;
 
     if (!push_pending()) {

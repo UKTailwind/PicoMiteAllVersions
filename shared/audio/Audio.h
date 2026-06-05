@@ -37,6 +37,13 @@ void CloseAudio(int all);
 void StopAudio(void);
 void audioInterrupt(void);
 void CheckAudio(void);
+int audio_cmd_play_common(void);
+int audio_cmd_play_common_can_handle(const char * verb);
+int audio_cmd_play_file_can_use_common(const char * verb, char * fname);
+void audio_cmd_play_require_available(void);
+void audio_cmd_play_prepare_tone(void);
+void audio_cmd_play_prepare_sound(void);
+void audio_cmd_play_prepare_file(const char * verb);
 extern volatile int vol_left, vol_right;
 #endif
 
@@ -72,6 +79,7 @@ extern volatile bool WAVcomplete;
 extern int WAV_fnbr;
 extern int PWM_FREQ;
 extern char *sbuff1, *sbuff2, *modbuff;
+extern uint16_t *ubuff1, *ubuff2;
 extern int16_t *g_buff1, *g_buff2;
 extern volatile uint32_t bcount[3];
 extern volatile int wav_filesize; // head and tail of the ring buffer for com1

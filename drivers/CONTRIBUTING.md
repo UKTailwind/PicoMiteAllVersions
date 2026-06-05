@@ -10,7 +10,7 @@ Existing drivers for reference:
 
 - **Input**: `drivers/ps2_matrix/`, `drivers/usb_host_kbd/`, `drivers/i2c_picocalc_kbd/`, `drivers/gui_touch/`
 - **Display**: `drivers/spi_lcd/`, `drivers/vga_pio/`, `drivers/hdmi/`, `drivers/display_merge/`
-- **Audio**: `drivers/pwm_synth/`, `drivers/vs1053/`, `drivers/audio_mp3/`
+- **Audio**: `drivers/audio_rp2_pwm_i2s/`, `drivers/audio_vs1053/`, `drivers/vs1053/`, `drivers/audio_mp3/`
 - **Storage / memory**: `drivers/sd_spi/`, `drivers/pico_flash/`, `drivers/psram_heap/`
 - **VM-side framebuffer**: `drivers/vm_framebuffer_picomite/`, `drivers/vm_framebuffer_unsupported/`
 - **Graphics helpers**: `drivers/gfx_3d/`, `drivers/upng_sprite/`
@@ -61,7 +61,7 @@ Device hot paths — per-pixel writes, per-sample audio kernels, DMA IRQ handler
 
 Examples in-tree:
 - `drivers/spi_lcd/spi_lcd.c:103` — `spi_write_fast` pushes bytes through the SPI block one at a time; must stay RAM-resident.
-- `drivers/pwm_synth/pwm_synth.c:590` — `iconvert` runs inside the audio IRQ callback every sample.
+- `drivers/audio_rp2_pwm_i2s/audio_rp2_pwm_i2s.c` — sample conversion and output paths run inside the audio IRQ callback every sample.
 - `drivers/spi_lcd/spi_lcd_fastgfx.c:55` — `fastgfx_swap_core1` is the core1 FIFO receiver for the FASTGFX scanline-diff swap.
 
 ### 6. Conformance tests

@@ -149,14 +149,28 @@ set(PICOMITE_LEGACY_CORE_SOURCES
 	core/mmbasic/CFunction.c
 )
 
-# Audio: Pico command/hardware glue lives in drivers/pwm_synth/pwm_synth.c.
-# Software file decoding and tone/sound tables are shared with the other ports.
-# shared/audio/Audio.c itself holds the host/shared cmd_play surface and compiles
-# on host/ESP32-style builds via their port build files.
-set(PICOMITE_AUDIO_DEVICE_SOURCES
-	drivers/pwm_synth/pwm_synth.c
+# Audio: shared PLAY dispatcher/runtime/decoder core plus exactly one
+# command/control + PCM sink backend. RP-only hook bodies stay separate.
+set(PICOMITE_AUDIO_SHARED_CORE_SOURCES
+	shared/audio/Audio.c
+	shared/audio/audio_runtime.c
 	shared/audio/audio_stream.c
 	shared/audio/synth_pcm.c
+)
+set(PICOMITE_AUDIO_BACKEND_SOURCES
+	drivers/audio_rp2_pwm_i2s/audio_rp2_pwm_i2s.c
+	drivers/audio_rp2_pwm_i2s/audio_rp2_play.c
+)
+set(PICOMITE_AUDIO_RP_HOOK_SOURCES
+	drivers/audio_vs1053/audio_vs1053.c
+)
+set(PICOMITE_AUDIO_DEVICE_SOURCES
+	${PICOMITE_AUDIO_SHARED_CORE_SOURCES}
+	${PICOMITE_AUDIO_BACKEND_SOURCES}
+	${PICOMITE_AUDIO_RP_HOOK_SOURCES}
+)
+set_source_files_properties(shared/audio/Audio.c PROPERTIES
+	COMPILE_DEFINITIONS AUDIO_RUNTIME_BACKEND_EXTERNAL
 )
 
 set(PICOMITE_VM_SHARED_GFX_SOURCES

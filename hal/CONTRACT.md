@@ -241,9 +241,9 @@ The surface shrank during Phase 5 once the landscape was mapped: every keyboard 
 
 ---
 
-## `hal_audio.h` — tone + sound + stop + volume + pause + resume (Phase 6)
+## `hal_audio.h` — audio command control + PCM stream sink (Phase 6)
 
-*Status: Phase 6a landed — top-level BASIC PLAY commands routed through the HAL on host. Device arm migration + `hal_audio_sample_push` (WAV/MP3/FLAC/MOD streaming) + driver relocation (`drivers/pwm_synth/`, `drivers/vs1053/`) deferred to Phase 6b/6c.*
+*Status: Phase 6 landed — `shared/audio/Audio.c` owns BASIC `PLAY` dispatch across host, ESP32, pc386, stdio/ANSI, and RP targets. Runtime state lives in `shared/audio/audio_runtime.c`; PCM streaming lives behind `hal/hal_audio_stream.h`; RP transport code lives in `drivers/audio_rp2_pwm_i2s/`; VS1053 PLAY extensions live in `drivers/audio_vs1053/` and use the low-level codec driver in `drivers/vs1053/`.*
 
 ```c
 void hal_audio_init(void);
@@ -261,15 +261,16 @@ The real signatures grew to match the actual BASIC semantics: independent L/R fr
 
 Return type dropped to `void` — the earlier sketch returned `int` but neither backend has a meaningful error to surface at this level (arg validation happens in cmd_play before the HAL call; internal backend failures are diagnostic only).
 
-**Call sites in core (migrated Phase 6a):**
+**Call sites in core (migrated):**
 
-- `shared/audio/Audio.c` host arm (lines 2225–2323) — `cmd_play`, `CloseAudio`, `StopAudio` route through `hal_audio_*` instead of calling `host_sim_audio_*` directly.
+- `shared/audio/Audio.c` — shared `cmd_play`, `CloseAudio`, and `StopAudio` route through the audio control HAL and optional PLAY extension hooks.
+- `shared/audio/audio_stream.c` — WAV/MP3/FLAC/MOD decoding feeds the selected PCM stream sink.
 
-**Not yet migrated:**
+**RP layout:**
 
-- `shared/audio/Audio.c` device arm (~2000 lines of PWM / DMA / codec logic). Device `cmd_play` TONE/SOUND/STOP/VOLUME/PAUSE/RESUME handling stays hardware-gated until the `#ifndef MMBASIC_HOST` wrapper is collapsed in Phase 6b.
-- `hal_audio_sample_push(const int16_t *samples, size_t frames)` for WAV/FLAC/MP3/MOD/MIDI streaming — Phase 6b.
-- `drivers/pwm_synth/` + `drivers/vs1053/` physical relocation — Phase 6c.
+- `drivers/audio_rp2_pwm_i2s/audio_rp2_pwm_i2s.c` owns PWM/SPI DAC/PIO-I2S transport, sample publication, conversion, and IRQ handling.
+- `drivers/audio_rp2_pwm_i2s/audio_rp2_play.c` owns RP-only PLAY hooks such as ARRAY, MOD sample handling, playlist advance, and routing file playback to software decode or VS1053.
+- `drivers/audio_vs1053/audio_vs1053.c` owns VS1053 MIDI/STREAM/HALT/CONTINUE/session PLAY extensions.
 
 **Hard part:** WASM's gesture-armed AudioContext (web-host Phase 3). `hal_audio_resume` must be idempotent and callable from any input event path. Both host impls (host_sim_audio.c and host_wasm_audio.c) already honour this; the HAL forwards to them unchanged.
 

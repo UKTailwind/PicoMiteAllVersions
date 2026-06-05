@@ -2,12 +2,9 @@
  * shared/audio/synth_pcm.c — portable MMBasic tone/sound synthesizer.
  *
  * Wavetables, SOUND/TONE voice state, and the per-frame mixing kernel,
- * shared by every audio backend. The synthesis math is transplanted
- * verbatim from the RP2 device path (the PWM-wrap audio ISR in
- * drivers/sd_spi and the table/state definitions in
- * drivers/pwm_synth); only the output is restructured to return one
- * stereo frame instead of pushing to the PIO FIFO, so a buffer-based
- * sink (ESP32 I2S) and the RP2 ISR drive identical samples.
+ * shared by every audio backend. The synthesis math follows the RP2
+ * device path, but returns one stereo frame instead of pushing directly
+ * to a hardware FIFO.
  *
  * Hot functions are tagged MMB_HOT_FUNC so the RP2 build keeps them in
  * RAM (__not_in_flash_func); on other ports the macro is a no-op.
@@ -22,9 +19,8 @@
 #include "port_config.h"
 #include "synth_pcm.h"
 
-/* TONE scalar state (PhaseAC/PhaseM/vol/mono) is owned by the command
- * layer that links per binary — pwm_synth.c on RP2, shared/audio/Audio.c
- * on host/ESP32 — so it is referenced here via synth_pcm.h, not defined. */
+/* TONE scalar state (PhaseAC/PhaseM/vol/mono) is owned by shared runtime
+ * state and referenced here via synth_pcm.h, not defined locally. */
 
 /* ---- SOUND voice state (per slot) ---- */
 volatile int sound_v_left[MAXSOUNDS] = {[0 ... MAXSOUNDS - 1] = 25};
@@ -37,7 +33,7 @@ volatile unsigned short * sound_mode_right[MAXSOUNDS];
 unsigned short * noisetable = NULL;
 const unsigned short whitenoise[2] = {0};
 
-/* ---- wavetables (relocated from drivers/pwm_synth) ---- */
+/* ---- wavetables ---- */
 const unsigned short nulltable[1] = {97};
 const unsigned short squaretable[1] = {99};
 const unsigned short triangletable[4096] = {

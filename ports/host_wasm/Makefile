@@ -79,6 +79,9 @@ LDFLAGS = -pthread -sPTHREAD_POOL_SIZE=1 \
           --preload-file $(REPO_ROOT)/ports/host_wasm/demos@/bundle \
           -Wl,--allow-multiple-definition
 
+AUDIO_SHARED_CORE_SRCS = shared/audio/Audio.c shared/audio/audio_runtime.c shared/audio/audio_stream.c
+AUDIO_BACKEND_SRCS = hal_audio_wasm.c
+
 # Core MMBasic sources — mirror ports/host_native/Makefile CORE_SRCS.
 CORE_SRCS = core/mmbasic/MMBasic.c core/mmbasic/Commands.c core/mmbasic/Functions.c core/mmbasic/Operators.c core/mmbasic/MATHS.c \
             core/mmbasic/Memory.c core/mmbasic/Editor.c \
@@ -109,7 +112,7 @@ CORE_SRCS = core/mmbasic/MMBasic.c core/mmbasic/Commands.c core/mmbasic/Function
             mm_net_udp_cmd.c \
             mm_net_web_cmd.c \
             mm_net_wifi_cmd.c \
-            core/mmbasic/Draw.c shared/gfx/RGB121.c shared/gfx/Tilemap.c core/mmbasic/FileIO.c shared/audio/Audio.c shared/audio/audio_stream.c drivers/bmp_decoder/BmpDecoder.c third_party/regex/re.c third_party/picojpeg/picojpeg.c
+            core/mmbasic/Draw.c shared/gfx/RGB121.c shared/gfx/Tilemap.c core/mmbasic/FileIO.c $(AUDIO_SHARED_CORE_SRCS) drivers/bmp_decoder/BmpDecoder.c third_party/regex/re.c third_party/picojpeg/picojpeg.c
 # Stubs + host-only subsystems — match ports/host_native/Makefile.
 CORE_SRCS += audio_mp3_real.c third_party/hxcmod/hxcmod.c spi_lcd_mem332_stub.c display_merge_stub.c vga_ops_stub.c
 CORE_SRCS += gfx_3d.c upng_sprite_stub.c gui_touch_stub.c gui_controls_stub.c psram_heap_stub.c hal_psram_stub.c i2c_keypad_stub.c heartbeat_stub.c
@@ -132,7 +135,7 @@ HOST_PORTABLE_SRCS = host_runtime.c host_fastgfx.c host_fs_shims.c \
                      host_sim_emit_stub.c \
                      host_time.c host_fb.c host_keys.c host_bc_runtime_noop.c \
                      hal_flash_host.c hal_time_host.c hal_random_host.c hal_pin_host.c hal_storage_host.c hal_filesystem_host.c \
-                     hal_keyboard_host.c hal_audio_host.c hal_vm_framebuffer_host.c
+                     hal_keyboard_host.c $(AUDIO_BACKEND_SRCS) hal_vm_framebuffer_host.c
 HOST_WASM_SRCS = host_wasm_main.c host_wasm_console.c host_wasm_canvas.c \
                  host_wasm_audio.c host_wasm_web.c host_sim_slowdown.c \
                  host_fastgfx_resync.c host_wasm_mode.c
