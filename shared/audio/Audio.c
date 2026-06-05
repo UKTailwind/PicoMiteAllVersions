@@ -50,7 +50,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 
 volatile int __attribute__((weak)) vol_left = 100;
 volatile int __attribute__((weak)) vol_right = 100;
-int __attribute__((weak)) WAV_fnbr = 0;
+int WAV_fnbr = 0;
 int __attribute__((weak)) PWM_FREQ = 0;
 extern unsigned short * usertable; /* PLAY LOAD SOUND target (audio_state.c) */
 static uint8_t s_sound_slot_mask[4];

@@ -46,7 +46,6 @@ volatile int v_left, v_right, vol_left = 100, vol_right = 100;
 char * wav_buf;            // pointer to the buffer for received wav data
 volatile int wav_filesize; // head and tail of the ring buffer for com1
 volatile int tickspersample;
-int WAV_fnbr = 0;
 int PWM_FREQ;
 volatile int swingbuf = 0, nextbuf = 0, playreadcomplete = 1;
 char *sbuff1 = NULL, *sbuff2 = NULL;

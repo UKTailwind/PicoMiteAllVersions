@@ -688,7 +688,7 @@ void hal_audio_sound(int slot, const char * ch, const char * type,
     }
     if (!(CurrentlyPlaying == P_SOUND || CurrentlyPlaying == P_PAUSE_SOUND)) {
         setrate(PWM_FREQ);
-            if (Option.AUDIO_MISO_PIN) audio_vs1053_play_immediate(P_SOUND);
+        if (Option.AUDIO_MISO_PIN) audio_vs1053_play_immediate(P_SOUND);
         rp2_audio_enable_output_irq();
     }
 }

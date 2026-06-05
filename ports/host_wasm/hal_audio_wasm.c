@@ -74,6 +74,7 @@ int hal_audio_sample_begin(int sample_rate_hz) {
     stream_queued_frames = 0.0;
     stream_last_ms = wasm_audio_now_ms();
 #ifdef MMBASIC_WASM
+    // clang-format off
     MAIN_THREAD_EM_ASM({
         if (typeof window !== 'undefined' && window.picomiteAudio) {
             window.picomiteAudio.streamBegin($0);
@@ -81,6 +82,7 @@ int hal_audio_sample_begin(int sample_rate_hz) {
             postMessage({ type: 'audio', op: 'streamBegin', args: [$0] });
         }
     }, sample_rate_hz);
+    // clang-format on
 #endif
     return 0;
 }
@@ -91,6 +93,7 @@ void hal_audio_sample_end(void) {
     stream_queued_frames = 0.0;
     stream_last_ms = 0.0;
 #ifdef MMBASIC_WASM
+    // clang-format off
     MAIN_THREAD_EM_ASM({
         if (typeof window !== 'undefined' && window.picomiteAudio) {
             window.picomiteAudio.streamEnd();
@@ -98,11 +101,13 @@ void hal_audio_sample_end(void) {
             postMessage({ type: 'audio', op: 'streamEnd', args: [] });
         }
     });
+    // clang-format on
 #endif
 }
 
 void hal_audio_sample_eof(void) {
 #ifdef MMBASIC_WASM
+    // clang-format off
     MAIN_THREAD_ASYNC_EM_ASM({
         if (typeof window !== 'undefined' && window.picomiteAudio) {
             window.picomiteAudio.streamEof();
@@ -110,6 +115,7 @@ void hal_audio_sample_eof(void) {
             postMessage({ type: 'audio', op: 'streamEof', args: [] });
         }
     });
+    // clang-format on
 #endif
 }
 
@@ -134,6 +140,7 @@ int hal_audio_sample_push(const int16_t * frames, int frame_count) {
     int accepted = frame_count < space ? frame_count : space;
     stream_queued_frames += accepted;
 #ifdef MMBASIC_WASM
+    // clang-format off
     MAIN_THREAD_EM_ASM({
         const ptr = $0;
         const frames = $1;
@@ -146,6 +153,7 @@ int hal_audio_sample_push(const int16_t * frames, int frame_count) {
             postMessage({ type: 'audio', op: 'streamSamples', args: [rate, data.buffer] }, [data.buffer]);
         }
     }, frames, accepted, stream_rate_hz);
+    // clang-format on
 #endif
     return accepted;
 }
