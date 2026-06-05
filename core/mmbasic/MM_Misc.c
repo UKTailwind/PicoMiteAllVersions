@@ -48,6 +48,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "hal/hal_keyboard.h"
 #include "hal/hal_gui_controls.h"
 #include "hal/hal_watchdog.h"
+#include "shared/audio/audio_option_common.h"
 #include "hardware/regs/addressmap.h"     /* XIP_BASE */
 #include "hardware/spi.h"
 #include "hardware/pio.h"
@@ -942,6 +943,8 @@ void MIPS16 disable_sd(void){
     port_disable_sd_release_system_spi();
 }
 void disable_audio(void){
+    int audio_i2s_lrck = audio_i2s_lrck_pin();
+
     if(!IsInvalidPin(Option.AUDIO_L))ExtCurrentConfig[Option.AUDIO_L] = EXT_DIG_IN ;
     if(!IsInvalidPin(Option.AUDIO_L))ExtCfg(Option.AUDIO_L, EXT_NOT_CONFIG, 0);
 
@@ -972,26 +975,13 @@ void disable_audio(void){
     if(!IsInvalidPin(Option.audio_i2s_bclk))ExtCurrentConfig[Option.audio_i2s_bclk] = EXT_DIG_IN ;
     if(!IsInvalidPin(Option.audio_i2s_bclk))ExtCfg(Option.audio_i2s_bclk, EXT_NOT_CONFIG, 0);
 
-
-    if(!IsInvalidPin(PINMAP[PinDef[Option.audio_i2s_bclk].GPno+1]))ExtCurrentConfig[PINMAP[PinDef[Option.audio_i2s_bclk].GPno+1]] = EXT_DIG_IN ;
-    if(!IsInvalidPin(PINMAP[PinDef[Option.audio_i2s_bclk].GPno+1]))ExtCfg(PINMAP[PinDef[Option.audio_i2s_bclk].GPno+1], EXT_NOT_CONFIG, 0);
-
+    if(!IsInvalidPin(audio_i2s_lrck))ExtCurrentConfig[audio_i2s_lrck] = EXT_DIG_IN ;
+    if(!IsInvalidPin(audio_i2s_lrck))ExtCfg(audio_i2s_lrck, EXT_NOT_CONFIG, 0);
 
     if(!IsInvalidPin(Option.audio_i2s_data))ExtCurrentConfig[Option.audio_i2s_data] = EXT_DIG_IN ;
     if(!IsInvalidPin(Option.audio_i2s_data))ExtCfg(Option.audio_i2s_data, EXT_NOT_CONFIG, 0);
 
-    Option.AUDIO_L=0;
-    Option.AUDIO_R=0;
-    Option.AUDIO_CLK_PIN=0;
-    Option.AUDIO_CS_PIN=0;
-    Option.AUDIO_DCS_PIN=0;
-    Option.AUDIO_DREQ_PIN=0;
-    Option.AUDIO_RESET_PIN=0;
-    Option.AUDIO_MOSI_PIN=0;
-    Option.AUDIO_MISO_PIN=0;
-    Option.audio_i2s_bclk=0;
-    Option.audio_i2s_data=0;
-    Option.AUDIO_SLICE=99;
+    audio_option_clear_common_fields(AUDIO_OPTION_SLICE_DISABLED);
 }
 /* ConfigDisplayUser + clear320 (SPI-LCD-only) live in
  * ports/pico_sdk_common/spi_lcd_options.c. */
@@ -1298,47 +1288,32 @@ void MIPS16 cmd_option(void) {
             int pin1,pin2,pin3,pin4,pin5,pin6,pin7;
             getargs(&p,13,(unsigned char *)",");
             if(argc!=13)error("Syntax");
-            unsigned char code;
 //
-            if(!(code=codecheck(argv[0])))argv[0]+=2;
-            pin1 = getinteger(argv[0]);
-            if(!code)pin1=codemap(pin1);
+            pin1 = audio_option_parse_mmbasic_pin(&argv[0]);
             if(IsInvalidPin(pin1)) error("Invalid pin");
             check_audio_pin_available(pin1);
 //
-            if(!(code=codecheck(argv[2])))argv[2]+=2;
-            pin2 = getinteger(argv[2]);
-            if(!code)pin2=codemap(pin2);
+            pin2 = audio_option_parse_mmbasic_pin(&argv[2]);
             if(IsInvalidPin(pin2)) error("Invalid pin");
             check_audio_pin_available(pin2);
 //
-            if(!(code=codecheck(argv[4])))argv[4]+=2;
-            pin3 = getinteger(argv[4]);
-            if(!code)pin3=codemap(pin3);
+            pin3 = audio_option_parse_mmbasic_pin(&argv[4]);
             if(IsInvalidPin(pin3)) error("Invalid pin");
             check_audio_pin_available(pin3);
 //
-            if(!(code=codecheck(argv[6])))argv[6]+=2;
-            pin4 = getinteger(argv[6]);
-            if(!code)pin4=codemap(pin4);
+            pin4 = audio_option_parse_mmbasic_pin(&argv[6]);
             if(IsInvalidPin(pin4)) error("Invalid pin");
             check_audio_pin_available(pin4);
 //
-            if(!(code=codecheck(argv[8])))argv[8]+=2;
-            pin5 = getinteger(argv[8]);
-            if(!code)pin5=codemap(pin5);
+            pin5 = audio_option_parse_mmbasic_pin(&argv[8]);
             if(IsInvalidPin(pin5)) error("Invalid pin");
             check_audio_pin_available(pin5);
 //
-            if(!(code=codecheck(argv[10])))argv[10]+=2;
-            pin6 = getinteger(argv[10]);
-            if(!code)pin6=codemap(pin6);
+            pin6 = audio_option_parse_mmbasic_pin(&argv[10]);
             if(IsInvalidPin(pin6)) error("Invalid pin");
             check_audio_pin_available(pin6);
 //
-            if(!(code=codecheck(argv[12])))argv[12]+=2;
-            pin7 = getinteger(argv[12]);
-            if(!code)pin7=codemap(pin7);
+            pin7 = audio_option_parse_mmbasic_pin(&argv[12]);
             if(IsInvalidPin(pin7)) error("Invalid pin");
             check_audio_pin_available(pin7);
 //
@@ -1366,23 +1341,16 @@ void MIPS16 cmd_option(void) {
             int pin1,pin2,pin3;
             getargs(&p,5,(unsigned char *)",");
             if(argc!=5)error("Syntax");
-            unsigned char code;
 //
-            if(!(code=codecheck(argv[0])))argv[0]+=2;
-            pin1 = getinteger(argv[0]);
-            if(!code)pin1=codemap(pin1);
+            pin1 = audio_option_parse_mmbasic_pin(&argv[0]);
             if(IsInvalidPin(pin1)) error("Invalid pin");
             check_audio_pin_available(pin1);
 //
-            if(!(code=codecheck(argv[2])))argv[2]+=2;
-            pin2 = getinteger(argv[2]);
-            if(!code)pin2=codemap(pin2);
+            pin2 = audio_option_parse_mmbasic_pin(&argv[2]);
             if(IsInvalidPin(pin2)) error("Invalid pin");
             check_audio_pin_available(pin2);
 //
-            if(!(code=codecheck(argv[4])))argv[4]+=2;
-            pin3 = getinteger(argv[4]);
-            if(!code)pin3=codemap(pin3);
+            pin3 = audio_option_parse_mmbasic_pin(&argv[4]);
             if(IsInvalidPin(pin3)) error("Invalid pin");
             check_audio_pin_available(pin3);
 //
@@ -1407,11 +1375,8 @@ void MIPS16 cmd_option(void) {
             int pin1,pin2,pin3;
             getargs(&p,3,(unsigned char *)",");
             if(argc!=3)error("Syntax");
-            unsigned char code;
 //
-            if(!(code=codecheck(argv[0])))argv[0]+=2;
-            pin1 = getinteger(argv[0]);
-            if(!code)pin1=codemap(pin1);
+            pin1 = audio_option_parse_mmbasic_pin(&argv[0]);
             if(IsInvalidPin(pin1)) error("Invalid pin");
             check_audio_pin_available(pin1);
 //
@@ -1419,9 +1384,7 @@ void MIPS16 cmd_option(void) {
             if(IsInvalidPin(pin3)) error("Invalid pin");
             check_audio_pin_available(pin3);
 //
-            if(!(code=codecheck(argv[2])))argv[2]+=2;
-            pin2 = getinteger(argv[2]);
-            if(!code)pin2=codemap(pin2);
+            pin2 = audio_option_parse_mmbasic_pin(&argv[2]);
             if(IsInvalidPin(pin2)) error("Invalid pin");
             if(pin2==pin1 || pin2==pin3) error("Pin %/| is in use",pin2,pin2);
             check_audio_pin_available(pin2);
@@ -1439,15 +1402,10 @@ void MIPS16 cmd_option(void) {
         }
     	getargs(&tp,3,(unsigned char *)",");
          if(argc!=3)error("Syntax");
-        unsigned char code;
-        if(!(code=codecheck(argv[0])))argv[0]+=2;
-        pin1 = getinteger(argv[0]);
-        if(!code)pin1=codemap(pin1);
+        pin1 = audio_option_parse_mmbasic_pin(&argv[0]);
         if(IsInvalidPin(pin1)) error("Invalid pin");
         check_audio_pin_available(pin1);
-        if(!(code=codecheck(argv[2])))argv[2]+=2;
-        pin2 = getinteger(argv[2]);
-        if(!code)pin2=codemap(pin2);
+        pin2 = audio_option_parse_mmbasic_pin(&argv[2]);
         if(IsInvalidPin(pin2)) error("Invalid pin");
         check_audio_pin_available(pin2);
         slice=checkslice(pin1,pin2, 0);

@@ -11,6 +11,7 @@
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
+#include "shared/audio/audio_option_common.h"
 
 void port_apply_load_overrides(void)
 {
@@ -39,7 +40,9 @@ void port_apply_load_overrides(void)
 
     Option.DefaultFC = GREEN;
 
-    if (!Option.AUDIO_L && !Option.AUDIO_CLK_PIN && !Option.audio_i2s_bclk) {
+    if (Option.AUDIO_SLICE == AUDIO_OPTION_SLICE_DISABLED) {
+        audio_option_clear_common_fields(AUDIO_OPTION_SLICE_DISABLED);
+    } else if (!Option.AUDIO_L && !Option.AUDIO_CLK_PIN && !Option.audio_i2s_bclk) {
         Option.AUDIO_L = 31;
         Option.AUDIO_R = 32;
         Option.AUDIO_SLICE = 5;

@@ -1,4 +1,3 @@
-#include <ctype.h>
 #include <stdint.h>
 #include <string.h>
 
@@ -9,21 +8,55 @@
 #include "OptionCommands.h"
 #include "port_config.h"
 #include "hal/hal_pin.h"
+#include "shared/audio/audio_option_common.h"
 
 #include "esp32_audio_options.h"
-
-static int esp32_audio_parse_pin_arg(unsigned char *arg)
-{
-    unsigned char *p = arg;
-    skipspace(p);
-    if ((p[0] == 'G' || p[0] == 'g') && (p[1] == 'P' || p[1] == 'p') && isdigit(p[2]))
-        return codemap(getinteger(p + 2));
-    return getinteger(p);
-}
 
 static int esp32_audio_pin_invalid(int pin)
 {
     return pin <= 0 || pin > NBRPINS || (PinDef[pin].mode & UNUSED);
+}
+
+static int esp32_audio_i2s_ws_pin(void)
+{
+    if (esp32_audio_pin_invalid(Option.audio_i2s_bclk))
+        return 0;
+    int ws_gpio = PinDef[Option.audio_i2s_bclk].GPno + 1;
+    if (ws_gpio < 0 || ws_gpio >= HAL_PORT_GPIO_COUNT)
+        return 0;
+    return codemap(ws_gpio);
+}
+
+static int esp32_audio_pin_reserved(int pin)
+{
+    return !esp32_audio_pin_invalid(pin) && ExtCurrentConfig[pin] == EXT_BOOT_RESERVED;
+}
+
+static int esp32_audio_is_current_audio_pin(int pin)
+{
+    if (esp32_audio_pin_invalid(pin))
+        return 0;
+
+    if (!esp32_audio_pin_reserved(pin))
+        return 0;
+
+    if (Option.AUDIO_L && (pin == Option.AUDIO_L || pin == Option.AUDIO_R))
+        return 1;
+
+    if (Option.audio_i2s_bclk && (pin == Option.audio_i2s_bclk ||
+                                  pin == Option.audio_i2s_data ||
+                                  pin == esp32_audio_i2s_ws_pin()))
+        return 1;
+
+    return 0;
+}
+
+static void esp32_audio_release_pin(int pin)
+{
+    if (!esp32_audio_pin_reserved(pin))
+        return;
+    hal_pin_deinit((uint32_t)PinDef[pin].GPno);
+    ExtCurrentConfig[pin] = EXT_NOT_CONFIG;
 }
 
 void esp32_audio_print_options(void)
@@ -46,42 +79,16 @@ void esp32_audio_print_options(void)
 
 static void esp32_audio_clear_options(void)
 {
-    if (!esp32_audio_pin_invalid(Option.AUDIO_L)) {
-        hal_pin_deinit((uint32_t)PinDef[Option.AUDIO_L].GPno);
-        ExtCurrentConfig[Option.AUDIO_L] = EXT_NOT_CONFIG;
+    if (Option.AUDIO_L) {
+        esp32_audio_release_pin(Option.AUDIO_L);
+        esp32_audio_release_pin(Option.AUDIO_R);
     }
-    if (!esp32_audio_pin_invalid(Option.AUDIO_R)) {
-        hal_pin_deinit((uint32_t)PinDef[Option.AUDIO_R].GPno);
-        ExtCurrentConfig[Option.AUDIO_R] = EXT_NOT_CONFIG;
+    if (Option.audio_i2s_bclk) {
+        esp32_audio_release_pin(Option.audio_i2s_bclk);
+        esp32_audio_release_pin(esp32_audio_i2s_ws_pin());
+        esp32_audio_release_pin(Option.audio_i2s_data);
     }
-    if (!esp32_audio_pin_invalid(Option.audio_i2s_bclk)) {
-        int ws_gpio = PinDef[Option.audio_i2s_bclk].GPno + 1;
-        hal_pin_deinit((uint32_t)PinDef[Option.audio_i2s_bclk].GPno);
-        ExtCurrentConfig[Option.audio_i2s_bclk] = EXT_NOT_CONFIG;
-        if (ws_gpio >= 0 && ws_gpio < HAL_PORT_GPIO_COUNT) {
-            int ws_pin = codemap(ws_gpio);
-            if (!esp32_audio_pin_invalid(ws_pin)) {
-                hal_pin_deinit((uint32_t)PinDef[ws_pin].GPno);
-                ExtCurrentConfig[ws_pin] = EXT_NOT_CONFIG;
-            }
-        }
-    }
-    if (!esp32_audio_pin_invalid(Option.audio_i2s_data)) {
-        hal_pin_deinit((uint32_t)PinDef[Option.audio_i2s_data].GPno);
-        ExtCurrentConfig[Option.audio_i2s_data] = EXT_NOT_CONFIG;
-    }
-    Option.AUDIO_L = 0;
-    Option.AUDIO_R = 0;
-    Option.AUDIO_SLICE = 0;
-    Option.AUDIO_CLK_PIN = 0;
-    Option.AUDIO_MOSI_PIN = 0;
-    Option.AUDIO_MISO_PIN = 0;
-    Option.AUDIO_CS_PIN = 0;
-    Option.AUDIO_DCS_PIN = 0;
-    Option.AUDIO_DREQ_PIN = 0;
-    Option.AUDIO_RESET_PIN = 0;
-    Option.audio_i2s_bclk = 0;
-    Option.audio_i2s_data = 0;
+    audio_option_clear_common_fields(0);
 }
 
 void disable_audio(void)
@@ -89,12 +96,67 @@ void disable_audio(void)
     esp32_audio_clear_options();
 }
 
-static void esp32_audio_require_free_pin(int pin)
+static void esp32_audio_require_valid_pin(int pin)
 {
     if (esp32_audio_pin_invalid(pin))
         error("Invalid pin");
-    if (ExtCurrentConfig[pin] != EXT_NOT_CONFIG)
+}
+
+static void esp32_audio_require_available_pin(int pin)
+{
+    esp32_audio_require_valid_pin(pin);
+    if (ExtCurrentConfig[pin] != EXT_NOT_CONFIG && !esp32_audio_is_current_audio_pin(pin))
         error("Pin %/| is in use", pin, pin);
+}
+
+static void esp32_audio_require_distinct_pin(int first_pin, int second_pin)
+{
+    if (first_pin == second_pin)
+        error("Pin %/| is in use", second_pin, second_pin);
+}
+
+static void esp32_audio_reserve_i2s(int bclk_pin, int data_pin, int ws_pin)
+{
+    Option.audio_i2s_bclk = bclk_pin;
+    Option.audio_i2s_data = data_pin;
+    Option.AUDIO_L = 0;
+    Option.AUDIO_R = 0;
+    Option.AUDIO_SLICE = 0;
+    ExtCurrentConfig[bclk_pin] = EXT_BOOT_RESERVED;
+    ExtCurrentConfig[ws_pin] = EXT_BOOT_RESERVED;
+    ExtCurrentConfig[data_pin] = EXT_BOOT_RESERVED;
+}
+
+static void esp32_audio_reserve_pdm(int left_pin, int right_pin)
+{
+    Option.AUDIO_L = left_pin;
+    Option.AUDIO_R = right_pin;
+    Option.AUDIO_SLICE = 0;
+    Option.audio_i2s_bclk = 0;
+    Option.audio_i2s_data = 0;
+    ExtCurrentConfig[left_pin] = EXT_BOOT_RESERVED;
+    ExtCurrentConfig[right_pin] = EXT_BOOT_RESERVED;
+}
+
+static void esp32_audio_require_available_pins3(int pin1, int pin2, int pin3)
+{
+    esp32_audio_require_available_pin(pin1);
+    esp32_audio_require_available_pin(pin2);
+    esp32_audio_require_available_pin(pin3);
+}
+
+static void esp32_audio_require_available_pins2(int pin1, int pin2)
+{
+    esp32_audio_require_available_pin(pin1);
+    esp32_audio_require_available_pin(pin2);
+}
+
+static int esp32_audio_ws_from_bclk(int bclk_pin)
+{
+    esp32_audio_require_valid_pin(bclk_pin);
+    int ws_pin = codemap(PinDef[bclk_pin].GPno + 1);
+    esp32_audio_require_valid_pin(ws_pin);
+    return ws_pin;
 }
 
 static void esp32_audio_save_options(void)
@@ -126,23 +188,15 @@ int esp32_audio_option_setter(unsigned char *line)
         int bclk_pin, data_pin, ws_pin;
         getargs(&line, 3, (unsigned char *)",");
         if (argc != 3) error("Syntax");
-        if (Option.AUDIO_L || Option.audio_i2s_bclk || Option.AUDIO_CLK_PIN)
-            error("Audio already configured");
-        bclk_pin = esp32_audio_parse_pin_arg(argv[0]);
-        data_pin = esp32_audio_parse_pin_arg(argv[2]);
-        esp32_audio_require_free_pin(bclk_pin);
-        esp32_audio_require_free_pin(data_pin);
-        ws_pin = codemap(PinDef[bclk_pin].GPno + 1);
-        esp32_audio_require_free_pin(ws_pin);
-        if (ws_pin == data_pin) error("Pin %/| is in use", data_pin, data_pin);
-        Option.audio_i2s_bclk = bclk_pin;
-        Option.audio_i2s_data = data_pin;
-        Option.AUDIO_L = 0;
-        Option.AUDIO_R = 0;
-        Option.AUDIO_SLICE = 0;
-        ExtCurrentConfig[bclk_pin] = EXT_BOOT_RESERVED;
-        ExtCurrentConfig[ws_pin] = EXT_BOOT_RESERVED;
-        ExtCurrentConfig[data_pin] = EXT_BOOT_RESERVED;
+        bclk_pin = audio_option_parse_gp_pin(argv[0]);
+        data_pin = audio_option_parse_gp_pin(argv[2]);
+        esp32_audio_require_valid_pin(data_pin);
+        ws_pin = esp32_audio_ws_from_bclk(bclk_pin);
+        esp32_audio_require_distinct_pin(bclk_pin, data_pin);
+        esp32_audio_require_distinct_pin(ws_pin, data_pin);
+        esp32_audio_require_available_pins3(bclk_pin, data_pin, ws_pin);
+        esp32_audio_clear_options();
+        esp32_audio_reserve_i2s(bclk_pin, data_pin, ws_pin);
         esp32_audio_save_options();
         return 1;
     }
@@ -153,20 +207,14 @@ int esp32_audio_option_setter(unsigned char *line)
         if (!line) line = tp;
         getargs(&line, 3, (unsigned char *)",");
         if (argc != 3) error("Syntax");
-        if (Option.AUDIO_L || Option.audio_i2s_bclk || Option.AUDIO_CLK_PIN)
-            error("Audio already configured");
-        left_pin = esp32_audio_parse_pin_arg(argv[0]);
-        right_pin = esp32_audio_parse_pin_arg(argv[2]);
-        esp32_audio_require_free_pin(left_pin);
-        esp32_audio_require_free_pin(right_pin);
-        if (left_pin == right_pin) error("Pin %/| is in use", right_pin, right_pin);
-        Option.AUDIO_L = left_pin;
-        Option.AUDIO_R = right_pin;
-        Option.AUDIO_SLICE = 0;
-        Option.audio_i2s_bclk = 0;
-        Option.audio_i2s_data = 0;
-        ExtCurrentConfig[left_pin] = EXT_BOOT_RESERVED;
-        ExtCurrentConfig[right_pin] = EXT_BOOT_RESERVED;
+        left_pin = audio_option_parse_gp_pin(argv[0]);
+        right_pin = audio_option_parse_gp_pin(argv[2]);
+        esp32_audio_require_valid_pin(left_pin);
+        esp32_audio_require_valid_pin(right_pin);
+        esp32_audio_require_distinct_pin(left_pin, right_pin);
+        esp32_audio_require_available_pins2(left_pin, right_pin);
+        esp32_audio_clear_options();
+        esp32_audio_reserve_pdm(left_pin, right_pin);
         esp32_audio_save_options();
         return 1;
     }

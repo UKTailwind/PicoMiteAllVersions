@@ -20,7 +20,7 @@
 #endif
 
 extern char *WAVInterrupt;
-extern bool WAVcomplete;
+extern volatile bool WAVcomplete;
 
 void MMB_HOT_FUNC(mmbasic_runtime_interrupt_save_error_state)(
     int *saved_option_error_skip,

@@ -20,6 +20,7 @@
 #include "ffconf.h"
 #include "hardware/pwm.h"
 #include "hardware/irq.h"
+#include "hardware/sync.h"
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 #include "port_config.h"
@@ -116,6 +117,9 @@ uint16_t *playbuff;
 int16_t *uplaybuff;
 volatile int ppos = 0;                                                       // playing position for PLAY WAV
 uint8_t nchannels;
+/* The PWM ISR treats bcount[1] and bcount[2] as the publication flags for
+ * completed ping-pong buffers. Foreground code must fill/convert a buffer
+ * first, then assign bcount[target] only inside a short critical section. */
 volatile uint32_t bcount[3] = {0, 0, 0};
 volatile uint8_t audiorepeat=1;
 a_flist *alist=NULL;
@@ -130,15 +134,18 @@ char *streambuffer=NULL;
 char WAVfilename[FF_MAX_LFN]={0};
 volatile int audio_shared_stream_active = 0;
 static int audio_shared_acquired_target = 0;
+static void pico_audio_publish_initial_target(int target, int count);
 //*************************************************************************************
 
 static void clear_sample_buffer_state(int complete) {
+	uint32_t save = save_and_disable_interrupts();
 	bcount[1] = bcount[2] = 0;
 	wav_filesize = 0;
 	swingbuf = nextbuf = 0;
 	audio_shared_acquired_target = 0;
 	ppos = 0;
 	playreadcomplete = complete;
+	restore_interrupts(save);
 }
 
 
@@ -271,21 +278,18 @@ void playvs1053(int mode){
 	setVolumes(vol_left,vol_right);
 	//playing a file
 	setrate(6000); //32KHz should be fast enough
+	int count;
 	if(mode==P_MOD){
 		memcpy((char *)sbuff1,wavheader,sizeof(wavheader));
-		bcount[1]=44;
-		wav_filesize=bcount[1];
+		count = 44;
 	} else {
 		sbuff1 = GetMemory(WAV_BUFFER_SIZE);
 		sbuff2 = GetMemory(WAV_BUFFER_SIZE);
-		bcount[1]=onRead(NULL,sbuff1,WAV_BUFFER_SIZE);
-		wav_filesize=bcount[1];
+		count = (int)onRead(NULL,sbuff1,WAV_BUFFER_SIZE);
 	}
 	CurrentlyPlaying = mode;
-	swingbuf=1;
-	nextbuf=2;
-	ppos=0;
 	playreadcomplete=0;
+	pico_audio_publish_initial_target(1, count);
 	pwm_set_irq0_enabled(AUDIO_SLICE, true);
 	pwm_set_enabled(AUDIO_SLICE, true); 
 	uint64_t t=hal_time_us_64();
@@ -693,16 +697,12 @@ void MIPS16 cmd_play(void) {
 		mono=0;
 		g_buff1 = (int16_t *)sbuff1;
 		g_buff2 = (int16_t *)sbuff2;
-		bcount[2]=0;
 		playreadcomplete=0;
-		bcount[1]=(volatile unsigned int)readarray(sbuff1);
-		if(Option.audio_i2s_bclk) i2sconvert((int16_t *)sbuff1,(int16_t *)sbuff1,bcount[1]);
-		else iconvert(ubuff1, (int16_t *)sbuff1, bcount[1]);
-		wav_filesize=bcount[1];
+		int count = (int)readarray(sbuff1);
+		if(Option.audio_i2s_bclk) i2sconvert((int16_t *)sbuff1,(int16_t *)sbuff1,count);
+		else iconvert(ubuff1, (int16_t *)sbuff1, count);
 		CurrentlyPlaying = P_ARRAY;
-		swingbuf=1;
-		nextbuf=2;
-		ppos=0;
+		pico_audio_publish_initial_target(1, count);
 		pwm_set_irq0_enabled(AUDIO_SLICE, true);
 		pwm_set_enabled(AUDIO_SLICE, true); 
 		return;
@@ -1390,19 +1390,15 @@ void MIPS16 cmd_play(void) {
 		} else {
 	        hxcmod_fillbuffer( mcontext, (msample*)sbuff1, MOD_BUFFER_SIZE/8, NULL, noloop );
 		}
-        wav_filesize=MOD_BUFFER_SIZE/4;
-        bcount[1]=MOD_BUFFER_SIZE/4;
-        bcount[2]=0;
-		if(Option.audio_i2s_bclk)i2sconvert(g_buff1, (int16_t *)sbuff1, bcount[1]);
-		else iconvert((uint16_t *)ubuff1, (int16_t *)sbuff1, bcount[1]);
+        int count = MOD_BUFFER_SIZE/4;
+		if(Option.audio_i2s_bclk)i2sconvert(g_buff1, (int16_t *)sbuff1, count);
+		else iconvert((uint16_t *)ubuff1, (int16_t *)sbuff1, count);
         nchannels=2;
         CurrentlyPlaying = P_MOD;
-        swingbuf=1;
-        nextbuf=2;
-        ppos=0;
         playreadcomplete=0;
         setrate(44100);
 		audiorepeat=2;
+        pico_audio_publish_initial_target(1, count);
     	pwm_set_irq0_enabled(AUDIO_SLICE, true);
 		pwm_set_enabled(AUDIO_SLICE, true); 
 		Timer1=500;
@@ -1495,12 +1491,7 @@ int hal_audio_sample_begin(int sample_rate_hz) {
 	ubuff2 = (uint16_t *)sbuff2;
 	g_buff1 = (int16_t *)sbuff1;
 	g_buff2 = (int16_t *)sbuff2;
-	bcount[1] = bcount[2] = 0;
-	wav_filesize = 0;
-	swingbuf = nextbuf = 0;
-	audio_shared_acquired_target = 0;
-	ppos = 0;
-	playreadcomplete = 0;
+	clear_sample_buffer_state(0);
 	mono = 0;
 	audiorepeat = 1;
 	int actualrate = sample_rate_hz;
@@ -1528,6 +1519,81 @@ static int pico_audio_stream_buffer_capacity_frames(void) {
 	return WAV_BUFFER_SIZE / (int)(sizeof(int16_t) * 2);
 }
 
+static int pico_audio_stream_claim_target(void) {
+	int target = 0;
+	uint32_t save = save_and_disable_interrupts();
+	if(audio_shared_stream_active && !audio_shared_acquired_target) {
+		if(swingbuf == 0 && bcount[1] == 0 && bcount[2] == 0) {
+			target = 1;
+		} else if(swingbuf != nextbuf) {
+			target = (swingbuf == 2) ? 1 : 2;
+			if(bcount[target] != 0) target = 0;
+		}
+	}
+	restore_interrupts(save);
+	return target;
+}
+
+static void pico_audio_stream_convert_buffer(char *dst, int samples) {
+	if(Option.audio_i2s_bclk) {
+		i2sconvert((int16_t *)dst, (int16_t *)dst, samples);
+	} else {
+		iconvert((uint16_t *)dst, (int16_t *)dst, samples);
+	}
+}
+
+static int pico_audio_stream_publish_target(int target, int samples) {
+	if(target < 1 || target > 2 || samples <= 0) return 0;
+	int published = 0;
+	uint32_t save = save_and_disable_interrupts();
+	if(audio_shared_stream_active && bcount[target] == 0) {
+		wav_filesize = samples;
+		if(swingbuf == 0) {
+			swingbuf = target;
+			nextbuf = (target == 1) ? 2 : 1;
+			ppos = 0;
+		} else {
+			nextbuf = swingbuf;
+		}
+		/* bcount[target] publishes the completed buffer to the PWM ISR.
+		 * Keep it last so the ISR cannot observe a partially filled buffer. */
+		bcount[target] = samples;
+		if(swingbuf == target) {
+			pwm_set_irq0_enabled(AUDIO_SLICE, true);
+			pwm_set_enabled(AUDIO_SLICE, true);
+		}
+		published = 1;
+	}
+	restore_interrupts(save);
+	return published;
+}
+
+static void pico_audio_publish_initial_target(int target, int count) {
+	if(target < 1 || target > 2) return;
+	int other = (target == 1) ? 2 : 1;
+	uint32_t save = save_and_disable_interrupts();
+	bcount[other] = 0;
+	wav_filesize = count;
+	swingbuf = target;
+	nextbuf = other;
+	ppos = 0;
+	/* bcount[target] is the completed-buffer publication flag for the ISR.
+	 * It is assigned last after the foreground fill/convert has completed. */
+	bcount[target] = count;
+	restore_interrupts(save);
+}
+
+static void pico_audio_publish_refill_target(int target, int count) {
+	if(target < 1 || target > 2) return;
+	uint32_t save = save_and_disable_interrupts();
+	wav_filesize = count;
+	nextbuf = swingbuf;
+	/* bcount[target] is the completed-buffer publication flag for the ISR.
+	 * It is assigned last after the foreground fill/convert has completed. */
+	bcount[target] = count;
+	restore_interrupts(save);
+}
+
 int hal_audio_sample_space(void) {
 	int capacity = pico_audio_stream_buffer_capacity_frames();
 	if(!audio_shared_stream_active) return 0;
@@ -1553,53 +1619,31 @@ int hal_audio_sample_push(const int16_t *frames, int frame_count) {
 	if(!audio_shared_stream_active || frame_count <= 0 || frames == NULL) return 0;
 	int capacity = pico_audio_stream_buffer_capacity_frames();
 	int frames_to_copy = frame_count > capacity ? capacity : frame_count;
-	int target = 0;
-	if(swingbuf == 0 && bcount[1] == 0 && bcount[2] == 0) {
-		target = 1;
-	} else if(swingbuf != nextbuf) {
-		target = (swingbuf == 2) ? 1 : 2;
-		if(bcount[target] != 0) return 0;
-	} else {
-		return 0;
-	}
+	int target = pico_audio_stream_claim_target();
+	if(!target) return 0;
 	char *dst = (target == 1) ? sbuff1 : sbuff2;
 	if(!dst) return 0;
 	memcpy(dst, frames, (size_t)frames_to_copy * 2u * sizeof(int16_t));
 	int samples = frames_to_copy * 2;
-	if(Option.audio_i2s_bclk) {
-		i2sconvert((int16_t *)dst, (int16_t *)dst, samples);
-	} else {
-		iconvert((uint16_t *)dst, (int16_t *)dst, samples);
-	}
-	bcount[target] = samples;
-	wav_filesize = samples;
-	if(swingbuf == 0) {
-		swingbuf = target;
-		nextbuf = (target == 1) ? 2 : 1;
-		ppos = 0;
-		pwm_set_irq0_enabled(AUDIO_SLICE, true);
-		pwm_set_enabled(AUDIO_SLICE, true);
-	} else {
-		nextbuf = swingbuf;
-	}
+	pico_audio_stream_convert_buffer(dst, samples);
+	if(!pico_audio_stream_publish_target(target, samples)) return 0;
 	return frames_to_copy;
 }
 
 int hal_audio_sample_acquire(int16_t **frames, int *frame_capacity) {
 	if(!audio_shared_stream_active || frames == NULL || frame_capacity == NULL) return 0;
-	if(audio_shared_acquired_target) return 0;
-	int target = 0;
-	if(swingbuf == 0 && bcount[1] == 0 && bcount[2] == 0) {
-		target = 1;
-	} else if(swingbuf != nextbuf) {
-		target = (swingbuf == 2) ? 1 : 2;
-		if(bcount[target] != 0) return 0;
-	} else {
-		return 0;
-	}
+	int target = pico_audio_stream_claim_target();
+	if(!target) return 0;
 	char *dst = (target == 1) ? sbuff1 : sbuff2;
 	if(!dst) return 0;
-	audio_shared_acquired_target = target;
+	uint32_t save = save_and_disable_interrupts();
+	if(audio_shared_stream_active && !audio_shared_acquired_target && bcount[target] == 0) {
+		audio_shared_acquired_target = target;
+	} else {
+		target = 0;
+	}
+	restore_interrupts(save);
+	if(!target) return 0;
 	*frames = (int16_t *)dst;
 	*frame_capacity = pico_audio_stream_buffer_capacity_frames();
 	return 1;
@@ -1607,29 +1651,21 @@ int hal_audio_sample_acquire(int16_t **frames, int *frame_capacity) {
 
 void hal_audio_sample_commit(int frame_count) {
 	int target = audio_shared_acquired_target;
-	audio_shared_acquired_target = 0;
-	if(!target || frame_count <= 0 || !audio_shared_stream_active) return;
+	if(!target || frame_count <= 0 || !audio_shared_stream_active) {
+		audio_shared_acquired_target = 0;
+		return;
+	}
 	int capacity = pico_audio_stream_buffer_capacity_frames();
 	int frames_to_commit = frame_count > capacity ? capacity : frame_count;
 	char *dst = (target == 1) ? sbuff1 : sbuff2;
-	if(!dst) return;
+	if(!dst) {
+		audio_shared_acquired_target = 0;
+		return;
+	}
 	int samples = frames_to_commit * 2;
-	if(Option.audio_i2s_bclk) {
-		i2sconvert((int16_t *)dst, (int16_t *)dst, samples);
-	} else {
-		iconvert((uint16_t *)dst, (int16_t *)dst, samples);
-	}
-	bcount[target] = samples;
-	wav_filesize = samples;
-	if(swingbuf == 0) {
-		swingbuf = target;
-		nextbuf = (target == 1) ? 2 : 1;
-		ppos = 0;
-		pwm_set_irq0_enabled(AUDIO_SLICE, true);
-		pwm_set_enabled(AUDIO_SLICE, true);
-	} else {
-		nextbuf = swingbuf;
-	}
+	pico_audio_stream_convert_buffer(dst, samples);
+	(void)pico_audio_stream_publish_target(target, samples);
+	audio_shared_acquired_target = 0;
 }
 
 void *hal_audio_workmem_alloc(unsigned long bytes) {
@@ -1667,55 +1703,49 @@ void checkWAVinput(void){
 		if(Option.AUDIO_MISO_PIN){
 			if(CurrentlyPlaying == P_FLAC || CurrentlyPlaying == P_WAV || (CurrentlyPlaying == P_MP3 && Option.AUDIO_MISO_PIN) ||CurrentlyPlaying == P_MIDI){
 				if(swingbuf==2){
-					bcount[1]=(volatile unsigned int)onRead(NULL,sbuff1,WAV_BUFFER_SIZE);
-					wav_filesize = bcount[1];
+					int count = (int)onRead(NULL,sbuff1,WAV_BUFFER_SIZE);
+					pico_audio_publish_refill_target(1, count);
 				} else {
-					bcount[2]=(volatile unsigned int)onRead(NULL,sbuff2,WAV_BUFFER_SIZE);
-					wav_filesize = bcount[2];
+					int count = (int)onRead(NULL,sbuff2,WAV_BUFFER_SIZE);
+					pico_audio_publish_refill_target(2, count);
 				}
-				nextbuf=swingbuf;
 				diskchecktimer=DISKCHECKRATE;
 			} else if(CurrentlyPlaying == P_MOD){
 				if(swingbuf==2){
 					if(hxcmod_fillbuffer( mcontext, (msample*)sbuff1, WAV_BUFFER_SIZE/4,NULL, noloop ))playreadcomplete = 1;
-					wav_filesize=WAV_BUFFER_SIZE;
-					bcount[1]=WAV_BUFFER_SIZE;
+					pico_audio_publish_refill_target(1, WAV_BUFFER_SIZE);
 				} else {
 					if(hxcmod_fillbuffer( mcontext, (msample*)sbuff2, WAV_BUFFER_SIZE/4,NULL, noloop ))playreadcomplete = 1;
-					wav_filesize=WAV_BUFFER_SIZE;
-					bcount[2]=WAV_BUFFER_SIZE;
+					pico_audio_publish_refill_target(2, WAV_BUFFER_SIZE);
 				}
-				nextbuf=swingbuf;
 			}
 		} else {
 			if(CurrentlyPlaying == P_MOD){
 				if(swingbuf==2){
 					if(hxcmod_fillbuffer( mcontext, (msample*)sbuff1, MOD_BUFFER_SIZE/4,NULL, noloop ))playreadcomplete = 1;
-					wav_filesize=MOD_BUFFER_SIZE/2;
-					bcount[1]=MOD_BUFFER_SIZE/2;
-					if(Option.audio_i2s_bclk)i2sconvert(g_buff1, (int16_t *)sbuff1, bcount[1]);
-					else iconvert((uint16_t *)ubuff1, (int16_t *)sbuff1, bcount[1]);
+					int count = MOD_BUFFER_SIZE/2;
+					if(Option.audio_i2s_bclk)i2sconvert(g_buff1, (int16_t *)sbuff1, count);
+					else iconvert((uint16_t *)ubuff1, (int16_t *)sbuff1, count);
+					pico_audio_publish_refill_target(1, count);
 				} else {
 					if(hxcmod_fillbuffer( mcontext, (msample*)sbuff2, MOD_BUFFER_SIZE/4,NULL, noloop ))playreadcomplete = 1;
-					wav_filesize=MOD_BUFFER_SIZE/2;
-					bcount[2]=MOD_BUFFER_SIZE/2;
-					if(Option.audio_i2s_bclk)i2sconvert(g_buff2, (int16_t *)sbuff2, bcount[2]);
-					else iconvert((uint16_t *)ubuff2, (int16_t *)sbuff2, bcount[2]);
+					int count = MOD_BUFFER_SIZE/2;
+					if(Option.audio_i2s_bclk)i2sconvert(g_buff2, (int16_t *)sbuff2, count);
+					else iconvert((uint16_t *)ubuff2, (int16_t *)sbuff2, count);
+					pico_audio_publish_refill_target(2, count);
 				}
-				nextbuf=swingbuf;
 			} else if(CurrentlyPlaying == P_ARRAY){
 				if(swingbuf==2){
-					bcount[1]=(volatile unsigned int)readarray(sbuff1);
-					if(Option.audio_i2s_bclk) i2sconvert((int16_t *)sbuff1,(int16_t *)sbuff1,bcount[1]);
-					else iconvert(ubuff1, (int16_t *)sbuff1, bcount[1]);
-					wav_filesize=bcount[1];
+					int count = (int)readarray(sbuff1);
+					if(Option.audio_i2s_bclk) i2sconvert((int16_t *)sbuff1,(int16_t *)sbuff1,count);
+					else iconvert(ubuff1, (int16_t *)sbuff1, count);
+					pico_audio_publish_refill_target(1, count);
 				} else {
-					bcount[2]=(volatile unsigned int)readarray(sbuff2);
-					if(Option.audio_i2s_bclk) i2sconvert((int16_t *)sbuff2,(int16_t *)sbuff2,bcount[2]);
-					else iconvert(ubuff2, (int16_t *)sbuff2, bcount[2]);
-					wav_filesize=bcount[2];
+					int count = (int)readarray(sbuff2);
+					if(Option.audio_i2s_bclk) i2sconvert((int16_t *)sbuff2,(int16_t *)sbuff2,count);
+					else iconvert(ubuff2, (int16_t *)sbuff2, count);
+					pico_audio_publish_refill_target(2, count);
 				}
-				nextbuf=swingbuf;
 			} 
 		}
 	}

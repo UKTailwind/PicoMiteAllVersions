@@ -44,6 +44,11 @@ void hal_audio_init(void);
 void hal_audio_tone(double left_hz, double right_hz,
                     int has_duration, int64_t duration_ms);
 
+/* Non-zero when the backend publishes WAVcomplete for finite PLAY TONE
+ * completion. Backends without this support must reject tone interrupts
+ * at the shared command layer. */
+int hal_audio_tone_interrupt_supported(void);
+
 /* PLAY SOUND slot, ch, type [, freq [, volume]].
  *   slot:   1..4 (PicoMite has four hardware SOUND slots).
  *   ch:     "L" | "R" | "B" (left / right / both).

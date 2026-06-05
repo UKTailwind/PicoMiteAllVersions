@@ -52,9 +52,9 @@ typedef enum {P_PAUSE_TONE, P_PAUSE_FLAC, P_PAUSE_MP3, P_PAUSE_SOUND, P_PAUSE_MO
     P_NOTHING, P_TONE, P_SOUND, P_WAV, P_FLAC, P_MP3, 
     P_MIDI, P_SYNC, P_MOD, P_STREAM, P_ARRAY, P_WAVOPEN} e_CurrentlyPlaying;
 extern const char* const PlayingStr[];
-extern volatile e_CurrentlyPlaying CurrentlyPlaying; 
+extern volatile e_CurrentlyPlaying CurrentlyPlaying;
 extern char *WAVInterrupt;
-extern bool WAVcomplete;
+extern volatile bool WAVcomplete;
 extern int WAV_fnbr;
 extern int PWM_FREQ;
 extern char *sbuff1, *sbuff2,  *modbuff;

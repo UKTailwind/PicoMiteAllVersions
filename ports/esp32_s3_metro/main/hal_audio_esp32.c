@@ -18,6 +18,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdatomic.h>
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -45,13 +46,17 @@ typedef enum {
 
 /* TONE/playback state owned by shared/audio/Audio.c (extern here). */
 extern volatile e_CurrentlyPlaying CurrentlyPlaying;
+extern volatile bool WAVcomplete;
 
 static const char *TAG = "mmaudio";
 
 static i2s_chan_handle_t s_tx;
 static TaskHandle_t      s_task;
 static volatile uint64_t s_tone_frames;   /* remaining TONE frames; UINT64_MAX = forever */
-static volatile bool     s_paused;
+static volatile bool     s_tone_finite;
+static volatile bool     s_tone_completion_reported;
+static portMUX_TYPE      s_tone_mux = portMUX_INITIALIZER_UNLOCKED;
+static _Atomic bool      s_paused;
 static volatile bool     s_ready;
 static audio_backend_t   s_backend;
 
@@ -65,35 +70,117 @@ bool dmarunning = 0;
 /* --- streamed-sample ring (PLAY WAV/FLAC/MP3/MOD/ARRAY) ---
  * Single-producer (decode pump, BASIC service loop) / single-consumer
  * (audio_task) ring of 16-bit stereo frames in PSRAM. Free-running 32-bit
- * head/tail counters; no lock needed for one producer + one consumer. */
+ * head/tail counters publish frame availability; the stream mux only
+ * protects reset/session changes and single-frame consumer claims. */
 #define SAMPLE_RING_FRAMES 32768u            /* 128 KB in PSRAM, ~0.74s @ 44.1k */
 static int16_t          *s_ring;             /* SAMPLE_RING_FRAMES * 2 int16 */
-static volatile uint32_t s_ring_head, s_ring_tail;
-static volatile uint32_t s_stream_inflight_frames;
-static volatile uint32_t s_stream_drain_frames;
-static volatile uint32_t s_stream_tail_hold_until;
-static volatile bool     s_stream_eof_seen;
-static int               s_stream_rate;
+static _Atomic uint32_t  s_ring_head, s_ring_tail;
+static _Atomic uint32_t  s_stream_inflight_frames;
+static _Atomic uint32_t  s_stream_drain_frames;
+static _Atomic uint32_t  s_stream_tail_hold_until;
+static _Atomic bool      s_stream_eof_seen;
+static _Atomic uint32_t  s_stream_generation;
+static _Atomic int       s_stream_rate;
+static portMUX_TYPE      s_stream_mux = portMUX_INITIALIZER_UNLOCKED;
 
 static int is_file_mode(int m) {
     return m == P_WAV || m == P_FLAC || m == P_MP3 ||
            m == P_MOD || m == P_ARRAY || m == P_STREAM;
 }
 
-static volatile int s_pending_rate;   /* requested by sample_begin/end */
+static _Atomic int s_pending_rate;   /* requested by sample_begin/end */
 
 static int default_audio_rate(void) {
     return AUDIO_RATE;
 }
 
 static int active_audio_rate(void) {
-    return s_stream_rate > 0 ? s_stream_rate : default_audio_rate();
+    int rate = atomic_load_explicit(&s_stream_rate, memory_order_acquire);
+    return rate > 0 ? rate : default_audio_rate();
 }
 
 static bool stream_tail_hold_active(void) {
-    uint32_t until = s_stream_tail_hold_until;
+    uint32_t until = atomic_load_explicit(&s_stream_tail_hold_until, memory_order_acquire);
     if (!until) return false;
     return (int32_t)(until - (uint32_t)xTaskGetTickCount()) > 0;
+}
+
+static uint32_t stream_count_clamped(uint32_t head, uint32_t tail) {
+    uint32_t count = head - tail;
+    return count > SAMPLE_RING_FRAMES ? SAMPLE_RING_FRAMES : count;
+}
+
+static bool stream_load_stable_counters(uint32_t *head, uint32_t *tail) {
+    uint32_t gen = atomic_load_explicit(&s_stream_generation, memory_order_acquire);
+    if (gen & 1u) return false;
+    *head = atomic_load_explicit(&s_ring_head, memory_order_acquire);
+    *tail = atomic_load_explicit(&s_ring_tail, memory_order_acquire);
+    return atomic_load_explicit(&s_stream_generation, memory_order_acquire) == gen;
+}
+
+static uint32_t stream_queued_frames(void) {
+    uint32_t head, tail;
+    if (!stream_load_stable_counters(&head, &tail)) return 0;
+    return stream_count_clamped(head, tail);
+}
+
+static uint32_t stream_space_frames(void) {
+    return SAMPLE_RING_FRAMES - stream_queued_frames();
+}
+
+static bool stream_generation_active(uint32_t generation) {
+    return !(generation & 1u) &&
+        atomic_load_explicit(&s_stream_generation, memory_order_acquire) == generation;
+}
+
+static void stream_reset_state(void) {
+    portENTER_CRITICAL(&s_stream_mux);
+    atomic_fetch_add_explicit(&s_stream_generation, 1u, memory_order_acq_rel);
+    atomic_store_explicit(&s_ring_head, 0, memory_order_release);
+    atomic_store_explicit(&s_ring_tail, 0, memory_order_release);
+    atomic_store_explicit(&s_stream_inflight_frames, 0, memory_order_release);
+    atomic_store_explicit(&s_stream_drain_frames, 0, memory_order_release);
+    atomic_store_explicit(&s_stream_tail_hold_until, 0, memory_order_release);
+    atomic_store_explicit(&s_stream_eof_seen, false, memory_order_release);
+    atomic_fetch_add_explicit(&s_stream_generation, 1u, memory_order_release);
+    portEXIT_CRITICAL(&s_stream_mux);
+}
+
+static bool stream_pop_frame(uint32_t generation, int16_t *left, int16_t *right) {
+    bool popped = false;
+    portENTER_CRITICAL(&s_stream_mux);
+    if (!stream_generation_active(generation)) {
+        portEXIT_CRITICAL(&s_stream_mux);
+        return false;
+    }
+    uint32_t tail = atomic_load_explicit(&s_ring_tail, memory_order_relaxed);
+    uint32_t head = atomic_load_explicit(&s_ring_head, memory_order_acquire);
+    uint32_t count = head - tail;
+    if (count > 0 && count <= SAMPLE_RING_FRAMES) {
+        uint32_t idx = (tail & (SAMPLE_RING_FRAMES - 1u)) * 2u;
+        *left = s_ring[idx];
+        *right = s_ring[idx + 1];
+        atomic_store_explicit(&s_ring_tail, tail + 1u, memory_order_release);
+        atomic_fetch_add_explicit(&s_stream_inflight_frames, 1u, memory_order_release);
+        popped = true;
+    }
+    portEXIT_CRITICAL(&s_stream_mux);
+    return popped;
+}
+
+static bool stream_claim_drain_frame(uint32_t generation) {
+    bool claimed = false;
+    portENTER_CRITICAL(&s_stream_mux);
+    if (stream_generation_active(generation)) {
+        uint32_t drain = atomic_load_explicit(&s_stream_drain_frames, memory_order_acquire);
+        if (drain > 0) {
+            atomic_store_explicit(&s_stream_drain_frames, drain - 1u, memory_order_release);
+            atomic_fetch_add_explicit(&s_stream_inflight_frames, 1u, memory_order_release);
+            claimed = true;
+        }
+    }
+    portEXIT_CRITICAL(&s_stream_mux);
+    return claimed;
 }
 
 static uint32_t stream_tail_hold_ticks(void) {
@@ -108,6 +195,19 @@ static int16_t pcm16_from_synth_frame(int32_t frame) {
     if (sample > INT16_MAX) return INT16_MAX;
     if (sample < INT16_MIN) return INT16_MIN;
     return (int16_t)sample;
+}
+
+static int volume_percent_clamped(int pct) {
+    if (pct < 0) return 0;
+    if (pct > 100) return 100;
+    return pct;
+}
+
+static int16_t pcm16_apply_volume(int16_t sample, int pct) {
+    int32_t scaled = (int32_t)sample * mapping[volume_percent_clamped(pct)] / 2000;
+    if (scaled > INT16_MAX) return INT16_MAX;
+    if (scaled < INT16_MIN) return INT16_MIN;
+    return (int16_t)scaled;
 }
 
 static int option_gpio(int pin, int fallback_gpio) {
@@ -147,14 +247,15 @@ void esp32_audio_reserve_option_pins(void) {
  * Reconfiguring from the BASIC thread would call i2s_channel_disable while
  * the task is blocked in i2s_channel_write(portMAX_DELAY) — a deadlock. */
 static void stream_set_rate(int rate) {
-    if (rate > 0) s_pending_rate = rate;
+    if (rate > 0) atomic_store_explicit(&s_pending_rate, rate, memory_order_release);
 }
 
 /* Apply a pending rate change. Runs only on the audio task, between writes,
  * so the channel is never disabled while a write is in flight. */
 static void apply_pending_rate(void) {
-    int rate = s_pending_rate;
-    if (!s_tx || rate <= 0 || rate == s_stream_rate) return;
+    int rate = atomic_load_explicit(&s_pending_rate, memory_order_acquire);
+    int current_rate = atomic_load_explicit(&s_stream_rate, memory_order_acquire);
+    if (!s_tx || rate <= 0 || rate == current_rate) return;
     i2s_channel_disable(s_tx);
     if (s_backend == AUDIO_BACKEND_PDM) {
         i2s_pdm_tx_clk_config_t clk = I2S_PDM_TX_CLK_DAC_DEFAULT_CONFIG((uint32_t)rate);
@@ -164,53 +265,48 @@ static void apply_pending_rate(void) {
         i2s_channel_reconfig_std_clock(s_tx, &clk);
     }
     i2s_channel_enable(s_tx);
-    s_stream_rate = rate;
+    atomic_store_explicit(&s_stream_rate, rate, memory_order_release);
 }
 
 int hal_audio_sample_begin(int sample_rate_hz) {
     hal_audio_init();                        /* ensure I2S + task are up */
     if (s_backend == AUDIO_BACKEND_NONE) return -1;
+    atomic_store_explicit(&s_paused, false, memory_order_release);
     if (!s_ring) {
         size_t bytes = (size_t)SAMPLE_RING_FRAMES * 2u * sizeof(int16_t);
         s_ring = heap_caps_malloc(bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
         if (!s_ring) s_ring = malloc(bytes);
         if (!s_ring) return -1;
     }
-    s_ring_head = s_ring_tail = 0;
-    s_stream_inflight_frames = 0;
-    s_stream_drain_frames = 0;
-    s_stream_tail_hold_until = 0;
-    s_stream_eof_seen = false;
+    stream_reset_state();
     stream_set_rate(sample_rate_hz);
     return 0;
 }
 
 void hal_audio_sample_end(void) {
-    s_ring_head = s_ring_tail = 0;
-    s_stream_inflight_frames = 0;
-    s_stream_drain_frames = 0;
-    s_stream_tail_hold_until = 0;
-    s_stream_eof_seen = false;
+    stream_reset_state();
     stream_set_rate(default_audio_rate());   /* restore the synth rate */
 }
 
 void hal_audio_sample_eof(void) {
-    if (!s_stream_eof_seen) {
-        s_stream_eof_seen = true;
-        s_stream_drain_frames = FRAMES_PER_CHUNK;
+    portENTER_CRITICAL(&s_stream_mux);
+    if (!atomic_load_explicit(&s_stream_eof_seen, memory_order_acquire)) {
+        atomic_store_explicit(&s_stream_eof_seen, true, memory_order_release);
+        atomic_store_explicit(&s_stream_drain_frames, FRAMES_PER_CHUNK, memory_order_release);
     }
+    portEXIT_CRITICAL(&s_stream_mux);
 }
 
 int hal_audio_sample_space(void) {
     if (!s_ring) return 0;
-    return (int)(SAMPLE_RING_FRAMES - (s_ring_head - s_ring_tail));
+    return (int)stream_space_frames();
 }
 
 int hal_audio_sample_queued(void) {
     if (!s_ring) return 0;
-    return (int)((s_ring_head - s_ring_tail) +
-                 s_stream_inflight_frames +
-                 s_stream_drain_frames +
+    return (int)(stream_queued_frames() +
+                 atomic_load_explicit(&s_stream_inflight_frames, memory_order_acquire) +
+                 atomic_load_explicit(&s_stream_drain_frames, memory_order_acquire) +
                  (stream_tail_hold_active() ? 1u : 0u));
 }
 
@@ -229,14 +325,26 @@ void hal_audio_workmem_free(void *p) { heap_caps_free(p); }
 
 int hal_audio_sample_push(const int16_t *frames, int frame_count) {
     if (!s_ring || frame_count <= 0) return 0;
-    int space = (int)(SAMPLE_RING_FRAMES - (s_ring_head - s_ring_tail));
+    uint32_t generation = atomic_load_explicit(&s_stream_generation, memory_order_acquire);
+    if (generation & 1u) return 0;
+    uint32_t head = atomic_load_explicit(&s_ring_head, memory_order_relaxed);
+    uint32_t tail = atomic_load_explicit(&s_ring_tail, memory_order_acquire);
+    int space = (int)(SAMPLE_RING_FRAMES - stream_count_clamped(head, tail));
     if (frame_count > space) frame_count = space;
+    uint32_t next_head = head;
     for (int i = 0; i < frame_count; i++) {
-        uint32_t idx = (s_ring_head & (SAMPLE_RING_FRAMES - 1u)) * 2u;
+        uint32_t idx = (next_head & (SAMPLE_RING_FRAMES - 1u)) * 2u;
         s_ring[idx]     = frames[2 * i];
         s_ring[idx + 1] = frames[2 * i + 1];
-        s_ring_head++;
+        next_head++;
     }
+    portENTER_CRITICAL(&s_stream_mux);
+    if (stream_generation_active(generation)) {
+        atomic_store_explicit(&s_ring_head, next_head, memory_order_release);
+    } else {
+        frame_count = 0;
+    }
+    portEXIT_CRITICAL(&s_stream_mux);
     return frame_count;
 }
 
@@ -265,15 +373,38 @@ static const unsigned short *audio_table_for(char type) {
     }
 }
 
+static bool tone_claim_frame(void) {
+    bool claimed = false;
+    portENTER_CRITICAL(&s_tone_mux);
+    if (CurrentlyPlaying == P_TONE && s_tone_frames != 0) {
+        claimed = true;
+        if (s_tone_frames != UINT64_MAX) s_tone_frames--;
+    }
+    portEXIT_CRITICAL(&s_tone_mux);
+    return claimed;
+}
+
+static void tone_publish_completion_if_done(void) {
+    portENTER_CRITICAL(&s_tone_mux);
+    if ((CurrentlyPlaying == P_TONE || CurrentlyPlaying == P_PAUSE_TONE) &&
+        s_tone_frames == 0) {
+        if (s_tone_finite && !s_tone_completion_reported) {
+            WAVcomplete = true;
+            s_tone_completion_reported = true;
+        }
+        CurrentlyPlaying = P_NOTHING;
+    }
+    portEXIT_CRITICAL(&s_tone_mux);
+}
+
 static void render_frame(int mode, int16_t *left, int16_t *right) {
     if (mode == P_TONE) {
         int32_t l, r;
-        if (s_tone_frames == 0) {
+        if (!tone_claim_frame()) {
             *left = *right = 0;
             return;
         }
         synth_pcm_tone_frame(&l, &r);
-        if (s_tone_frames != UINT64_MAX) s_tone_frames--;
         *left = pcm16_from_synth_frame(l);
         *right = pcm16_from_synth_frame(r);
         return;
@@ -285,13 +416,6 @@ static void render_frame(int mode, int16_t *left, int16_t *right) {
         *right = pcm16_from_synth_frame(r);
         return;
     }
-    if (is_file_mode(mode) && s_ring && (s_ring_head - s_ring_tail) > 0) {
-        uint32_t idx = (s_ring_tail & (SAMPLE_RING_FRAMES - 1u)) * 2u;
-        *left = s_ring[idx];
-        *right = s_ring[idx + 1];
-        s_ring_tail++;
-        return;
-    }
     *left = *right = 0;
 }
 
@@ -300,31 +424,52 @@ static void audio_task(void *arg) {
     int16_t buf[FRAMES_PER_CHUNK * 2];
     for (;;) {
         apply_pending_rate();          /* safe rate switch between writes */
-        int mode = s_paused ? P_NOTHING : (int)CurrentlyPlaying;
+        int mode = atomic_load_explicit(&s_paused, memory_order_acquire)
+            ? P_NOTHING
+            : (int)CurrentlyPlaying;
         if (s_backend != AUDIO_BACKEND_I2S && s_backend != AUDIO_BACKEND_PDM) {
             vTaskDelay(pdMS_TO_TICKS(20));
             continue;
         }
-        if (is_file_mode(mode)) s_stream_inflight_frames = 0;
+        bool file_mode = is_file_mode(mode);
+        uint32_t stream_generation = atomic_load_explicit(&s_stream_generation, memory_order_acquire);
+        if (file_mode) {
+            atomic_store_explicit(&s_stream_inflight_frames, 0, memory_order_release);
+        }
         for (int n = 0; n < FRAMES_PER_CHUNK; n++) {
-            if (is_file_mode(mode) && s_ring && (s_ring_head - s_ring_tail) > 0) {
-                s_stream_inflight_frames++;
-            } else if (is_file_mode(mode) && s_stream_drain_frames > 0) {
-                s_stream_inflight_frames++;
-                s_stream_drain_frames--;
+            if (file_mode) {
+                int16_t left = 0, right = 0;
+                if (s_ring && stream_pop_frame(stream_generation, &left, &right)) {
+                    buf[2 * n] = pcm16_apply_volume(left, vol_left);
+                    buf[2 * n + 1] = pcm16_apply_volume(right, vol_right);
+                } else {
+                    (void)stream_claim_drain_frame(stream_generation);
+                    buf[2 * n] = 0;
+                    buf[2 * n + 1] = 0;
+                }
+            } else {
+                render_frame(mode, &buf[2 * n], &buf[2 * n + 1]);
             }
-            render_frame(mode, &buf[2 * n], &buf[2 * n + 1]);
         }
         size_t wr;
-        i2s_channel_write(s_tx, buf, sizeof(buf), &wr, portMAX_DELAY);
-        if (is_file_mode(mode) && s_stream_eof_seen &&
-            s_stream_drain_frames == 0 && s_ring &&
-            (s_ring_head - s_ring_tail) == 0 &&
-            s_stream_tail_hold_until == 0) {
-            s_stream_tail_hold_until = (uint32_t)xTaskGetTickCount() + stream_tail_hold_ticks();
+        if (file_mode && !stream_generation_active(stream_generation)) {
+            memset(buf, 0, sizeof(buf));
+            atomic_store_explicit(&s_stream_inflight_frames, 0, memory_order_release);
         }
-        if (is_file_mode(mode)) s_stream_inflight_frames = 0;
-        if (mode == P_TONE && s_tone_frames == 0) CurrentlyPlaying = P_NOTHING;
+        i2s_channel_write(s_tx, buf, sizeof(buf), &wr, portMAX_DELAY);
+        if (file_mode &&
+            atomic_load_explicit(&s_stream_eof_seen, memory_order_acquire) &&
+            atomic_load_explicit(&s_stream_drain_frames, memory_order_acquire) == 0 &&
+            s_ring && stream_queued_frames() == 0 &&
+            atomic_load_explicit(&s_stream_tail_hold_until, memory_order_acquire) == 0) {
+            atomic_store_explicit(&s_stream_tail_hold_until,
+                                  (uint32_t)xTaskGetTickCount() + stream_tail_hold_ticks(),
+                                  memory_order_release);
+        }
+        if (file_mode) {
+            atomic_store_explicit(&s_stream_inflight_frames, 0, memory_order_release);
+        }
+        if (mode == P_TONE) tone_publish_completion_if_done();
     }
 }
 
@@ -400,8 +545,8 @@ void hal_audio_init(void) {
         }
         i2s_channel_enable(s_tx);
     }
-    s_stream_rate = default_rate;       /* channel starts at the synth rate */
-    s_pending_rate = default_rate;
+    atomic_store_explicit(&s_stream_rate, default_rate, memory_order_release);  /* channel starts at the synth rate */
+    atomic_store_explicit(&s_pending_rate, default_rate, memory_order_release);
 
     if (xTaskCreate(audio_task, "mmaudio", 4096, NULL, 5, &s_task) != pdPASS) {
         ESP_LOGE(TAG, "audio task create failed");
@@ -413,6 +558,7 @@ void hal_audio_init(void) {
 void hal_audio_tone(double left_hz, double right_hz,
                     int has_duration, int64_t duration_ms) {
     hal_audio_init();
+    atomic_store_explicit(&s_paused, false, memory_order_release);
     int rate = active_audio_rate();
     mono = (left_hz == right_hz && vol_left == vol_right) ? 1 : 0;
     PhaseM_left  = (float)(left_hz  / (double)rate * 4096.0);
@@ -421,9 +567,19 @@ void hal_audio_tone(double left_hz, double right_hz,
         PhaseAC_left = 0.0f;
         PhaseAC_right = 0.0f;
     }
+    portENTER_CRITICAL(&s_tone_mux);
+    s_tone_completion_reported = true;
     s_tone_frames = has_duration
         ? (uint64_t)((double)duration_ms / 1000.0 * (double)rate)
         : UINT64_MAX;
+    s_tone_finite = has_duration;
+    s_tone_completion_reported = !has_duration;
+    portEXIT_CRITICAL(&s_tone_mux);
+}
+
+int hal_audio_tone_interrupt_supported(void) {
+    hal_audio_init();
+    return s_ready && (s_backend == AUDIO_BACKEND_I2S || s_backend == AUDIO_BACKEND_PDM);
 }
 
 void hal_audio_sound(int slot, const char *ch, const char *type,
@@ -434,6 +590,7 @@ void hal_audio_sound(int slot, const char *ch, const char *type,
     if (!tbl) return;
 
     hal_audio_init();
+    atomic_store_explicit(&s_paused, false, memory_order_release);
     int rate = active_audio_rate();
 
     int left  = (ch[0] == 'L' || ch[0] == 'l' || ch[0] == 'B' || ch[0] == 'b' ||
@@ -466,7 +623,12 @@ void hal_audio_sound(int slot, const char *ch, const char *type,
 
 void hal_audio_stop(void) {
     int i;
+    atomic_store_explicit(&s_paused, false, memory_order_release);
+    portENTER_CRITICAL(&s_tone_mux);
     s_tone_frames = 0;
+    s_tone_finite = false;
+    s_tone_completion_reported = true;
+    portEXIT_CRITICAL(&s_tone_mux);
     for (i = 0; i < MAXSOUNDS; i++) {
         sound_mode_left[i]  = (unsigned short *)nulltable;
         sound_mode_right[i] = (unsigned short *)nulltable;
@@ -479,5 +641,5 @@ void hal_audio_volume(int left_pct, int right_pct) {
     if (CurrentlyPlaying == P_TONE && vol_left != vol_right) mono = 0;
 }
 
-void hal_audio_pause(void)  { s_paused = true; }
-void hal_audio_resume(void) { s_paused = false; }
+void hal_audio_pause(void)  { atomic_store_explicit(&s_paused, true, memory_order_release); }
+void hal_audio_resume(void) { atomic_store_explicit(&s_paused, false, memory_order_release); }

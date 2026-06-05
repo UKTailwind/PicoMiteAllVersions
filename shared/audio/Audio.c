@@ -59,6 +59,15 @@ volatile float PhaseAC_left = 0.0f, PhaseAC_right = 0.0f;
 volatile uint8_t mono = 0;
 static uint8_t s_sound_slot_mask[4];
 
+static void shared_sound_clear_slots(void) {
+    for (int i = 0; i < 4; i++) s_sound_slot_mask[i] = 0;
+}
+
+static int shared_audio_file_mode(int mode) {
+    return mode == P_WAV || mode == P_FLAC || mode == P_MP3 ||
+           mode == P_MOD || mode == P_ARRAY || mode == P_STREAM;
+}
+
 static int shared_sound_all_off(void) {
     for (int i = 0; i < 4; i++) if (s_sound_slot_mask[i]) return 0;
     return 1;
@@ -77,9 +86,30 @@ static void shared_sound_mark(int slot, int left, int right, const char *type) {
 }
 
 static void shared_sound_stop_if_all_off(void) {
+    if (CurrentlyPlaying != P_SOUND && CurrentlyPlaying != P_PAUSE_SOUND) return;
     if (!shared_sound_all_off()) return;
     hal_audio_stop();
+    shared_sound_clear_slots();
     CurrentlyPlaying = P_NOTHING;
+}
+
+static void shared_audio_prepare_tone(void) {
+    if (CurrentlyPlaying == P_NOTHING || CurrentlyPlaying == P_STOP) return;
+    StopAudio();
+}
+
+static void shared_audio_prepare_sound(void) {
+    if (CurrentlyPlaying == P_NOTHING || CurrentlyPlaying == P_SOUND ||
+        CurrentlyPlaying == P_PAUSE_SOUND || CurrentlyPlaying == P_STOP) return;
+    StopAudio();
+}
+
+static int shared_audio_sound_owns_backend(void) {
+    return CurrentlyPlaying == P_SOUND || CurrentlyPlaying == P_PAUSE_SOUND;
+}
+
+int __attribute__((weak)) hal_audio_tone_interrupt_supported(void) {
+    return 0;
 }
 
 static int host_play_parse_channel(unsigned char *arg, int *left, int *right) {
@@ -144,8 +174,18 @@ void MIPS16 cmd_play(void) {
     unsigned char *tp;
 
     if (checkstring(cmdline, (unsigned char *)"STOP")) {
-        if (CurrentlyPlaying == P_NOTHING) return;
+        if (CurrentlyPlaying == P_NOTHING) {
+            WAVInterrupt = NULL;
+            WAVcomplete = 0;
+            return;
+        }
+        int complete_file_interrupt = shared_audio_file_mode(CurrentlyPlaying) &&
+                                      WAVInterrupt != NULL;
         CloseAudio(1);
+        if (!complete_file_interrupt) {
+            WAVInterrupt = NULL;
+            WAVcomplete = 0;
+        }
         return;
     }
     if (checkstring(cmdline, (unsigned char *)"PAUSE")) {
@@ -157,7 +197,13 @@ void MIPS16 cmd_play(void) {
         return;
     }
     if (checkstring(cmdline, (unsigned char *)"CLOSE")) {
+        int complete_file_interrupt = shared_audio_file_mode(CurrentlyPlaying) &&
+                                      WAVInterrupt != NULL;
         CloseAudio(1);
+        if (!complete_file_interrupt) {
+            WAVInterrupt = NULL;
+            WAVcomplete = 0;
+        }
         return;
     }
     if ((tp = checkstring(cmdline, (unsigned char *)"VOLUME"))) {
@@ -184,11 +230,25 @@ void MIPS16 cmd_play(void) {
         if (argc > 4) {
             dur_ms = getint(argv[4], 0, INT_MAX);
             has_dur = 1;
-            if (dur_ms == 0) return;
         }
-        /* Interrupt arg (argv[6]) is ignored on host — WAV interrupts
-         * aren't plumbed through --sim. */
+        if (dur_ms == 0 && has_dur) return;
+        char *tone_interrupt = NULL;
+        if (argc == 7) {
+            if (!CurrentLinePtr) error("No program running");
+            if (!hal_audio_tone_interrupt_supported())
+                error("PLAY TONE interrupt not supported");
+            tone_interrupt = (char *)GetIntAddress(argv[6]);
+        }
+        shared_audio_prepare_tone();
         hal_audio_tone((double)f_left, (double)f_right, has_dur, dur_ms);
+        if (tone_interrupt) {
+            WAVInterrupt = tone_interrupt;
+            WAVcomplete = false;
+            InterruptUsed = true;
+        } else {
+            WAVInterrupt = NULL;
+            WAVcomplete = 0;
+        }
         CurrentlyPlaying = P_TONE;
         return;
     }
@@ -210,12 +270,16 @@ void MIPS16 cmd_play(void) {
         int vol = 25;
         if (argc == 9) vol = getint(argv[8], 0, 25);
         const char *ch = (left && right) ? "B" : (left ? "L" : "R");
-        hal_audio_sound(slot, ch, type, (double)f_in, vol);
-        shared_sound_mark(slot, left, right, type);
-        if (strcasecmp(type, "O") == 0 && shared_sound_all_off()) {
+        if (strcasecmp(type, "O") == 0) {
+            if (!shared_audio_sound_owns_backend()) return;
+            hal_audio_sound(slot, ch, type, (double)f_in, vol);
+            shared_sound_mark(slot, left, right, type);
             shared_sound_stop_if_all_off();
             return;
         }
+        shared_audio_prepare_sound();
+        hal_audio_sound(slot, ch, type, (double)f_in, vol);
+        shared_sound_mark(slot, left, right, type);
         CurrentlyPlaying = P_SOUND;
         return;
     }
@@ -237,11 +301,13 @@ void MIPS16 cmd_play(void) {
             int velocity = getint(argv[4], 0, 127);
             int slot = channel + 1;
             if (velocity == 0) {
+                if (!shared_audio_sound_owns_backend()) return;
                 hal_audio_sound(slot, "B", "O", 10.0, 0);
                 shared_sound_mark(slot, 1, 1, "O");
                 shared_sound_stop_if_all_off();
                 return;
             } else {
+                shared_audio_prepare_sound();
                 hal_audio_sound(slot, "B", "S",
                                 audio_play_midi_note_frequency(note),
                                 audio_play_note_velocity_volume(velocity));
@@ -256,11 +322,10 @@ void MIPS16 cmd_play(void) {
             int channel = getint(argv[0], 0, 3);
             (void)getint(argv[2], 0, 127);
             if (argc == 5) (void)getint(argv[4], 0, 127);
+            if (!shared_audio_sound_owns_backend()) return;
             hal_audio_sound(channel + 1, "B", "O", 10.0, 0);
             shared_sound_mark(channel + 1, 1, 1, "O");
             shared_sound_stop_if_all_off();
-            if (CurrentlyPlaying == P_NOTHING) return;
-            CurrentlyPlaying = P_SOUND;
             return;
         }
         error("Syntax");
@@ -269,6 +334,9 @@ void MIPS16 cmd_play(void) {
         getargs(&tp, 3, (unsigned char *)",");
         if (argc < 1) error("Argument count");
         char *fname = (char *)getFstring(argv[0]);
+        StopAudio();
+        WAVInterrupt = NULL;
+        WAVcomplete = 0;
         if (audio_stream_play_wav(fname) != 0) error("Cannot play file");
         if (argc == 3) {
             if (!CurrentLinePtr) error("No program running");
@@ -281,21 +349,33 @@ void MIPS16 cmd_play(void) {
     if ((tp = checkstring(cmdline, (unsigned char *)"MP3"))) {
         getargs(&tp, 3, (unsigned char *)",");
         if (argc < 1) error("Argument count");
-        if (audio_stream_play_mp3((char *)getFstring(argv[0])) != 0) error("Cannot play file");
+        char *fname = (char *)getFstring(argv[0]);
+        StopAudio();
+        WAVInterrupt = NULL;
+        WAVcomplete = 0;
+        if (audio_stream_play_mp3(fname) != 0) error("Cannot play file");
         if (argc == 3) { WAVInterrupt = (char *)GetIntAddress(argv[2]); WAVcomplete = false; InterruptUsed = true; }
         return;
     }
     if ((tp = checkstring(cmdline, (unsigned char *)"FLAC"))) {
         getargs(&tp, 3, (unsigned char *)",");
         if (argc < 1) error("Argument count");
-        if (audio_stream_play_flac((char *)getFstring(argv[0])) != 0) error("Cannot play file");
+        char *fname = (char *)getFstring(argv[0]);
+        StopAudio();
+        WAVInterrupt = NULL;
+        WAVcomplete = 0;
+        if (audio_stream_play_flac(fname) != 0) error("Cannot play file");
         if (argc == 3) { WAVInterrupt = (char *)GetIntAddress(argv[2]); WAVcomplete = false; InterruptUsed = true; }
         return;
     }
     if ((tp = checkstring(cmdline, (unsigned char *)"MODFILE"))) {
         getargs(&tp, 3, (unsigned char *)",");
         if (argc < 1) error("Argument count");
-        if (audio_stream_play_mod((char *)getFstring(argv[0])) != 0) error("Cannot play file");
+        char *fname = (char *)getFstring(argv[0]);
+        StopAudio();
+        WAVInterrupt = NULL;
+        WAVcomplete = 0;
+        if (audio_stream_play_mod(fname) != 0) error("Cannot play file");
         if (argc == 3) { WAVInterrupt = (char *)GetIntAddress(argv[2]); WAVcomplete = false; InterruptUsed = true; }
         return;
     }
@@ -309,12 +389,15 @@ void MIPS16 cmd_play(void) {
 
 void CloseAudio(int all) {
     (void)all;
+    int complete_file_interrupt = shared_audio_file_mode(CurrentlyPlaying) &&
+                                  WAVInterrupt != NULL;
     audio_stream_stop();
     hal_audio_stop();
     CurrentlyPlaying = P_NOTHING;
+    shared_sound_clear_slots();
     WAV_fnbr = 0;
     usertable = NULL;
-    WAVcomplete = true;
+    WAVcomplete = complete_file_interrupt;
     FSerror = 0;
 }
 
@@ -322,6 +405,9 @@ void StopAudio(void) {
     audio_stream_stop();
     hal_audio_stop();
     CurrentlyPlaying = P_NOTHING;
+    shared_sound_clear_slots();
+    WAVInterrupt = NULL;
+    WAVcomplete = 0;
 }
 
 void checkWAVinput(void) { audio_stream_service(); }

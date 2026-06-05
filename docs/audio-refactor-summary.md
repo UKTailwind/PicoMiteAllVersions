@@ -84,9 +84,12 @@ Pico I2S still exists:
 
 - `OPTION AUDIO I2S bclk,data` uses `bclk` as BCLK, `bclk + 1` as LRCLK/WS, and `data` as DIN/DOUT-to-DAC.
 - For PicoCalc external pins, a practical test configuration is `OPTION AUDIO I2S GP2, GP4`; this means GP2=BCLK, GP3=LRCLK/WS, GP4=DATA.
-- PicoCalc still defaults to PWM on GP26/GP27 only when no audio backend is saved.
+- PicoCalc still defaults to PWM on GP26/GP27 when no audio backend is saved,
+  unless the saved options contain the explicit disabled-audio sentinel.
 - Pico `OPTION AUDIO ...` validation now allows reconfiguring over the currently-owned audio pins, then disables the old backend and saves the new one.
-- `OPTION AUDIO DISABLE` does not persist a disabled PicoCalc state. On reboot, the PicoCalc load override will restore default PWM if no saved backend exists.
+- `OPTION AUDIO DISABLE` persists a disabled PicoCalc state using an invalid
+  `AUDIO_SLICE` sentinel. A factory/default reset still restores board-default
+  PWM because it uses the ordinary unset sentinel.
 
 Pico MP3 behavior:
 
@@ -111,7 +114,10 @@ ESP32 option parsing lives in `ports/esp32_s3_metro/main/esp32_audio_options.c`:
 - `OPTION AUDIO DISABLE`.
 - `MM.INFO$(AUDIO)` returns `I2S`, `PDM`, or `OFF`.
 
-Important current limitation: the ESP32 option parser still errors with `Audio already configured` when changing from one configured audio backend to another. Pico reconfiguration was addressed, but ESP32 reconfiguration still needs an audit/fix if the same behavior is desired there.
+ESP32 audio can now be reconfigured over pins owned by the active audio
+backend. Pins owned by other peripherals still fail validation. The old audio
+backend options are cleared before the new I2S/PDM backend is saved and the
+board restarts.
 
 ESP32 backend details:
 
@@ -143,6 +149,66 @@ Intentionally not completed in the shared software path:
 - VS1053-specific behavior
 - Playlist controls outside the Pico legacy path
 
+## Planned `cmd_play()` Split
+
+The full Pico `cmd_play()` migration should be a staged extraction, not a
+single rewrite. This section is a planning artifact only; do not implement the
+large parser refactor in the current pass. The next implementation pass should
+introduce a shared parser for common `PLAY` forms and a small capability table
+for backend-specific extensions.
+
+Recommended structure:
+
+- Keep `shared/audio/Audio.c` as the owner of common command semantics:
+  `STOP`, `CLOSE`, `PAUSE`, `RESUME`, `VOLUME`, `TONE`, `SOUND`, non-MIDI
+  `NOTE`, `WAV`, `MP3`, `FLAC`, and software `MODFILE`.
+- Add a capability/hook header for non-common commands. Pico can provide hooks
+  for `ARRAY`, `STREAM`, MIDI/MIDIFILE, VS1053 paths, MOD samples, and
+  playlist `NEXT`/`PREVIOUS`. ESP32/host should return consistent unsupported
+  errors when those hooks are absent.
+- Keep file extension normalization and playlist directory scanning behind
+  explicit policy. If playlist behavior remains Pico-only, the shared parser
+  should say so through the capability hook instead of silently no-oping.
+- Do not move VS1053, MIDI, `PLAY STREAM`, or `PLAY ARRAY` into the base shared
+  parser. They require transport-specific state, ISR behavior, or legacy buffer
+  contracts that should stay in Pico hook code until separately audited.
+
+Risk areas to preserve explicitly:
+
+- Argument compatibility: accepted arities, default values, optional interrupt
+  arguments, type coercion, and exact error messages where BASIC programs rely
+  on them.
+- Runtime state transitions: completion interrupts, `WAVcomplete`,
+  `CurrentlyPlaying`, SOUND slot cleanup, pause/resume after stop/close, and
+  EOF/drain behavior before another file starts.
+- File command policy: extension inference and normalization, unsupported
+  extension errors, playlist directory scans, and `NEXT`/`PREVIOUS` behavior.
+- Backend-only behavior: VS1053, MIDI/MIDIFILE, `PLAY STREAM`, `PLAY ARRAY`,
+  MOD samples, legacy MOD/file buffer paths, and any ISR or transport-specific
+  state they depend on.
+
+Staged acceptance criteria and testing expectations:
+
+- Stage 1 extracts only common state commands: `STOP`, `CLOSE`, `PAUSE`,
+  `RESUME`, and `VOLUME`. Pico, ESP32, and host behavior must match existing
+  behavior, including repeated calls and unsupported-backend errors.
+- Stage 2 extracts software synth commands: `TONE`, `SOUND`, and non-MIDI
+  `NOTE`. Host tests should cover argument compatibility, tone interrupts where
+  supported, SOUND slot cleanup, and pause/resume/stop interactions.
+- Stage 3 extracts common file commands: `WAV`, `MP3`, `FLAC`, and software
+  `MODFILE`. Tests should cover extension handling, failed opens, EOF/drain,
+  immediate next-file playback, pause/resume, and stop during startup and drain.
+- Stage 4 wires Pico-only hooks without moving them into the shared parser:
+  VS1053, MIDI/MIDIFILE, `PLAY STREAM`, `PLAY ARRAY`, MOD samples, playlist
+  `NEXT`/`PREVIOUS`, and legacy buffer paths. Hardware/manual testing is
+  required for each hooked feature.
+- Every stage should keep Pico command coverage and error behavior unchanged
+  for migrated branches, while ESP32 and host expose only the shared
+  software-audio surface plus explicit unsupported-feature errors.
+- Each stage should land with focused host tests where possible and an updated
+  manual hardware checklist for Pico and ESP32 behavior that cannot be covered
+  by host tests.
+
 ## Bugs Fixed During This Pass
 
 - ESP32 now has real audio output instead of stubs.
@@ -150,7 +216,10 @@ Intentionally not completed in the shared software path:
 - `OPTION AUDIO left,right` on ESP32 configures PDM output.
 - `PLAY NOTE` works over the software synth path without MIDI.
 - PicoCalc no longer overwrites a saved I2S backend with default PWM on every boot.
+- PicoCalc now persists explicit `OPTION AUDIO DISABLE` instead of restoring
+  default PWM on the next boot.
 - Pico `OPTION AUDIO` can reconfigure an already configured backend.
+- ESP32 `OPTION AUDIO` can reconfigure over pins already owned by audio.
 - Pico file playback no longer leaves junk noise after WAV/FLAC EOF in the tested case.
 - Pico `test_audio.bas` file-playback step no longer skips because stale `P_SOUND` state is left after all SOUND slots are off.
 - Repeated `RUN "mp3.bas"` no longer keeps stale audio decoder state across program loads.
@@ -180,17 +249,18 @@ Not all Pico variants or all host/PC/WASM targets have been rebuilt after every 
 
 Highest priority:
 
-- Decide whether Pico `cmd_play()` should be further extracted so command semantics are shared with `shared/audio/Audio.c`, or document exactly why Pico must remain local.
+- Execute the planned `cmd_play()` split in small stages, starting with common
+  command branches and adding backend capability hooks for Pico-only commands.
 - Compare Pico and shared command behavior for every `PLAY` subcommand, especially argument counts, interrupts, pause/resume, file extension handling, and state transitions.
 - Audit `shared/audio/audio_stream.c` EOF behavior across WAV/MP3/FLAC/MOD and both Pico and ESP32 sinks.
 - Retest ESP32 I2S streamed-file EOF after the tail-hold change.
-- Audit ESP32 `OPTION AUDIO` reconfiguration behavior; currently it still rejects changes when already configured.
+- Hardware-test ESP32 `OPTION AUDIO` reconfiguration across I2S and PDM.
 
 Pico-specific:
 
 - Audit the remaining legacy playback paths in `drivers/pwm_synth/pwm_synth.c`: VS1053, MIDI, STREAM, ARRAY, playlist handling, and old MOD/file buffer branches.
 - Verify Pico I2S EOF logic in `drivers/sd_spi/mmc_stm32.c` for both file playback and synth playback.
-- Review `OPTION AUDIO DISABLE` on PicoCalc. It currently means "return to default PWM on next boot," not "persistently disabled."
+- Hardware-test PicoCalc `OPTION AUDIO DISABLE` persistence across reboot.
 - Review pin validation/reconfiguration in `core/mmbasic/MM_Misc.c`, including `PINMAP[PinDef[pin].GPno + 1]` use for inferred I2S LRCLK.
 - Re-test MP3 performance against the previous Pico code path and confirm whether any extra copies remain.
 
@@ -245,4 +315,3 @@ ESP32 PDM:
 OPTION AUDIO GP12, GP13
 OPTION AUDIO PDM GP12, GP13
 ```
-

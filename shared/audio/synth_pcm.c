@@ -519,7 +519,24 @@ void MMB_HOT_FUNC(synth_pcm_tone_frame)(int32_t *left, int32_t *right){
 	}
 }
 
-/* PLAY SOUND: sum the active slots for each channel. */
+static int volume_percent_clamped(int pct) {
+	if (pct < 0) return 0;
+	if (pct > 100) return 100;
+	return pct;
+}
+
+static int sound_apply_master_volume(int sample, int pct) {
+	return (int)((int64_t)sample * mapping[volume_percent_clamped(pct)] / 2000);
+}
+
+static int32_t sound_sample_to_frame(int sample) {
+	int64_t frame = (int64_t)sample * 2000 * 512;
+	if (frame > INT32_MAX) return INT32_MAX;
+	if (frame < INT32_MIN) return INT32_MIN;
+	return (int32_t)frame;
+}
+
+/* PLAY SOUND: sum the active slots for each channel and apply master volume. */
 void MMB_HOT_FUNC(synth_pcm_sound_sample)(int *left, int *right){
 	static int noisedwellleft[MAXSOUNDS]={0}, noisedwellright[MAXSOUNDS]={0};
 	static uint32_t noiseleft[MAXSOUNDS]={0}, noiseright[MAXSOUNDS]={0};
@@ -559,13 +576,13 @@ void MMB_HOT_FUNC(synth_pcm_sound_sample)(int *left, int *right){
 			}
 		}
 	}
-	*left=leftv;
-	*right=rightv;
+	*left=sound_apply_master_volume(leftv, vol_left);
+	*right=sound_apply_master_volume(rightv, vol_right);
 }
 
 void MMB_HOT_FUNC(synth_pcm_sound_frame)(int32_t *left, int32_t *right){
 	int leftv, rightv;
 	synth_pcm_sound_sample(&leftv, &rightv);
-	*left=leftv*2000*512;
-	*right=rightv*2000*512;
+	*left=sound_sample_to_frame(leftv);
+	*right=sound_sample_to_frame(rightv);
 }

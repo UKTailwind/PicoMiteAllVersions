@@ -1,246 +1,481 @@
-' test_audio.bas -- exhaustive PLAY / synth test for MMBasic audio.
+' test_audio.bas -- manual PLAY acceptance suite for one configured device.
 '
-' Exercises the whole PLAY surface (TONE, SOUND, VOLUME, PAUSE/RESUME,
-' STOP/CLOSE, every waveform, all channels, all 4 slots, polyphony, the
-' user wavetable) and a broad slice of the BASIC API (SUB/FUNCTION, arrays,
-' DATA/READ, SELECT CASE, ON ERROR, string + math functions, INKEY$).
+' Run with:  RUN "test_audio"
 '
-' Run with:  RUN "test_audio"   -- PLAY SOUND is interpreter-only (not the VM).
-'
-' NOTE: the PicoCalc's built-in speaker is MONO (left channel). Sections
-' that put sound only on the RIGHT channel are marked (headphones) -- use
-' the headphone jack to hear the stereo separation.
+' This suite runs automatically. It never changes OPTION AUDIO, never disables
+' audio, and never intentionally reboots. Put the sample files listed in
+' demos/sound/README.md next to this program before running file sections.
 
 OPTION DEFAULT FLOAT
-CONST NTEST = 11
+CONST NTEST = 9
+
+toneIrq% = 0
+modIrq% = 0
+fileIrq% = 0
+lastFileOk% = 0
+
+monoWav$ = "mono.wav"
+stereoWav$ = "stereo.wav"
+mp3File$ = "short.mp3"
+flacFile$ = "short.flac"
+modFile$ = "short.mod"
+longFile$ = "long.wav"
 
 CLS
-PRINT "=== MMBasic audio test ==="
+PRINT "=== MMBasic manual audio acceptance ==="
 PRINT "Device : "; MM.DEVICE$
 PRINT "Version: "; MM.VER
+PRINT "Audio  : ";
+PrintAudioInfo
+PRINT "State  : ";
+PrintSoundInfo
 PRINT
-PRINT "Speaker is mono (left). Use headphones for"
-PRINT "the (headphones) stereo sections."
+PRINT "Use the already-configured audio backend. Do not run"
+PRINT "OPTION AUDIO while this suite is running."
 PRINT
-PRINT "Press any key to start each section, Q to quit."
-PRINT
-WaitKey
+PRINT "The suite auto-runs. Watch/listen for each expected result."
+WaitAny
 
-PLAY VOLUME 100, 100            ' known starting state
+PLAY STOP
+PLAY CLOSE
+PLAY VOLUME 100, 100
 
-Section 1, "PLAY TONE"
-  Doing "Mono 440 Hz, 500 ms (timed)"
+IF StartSection%(1, "PLAY TONE control", "finite tones, stereo, zero-side silence, pause/resume/stop/close/new playback, interrupt if supported") THEN
+  Doing "Mono 440 Hz for 500 ms"
   PLAY TONE 440, 440, 500
-  PAUSE 700
+  PAUSE 750
 
-  Doing "Sustain 220 Hz until STOP"
-  PLAY TONE 220, 220
-  PAUSE 800
-  PLAY STOP
+  Doing "Left silent, right 660 Hz (headphones)"
+  PLAY TONE 0, 660, 650
+  PAUSE 850
 
-  Doing "Left 0 Hz / right 660 Hz (headphones)"
-  PLAY TONE 0, 660, 700
-  PAUSE 900
+  Doing "Right silent, left 660 Hz"
+  PLAY TONE 660, 0, 650
+  PAUSE 850
 
   Doing "Stereo split 300/500 Hz (headphones)"
   PLAY TONE 300, 500, 700
   PAUSE 900
 
-  Doing "Mono sweep 200 -> 2000 Hz"
-  FOR f = 200 TO 2000 STEP 40
-    PLAY TONE f, f
-    PAUSE 12
-  NEXT f
-  PLAY STOP
-
-Section 2, "PLAY VOLUME (master)"
-  Doing "440 Hz, ramp master volume 100 -> 0"
-  PLAY TONE 440, 440
-  FOR v = 100 TO 0 STEP -5
-    PLAY VOLUME v, v
-    PAUSE 60
-  NEXT v
-  PLAY STOP
-  PLAY VOLUME 100, 100
-
-  Doing "Pan left -> right via VOLUME (headphones)"
-  PLAY TONE 440, 440
-  FOR v = 0 TO 100 STEP 5
-    PLAY VOLUME 100 - v, v
-    PAUSE 40
-  NEXT v
-  PLAY STOP
-  PLAY VOLUME 100, 100
-
-Section 3, "PLAY SOUND -- every waveform"
-  DIM wname$(5) = ("Sine S","Square Q","Triangle T","Sawtooth W","Periodic noise P","White noise N")
-  wtypes$ = "SQTWPN"
-  FOR i = 0 TO 5
-    Doing wname$(i)
-    PLAY SOUND 1, B, MID$(wtypes$, i + 1, 1), 330, 20
-    PAUSE 1000
-    PLAY SOUND 1, B, O
-    PAUSE 150
-  NEXT i
-
-Section 4, "PLAY SOUND -- per-slot volume 0..25"
-  FOR vol = 0 TO 25 STEP 5
-    Doing "Square 440 Hz at volume " + STR$(vol)
-    PLAY SOUND 1, B, Q, 440, vol
-    PAUSE 600
-  NEXT vol
-  PLAY SOUND 1, B, O
-
-Section 5, "PLAY SOUND -- frequency range"
-  DIM freqs(6) = (20, 110, 440, 1000, 4000, 10000, 20000)
-  FOR i = 0 TO 6
-    Doing "Sine " + STR$(freqs(i)) + " Hz"
-    PLAY SOUND 1, B, S, freqs(i), 22
-    PAUSE 600
-  NEXT i
-  PLAY SOUND 1, B, O
-
-Section 6, "Polyphony -- 4-slot chord"
-  Doing "C major (C-E-G-C) across slots 1..4"
-  PLAY SOUND 1, B, T, 261.63, 12     ' C4
-  PLAY SOUND 2, B, T, 329.63, 12     ' E4
-  PLAY SOUND 3, B, T, 392.00, 12     ' G4
-  PLAY SOUND 4, B, T, 523.25, 12     ' C5
-  PAUSE 1500
-  ' release voices one at a time
-  FOR s = 1 TO 4
-    PLAY SOUND s, B, O
-    PAUSE 300
-  NEXT s
-
-Section 7, "Stereo separation (headphones)"
-  Doing "Slot 1 LEFT 523 Hz, slot 2 RIGHT 392 Hz"
-  PLAY SOUND 1, L, Q, 523.25, 18
-  PLAY SOUND 2, R, Q, 392.00, 18
-  PAUSE 1200
-  Doing "Channel as string M (both) reference tone"
-  PLAY SOUND 1, L, O
-  PLAY SOUND 2, R, O
-  PLAY SOUND 1, "M", S, 440, 18
-  PAUSE 800
-  PLAY SOUND 1, B, O
-
-Section 8, "User wavetable (PLAY LOAD SOUND + U)"
-  Doing "Build a rich additive wave, load it, play an arpeggio"
-  DIM tbl%(1023)
-  FOR n% = 0 TO 1023
-    tbl%(n%) =  UWave%(4*n%)
-    tbl%(n%) = tbl%(n%) OR (UWave%(4*n%+1) << 16)
-    tbl%(n%) = tbl%(n%) OR (UWave%(4*n%+2) << 32)
-    tbl%(n%) = tbl%(n%) OR (UWave%(4*n%+3) << 48)
-  NEXT n%
-  ON ERROR SKIP
-  PLAY LOAD SOUND tbl%()
-  IF MM.ERRNO <> 0 THEN
-    PRINT "  (LOAD SOUND unavailable here: "; MM.ERRMSG$; ")"
-  ELSE
-    DIM uf(4) = (220.00, 277.18, 329.63, 440.00, 554.37)   ' A major up an octave
-    FOR i = 0 TO 4
-      PLAY SOUND 1, B, U, uf(i), 22
-      PAUSE 450
-    NEXT i
-    PLAY SOUND 1, B, U, 220.00, 22                          ' hold the root to hear the timbre
-    PAUSE 1000
-    PLAY SOUND 1, B, O
-  ENDIF
-  ON ERROR CLEAR
-
-Section 9, "PAUSE / RESUME"
-  Doing "Chord, PAUSE 500 ms, RESUME"
-  PLAY SOUND 1, B, S, 440, 14
-  PLAY SOUND 2, B, S, 554.37, 14
-  PAUSE 600
+  Doing "Indefinite tone, PAUSE, RESUME, STOP, CLOSE, then new tone"
+  PLAY TONE 330, 330
+  PAUSE 450
   PLAY PAUSE
   PAUSE 500
   PLAY RESUME
-  PAUSE 800
+  PAUSE 500
   PLAY STOP
+  PAUSE 200
+  PLAY CLOSE
+  PAUSE 200
+  PLAY TONE 660, 660, 450
+  PAUSE 650
+
+  Doing "Completion interrupt on a short tone, if this port supports it"
+  toneIrq% = 0
+  ON ERROR IGNORE
+  PLAY TONE 880, 880, 300, ToneDone
+  ON ERROR ABORT
+  IF MM.ERRNO <> 0 THEN
+    PRINT "      skipped interrupt: "; MM.ERRMSG$
+    ON ERROR CLEAR
+  ELSE
+    PAUSE 800
+    PRINT "      interrupt count = "; toneIrq%; " (expected 1)"
+  ENDIF
+  PLAY STOP
+  ConfirmSection
+ENDIF
+
+IF StartSection%(2, "PLAY SOUND waveforms/routing", "S Q T W P N U waveforms, left/right/both routing, M alias, volume ramp") THEN
+  wtypes$ = "SQTWPN"
+  FOR i% = 0 TO 5
+    Doing WaveName$(i%)
+    PLAY SOUND 1, B, MID$(wtypes$, i% + 1, 1), 330, 20
+    PAUSE 700
+    PLAY SOUND 1, B, O
+    PAUSE 120
+  NEXT i%
+
+  Doing "Routing: L 523 Hz, R 392 Hz, then B 440 Hz"
+  PLAY SOUND 1, L, Q, 523.25, 18
+  PLAY SOUND 2, R, Q, 392.00, 18
+  PAUSE 1200
+  PLAY SOUND 1, L, O
+  PLAY SOUND 2, R, O
+  PLAY SOUND 1, B, S, 440, 18
+  PAUSE 700
   PLAY SOUND 1, B, O
+
+  Doing "M alias should behave like both channels"
+  PLAY SOUND 1, "M", T, 440, 18
+  PAUSE 800
+  PLAY SOUND 1, B, O
+
+  Doing "Master volume ramp 100 -> 0 -> 100"
+  PLAY SOUND 1, B, S, 440, 20
+  FOR v% = 100 TO 0 STEP -10
+    PLAY VOLUME v%, v%
+    PAUSE 80
+  NEXT v%
+  FOR v% = 0 TO 100 STEP 10
+    PLAY VOLUME v%, v%
+    PAUSE 60
+  NEXT v%
+  PLAY SOUND 1, B, O
+  PLAY VOLUME 100, 100
+
+  Doing "User waveform U via PLAY LOAD SOUND"
+  DIM baseProbe%(2)
+  tableBase% = 0
+  ON ERROR IGNORE
+  baseProbe%(0) = 0
+  ON ERROR ABORT
+  IF MM.ERRNO <> 0 THEN
+    tableBase% = 1
+    ON ERROR CLEAR
+  ENDIF
+  IF tableBase% = 0 THEN
+    DIM tbl%(1023)
+  ELSE
+    DIM tbl%(1024)
+  ENDIF
+  tableLast% = tableBase% + 1023
+  FOR n% = tableBase% TO tableLast%
+    sample% = n% - tableBase%
+    tbl%(n%) = UWave%(4 * sample%)
+    tbl%(n%) = tbl%(n%) OR (UWave%(4 * sample% + 1) << 16)
+    tbl%(n%) = tbl%(n%) OR (UWave%(4 * sample% + 2) << 32)
+    tbl%(n%) = tbl%(n%) OR (UWave%(4 * sample% + 3) << 48)
+  NEXT n%
+  ON ERROR IGNORE
+  PLAY LOAD SOUND tbl%()
+  ON ERROR ABORT
+  IF MM.ERRNO <> 0 THEN
+    PRINT "      skipped U waveform: "; MM.ERRMSG$
+    ON ERROR CLEAR
+  ELSE
+    PLAY SOUND 1, B, U, 220, 22
+    PAUSE 800
+    PLAY SOUND 1, B, U, 330, 22
+    PAUSE 800
+    PLAY SOUND 1, B, O
+  ENDIF
+  PLAY STOP
+  ConfirmSection
+ENDIF
+
+IF StartSection%(3, "PLAY SOUND slots/state", "four independent slots, all-off cleanup, STOP stale-mask regression") THEN
+  Doing "Four-slot C major chord, then turn off one slot at a time"
+  PLAY SOUND 1, B, T, 261.63, 12
+  PLAY SOUND 2, B, T, 329.63, 12
+  PLAY SOUND 3, B, T, 392.00, 12
+  PLAY SOUND 4, B, T, 523.25, 12
+  PAUSE 1400
+  FOR s% = 1 TO 4
+    PLAY SOUND s%, B, O
+    PAUSE 280
+  NEXT s%
+  PRINT "      state after all slot O commands: ";
+  PrintSoundInfo
+  PRINT "      expected: OFF"
+
+  Doing "PLAY STOP, then new slot playback, then O on that slot"
+  PLAY SOUND 1, B, S, 440, 20
+  PAUSE 500
+  PLAY STOP
+  PAUSE 200
+  PLAY SOUND 2, B, S, 660, 20
+  PAUSE 700
   PLAY SOUND 2, B, O
+  PAUSE 250
+  PRINT "      state after stale-mask probe: ";
+  PrintSoundInfo
+  PRINT "      expected: OFF"
 
-Section 10, "Melody via DATA / READ"
-  Doing "Tune through the SOUND engine"
-  RESTORE notes
-  DO
-    READ nt, ms
-    IF nt < 0 THEN EXIT DO
-    IF nt = 0 THEN
-      PLAY SOUND 1, B, O
-    ELSE
-      PLAY SOUND 1, B, T, nt, 18
-    ENDIF
-    PAUSE ms
-  LOOP
-  PLAY SOUND 1, B, O
+  Doing "New playback after stale-mask probe"
+  PLAY SOUND 3, B, Q, 550, 18
+  PAUSE 600
+  PLAY STOP
+  ConfirmSection
+ENDIF
 
-Section 11, "File playback (WAV / MP3 / FLAC / MOD)"
-  ' Decoded-file playback. Works fully on PicoMite devices; on the ESP32
-  ' only WAV is wired so far; on stdio/host it skips. Files live next to
-  ' this program (A: drive / SD card).
-  PlayFile "chime.wav",  "WAV",     2500
-  PlayFile "sweep.wav",  "WAV",     2500
-  PlayFile "chime.mp3",  "MP3",     2500
-  PlayFile "chime.flac", "FLAC",    2500
-  PlayFile "laamaa.mod", "MODFILE", 6000
+IF StartSection%(4, "PLAY NOTE adapter", "note on/off, velocity zero off, four channels mapped to four synth slots, invalid channel error") THEN
+  Doing "Channel 0 note on, then note off"
+  PLAY NOTE ON 0, 60, 96
+  PAUSE 700
+  PLAY NOTE OFF 0, 60, 0
+  PAUSE 250
 
-' --- all done: full teardown ---
+  Doing "Velocity zero should act as note off"
+  PLAY NOTE ON 1, 64, 96
+  PAUSE 600
+  PLAY NOTE ON 1, 64, 0
+  PAUSE 300
+
+  Doing "Four-note chord on channels 0..3"
+  PLAY NOTE ON 0, 60, 80
+  PLAY NOTE ON 1, 64, 80
+  PLAY NOTE ON 2, 67, 80
+  PLAY NOTE ON 3, 72, 80
+  PAUSE 1400
+  FOR c% = 0 TO 3
+    PLAY NOTE OFF c%, 0, 0
+    PAUSE 120
+  NEXT c%
+  PRINT "      state after NOTE OFF: ";
+  PrintSoundInfo
+  PRINT "      expected: OFF"
+
+  Doing "Invalid non-MIDI channel 4 should report an error"
+  ON ERROR IGNORE
+  PLAY NOTE ON 4, 60, 80
+  ON ERROR ABORT
+  IF MM.ERRNO <> 0 THEN
+    PRINT "      expected error: "; MM.ERRMSG$
+    ON ERROR CLEAR
+  ELSE
+    PRINT "      WARNING: channel 4 was accepted on this backend"
+    PLAY STOP
+  ENDIF
+  ConfirmSection
+ENDIF
+
+IF StartSection%(5, "WAV file playback", "mono/stereo WAV, pause/resume, stop during startup/middle/near-end, immediate next after EOF") THEN
+  PlayFile monoWav$, "WAV", 1800
+  PlayFile stereoWav$, "WAV", 1800
+  PauseResumeFile monoWav$, "WAV"
+  StopDuringFile monoWav$, "WAV", 50, "startup"
+  StopDuringFile monoWav$, "WAV", 600, "middle"
+  StopDuringFile monoWav$, "WAV", 1000, "near-end before EOF"
+
+  Doing "Immediate next WAV after expected EOF"
+  StartFile monoWav$, "WAV"
+  IF lastFileOk% THEN
+    PAUSE 1800
+    StartFile stereoWav$, "WAV"
+    IF lastFileOk% THEN PAUSE 1800
+  ENDIF
+  PLAY STOP
+  ConfirmSection
+ENDIF
+
+IF StartSection%(6, "MP3 and FLAC playback", "codec open, pause/resume, stop during startup/middle/near-end, immediate next after EOF") THEN
+  PlayFile mp3File$, "MP3", 1800
+  PauseResumeFile mp3File$, "MP3"
+  StopDuringFile mp3File$, "MP3", 60, "startup"
+  StopDuringFile mp3File$, "MP3", 600, "middle"
+  StopDuringFile mp3File$, "MP3", 1000, "near-end before EOF"
+
+  PlayFile flacFile$, "FLAC", 1800
+  PauseResumeFile flacFile$, "FLAC"
+  StopDuringFile flacFile$, "FLAC", 60, "startup"
+  StopDuringFile flacFile$, "FLAC", 600, "middle"
+  StopDuringFile flacFile$, "FLAC", 1000, "near-end before EOF"
+
+  Doing "Immediate MP3 -> FLAC switch after expected MP3 EOF"
+  StartFile mp3File$, "MP3"
+  IF lastFileOk% THEN
+    PAUSE 1800
+    StartFile flacFile$, "FLAC"
+    IF lastFileOk% THEN PAUSE 1800
+  ENDIF
+  PLAY STOP
+  ConfirmSection
+ENDIF
+
+IF StartSection%(7, "MOD file playback", "MOD looping, stop during playback, optional no-loop interrupt with short MOD") THEN
+  Doing "Looping MOD playback for 5 seconds"
+  StartFile modFile$, "MODFILE"
+  IF lastFileOk% THEN PAUSE 5000
+  PLAY STOP
+  PAUSE 250
+
+  StopDuringFile modFile$, "MODFILE", 60, "startup"
+  StopDuringFile modFile$, "MODFILE", 1800, "middle"
+
+  Doing "MOD no-loop/completion interrupt if this backend supports it"
+  modIrq% = 0
+  ON ERROR IGNORE
+  PLAY MODFILE modFile$, ModDone
+  ON ERROR ABORT
+  IF MM.ERRNO <> 0 THEN
+    PRINT "      skipped MOD interrupt: "; MM.ERRMSG$
+    ON ERROR CLEAR
+  ELSE
+    PAUSE 7500
+    PRINT "      MOD interrupt count = "; modIrq%; " (expected 1 if no-loop interrupt is supported)"
+    IF modIrq% = 0 THEN PRINT "      expected on backends that loop MODFILE or lack the interrupt"
+  ENDIF
+  PLAY STOP
+  ConfirmSection
+ENDIF
+
+IF StartSection%(8, "Open/close transitions", "repeated open-close and immediate next across WAV/MP3/FLAC/MOD") THEN
+  Doing "Repeated WAV open/close"
+  FOR i% = 1 TO 3
+    StartFile monoWav$, "WAV"
+    IF lastFileOk% THEN PAUSE 250
+    PLAY CLOSE
+    PAUSE 150
+  NEXT i%
+
+  Doing "Repeated MP3/FLAC/MOD open-close"
+  OpenCloseOnce mp3File$, "MP3"
+  OpenCloseOnce flacFile$, "FLAC"
+  OpenCloseOnce modFile$, "MODFILE"
+
+  Doing "Immediate sequence: WAV, MP3, FLAC, MOD"
+  StartFile monoWav$, "WAV"
+  IF lastFileOk% THEN PAUSE 500
+  StartFile mp3File$, "MP3"
+  IF lastFileOk% THEN PAUSE 500
+  StartFile flacFile$, "FLAC"
+  IF lastFileOk% THEN PAUSE 500
+  StartFile modFile$, "MODFILE"
+  IF lastFileOk% THEN PAUSE 900
+  PLAY STOP
+  PLAY CLOSE
+  ConfirmSection
+ENDIF
+
+IF StartSection%(9, "Buffer stress", "rapid STOP during decode, small files in sequence, optional long file while polling keyboard") THEN
+  Doing "Rapid STOP around short files"
+  FOR i% = 1 TO 4
+    StopDuringFile monoWav$, "WAV", 30, "rapid WAV"
+    StopDuringFile mp3File$, "MP3", 30, "rapid MP3"
+    StopDuringFile flacFile$, "FLAC", 30, "rapid FLAC"
+  NEXT i%
+
+  Doing "Short-file sequence without extra close"
+  FOR i% = 1 TO 2
+    StartFile monoWav$, "WAV": IF lastFileOk% THEN PAUSE 350
+    StartFile stereoWav$, "WAV": IF lastFileOk% THEN PAUSE 350
+    StartFile mp3File$, "MP3": IF lastFileOk% THEN PAUSE 350
+    StartFile flacFile$, "FLAC": IF lastFileOk% THEN PAUSE 350
+    StartFile modFile$, "MODFILE": IF lastFileOk% THEN PAUSE 350
+  NEXT i%
+  PLAY STOP
+
+  Doing "Optional long file with keyboard/display activity"
+  StartFile longFile$, "WAV"
+  IF lastFileOk% THEN
+    FOR i% = 1 TO 80
+      PRINT "." ;
+      k$ = INKEY$
+      PAUSE 50
+    NEXT i%
+    PRINT
+  ENDIF
+  PLAY STOP
+  PLAY CLOSE
+  ConfirmSection
+ENDIF
+
 PLAY STOP
 PLAY CLOSE
 CLS
-PRINT "=== audio test complete ==="
-PRINT "Synth + file-playback paths exercised."
+PRINT "=== audio acceptance complete ==="
+PRINT "Final state: ";
+PrintSoundInfo
 END
 
-notes:
-DATA 261.63,250, 293.66,250, 329.63,250, 349.23,250
-DATA 392.00,250, 440.00,250, 493.88,250, 523.25,400
-DATA 0,120, 523.25,200, 392.00,200, 440.00,400
-DATA 0,120, 261.63,500
-DATA -1,0
+ToneDone:
+  toneIrq% = toneIrq% + 1
+  IRETURN
+
+ModDone:
+  modIrq% = modIrq% + 1
+  IRETURN
+
+FileDone:
+  fileIrq% = fileIrq% + 1
+  IRETURN
 
 ' ---------------------------------------------------------------------------
-' Helpers (exercise SUB / FUNCTION / SELECT CASE / INKEY$)
+' Helpers
 ' ---------------------------------------------------------------------------
 
-' One uint16 wavetable sample (0..4095 -> ~100..3900).
-' Additive "reed organ" timbre: fundamental + a rolled-off harmonic
-' series with the odd harmonics emphasised, for a bright, hollow tone
-' that's clearly distinct from the built-in S/Q/T/W waveforms.
 FUNCTION UWave%(n%)
   LOCAL FLOAT th, y
   th = 2 * PI * (n% MOD 4096) / 4096
-  y =            SIN(th)
+  y = SIN(th)
   y = y + 0.50 * SIN(2 * th)
   y = y + 0.66 * SIN(3 * th)
   y = y + 0.40 * SIN(4 * th)
   y = y + 0.28 * SIN(5 * th)
   y = y + 0.18 * SIN(6 * th)
   y = y + 0.12 * SIN(7 * th)
-  y = 2000 + 560 * y                ' coeff sum 3.14 -> peak well inside range
+  y = 2000 + 560 * y
   IF y < 100 THEN y = 100
   IF y > 3900 THEN y = 3900
   UWave% = INT(y)
 END FUNCTION
 
-SUB Section(n%, title$)
+FUNCTION WaveName$(i%)
+  SELECT CASE i%
+    CASE 0: WaveName$ = "Sine S"
+    CASE 1: WaveName$ = "Square Q"
+    CASE 2: WaveName$ = "Triangle T"
+    CASE 3: WaveName$ = "Sawtooth W"
+    CASE 4: WaveName$ = "Periodic noise P"
+    CASE 5: WaveName$ = "White noise N"
+  END SELECT
+END FUNCTION
+
+FUNCTION StartSection%(n%, title$, expect$)
   PRINT
   PRINT "[" + STR$(n%) + "/" + STR$(NTEST) + "] " + title$
-  WaitKey
+  PRINT "Expect: " + expect$
+  PAUSE 1200
+  StartSection% = 1
+END FUNCTION
+
+SUB ConfirmSection
+  PLAY STOP
+  PRINT "   section complete"
+  PAUSE 700
 END SUB
 
 SUB Doing(label$)
   PRINT "   - " + label$
 END SUB
 
-' Play one decoded file in the background for `ms`, then stop. Skips
-' cleanly (prints the reason) on ports without that codec or file.
-SUB PlayFile(fname$, kind$, ms)
-  Doing kind$ + ": " + fname$
+SUB WaitAny
+  PAUSE 1500
+END SUB
+
+SUB CleanQuit
+  PLAY STOP
+  PLAY CLOSE
+  PRINT
+  PRINT "Aborted."
+  END
+END SUB
+
+SUB PrintAudioInfo
+  ON ERROR IGNORE
+  PRINT MM.INFO(AUDIO)
+  ON ERROR ABORT
+  IF MM.ERRNO <> 0 THEN
+    PRINT "(unavailable: "; MM.ERRMSG$; ")"
+    ON ERROR CLEAR
+  ENDIF
+END SUB
+
+SUB PrintSoundInfo
+  ON ERROR IGNORE
+  PRINT MM.INFO(SOUND)
+  ON ERROR ABORT
+  IF MM.ERRNO <> 0 THEN
+    PRINT "(unavailable: "; MM.ERRMSG$; ")"
+    ON ERROR CLEAR
+  ENDIF
+END SUB
+
+SUB StartFile(fname$, kind$)
+  Doing kind$ + ": start " + fname$
+  lastFileOk% = 0
   ON ERROR IGNORE
   SELECT CASE kind$
     CASE "WAV":     PLAY WAV fname$
@@ -250,26 +485,45 @@ SUB PlayFile(fname$, kind$, ms)
   END SELECT
   ON ERROR ABORT
   IF MM.ERRNO <> 0 THEN
-    PRINT "      (skipped: "; MM.ERRMSG$; ")"
+    PRINT "      skipped: "; MM.ERRMSG$
     ON ERROR CLEAR
-    EXIT SUB
+  ELSE
+    lastFileOk% = 1
   ENDIF
-  PAUSE ms
+END SUB
+
+SUB PlayFile(fname$, kind$, ms%)
+  StartFile fname$, kind$
+  IF lastFileOk% THEN PAUSE ms%
   PLAY STOP
   PAUSE 200
 END SUB
 
-' Wait for a key; Q quits the whole program cleanly.
-SUB WaitKey
-  LOCAL k$
-  DO
-    k$ = INKEY$
-  LOOP UNTIL k$ <> ""
-  IF UCASE$(k$) = "Q" THEN
-    PLAY STOP
-    PLAY CLOSE
-    PRINT
-    PRINT "Aborted."
-    END
+SUB PauseResumeFile(fname$, kind$)
+  Doing kind$ + ": pause/resume"
+  StartFile fname$, kind$
+  IF lastFileOk% THEN
+    PAUSE 450
+    PLAY PAUSE
+    PAUSE 500
+    PLAY RESUME
+    PAUSE 900
   ENDIF
+  PLAY STOP
+  PAUSE 200
+END SUB
+
+SUB StopDuringFile(fname$, kind$, delay%, label$)
+  Doing kind$ + ": STOP during " + label$
+  StartFile fname$, kind$
+  IF lastFileOk% THEN PAUSE delay%
+  PLAY STOP
+  PAUSE 120
+END SUB
+
+SUB OpenCloseOnce(fname$, kind$)
+  StartFile fname$, kind$
+  IF lastFileOk% THEN PAUSE 300
+  PLAY CLOSE
+  PAUSE 150
 END SUB
