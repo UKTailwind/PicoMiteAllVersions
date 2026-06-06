@@ -6,8 +6,15 @@
 #include <stdint.h>
 #include "hal/hal_keyboard.h"
 
-void hal_keyboard_service(void) {}
-void hal_keyboard_clear_repeat_state(void) {}
+extern void esp32_usb_keyboard_service(void);
+extern void esp32_usb_keyboard_clear_repeat_state(void);
+
+void hal_keyboard_service(void) {
+    esp32_usb_keyboard_service();
+}
+void hal_keyboard_clear_repeat_state(void) {
+    esp32_usb_keyboard_clear_repeat_state();
+}
 void hal_keyboard_init(void) {}
 int hal_keyboard_keydown_count(void) {
     return 0;

@@ -1,6 +1,6 @@
 # MMBasic Anywhere - Adafruit Metro ESP32-S3
 
-ESP32-S3 port targeting the Adafruit Metro ESP32-S3 (#5500), currently verified on the N16R8 board variant: 16 MB flash and 8 MB embedded Octal PSRAM. PSRAM is owned by MMBasic via a fixed slab reserved from ESP-IDF at boot; `PSRAMsize` and the shared `RAM` command surface match Pico variants. The port runs an MMBasic stdio REPL over the ESP32-S3 native USB Serial/JTAG interface.
+ESP32-S3 port targeting the Adafruit Metro ESP32-S3 (#5500), currently verified on the N16R8 board variant: 16 MB flash and 8 MB embedded Octal PSRAM. PSRAM is owned by MMBasic via a fixed slab reserved from ESP-IDF at boot; `PSRAMsize` and the shared `RAM` command surface match Pico variants. The port can use the ESP32-S3 native USB port either as a USB Serial/JTAG console or as a USB HID host for an external keyboard.
 
 Plan: [docs/real-hal/esp32-s3-port.md](../../docs/real-hal/esp32-s3-port.md). Session log: [docs/real-hal/esp32-s3-port-log.md](../../docs/real-hal/esp32-s3-port-log.md).
 
@@ -82,29 +82,88 @@ python3 probe.py /dev/cu.usbmodem* --cmd 'PRINT MM.VER'
 
 `probe.py` avoids the DTR pulse behavior that can reset the Metro into the wrong USB mode. Terminal programs such as `picocom` can work, but be careful with DTR/HUPCL reset behavior on open.
 
-## Web Console
+## WiFi, Telnet, And Web Console
 
-The port can serve a browser-based terminal + 320×240 framebuffer over WiFi.
-From the REPL:
+WiFi credentials are stored in NVS. `OPTION WIFI` connects immediately, and the saved credentials are reused on later boots when network services are enabled.
 
 ```basic
-OPTION WIFI "your-ssid", "your-password"   ' stored in NVS, one-time
-WEB CONNECT                                ' join the network
-PRINT MM.INFO$(IP ADDRESS)                 ' note the address, e.g. 192.168.5.89
-OPTION WEB CONSOLE ON                      ' enable it (reboots the board)
+OPTION WIFI "your-ssid","your-password"
+PRINT MM.INFO$(IP ADDRESS)
 ```
 
-After it reboots it auto-rejoins WiFi (the credentials are persisted) and listens
-on `Option.TCP_PORT` (default **80**). Then open this URL in a browser on the same
-network — **note the `/__web_console/` path, the root `/` will not work**:
+Common network console setup:
+
+```basic
+OPTION TCP SERVER PORT 80
+OPTION TELNET CONSOLE ON
+OPTION WEB CONSOLE ON
+CPU RESTART
+```
+
+`OPTION TELNET CONSOLE ON` mirrors console I/O to telnet while keeping the local console active. `OPTION TELNET CONSOLE ONLY` makes telnet the only console. `OPTION TELNET CONSOLE OFF` disables telnet console use.
+
+The web console listens on `Option.TCP_PORT` (default **80**) and uses this path:
 
 ```
 http://<device-ip>/__web_console/
 ```
 
-The console UI is namespaced under `/__web_console/` on purpose, so it does not
-collide with pages your own BASIC programs serve via `WEB TRANSMIT PAGE`. An
-unhandled `GET /` is left for those programs and otherwise returns an empty reply.
+The root `/` remains available for BASIC programs serving pages with `WEB TRANSMIT PAGE`.
+
+## USB Console And Keyboard
+
+The native USB-C port has two saved runtime roles:
+
+| Command | USB role after reboot |
+|---|---|
+| `OPTION USB SERIAL` | USB Serial/JTAG console for a host computer |
+| `OPTION USB KEYBOARD` | USB host mode for a HID boot keyboard |
+
+Changing the USB role saves the option and reboots. `LIST OPTIONS` prints the saved role.
+
+```basic
+OPTION USB SERIAL
+OPTION USB KEYBOARD
+OPTION USB STATUS
+```
+
+In keyboard mode, connect a USB keyboard to the Metro USB-C port through a suitable host cable or adapter. Local VGA remains the display console. Key repeat uses the standard MMBasic default timing: 600 ms before repeat starts, then 150 ms between repeated keys.
+
+Holding BOOT during reset forces USB Serial/JTAG for that boot without changing the saved USB role.
+
+## VGA
+
+The ESP32-S3 VGA output uses LCD_CAM RGB scanout into a resistor-DAC style VGA input. No external pixel clock pin is routed or required.
+
+For the VGA Serial Wombat 3-bit board, wire one bit per channel plus sync:
+
+| VGA signal | Metro GPIO |
+|---|---|
+| Red | GP8 |
+| Green | GP9 |
+| Blue | GP10 |
+| HSync | GP11 |
+| VSync | GP12 |
+
+Recommended option set:
+
+```basic
+OPTION VGA 3BIT GP8,GP9,GP10,GP11,GP12
+OPTION VGA SYNC NEGATIVE,NEGATIVE
+OPTION VGA CLOCK 25MHZ
+OPTION VGA DRIVE 2
+CPU RESTART
+```
+
+Available display modes:
+
+| Command | Logical framebuffer | Scanout |
+|---|---|---|
+| `MODE 1` | 640 x 480 RGB332 | 640 x 480 VGA |
+| `MODE 2` | 320 x 240 RGB332 | 2x scaled to 640 x 480 |
+| `MODE 3` | 320 x 240 RGB332 | 2x scaled with 3-bit output dithering |
+
+`OPTION VGA DISABLE` clears the VGA configuration and reboots. Full RGB332 wiring is also supported with `OPTION VGA r2,r1,r0,g2,g1,g0,b1,b0,hsync,vsync`.
 
 ## Audio
 
@@ -123,7 +182,13 @@ strapping, USB, and Octal-PSRAM GPIOs on the N16R8):
 | WS / LRCLK | 6 | `HAL_PORT_AUDIO_I2S_WS_PIN` |
 | DOUT (serial data) | 7 | `HAL_PORT_AUDIO_I2S_DOUT_PIN` |
 
-Audio configuration:
+Recommended I2S option set for the current Metro VGA wiring:
+
+```basic
+OPTION AUDIO I2S GP5,GP6,GP7
+```
+
+Audio configuration commands:
 
 | Command | Backend | Pins |
 |---|---|---|
@@ -133,20 +198,17 @@ Audio configuration:
 | `OPTION AUDIO PDM left,right` | Same as the bare two-pin form | left PDM output, right PDM output |
 | `OPTION AUDIO DISABLE` | Audio off | none |
 
-```
+```basic
 OPTION AUDIO I2S GP5,GP7
 OPTION AUDIO I2S GP5,GP6,GP7
 OPTION AUDIO GP12,GP13
 OPTION AUDIO PDM GP12,GP13
 OPTION AUDIO DISABLE
 PRINT MM.INFO$(AUDIO)
+PRINT MM.INFO$(AUDIO STATUS)
 ```
 
-For I2S, WS/LRCLK is inferred as `BCLK + 1`, matching the RP2 `OPTION AUDIO I2S`
-shape; `LIST OPTIONS` prints BCLK, WS/LRCLK, and DOUT. The two-pin form configures the ESP32-S3 hardware PDM TX converter, not
-LEDC PWM. The selected pins are the left/right PDM data outputs; no separate
-PDM clock pin is exposed by the BASIC option. `MM.INFO$(AUDIO)` reports `I2S`,
-`PDM`, or `OFF`.
+For I2S, the two-pin form infers WS/LRCLK as `BCLK + 1`. `LIST OPTIONS` prints BCLK, WS/LRCLK, and DOUT. The PDM form configures the ESP32-S3 hardware PDM TX converter; the selected pins are the left/right PDM data outputs. `MM.INFO$(AUDIO)` reports `I2S`, `PDM`, or `OFF`. `MM.INFO$(AUDIO STATUS)` reports the active pins and I2S driver status.
 
 PDM output can be filtered and amplified externally for analog audio. In
 practice it also works directly into some high-impedance AUX inputs, but a
@@ -176,7 +238,10 @@ Working on hardware:
 - ESP-IDF detects the onboard Octal PSRAM. The port reserves a fixed slab via `heap_caps_aligned_alloc(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT)` at boot and publishes it as `PSRAMbase` / `PSRAMsize`; `MM.INFO(PSRAM SIZE)` now returns the slab size and the shared `RAM` command (test / list / save / load / erase) works the same as on Pico variants. `RAM TEST NOCACHE` is Pico-only and errors on ESP32.
 - `WEB CONNECT`, `WEB SCAN`, TCP server, TCP client request/stream, UDP send/receive, NTP, and plain-TCP MQTT are hardware-smoked.
 - Bundled WEB demos seeded to A: include the small server demo and the multi-file website demo.
-- Browser web console over WiFi at `http://<device-ip>/__web_console/` (see [Web Console](#web-console)).
+- Browser web console over WiFi at `http://<device-ip>/__web_console/` (see [WiFi, Telnet, And Web Console](#wifi-telnet-and-web-console)).
+- Telnet console over WiFi with `OPTION TELNET CONSOLE ON`.
+- Runtime USB role switching between USB Serial/JTAG console and USB HID host keyboard.
+- VGA over LCD_CAM, including 3-bit Serial Wombat wiring, 640 x 480, 320 x 240, and 320 x 240 dithered modes.
 - `PLAY TONE` / `PLAY SOUND` / `PLAY NOTE` over external I2S DAC or I2S PDM TX via the shared synthesizer (see [Audio](#audio)).
 - `porttools/esp32_fs_vm_smoke.py` default smoke, opt-in flash/VAR persistence, and network conformance have passed on hardware.
 
@@ -185,7 +250,7 @@ Still stubbed or incomplete:
 - BASIC-visible GPIO DOUT/DIN/ARAW is hardware-smoked. PWM/servo are still explicit unsupported paths.
 - MQTT TLS/cert handling is not implemented; current MQTT support is plain TCP.
 - MIDI, ARRAY, and STREAM playback are not wired.
-- Display (local LCD/VGA), keyboard, BLE/Bluetooth, and OTA are deferred.
+- BLE/Bluetooth and OTA are not implemented.
 
 ## Port Tools
 

@@ -12,6 +12,8 @@
 
 #include "esp32_audio_options.h"
 
+extern void esp32_audio_status_string(char *out, size_t out_len);
+
 static int esp32_audio_pin_invalid(int pin) {
     return pin <= 0 || pin > NBRPINS || (PinDef[pin].mode & UNUSED);
 }
@@ -215,6 +217,12 @@ int esp32_audio_option_setter(unsigned char * line) {
 }
 
 int esp32_audio_mminfo(unsigned char * ep, unsigned char * out_sret, int * out_targ) {
+    if (checkstring(ep, (unsigned char *)"AUDIO STATUS")) {
+        esp32_audio_status_string((char *)out_sret, STRINGSIZE);
+        CtoM(out_sret);
+        *out_targ = T_STR;
+        return 1;
+    }
     if (!checkstring(ep, (unsigned char *)"AUDIO")) return 0;
     if (Option.AUDIO_L)
         strcpy((char *)out_sret, "PDM");

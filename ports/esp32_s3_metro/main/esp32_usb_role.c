@@ -14,12 +14,18 @@
 #include "esp_system.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "hal/usb_serial_jtag_ll.h"
 
 static int s_effective_role = USB_ROLE_SERIAL;
 static int s_forced_serial;
 
 static int valid_role(int role) {
     return role == USB_ROLE_SERIAL || role == USB_ROLE_KEYBOARD;
+}
+
+static void select_usb_serial_jtag_phy(void) {
+    usb_serial_jtag_ll_phy_enable_external(false);
+    usb_serial_jtag_ll_phy_enable_pad(true);
 }
 
 void esp32_usb_role_resolve_boot(void) {
@@ -37,6 +43,7 @@ void esp32_usb_role_resolve_boot(void) {
 
     s_forced_serial = (gpio_get_level(GPIO_NUM_0) == 0);
     s_effective_role = s_forced_serial ? USB_ROLE_SERIAL : Option.USBRole;
+    if (s_effective_role == USB_ROLE_SERIAL) select_usb_serial_jtag_phy();
 }
 
 int esp32_usb_role_is_serial(void) {
@@ -82,6 +89,8 @@ int esp32_usb_role_option_setter(unsigned char *cmdline) {
     SaveOptions();
     if (role == USB_ROLE_KEYBOARD) {
         MMPrintString("Hold BOOT during reset to force USB SERIAL for one boot\r\n");
+    } else {
+        select_usb_serial_jtag_phy();
     }
     MMPrintString("Restarting\r\n");
     vTaskDelay(pdMS_TO_TICKS(150));
@@ -97,4 +106,8 @@ void esp32_usb_role_prepare_keyboard_host(void) {
     if (usb_serial_jtag_is_driver_installed()) {
         usb_serial_jtag_driver_uninstall();
     }
+}
+
+void esp32_usb_role_prepare_serial_device(void) {
+    select_usb_serial_jtag_phy();
 }

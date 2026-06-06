@@ -45,6 +45,13 @@ static usb_device_handle_t s_raw_kbd_device;
 static usb_transfer_t *s_raw_kbd_transfer;
 static uint8_t s_raw_kbd_iface = 0xff;
 static uint8_t s_raw_kbd_ep = 0;
+static portMUX_TYPE s_repeat_mux = portMUX_INITIALIZER_UNLOCKED;
+static uint8_t s_prev_keys[HID_KEYBOARD_KEY_MAX];
+static uint8_t s_repeat_hid_key;
+static uint8_t s_repeat_modifier;
+static int s_repeat_key;
+static TickType_t s_repeat_next_tick;
+static bool s_repeat_active;
 
 typedef struct {
     volatile int queues_ready;
@@ -225,6 +232,8 @@ static bool modifier_ctrl(uint8_t modifier) {
     return (modifier & (HID_LEFT_CONTROL | HID_RIGHT_CONTROL)) != 0;
 }
 
+static bool key_found(const uint8_t *src, uint8_t key, unsigned len);
+
 static int translate_key(uint8_t modifier, uint8_t key_code) {
     if (key_code >= HID_KEY_A && key_code <= HID_KEY_Z && modifier_ctrl(modifier)) {
         return (key_code - HID_KEY_A) + 1;
@@ -261,6 +270,79 @@ static int translate_key(uint8_t modifier, uint8_t key_code) {
     }
 }
 
+static TickType_t repeat_delay_ticks(int ms, int fallback_ms) {
+    if (ms <= 0) ms = fallback_ms;
+    TickType_t ticks = pdMS_TO_TICKS((uint32_t)ms);
+    return ticks ? ticks : 1;
+}
+
+static bool tick_due(TickType_t now, TickType_t due) {
+    return (int32_t)(now - due) >= 0;
+}
+
+static void repeat_clear_locked(void) {
+    s_repeat_hid_key = 0;
+    s_repeat_modifier = 0;
+    s_repeat_key = 0;
+    s_repeat_next_tick = 0;
+    s_repeat_active = false;
+}
+
+static void repeat_begin_locked(uint8_t modifier, uint8_t hid_key) {
+    int key = translate_key(modifier, hid_key);
+    if (!key) {
+        repeat_clear_locked();
+        return;
+    }
+    s_repeat_hid_key = hid_key;
+    s_repeat_modifier = modifier;
+    s_repeat_key = key;
+    s_repeat_next_tick = xTaskGetTickCount() +
+                         repeat_delay_ticks(Option.RepeatStart, 600);
+    s_repeat_active = true;
+}
+
+static void repeat_update_from_report(uint8_t modifier, const uint8_t *keys) {
+    portENTER_CRITICAL(&s_repeat_mux);
+    if (s_repeat_active && key_found(keys, s_repeat_hid_key, HID_KEYBOARD_KEY_MAX)) {
+        s_repeat_modifier = modifier;
+        s_repeat_key = translate_key(modifier, s_repeat_hid_key);
+        if (!s_repeat_key) repeat_clear_locked();
+    } else {
+        repeat_clear_locked();
+        for (int i = 0; i < HID_KEYBOARD_KEY_MAX; i++) {
+            uint8_t key = keys[i];
+            if (key > HID_KEY_ERROR_UNDEFINED && translate_key(modifier, key)) {
+                repeat_begin_locked(modifier, key);
+                break;
+            }
+        }
+    }
+    portEXIT_CRITICAL(&s_repeat_mux);
+}
+
+static void repeat_start_for_new_key(uint8_t modifier, uint8_t hid_key) {
+    portENTER_CRITICAL(&s_repeat_mux);
+    repeat_begin_locked(modifier, hid_key);
+    portEXIT_CRITICAL(&s_repeat_mux);
+}
+
+static void synth_repeat_due(void) {
+    int key = 0;
+    TickType_t now = xTaskGetTickCount();
+
+    portENTER_CRITICAL(&s_repeat_mux);
+    if (s_repeat_active && s_repeat_key && tick_due(now, s_repeat_next_tick)) {
+        key = s_repeat_key;
+        TickType_t interval = repeat_delay_ticks(Option.RepeatRate, 150);
+        s_repeat_next_tick += interval;
+        if (tick_due(now, s_repeat_next_tick)) s_repeat_next_tick = now + interval;
+    }
+    portEXIT_CRITICAL(&s_repeat_mux);
+
+    if (key) queue_key(key);
+}
+
 static bool key_found(const uint8_t *src, uint8_t key, unsigned len) {
     for (unsigned i = 0; i < len; i++) {
         if (src[i] == key) return true;
@@ -269,8 +351,6 @@ static bool key_found(const uint8_t *src, uint8_t key, unsigned len) {
 }
 
 static void keyboard_report(const uint8_t *data, int length) {
-    static uint8_t prev_keys[HID_KEYBOARD_KEY_MAX];
-
     s_diag.last_report_len = length;
     if (length < (int)sizeof(hid_keyboard_input_report_boot_t)) {
         s_diag.short_reports++;
@@ -282,12 +362,14 @@ static void keyboard_report(const uint8_t *data, int length) {
     for (int i = 0; i < HID_KEYBOARD_KEY_MAX; i++) {
         uint8_t key = report->key[i];
         if (key > HID_KEY_ERROR_UNDEFINED &&
-            !key_found(prev_keys, key, HID_KEYBOARD_KEY_MAX)) {
+            !key_found(s_prev_keys, key, HID_KEYBOARD_KEY_MAX)) {
             queue_key(translate_key(report->modifier.val, key));
+            repeat_start_for_new_key(report->modifier.val, key);
         }
     }
 
-    memcpy(prev_keys, report->key, HID_KEYBOARD_KEY_MAX);
+    repeat_update_from_report(report->modifier.val, report->key);
+    memcpy(s_prev_keys, report->key, HID_KEYBOARD_KEY_MAX);
 }
 
 static void hid_interface_callback(hid_host_device_handle_t handle,
@@ -749,12 +831,25 @@ void esp32_usb_keyboard_init(void) {
 
 int esp32_usb_keyboard_pop_key(void) {
     if (!s_key_queue) return -1;
+    synth_repeat_due();
     int key = -1;
     return xQueueReceive(s_key_queue, &key, 0) == pdTRUE ? key : -1;
 }
 
 int esp32_usb_keyboard_input_available(void) {
+    synth_repeat_due();
     return s_key_queue && uxQueueMessagesWaiting(s_key_queue) > 0;
+}
+
+void esp32_usb_keyboard_service(void) {
+    synth_repeat_due();
+}
+
+void esp32_usb_keyboard_clear_repeat_state(void) {
+    portENTER_CRITICAL(&s_repeat_mux);
+    repeat_clear_locked();
+    memset(s_prev_keys, 0, sizeof s_prev_keys);
+    portEXIT_CRITICAL(&s_repeat_mux);
 }
 
 int esp32_usb_keyboard_has_keyboard(void) {
