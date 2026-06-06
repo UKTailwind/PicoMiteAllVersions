@@ -383,6 +383,7 @@ struct option_s {
     unsigned char VGA_DATA[8];
     unsigned char VGA_VSYNC;
     unsigned char VGA_PCLK;
+    unsigned char USBRole;
 } __attribute__((packed));
 
 // Define the offsets from the PORT address

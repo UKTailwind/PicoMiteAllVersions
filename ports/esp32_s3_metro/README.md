@@ -127,13 +127,15 @@ Audio configuration:
 
 | Command | Backend | Pins |
 |---|---|---|
-| `OPTION AUDIO I2S bclk,data` | Standard I2S PCM for an external DAC/amp | `bclk`, inferred `ws = bclk + 1`, `data` |
+| `OPTION AUDIO I2S bclk,data` | Standard I2S PCM for an external DAC/amp | Legacy two-pin form: `bclk`, inferred `ws = bclk + 1`, `data` |
+| `OPTION AUDIO I2S bclk,ws,data` | Standard I2S PCM for an external DAC/amp | Explicit wiring form; `ws` must be `bclk + 1` |
 | `OPTION AUDIO left,right` | ESP32-S3 I2S PDM TX DAC-style two-line output | left PDM output, right PDM output |
 | `OPTION AUDIO PDM left,right` | Same as the bare two-pin form | left PDM output, right PDM output |
 | `OPTION AUDIO DISABLE` | Audio off | none |
 
 ```
 OPTION AUDIO I2S GP5,GP7
+OPTION AUDIO I2S GP5,GP6,GP7
 OPTION AUDIO GP12,GP13
 OPTION AUDIO PDM GP12,GP13
 OPTION AUDIO DISABLE
@@ -141,7 +143,7 @@ PRINT MM.INFO$(AUDIO)
 ```
 
 For I2S, WS/LRCLK is inferred as `BCLK + 1`, matching the RP2 `OPTION AUDIO I2S`
-shape. The two-pin form configures the ESP32-S3 hardware PDM TX converter, not
+shape; `LIST OPTIONS` prints BCLK, WS/LRCLK, and DOUT. The two-pin form configures the ESP32-S3 hardware PDM TX converter, not
 LEDC PWM. The selected pins are the left/right PDM data outputs; no separate
 PDM clock pin is exposed by the BASIC option. `MM.INFO$(AUDIO)` reports `I2S`,
 `PDM`, or `OFF`.

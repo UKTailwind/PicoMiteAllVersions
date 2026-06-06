@@ -9,6 +9,7 @@
 #define PORT_TOKENS_H
 
 #define HAL_PORT_VIDEO_CMD_TOKENS                      \
+    {(unsigned char *)"MODE", T_CMD, 0, cmd_mode},     \
     {(unsigned char *)"Camera", T_CMD, 0, cmd_camera}, \
         {(unsigned char *)"Refresh", T_CMD, 0, cmd_refresh},
 

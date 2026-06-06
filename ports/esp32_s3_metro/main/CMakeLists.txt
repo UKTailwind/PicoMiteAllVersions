@@ -138,6 +138,8 @@ set(PORT_LOCAL_SRCS
     app_main.c                              # IDF entry, MMBasic boot, REPL
     esp32_console.c                         # USB Serial/JTAG read/write (raw bytes)
     esp32_mmbasic_console_glue.c            # MMPrintString / MMInkey + ring state (MMputchar / MMgetline are shared)
+    esp32_usb_role.c                        # OPTION USB SERIAL/KEYBOARD persisted role selection
+    esp32_usb_keyboard.c                    # USB host HID boot-keyboard input queue
     ${REPO_ROOT}/runtime/runtime_getline.c        # shared console-line reader (see runtime/runtime_getline.c)
     ${REPO_ROOT}/runtime/runtime_console_putchar.c # shared MMputchar (Finding 1 in docs/port-duplication-audit.md)
     ${REPO_ROOT}/runtime/runtime_console_printstring.c # shared MMPrintString/SSPrintString (Finding 1 remainder)
@@ -258,6 +260,8 @@ idf_component_register(
         esp_event
         esp_netif
         esp_wifi
+        usb
+        usb_host_hid
         mqtt
         nvs_flash
         spi_flash

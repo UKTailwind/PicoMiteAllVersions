@@ -20,5 +20,6 @@ void DrawPixel256(int x, int y, int c);
 void ReadBuffer256(int x1, int y1, int x2, int y2, unsigned char * c);
 void ReadBuffer256Fast(int x1, int y1, int x2, int y2, unsigned char * c);
 void ScrollLCD256(int lines);
+void DrawRGB332FlushRegion(int x1, int y1, int x2, int y2);
 
 #endif /* DRAW_RGB332_H */

@@ -38,6 +38,9 @@
 
 #define AUDIO_RATE HAL_PORT_AUDIO_SAMPLE_RATE
 #define FRAMES_PER_CHUNK 256 /* stereo frames per write */
+#define AUDIO_I2S_PORT I2S_NUM_1
+#define AUDIO_DMA_DESC_NUM 2
+#define AUDIO_DMA_FRAME_NUM 64
 
 typedef enum {
     AUDIO_BACKEND_NONE = 0,
@@ -93,6 +96,13 @@ static _Atomic int s_pending_rate; /* requested by sample_begin/end */
 
 static int default_audio_rate(void) {
     return AUDIO_RATE;
+}
+
+static i2s_chan_config_t audio_i2s_chan_config(void) {
+    i2s_chan_config_t cfg = I2S_CHANNEL_DEFAULT_CONFIG(AUDIO_I2S_PORT, I2S_ROLE_MASTER);
+    cfg.dma_desc_num = AUDIO_DMA_DESC_NUM;
+    cfg.dma_frame_num = AUDIO_DMA_FRAME_NUM;
+    return cfg;
 }
 
 static int active_audio_rate(void) {
@@ -516,7 +526,7 @@ void hal_audio_init(void) {
         int bclk_gpio = option_gpio(Option.audio_i2s_bclk, HAL_PORT_AUDIO_I2S_BCLK_PIN);
         int data_gpio = option_gpio(Option.audio_i2s_data, HAL_PORT_AUDIO_I2S_DOUT_PIN);
         int ws_gpio = bclk_gpio + 1;
-        i2s_chan_config_t chan_cfg = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_0, I2S_ROLE_MASTER);
+        i2s_chan_config_t chan_cfg = audio_i2s_chan_config();
         if (i2s_new_channel(&chan_cfg, &s_tx, NULL) != ESP_OK) {
             ESP_LOGE(TAG, "i2s_new_channel failed");
             return;
@@ -542,7 +552,7 @@ void hal_audio_init(void) {
     } else if (s_backend == AUDIO_BACKEND_PDM) {
         int left_gpio = PinDef[Option.AUDIO_L].GPno;
         int right_gpio = PinDef[Option.AUDIO_R].GPno;
-        i2s_chan_config_t chan_cfg = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_0, I2S_ROLE_MASTER);
+        i2s_chan_config_t chan_cfg = audio_i2s_chan_config();
         if (i2s_new_channel(&chan_cfg, &s_tx, NULL) != ESP_OK) {
             ESP_LOGE(TAG, "i2s_new_channel failed");
             return;

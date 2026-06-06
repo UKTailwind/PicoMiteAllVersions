@@ -12,6 +12,17 @@
 #include <stdint.h>
 #include "hal/hal_vga_ops.h"
 
+#define STUB_SCREENMODE4 32
+#define STUB_SCREENMODE5 33
+#define STUB_SCREENMODE6 34
+#define STUB_SCREENMODE7 35
+
+extern volatile int DISPLAY_TYPE;
+extern void *GetMemory(int msize);
+extern void FreeMemory(unsigned char *addr);
+extern void (*DrawBufferFast)(int x1, int y1, int x2, int y2, int blank, unsigned char *c);
+extern void (*ReadBufferFast)(int x1, int y1, int x2, int y2, unsigned char *c);
+
 int hal_vga_ops_handle_cls(int c) {
     (void)c;
     return 0;
@@ -69,12 +80,30 @@ void hal_vga_ops_tile_colour(int x, int y, int * front, int * back) {
     *back = 0;
 }
 int hal_vga_ops_handle_blit_move(int x1, int y1, int x2, int y2, int w, int h) {
-    (void)x1;
-    (void)y1;
-    (void)x2;
-    (void)y2;
-    (void)w;
-    (void)h;
+    if (DISPLAY_TYPE == STUB_SCREENMODE4 || DISPLAY_TYPE == STUB_SCREENMODE5 ||
+        DISPLAY_TYPE == STUB_SCREENMODE6 || DISPLAY_TYPE == STUB_SCREENMODE7) {
+        const int bytes_per_pixel = DISPLAY_TYPE == STUB_SCREENMODE4 ? 2 : 1;
+        unsigned char *buff = GetMemory(h * bytes_per_pixel);
+        if (x1 >= x2) {
+            while (w-- > 0) {
+                ReadBufferFast(x1, y1, x1, y1 + h - 1, buff);
+                DrawBufferFast(x2, y2, x2, y2 + h - 1, -1, buff);
+                x1++;
+                x2++;
+            }
+        } else {
+            x1 += w - 1;
+            x2 += w - 1;
+            while (w-- > 0) {
+                ReadBufferFast(x1, y1, x1, y1 + h - 1, buff);
+                DrawBufferFast(x2, y2, x2, y2 + h - 1, -1, buff);
+                x1--;
+                x2--;
+            }
+        }
+        FreeMemory(buff);
+        return 1;
+    }
     return 0;
 }
 void hal_vga_ops_reset_display_vga(void) {}
@@ -110,7 +139,7 @@ void vga_memory_init_planes(void) {}
  * cmd_new / cmd_end. Non-VGA ports don't have QVGA SCREENMODEs and
  * Option.DISPLAY_TYPE never takes a SCREENMODE value there, so the
  * stub is safely unreachable at runtime. */
-void setmode(int mode, bool clear) {
+__attribute__((weak)) void setmode(int mode, bool clear) {
     (void)mode;
     (void)clear;
 }

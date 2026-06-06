@@ -62,9 +62,14 @@ void esp32_audio_print_options(void) {
             MMputchar(',', 1);
             MMPrintString((char *)PinDef[Option.AUDIO_R].pinname);
         } else {
+            int ws_pin = esp32_audio_i2s_ws_pin();
             MMPrintString("I2S ");
             MMPrintString((char *)PinDef[Option.audio_i2s_bclk].pinname);
             MMputchar(',', 1);
+            if (!esp32_audio_pin_invalid(ws_pin)) {
+                MMPrintString((char *)PinDef[ws_pin].pinname);
+                MMputchar(',', 1);
+            }
             MMPrintString((char *)PinDef[Option.audio_i2s_data].pinname);
         }
         PRet();
@@ -168,12 +173,19 @@ int esp32_audio_option_setter(unsigned char * line) {
 
     if ((line = checkstring(tp, (unsigned char *)"I2S"))) {
         int bclk_pin, data_pin, ws_pin;
-        getargs(&line, 3, (unsigned char *)",");
-        if (argc != 3) error("Syntax");
+        getargs(&line, 5, (unsigned char *)",");
+        if (argc != 3 && argc != 5) error("Syntax");
         bclk_pin = audio_option_parse_gp_pin(argv[0]);
-        data_pin = audio_option_parse_gp_pin(argv[2]);
-        esp32_audio_require_valid_pin(data_pin);
         ws_pin = esp32_audio_ws_from_bclk(bclk_pin);
+        if (argc == 5) {
+            int explicit_ws_pin = audio_option_parse_gp_pin(argv[2]);
+            if (explicit_ws_pin != ws_pin)
+                error("WS/LRCLK must be %", PinDef[ws_pin].pinname);
+            data_pin = audio_option_parse_gp_pin(argv[4]);
+        } else {
+            data_pin = audio_option_parse_gp_pin(argv[2]);
+        }
+        esp32_audio_require_valid_pin(data_pin);
         esp32_audio_require_distinct_pin(bclk_pin, data_pin);
         esp32_audio_require_distinct_pin(ws_pin, data_pin);
         esp32_audio_require_available_pins3(bclk_pin, data_pin, ws_pin);

@@ -834,12 +834,15 @@ int hal_net_udp_recv_event(hal_net_udp_socket_t sock, hal_net_addr_t * from,
         from->family = 4;
         from->port = ntohs(sin->sin_port);
         memcpy(from->bytes, &sin->sin_addr, 4);
-    } else if (from && src.ss_family == AF_INET6) {
+    }
+#if CONFIG_LWIP_IPV6
+    else if (from && src.ss_family == AF_INET6) {
         struct sockaddr_in6 * sin6 = (struct sockaddr_in6 *)&src;
         from->family = 6;
         from->port = ntohs(sin6->sin6_port);
         memcpy(from->bytes, &sin6->sin6_addr, 16);
     }
+#endif
     return HAL_NET_OK;
 }
 

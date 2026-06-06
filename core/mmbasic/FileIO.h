@@ -75,6 +75,8 @@ void FilePutStr(int count, char * c, int fnbr);
 char FilePutChar(char c, int fnbr);
 void CheckSDCard(void);
 void LoadOptions(void);
+int LoadOptionsAtBoot(void);
+const char *OptionsInvalidReason(void);
 void CrunchData(unsigned char ** p, int c);
 int FileEOF(int fnbr);
 void ClearSavedVars(void);
@@ -111,6 +113,9 @@ extern void positionfile(int fnbr, int idx);
  *   MaxCtrls             — GUICONTROLS widget table cap
  *   HDMIclock/HDMId0..d2 — HDMI clock + 3 data PIO pair indices
  */
+#define USB_ROLE_SERIAL 0
+#define USB_ROLE_KEYBOARD 1
+
 struct option_s {
     int Magic;
     char Autorun;
@@ -289,6 +294,7 @@ struct option_s {
     unsigned char VGA_DATA[8];
     unsigned char VGA_VSYNC;
     unsigned char VGA_PCLK;
+    unsigned char USBRole; /* USB_ROLE_*: runtime USB peripheral role, applied at reboot */
 } __attribute__((packed));
 extern unsigned char *CFunctionFlash, *CFunctionLibrary;
 extern struct option_s Option;

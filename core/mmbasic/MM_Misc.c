@@ -1718,10 +1718,7 @@ void MIPS16 cmd_option(void) {
         }
         Option.Magic = MagicKey; //This isn't ideal but it improves the chances of a older config working in a new build
         FileClose(fnbr);
-        uSec(100000);
-        fileio_flash_write_begin();
-        hal_flash_write_options(&Option, sizeof(struct option_s));
-        fileio_flash_write_end();
+        SaveOptions();
         _excep_code = RESET_COMMAND;
         SoftReset();
     }

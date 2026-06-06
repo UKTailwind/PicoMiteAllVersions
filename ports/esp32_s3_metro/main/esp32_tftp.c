@@ -30,8 +30,10 @@ static int esp32_tftp_peer_text(const mm_net_tftp_peer_t * peer, char * out,
     if (!peer || !out || out_len == 0) return 0;
     if (peer->family == 4)
         return inet_ntop(AF_INET, peer->bytes, out, out_len) != NULL;
+#if CONFIG_LWIP_IPV6
     if (peer->family == 6)
         return inet_ntop(AF_INET6, peer->bytes, out, out_len) != NULL;
+#endif
     return 0;
 }
 
@@ -39,7 +41,11 @@ static int esp32_tftp_send(void * ctx, const mm_net_tftp_peer_t * peer,
                            const void * buf, size_t len) {
     (void)ctx;
     if (!s_tftp.socket) return 0;
+#if CONFIG_LWIP_IPV6
     char host[INET6_ADDRSTRLEN];
+#else
+    char host[INET_ADDRSTRLEN];
+#endif
     if (!esp32_tftp_peer_text(peer, host, sizeof host)) return 0;
     return hal_net_udp_socket_send(s_tftp.socket, host, peer->port, buf, len,
                                    1000) == HAL_NET_OK;

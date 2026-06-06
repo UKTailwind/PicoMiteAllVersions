@@ -142,6 +142,9 @@ static const mm_options_ini_field_t option_fields[] = {
     OPT_FIELD(CombinedCS, MM_OPT_INI_U8),
     OPT_FIELD(USBKeyboard, MM_OPT_INI_U8),
     OPT_FIELD(VGA_HSYNC, MM_OPT_INI_U8),
+    OPT_FIELD(VGA_DATA, MM_OPT_INI_HEX),
+    OPT_FIELD(VGA_VSYNC, MM_OPT_INI_U8),
+    OPT_FIELD(VGA_PCLK, MM_OPT_INI_U8),
     OPT_FIELD(VGA_BLUE, MM_OPT_INI_U8),
     OPT_FIELD(AUDIO_MISO_PIN, MM_OPT_INI_U8),
     OPT_FIELD(AUDIO_DCS_PIN, MM_OPT_INI_U8),
@@ -172,6 +175,8 @@ static const mm_options_ini_field_t option_fields[] = {
     OPT_FIELD(pc386_sb_irq, MM_OPT_INI_U8),
     OPT_FIELD(pc386_sb_dma, MM_OPT_INI_U8),
     OPT_FIELD(pc386_sb_dma16, MM_OPT_INI_U8),
+    OPT_FIELD(WebConsole, MM_OPT_INI_U8),
+    OPT_FIELD(USBRole, MM_OPT_INI_U8),
 };
 
 static char * trim(char * s) {
