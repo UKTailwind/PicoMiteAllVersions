@@ -147,31 +147,57 @@ DSTATUS disk_status(BYTE pdrv) {
     return SDCardStat;
 }
 
+static DRESULT with_sector_scratch(BYTE * scratch,
+                                   BYTE * dst,
+                                   const BYTE * src,
+                                   LBA_t sector,
+                                   UINT count,
+                                   int write) {
+    for (UINT i = 0; i < count; i++) {
+        esp_err_t err;
+        if (write) {
+            memcpy(scratch, src + (size_t)i * METRO_SD_SECTOR_SIZE,
+                   METRO_SD_SECTOR_SIZE);
+            err = sdmmc_write_sectors(s_cardp, scratch, sector + i, 1);
+        } else {
+            err = sdmmc_read_sectors(s_cardp, scratch, sector + i, 1);
+            if (err == ESP_OK) {
+                memcpy(dst + (size_t)i * METRO_SD_SECTOR_SIZE, scratch,
+                       METRO_SD_SECTOR_SIZE);
+            }
+        }
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "%s sector %llu failed: %s",
+                     write ? "write" : "read",
+                     (unsigned long long)(sector + i),
+                     esp_err_to_name(err));
+            return RES_ERROR;
+        }
+    }
+    return RES_OK;
+}
+
 DRESULT disk_read(BYTE pdrv, BYTE * buff, LBA_t sector, UINT count) {
     if (pdrv != 0 || !s_cardp) return RES_NOTRDY;
     if (!buff || count == 0) return RES_PARERR;
-    esp_err_t err = sdmmc_read_sectors(s_cardp, buff, sector, count);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "read sector %llu count %u failed: %s",
-                 (unsigned long long)sector, (unsigned int)count,
-                 esp_err_to_name(err));
-        return RES_ERROR;
-    }
-    return RES_OK;
+    BYTE * scratch = (BYTE *)heap_caps_malloc(METRO_SD_SECTOR_SIZE,
+                                              MALLOC_CAP_DMA | MALLOC_CAP_8BIT);
+    if (!scratch) return RES_ERROR;
+    DRESULT r = with_sector_scratch(scratch, buff, NULL, sector, count, 0);
+    heap_caps_free(scratch);
+    return r;
 }
 
 DRESULT disk_write(BYTE pdrv, const BYTE * buff, LBA_t sector, UINT count) {
     if (pdrv != 0 || !s_cardp) return RES_NOTRDY;
     if (!buff || count == 0) return RES_PARERR;
     if (SDCardStat & STA_PROTECT) return RES_WRPRT;
-    esp_err_t err = sdmmc_write_sectors(s_cardp, buff, sector, count);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "write sector %llu count %u failed: %s",
-                 (unsigned long long)sector, (unsigned int)count,
-                 esp_err_to_name(err));
-        return RES_ERROR;
-    }
-    return RES_OK;
+    BYTE * scratch = (BYTE *)heap_caps_malloc(METRO_SD_SECTOR_SIZE,
+                                              MALLOC_CAP_DMA | MALLOC_CAP_8BIT);
+    if (!scratch) return RES_ERROR;
+    DRESULT r = with_sector_scratch(scratch, NULL, buff, sector, count, 1);
+    heap_caps_free(scratch);
+    return r;
 }
 
 DRESULT disk_ioctl(BYTE pdrv, BYTE cmd, void * buff) {

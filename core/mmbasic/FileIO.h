@@ -111,9 +111,6 @@ extern void positionfile(int fnbr, int idx);
  *   MaxCtrls             — GUICONTROLS widget table cap
  *   HDMIclock/HDMId0..d2 — HDMI clock + 3 data PIO pair indices
  */
-#define USB_ROLE_SERIAL 0
-#define USB_ROLE_KEYBOARD 1
-
 struct option_s {
     int Magic;
     char Autorun;
@@ -279,20 +276,13 @@ struct option_s {
     unsigned char SSID[MAXKEYLEN];
     unsigned char PASSWORD[MAXKEYLEN]; //512=768
     unsigned char platform[32];
-    unsigned char extensions[86]; //128=896 == 7 XMODEM blocks
+    unsigned char extensions[96]; //128=896 == 7 XMODEM blocks
     uint16_t pc386_sb_base;
     uint8_t pc386_sb_irq;
     uint8_t pc386_sb_dma;
     uint8_t pc386_sb_dma16;
     unsigned char WebConsole; // ESP32 web console enable (0=off,1=on)
     // To enable older CFunctions to run any new options *MUST* be added at the end of the list
-    /* ESP32-S3 LCD_CAM VGA (RGB332) pin map. VGA_DATA[i] is the PinDef
-     * index driving bus bit i (0 = blue LSB .. 7 = red MSB); HSYNC reuses
-     * VGA_HSYNC above. Carved from extensions[] to keep the config size. */
-    unsigned char VGA_DATA[8];
-    unsigned char VGA_VSYNC;
-    unsigned char VGA_PCLK;
-    unsigned char USBRole; /* USB_ROLE_*: runtime USB peripheral role, applied at reboot */
 } __attribute__((packed));
 extern unsigned char *CFunctionFlash, *CFunctionLibrary;
 extern struct option_s Option;

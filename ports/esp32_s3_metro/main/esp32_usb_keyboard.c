@@ -17,8 +17,8 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "freertos/task.h"
+#include "usb/hid.h"
 #include "usb/usb_host.h"
-#include "usb/hid_host.h"
 #include "usb/hid_usage_keyboard.h"
 #include "hal/usb_serial_jtag_ll.h"
 #include "soc/rtc_cntl_struct.h"
@@ -27,18 +27,6 @@
 
 static const char * TAG = "esp32_usb_kbd";
 
-typedef enum {
-    USB_KBD_EVENT_HID,
-} usb_kbd_event_group_t;
-
-typedef struct {
-    usb_kbd_event_group_t event_group;
-    hid_host_device_handle_t handle;
-    hid_host_driver_event_t event;
-    void * arg;
-} usb_kbd_event_t;
-
-static QueueHandle_t s_event_queue;
 static QueueHandle_t s_key_queue;
 static usb_host_client_handle_t s_probe_client;
 static usb_device_handle_t s_raw_kbd_device;
@@ -95,23 +83,12 @@ typedef struct {
     volatile int wrap_dm_pd;
     volatile int rtc_sw_hw_phy_sel;
     volatile int rtc_sw_phy_sel;
-    volatile int hid_start_attempted;
-    volatile int hid_started;
-    volatile int hid_err;
-    volatile int hid_event_task_created;
-    volatile int hid_event_task_err;
     volatile unsigned host_heap_internal_free;
     volatile unsigned host_heap_internal_largest;
     volatile unsigned host_heap_dma_free;
     volatile unsigned host_heap_dma_largest;
-    volatile unsigned hid_heap_internal_free;
-    volatile unsigned hid_heap_internal_largest;
-    volatile unsigned hid_heap_dma_free;
-    volatile unsigned hid_heap_dma_largest;
     volatile int keyboard_attached;
-    volatile unsigned driver_connected_events;
-    volatile unsigned keyboard_connected;
-    volatile unsigned non_keyboard_connected;
+    volatile unsigned raw_keyboard_connected;
     volatile unsigned disconnected;
     volatile unsigned transfer_errors;
     volatile unsigned reports;
@@ -119,15 +96,6 @@ typedef struct {
     volatile unsigned raw_report_errors;
     volatile unsigned queued_keys;
     volatile unsigned queue_drops;
-    volatile unsigned param_errors;
-    volatile unsigned open_errors;
-    volatile unsigned protocol_errors;
-    volatile unsigned idle_errors;
-    volatile unsigned start_errors;
-    volatile int last_addr;
-    volatile int last_iface;
-    volatile int last_subclass;
-    volatile int last_proto;
     volatile int last_report_len;
     volatile int last_key;
 } usb_keyboard_diag_t;
@@ -151,12 +119,6 @@ static usb_keyboard_diag_t s_diag = {
     .raw_transfer_submit_err = ESP_ERR_INVALID_STATE,
     .raw_endpoint = -1,
     .raw_packet_size = -1,
-    .hid_err = ESP_ERR_INVALID_STATE,
-    .hid_event_task_err = ESP_ERR_INVALID_STATE,
-    .last_addr = -1,
-    .last_iface = -1,
-    .last_subclass = -1,
-    .last_proto = -1,
     .last_report_len = -1,
     .last_key = -1,
 };
@@ -174,13 +136,6 @@ static void capture_host_heap(void) {
     s_diag.host_heap_internal_largest = heap_largest(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
     s_diag.host_heap_dma_free = heap_free(MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA);
     s_diag.host_heap_dma_largest = heap_largest(MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA);
-}
-
-static void capture_hid_heap(void) {
-    s_diag.hid_heap_internal_free = heap_free(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-    s_diag.hid_heap_internal_largest = heap_largest(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-    s_diag.hid_heap_dma_free = heap_free(MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA);
-    s_diag.hid_heap_dma_largest = heap_largest(MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA);
 }
 
 static void capture_usb_pad_state(void) {
@@ -437,101 +392,6 @@ static void keyboard_report(const uint8_t * data, int length) {
     memcpy(s_prev_keys, report->key, HID_KEYBOARD_KEY_MAX);
 }
 
-static void hid_interface_callback(hid_host_device_handle_t handle,
-                                   hid_host_interface_event_t event,
-                                   void * arg) {
-    (void)arg;
-    uint8_t data[64];
-    size_t data_length = 0;
-    hid_host_dev_params_t params;
-
-    switch (event) {
-    case HID_HOST_INTERFACE_EVENT_INPUT_REPORT:
-        if (hid_host_device_get_params(handle, &params) != ESP_OK) {
-            s_diag.param_errors++;
-            return;
-        }
-        if (hid_host_device_get_raw_input_report_data(handle, data, sizeof data,
-                                                      &data_length) != ESP_OK) {
-            s_diag.raw_report_errors++;
-            return;
-        }
-        if (params.sub_class == HID_SUBCLASS_BOOT_INTERFACE &&
-            params.proto == HID_PROTOCOL_KEYBOARD) {
-            keyboard_report(data, (int)data_length);
-        }
-        break;
-    case HID_HOST_INTERFACE_EVENT_TRANSFER_ERROR:
-        s_diag.transfer_errors++;
-        break;
-    case HID_HOST_INTERFACE_EVENT_DISCONNECTED:
-        s_diag.disconnected++;
-        s_diag.keyboard_attached = 0;
-        hid_host_device_close(handle);
-        break;
-    default:
-        break;
-    }
-}
-
-static void handle_hid_event(hid_host_device_handle_t handle,
-                             hid_host_driver_event_t event,
-                             void * arg) {
-    (void)arg;
-    hid_host_dev_params_t params;
-    s_diag.driver_connected_events++;
-    if (hid_host_device_get_params(handle, &params) != ESP_OK) {
-        s_diag.param_errors++;
-        return;
-    }
-    s_diag.last_addr = params.addr;
-    s_diag.last_iface = params.iface_num;
-    s_diag.last_subclass = params.sub_class;
-    s_diag.last_proto = params.proto;
-
-    if (event != HID_HOST_DRIVER_EVENT_CONNECTED) return;
-    if (params.proto != HID_PROTOCOL_KEYBOARD) {
-        s_diag.non_keyboard_connected++;
-        return;
-    }
-
-    const hid_host_device_config_t dev_config = {
-        .callback = hid_interface_callback,
-        .callback_arg = NULL,
-    };
-    if (hid_host_device_open(handle, &dev_config) != ESP_OK) {
-        s_diag.open_errors++;
-        return;
-    }
-    if (params.sub_class == HID_SUBCLASS_BOOT_INTERFACE) {
-        if (hid_class_request_set_protocol(handle, HID_REPORT_PROTOCOL_BOOT) != ESP_OK) {
-            s_diag.protocol_errors++;
-        }
-        if (hid_class_request_set_idle(handle, 0, 0) != ESP_OK) {
-            s_diag.idle_errors++;
-        }
-    }
-    if (hid_host_device_start(handle) != ESP_OK) {
-        s_diag.start_errors++;
-        return;
-    }
-    s_diag.keyboard_connected++;
-    s_diag.keyboard_attached = 1;
-}
-
-static void hid_device_callback(hid_host_device_handle_t handle,
-                                hid_host_driver_event_t event,
-                                void * arg) {
-    if (!s_event_queue) return;
-    usb_kbd_event_t evt = {
-        .event_group = USB_KBD_EVENT_HID,
-        .handle = handle,
-        .event = event,
-        .arg = arg,
-    };
-    xQueueSend(s_event_queue, &evt, 0);
-}
-
 static void usb_probe_client_callback(const usb_host_client_event_msg_t * event_msg,
                                       void * arg) {
     (void)arg;
@@ -639,7 +499,7 @@ static bool raw_keyboard_attach(usb_device_handle_t handle,
     s_diag.raw_endpoint = endpoint;
     s_diag.raw_packet_size = packet_size;
     s_diag.keyboard_attached = 1;
-    s_diag.keyboard_connected++;
+    s_diag.raw_keyboard_connected++;
 
     err = usb_host_transfer_submit(transfer);
     s_diag.raw_transfer_submit_err = err;
@@ -806,20 +666,9 @@ static void usb_lib_task(void * arg) {
     }
 }
 
-static void hid_event_task(void * arg) {
-    (void)arg;
-    usb_kbd_event_t evt;
-    while (true) {
-        if (xQueueReceive(s_event_queue, &evt, portMAX_DELAY)) {
-            handle_hid_event(evt.handle, evt.event, evt.arg);
-        }
-    }
-}
-
 static int ensure_queues(void) {
     s_key_queue = xQueueCreate(64, sizeof(int));
-    s_event_queue = xQueueCreate(10, sizeof(usb_kbd_event_t));
-    if (!s_key_queue || !s_event_queue) {
+    if (!s_key_queue) {
         s_diag.host_err = ESP_ERR_NO_MEM;
         ESP_LOGE(TAG, "queue allocation failed");
         return 0;
@@ -848,50 +697,8 @@ void esp32_usb_keyboard_start_host(void) {
     }
 }
 
-void esp32_usb_keyboard_start_hid(void) {
-    if (s_diag.hid_start_attempted) return;
-    s_diag.hid_start_attempted = 1;
-
-    if (!s_diag.host_started) {
-        s_diag.hid_err = ESP_ERR_INVALID_STATE;
-        return;
-    }
-
-    s_diag.hid_err = ESP_ERR_NOT_SUPPORTED;
-    s_diag.hid_event_task_err = ESP_ERR_NOT_SUPPORTED;
-    return;
-
-    const hid_host_driver_config_t hid_config = {
-        .create_background_task = true,
-        .task_priority = 5,
-        .stack_size = 4096,
-        .core_id = 0,
-        .callback = hid_device_callback,
-        .callback_arg = NULL,
-    };
-    capture_hid_heap();
-    esp_err_t err = hid_host_install(&hid_config);
-    if (err != ESP_OK) {
-        s_diag.hid_err = err;
-        ESP_LOGE(TAG, "hid_host_install failed: %s", esp_err_to_name(err));
-        return;
-    }
-    s_diag.hid_err = ESP_OK;
-    s_diag.hid_started = 1;
-
-    if (xTaskCreatePinnedToCore(hid_event_task, "hid_events", 4096, NULL, 4,
-                                NULL, 0) == pdTRUE) {
-        s_diag.hid_event_task_err = ESP_OK;
-        s_diag.hid_event_task_created = 1;
-    } else {
-        s_diag.hid_event_task_err = ESP_FAIL;
-        ESP_LOGE(TAG, "hid event task create failed");
-    }
-}
-
 void esp32_usb_keyboard_init(void) {
     esp32_usb_keyboard_start_host();
-    esp32_usb_keyboard_start_hid();
 }
 
 int esp32_usb_keyboard_pop_key(void) {
@@ -968,31 +775,19 @@ void esp32_usb_keyboard_print_status(void) {
              s_diag.host_heap_internal_free, s_diag.host_heap_internal_largest,
              s_diag.host_heap_dma_free, s_diag.host_heap_dma_largest);
     MMPrintString(line);
-    if (s_diag.hid_err == ESP_ERR_NOT_SUPPORTED) {
-        snprintf(line, sizeof line, "HID host: disabled; using raw USB HID\r\n");
-    } else {
-        snprintf(line, sizeof line, "HID host: %s err=%d task=%d\r\n",
-                 s_diag.hid_started ? "started" : "not started",
-                 s_diag.hid_err, s_diag.hid_event_task_err);
-    }
-    MMPrintString(line);
-    snprintf(line, sizeof line, "HID heap: int=%u/%u dma=%u/%u\r\n",
-             s_diag.hid_heap_internal_free, s_diag.hid_heap_internal_largest,
-             s_diag.hid_heap_dma_free, s_diag.hid_heap_dma_largest);
+    snprintf(line, sizeof line,
+             "Raw HID: attached=%d disc=%u endpoint=%02x pkt=%d\r\n",
+             s_diag.keyboard_attached, s_diag.disconnected,
+             s_diag.raw_endpoint & 0xff, s_diag.raw_packet_size);
     MMPrintString(line);
     snprintf(line, sizeof line,
-             "HID dev: attached=%d kbd=%u other=%u disc=%u\r\n",
-             s_diag.keyboard_attached, s_diag.keyboard_connected,
-             s_diag.non_keyboard_connected, s_diag.disconnected);
+             "Raw HID reports: keyboards=%u reports=%u keys=%u drops=%u\r\n",
+             s_diag.raw_keyboard_connected, s_diag.reports,
+             s_diag.queued_keys, s_diag.queue_drops);
     MMPrintString(line);
     snprintf(line, sizeof line,
-             "Last HID: addr=%d iface=%d subclass=%d proto=%d\r\n",
-             s_diag.last_addr, s_diag.last_iface, s_diag.last_subclass,
-             s_diag.last_proto);
-    MMPrintString(line);
-    snprintf(line, sizeof line,
-             "Reports=%u keys=%u drops=%u xfererr=%u rawerr=%u\r\n",
-             s_diag.reports, s_diag.queued_keys, s_diag.queue_drops,
-             s_diag.transfer_errors, s_diag.raw_report_errors);
+             "Raw HID errors: xfer=%u report=%u submit=%u short=%u\r\n",
+             s_diag.transfer_errors, s_diag.raw_report_errors,
+             s_diag.raw_submit_errors, s_diag.short_reports);
     MMPrintString(line);
 }

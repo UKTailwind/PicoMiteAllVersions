@@ -20,6 +20,7 @@
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
+#include "esp32_option_ext.h"
 #include "port_config.h"
 #include "hal/hal_calendar.h"
 #include "hal/hal_time.h"
@@ -78,7 +79,7 @@ void port_set_default_options(void) {
     Option.DISPLAY_CONSOLE = 0;
     Option.audio_i2s_bclk = codemap(HAL_PORT_AUDIO_I2S_BCLK_PIN);
     Option.audio_i2s_data = codemap(HAL_PORT_AUDIO_I2S_DOUT_PIN);
-    Option.USBRole = USB_ROLE_SERIAL;
+    ESP32_OPTION_USB_ROLE = USB_ROLE_SERIAL;
 
     extern int esp32_vga_apply_default_options_if_unset(void);
     esp32_vga_apply_default_options_if_unset();

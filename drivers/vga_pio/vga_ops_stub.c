@@ -36,6 +36,13 @@ int hal_vga_ops_handle_layer_clear(void) {
 }
 void hal_vga_ops_retile_for_font(void) {}
 void hal_vga_ops_wait_scanline_zero(void) {}
+static void (*s_fastgfx_present_callback)(void) = NULL;
+void hal_vga_ops_fastgfx_present(void) {
+    if (s_fastgfx_present_callback) s_fastgfx_present_callback();
+}
+void hal_vga_ops_set_fastgfx_present_callback(void (*callback)(void)) {
+    s_fastgfx_present_callback = callback;
+}
 uint8_t hal_vga_ops_layer_merge_byte(uint8_t primary, int x, int y) {
     (void)x;
     (void)y;

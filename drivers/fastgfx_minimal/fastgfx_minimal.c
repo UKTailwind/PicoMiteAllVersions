@@ -38,16 +38,13 @@ static uint64_t fastgfx_last_swap_us = 0;
 static uint8_t * fastgfx_back_buf = NULL;
 static unsigned char * fastgfx_saved_writebuf = NULL;
 
-__attribute__((weak)) void fastgfx_present_hook(void) {
-}
-
 /* Copy the back buffer onto the scanout. Called from SWAP and
  * during CLOSE so the last drawn frame stays on screen. */
 static void fastgfx_present(void) {
     if (!fastgfx_back_buf) return;
     if (FRAMEBUFFER == NULL || framebuffersize == 0) return;
     memcpy((void *)FRAMEBUFFER, fastgfx_back_buf, framebuffersize);
-    fastgfx_present_hook();
+    hal_vga_ops_fastgfx_present();
 }
 
 void bc_fastgfx_create(void) {

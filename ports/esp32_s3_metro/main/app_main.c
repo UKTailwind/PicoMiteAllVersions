@@ -21,6 +21,7 @@
 #include "Hardware_Includes.h"
 #include "hal/hal_psram.h"
 #include "runtime/runtime.h"
+#include "esp32_option_ext.h"
 
 extern jmp_buf mark;
 extern unsigned char flash_prog_buf[];
@@ -35,7 +36,6 @@ extern int esp32_usb_role_is_serial(void);
 extern int esp32_usb_role_is_keyboard(void);
 extern void esp32_usb_role_prepare_keyboard_host(void);
 extern void esp32_usb_keyboard_start_host(void);
-extern void esp32_usb_keyboard_start_hid(void);
 extern int esp32_usb_keyboard_has_keyboard(void);
 extern void esp32_usb_keyboard_print_status(void);
 
@@ -62,7 +62,7 @@ static int esp32_saved_options_valid(const char ** reason) {
         if (reason) *reason = "program flash size mismatch";
         return 0;
     }
-    if (!(Option.USBRole == USB_ROLE_SERIAL || Option.USBRole == USB_ROLE_KEYBOARD)) {
+    if (!(ESP32_OPTION_USB_ROLE == USB_ROLE_SERIAL || ESP32_OPTION_USB_ROLE == USB_ROLE_KEYBOARD)) {
         if (reason) *reason = "bad usb role";
         return 0;
     }
@@ -147,7 +147,9 @@ void app_main(void) {
     vm_sys_file_reset();
     vm_sys_pin_reset();
     extern void esp32_audio_reserve_option_pins(void);
+    extern void esp32_vga_reserve_option_pins(void);
     esp32_audio_reserve_option_pins();
+    esp32_vga_reserve_option_pins();
 
     /* ClearRuntime initialises OptionConsole (= 3 BOTH) and several other
      * runtime globals MMBasic expects to be sane before the first
@@ -166,8 +168,7 @@ void app_main(void) {
         MMPrintString("USB KEYBOARD MODE: starting host\r\n");
         esp32_usb_role_prepare_keyboard_host();
         esp32_usb_keyboard_start_host();
-        MMPrintString("USB KEYBOARD MODE: starting raw HID\r\n");
-        esp32_usb_keyboard_start_hid();
+        MMPrintString("USB KEYBOARD MODE: raw HID probe active\r\n");
         esp32_keyboard_mode_recovery();
     }
 

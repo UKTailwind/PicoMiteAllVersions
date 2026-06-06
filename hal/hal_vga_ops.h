@@ -47,6 +47,13 @@ void hal_vga_ops_retile_for_font(void);
  * non-VGA. */
 void hal_vga_ops_wait_scanline_zero(void);
 
+/* FASTGFX copied into the scanout framebuffer. Continuous-scanout
+ * targets are already visible after memcpy; ports with a separate
+ * scanout DMA buffer can register a present callback through the stub
+ * implementation. */
+void hal_vga_ops_fastgfx_present(void);
+void hal_vga_ops_set_fastgfx_present_callback(void (*callback)(void));
+
 /* SCREENMODE1 tile-color buffer init. HDMI ports call into the
  * scanout's settiles(); pure-VGA ports do an RGB121-tile-color loop
  * over X_TILE x Y_TILE tilefcols/tilebcols arrays. */

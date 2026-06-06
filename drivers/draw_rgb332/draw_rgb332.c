@@ -13,18 +13,6 @@
 #include "hal/hal_vga_ops.h"
 #include "draw_rgb332.h"
 
-__attribute__((weak)) void DrawRGB332FlushRegion(int x1, int y1, int x2, int y2) {
-    (void)x1;
-    (void)y1;
-    (void)x2;
-    (void)y2;
-}
-
-static void flush_rgb332_rect(int x1, int y1, int x2, int y2) {
-    if (x1 > x2 || y1 > y2) return;
-    DrawRGB332FlushRegion(x1, y1, x2, y2);
-}
-
 /*
  * @cond
  * The following section will be excluded from the documentation.
@@ -54,7 +42,6 @@ void DrawRectangle256(int x1, int y1, int x2, int y2, int c) {
         volatile uint8_t * p = WriteBuf + (y * HRes + x1);
         memset((void *)p, colour, x2 - x1 + 1);
     }
-    flush_rgb332_rect(x1, y1, x2, y2);
 }
 void DrawBitmap256(int x1, int y1, int width, int height, int scale, int fc, int bc, unsigned char * bitmap) {
     int i, j, k, m, x, y;
@@ -88,7 +75,6 @@ void DrawBitmap256(int x1, int y1, int width, int height, int scale, int fc, int
     if (y1 < 0) y1 = 0;
     if (x2 >= HRes) x2 = HRes - 1;
     if (y2 >= VRes) y2 = VRes - 1;
-    flush_rgb332_rect(x1, y1, x2, y2);
 }
 
 void DrawBuffer256(int x1, int y1, int x2, int y2, unsigned char * p) {
@@ -128,7 +114,6 @@ void DrawBuffer256(int x1, int y1, int x2, int y2, unsigned char * p) {
             *pp = fcolour;
         }
     }
-    flush_rgb332_rect(x1, y1, x2, y2);
 }
 void DrawBuffer256Fast(int x1, int y1, int x2, int y2, int blank, unsigned char * p) {
     int x, y, t;
@@ -159,14 +144,12 @@ void DrawBuffer256Fast(int x1, int y1, int x2, int y2, int blank, unsigned char 
             }
         }
     }
-    flush_rgb332_rect(xx1, yy1, xx2, yy2);
 }
 void DrawPixel256(int x, int y, int c) {
     if (x < 0 || y < 0 || x >= HRes || y >= VRes) return;
     uint8_t colour = RGB332(c);
     uint8_t * p = (uint8_t *)((uint32_t)(WriteBuf + y * HRes + x));
     *p = colour;
-    flush_rgb332_rect(x, y, x, y);
 }
 void ReadBuffer256(int x1, int y1, int x2, int y2, unsigned char * c) {
     int x, y, t;
@@ -249,6 +232,5 @@ void ScrollLCD256(int lines) {
         }
         DrawRectangle(0, 0, HRes - 1, lines - 1, PromptBC); // erase the lines introduced at the top
     }
-    flush_rgb332_rect(0, 0, HRes - 1, VRes - 1);
 }
 /*  @endcond */

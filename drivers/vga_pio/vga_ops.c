@@ -204,6 +204,11 @@ void Display_Refresh(void) {}
  * vga_qvga_modes.c (pure-VGA — spins on QVgaScanLine) and
  * hdmi_scanout.c (HDMI — spins on v_scanline). */
 
+void hal_vga_ops_fastgfx_present(void) {}
+void hal_vga_ops_set_fastgfx_present_callback(void (*callback)(void)) {
+    (void)callback;
+}
+
 void hal_vga_ops_retile_for_font(void) {
     if (!(gui_font_height >= 8 && (gui_font_width % 8) == 0)) return;
     ytileheight = gui_font_height;

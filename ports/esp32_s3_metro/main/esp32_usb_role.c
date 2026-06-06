@@ -1,7 +1,7 @@
 /*
  * esp32_usb_role.c - persisted runtime USB role selection.
  *
- * OPTION USB SERIAL/KEYBOARD stores the desired role in Option.USBRole and
+ * OPTION USB SERIAL/KEYBOARD stores the desired role in ESP32_OPTION_USB_ROLE and
  * reboots. At boot the port initialises either USB Serial/JTAG or USB HID
  * host. Holding BOOT (GPIO0) during reset forces serial for that boot only.
  */
@@ -15,6 +15,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "hal/usb_serial_jtag_ll.h"
+#include "esp32_option_ext.h"
 
 static int s_effective_role = USB_ROLE_SERIAL;
 static int s_forced_serial;
@@ -29,7 +30,7 @@ static void select_usb_serial_jtag_phy(void) {
 }
 
 void esp32_usb_role_resolve_boot(void) {
-    if (!valid_role(Option.USBRole)) Option.USBRole = USB_ROLE_SERIAL;
+    if (!valid_role(ESP32_OPTION_USB_ROLE)) ESP32_OPTION_USB_ROLE = USB_ROLE_SERIAL;
 
     const gpio_config_t boot_cfg = {
         .pin_bit_mask = 1ULL << GPIO_NUM_0,
@@ -42,7 +43,7 @@ void esp32_usb_role_resolve_boot(void) {
     vTaskDelay(pdMS_TO_TICKS(10));
 
     s_forced_serial = (gpio_get_level(GPIO_NUM_0) == 0);
-    s_effective_role = s_forced_serial ? USB_ROLE_SERIAL : Option.USBRole;
+    s_effective_role = s_forced_serial ? USB_ROLE_SERIAL : ESP32_OPTION_USB_ROLE;
     if (s_effective_role == USB_ROLE_SERIAL) select_usb_serial_jtag_phy();
 }
 
@@ -56,7 +57,7 @@ int esp32_usb_role_is_keyboard(void) {
 
 void esp32_usb_role_print_options(void) {
     MMPrintString("OPTION USB ");
-    MMPrintString(Option.USBRole == USB_ROLE_KEYBOARD ? "KEYBOARD" : "SERIAL");
+    MMPrintString(ESP32_OPTION_USB_ROLE == USB_ROLE_KEYBOARD ? "KEYBOARD" : "SERIAL");
     MMPrintString("\r\n");
 }
 
@@ -68,7 +69,7 @@ int esp32_usb_role_option_setter(unsigned char * cmdline) {
     if (checkstring(tp, (unsigned char *)"STATUS")) {
         extern void esp32_usb_keyboard_print_status(void);
         MMPrintString("Saved USB role: ");
-        MMPrintString(Option.USBRole == USB_ROLE_KEYBOARD ? "KEYBOARD\r\n" : "SERIAL\r\n");
+        MMPrintString(ESP32_OPTION_USB_ROLE == USB_ROLE_KEYBOARD ? "KEYBOARD\r\n" : "SERIAL\r\n");
         MMPrintString("Effective USB role: ");
         MMPrintString(esp32_usb_role_is_keyboard() ? "KEYBOARD\r\n" : "SERIAL\r\n");
         if (s_forced_serial) MMPrintString("BOOT forced serial for this boot\r\n");
@@ -85,7 +86,7 @@ int esp32_usb_role_option_setter(unsigned char * cmdline) {
         error("Syntax");
     }
 
-    Option.USBRole = (unsigned char)role;
+    ESP32_OPTION_USB_ROLE = (unsigned char)role;
     SaveOptions();
     if (role == USB_ROLE_KEYBOARD) {
         MMPrintString("Hold BOOT during reset to force USB SERIAL for one boot\r\n");
