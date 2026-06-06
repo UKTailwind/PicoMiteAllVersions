@@ -25,7 +25,7 @@
 #include "soc/usb_serial_jtag_struct.h"
 #include "soc/usb_wrap_struct.h"
 
-static const char *TAG = "esp32_usb_kbd";
+static const char * TAG = "esp32_usb_kbd";
 
 typedef enum {
     USB_KBD_EVENT_HID,
@@ -35,14 +35,14 @@ typedef struct {
     usb_kbd_event_group_t event_group;
     hid_host_device_handle_t handle;
     hid_host_driver_event_t event;
-    void *arg;
+    void * arg;
 } usb_kbd_event_t;
 
 static QueueHandle_t s_event_queue;
 static QueueHandle_t s_key_queue;
 static usb_host_client_handle_t s_probe_client;
 static usb_device_handle_t s_raw_kbd_device;
-static usb_transfer_t *s_raw_kbd_transfer;
+static usb_transfer_t * s_raw_kbd_transfer;
 static uint8_t s_raw_kbd_iface = 0xff;
 static uint8_t s_raw_kbd_ep = 0;
 static portMUX_TYPE s_repeat_mux = portMUX_INITIALIZER_UNLOCKED;
@@ -197,20 +197,62 @@ static void capture_usb_pad_state(void) {
 }
 
 static const uint8_t keycode2ascii[57][2] = {
-    {0, 0},     {0, 0},     {0, 0},     {0, 0},
-    {'a', 'A'}, {'b', 'B'}, {'c', 'C'}, {'d', 'D'},
-    {'e', 'E'}, {'f', 'F'}, {'g', 'G'}, {'h', 'H'},
-    {'i', 'I'}, {'j', 'J'}, {'k', 'K'}, {'l', 'L'},
-    {'m', 'M'}, {'n', 'N'}, {'o', 'O'}, {'p', 'P'},
-    {'q', 'Q'}, {'r', 'R'}, {'s', 'S'}, {'t', 'T'},
-    {'u', 'U'}, {'v', 'V'}, {'w', 'W'}, {'x', 'X'},
-    {'y', 'Y'}, {'z', 'Z'}, {'1', '!'}, {'2', '@'},
-    {'3', '#'}, {'4', '$'}, {'5', '%'}, {'6', '^'},
-    {'7', '&'}, {'8', '*'}, {'9', '('}, {'0', ')'},
-    {ENTER, ENTER}, {ESC, ESC}, {BKSP, BKSP}, {'\t', '\t'},
-    {' ', ' '}, {'-', '_'}, {'=', '+'}, {'[', '{'},
-    {']', '}'}, {'\\', '|'}, {'\\', '|'}, {';', ':'},
-    {'\'', '"'}, {'`', '~'}, {',', '<'}, {'.', '>'},
+    {0, 0},
+    {0, 0},
+    {0, 0},
+    {0, 0},
+    {'a', 'A'},
+    {'b', 'B'},
+    {'c', 'C'},
+    {'d', 'D'},
+    {'e', 'E'},
+    {'f', 'F'},
+    {'g', 'G'},
+    {'h', 'H'},
+    {'i', 'I'},
+    {'j', 'J'},
+    {'k', 'K'},
+    {'l', 'L'},
+    {'m', 'M'},
+    {'n', 'N'},
+    {'o', 'O'},
+    {'p', 'P'},
+    {'q', 'Q'},
+    {'r', 'R'},
+    {'s', 'S'},
+    {'t', 'T'},
+    {'u', 'U'},
+    {'v', 'V'},
+    {'w', 'W'},
+    {'x', 'X'},
+    {'y', 'Y'},
+    {'z', 'Z'},
+    {'1', '!'},
+    {'2', '@'},
+    {'3', '#'},
+    {'4', '$'},
+    {'5', '%'},
+    {'6', '^'},
+    {'7', '&'},
+    {'8', '*'},
+    {'9', '('},
+    {'0', ')'},
+    {ENTER, ENTER},
+    {ESC, ESC},
+    {BKSP, BKSP},
+    {'\t', '\t'},
+    {' ', ' '},
+    {'-', '_'},
+    {'=', '+'},
+    {'[', '{'},
+    {']', '}'},
+    {'\\', '|'},
+    {'\\', '|'},
+    {';', ':'},
+    {'\'', '"'},
+    {'`', '~'},
+    {',', '<'},
+    {'.', '>'},
     {'/', '?'},
 };
 
@@ -232,7 +274,7 @@ static bool modifier_ctrl(uint8_t modifier) {
     return (modifier & (HID_LEFT_CONTROL | HID_RIGHT_CONTROL)) != 0;
 }
 
-static bool key_found(const uint8_t *src, uint8_t key, unsigned len);
+static bool key_found(const uint8_t * src, uint8_t key, unsigned len);
 
 static int translate_key(uint8_t modifier, uint8_t key_code) {
     if (key_code >= HID_KEY_A && key_code <= HID_KEY_Z && modifier_ctrl(modifier)) {
@@ -244,29 +286,52 @@ static int translate_key(uint8_t modifier, uint8_t key_code) {
     }
 
     switch (key_code) {
-    case HID_KEY_F1: return F1;
-    case HID_KEY_F2: return F2;
-    case HID_KEY_F3: return F3;
-    case HID_KEY_F4: return F4;
-    case HID_KEY_F5: return F5;
-    case HID_KEY_F6: return F6;
-    case HID_KEY_F7: return F7;
-    case HID_KEY_F8: return F8;
-    case HID_KEY_F9: return F9;
-    case HID_KEY_F10: return F10;
-    case HID_KEY_F11: return F11;
-    case HID_KEY_F12: return F12;
-    case HID_KEY_INSERT: return INSERT;
-    case HID_KEY_HOME: return HOME;
-    case HID_KEY_PAGEUP: return PUP;
-    case HID_KEY_DELETE: return DEL;
-    case HID_KEY_END: return END;
-    case HID_KEY_PAGEDOWN: return PDOWN;
-    case HID_KEY_RIGHT: return RIGHT;
-    case HID_KEY_LEFT: return LEFT;
-    case HID_KEY_DOWN: return DOWN;
-    case HID_KEY_UP: return UP;
-    default: return 0;
+    case HID_KEY_F1:
+        return F1;
+    case HID_KEY_F2:
+        return F2;
+    case HID_KEY_F3:
+        return F3;
+    case HID_KEY_F4:
+        return F4;
+    case HID_KEY_F5:
+        return F5;
+    case HID_KEY_F6:
+        return F6;
+    case HID_KEY_F7:
+        return F7;
+    case HID_KEY_F8:
+        return F8;
+    case HID_KEY_F9:
+        return F9;
+    case HID_KEY_F10:
+        return F10;
+    case HID_KEY_F11:
+        return F11;
+    case HID_KEY_F12:
+        return F12;
+    case HID_KEY_INSERT:
+        return INSERT;
+    case HID_KEY_HOME:
+        return HOME;
+    case HID_KEY_PAGEUP:
+        return PUP;
+    case HID_KEY_DELETE:
+        return DEL;
+    case HID_KEY_END:
+        return END;
+    case HID_KEY_PAGEDOWN:
+        return PDOWN;
+    case HID_KEY_RIGHT:
+        return RIGHT;
+    case HID_KEY_LEFT:
+        return LEFT;
+    case HID_KEY_DOWN:
+        return DOWN;
+    case HID_KEY_UP:
+        return UP;
+    default:
+        return 0;
     }
 }
 
@@ -302,7 +367,7 @@ static void repeat_begin_locked(uint8_t modifier, uint8_t hid_key) {
     s_repeat_active = true;
 }
 
-static void repeat_update_from_report(uint8_t modifier, const uint8_t *keys) {
+static void repeat_update_from_report(uint8_t modifier, const uint8_t * keys) {
     portENTER_CRITICAL(&s_repeat_mux);
     if (s_repeat_active && key_found(keys, s_repeat_hid_key, HID_KEYBOARD_KEY_MAX)) {
         s_repeat_modifier = modifier;
@@ -343,21 +408,21 @@ static void synth_repeat_due(void) {
     if (key) queue_key(key);
 }
 
-static bool key_found(const uint8_t *src, uint8_t key, unsigned len) {
+static bool key_found(const uint8_t * src, uint8_t key, unsigned len) {
     for (unsigned i = 0; i < len; i++) {
         if (src[i] == key) return true;
     }
     return false;
 }
 
-static void keyboard_report(const uint8_t *data, int length) {
+static void keyboard_report(const uint8_t * data, int length) {
     s_diag.last_report_len = length;
     if (length < (int)sizeof(hid_keyboard_input_report_boot_t)) {
         s_diag.short_reports++;
         return;
     }
     s_diag.reports++;
-    hid_keyboard_input_report_boot_t *report = (hid_keyboard_input_report_boot_t *)data;
+    hid_keyboard_input_report_boot_t * report = (hid_keyboard_input_report_boot_t *)data;
 
     for (int i = 0; i < HID_KEYBOARD_KEY_MAX; i++) {
         uint8_t key = report->key[i];
@@ -374,7 +439,7 @@ static void keyboard_report(const uint8_t *data, int length) {
 
 static void hid_interface_callback(hid_host_device_handle_t handle,
                                    hid_host_interface_event_t event,
-                                   void *arg) {
+                                   void * arg) {
     (void)arg;
     uint8_t data[64];
     size_t data_length = 0;
@@ -411,7 +476,7 @@ static void hid_interface_callback(hid_host_device_handle_t handle,
 
 static void handle_hid_event(hid_host_device_handle_t handle,
                              hid_host_driver_event_t event,
-                             void *arg) {
+                             void * arg) {
     (void)arg;
     hid_host_dev_params_t params;
     s_diag.driver_connected_events++;
@@ -456,7 +521,7 @@ static void handle_hid_event(hid_host_device_handle_t handle,
 
 static void hid_device_callback(hid_host_device_handle_t handle,
                                 hid_host_driver_event_t event,
-                                void *arg) {
+                                void * arg) {
     if (!s_event_queue) return;
     usb_kbd_event_t evt = {
         .event_group = USB_KBD_EVENT_HID,
@@ -467,8 +532,8 @@ static void hid_device_callback(hid_host_device_handle_t handle,
     xQueueSend(s_event_queue, &evt, 0);
 }
 
-static void usb_probe_client_callback(const usb_host_client_event_msg_t *event_msg,
-                                      void *arg) {
+static void usb_probe_client_callback(const usb_host_client_event_msg_t * event_msg,
+                                      void * arg) {
     (void)arg;
     if (!event_msg) return;
     switch (event_msg->event) {
@@ -492,7 +557,7 @@ static void usb_probe_client_callback(const usb_host_client_event_msg_t *event_m
     }
 }
 
-static void raw_keyboard_transfer_callback(usb_transfer_t *transfer) {
+static void raw_keyboard_transfer_callback(usb_transfer_t * transfer) {
     if (!transfer) return;
     if (transfer->status == USB_TRANSFER_STATUS_COMPLETED) {
         s_diag.raw_reports++;
@@ -511,27 +576,27 @@ static void raw_keyboard_transfer_callback(usb_transfer_t *transfer) {
 }
 
 static bool raw_keyboard_attach(usb_device_handle_t handle,
-                                const usb_config_desc_t *config_desc,
+                                const usb_config_desc_t * config_desc,
                                 uint8_t iface_num,
                                 uint8_t alt_setting) {
     if (s_raw_kbd_device || !handle || !config_desc) return false;
 
     uint8_t endpoint = 0;
     uint16_t packet_size = 0;
-    const uint8_t *p = (const uint8_t *)config_desc;
+    const uint8_t * p = (const uint8_t *)config_desc;
     bool in_target_iface = false;
     for (int offset = 0; offset < config_desc->wTotalLength;) {
         uint8_t length = p[offset];
         uint8_t type = p[offset + 1];
         if (length < 2 || offset + length > config_desc->wTotalLength) break;
         if (type == USB_B_DESCRIPTOR_TYPE_INTERFACE && length >= sizeof(usb_intf_desc_t)) {
-            const usb_intf_desc_t *intf = (const usb_intf_desc_t *)(p + offset);
+            const usb_intf_desc_t * intf = (const usb_intf_desc_t *)(p + offset);
             in_target_iface = intf->bInterfaceNumber == iface_num &&
                               intf->bAlternateSetting == alt_setting;
         } else if (in_target_iface &&
                    type == USB_B_DESCRIPTOR_TYPE_ENDPOINT &&
                    length >= sizeof(usb_ep_desc_t)) {
-            const usb_ep_desc_t *ep = (const usb_ep_desc_t *)(p + offset);
+            const usb_ep_desc_t * ep = (const usb_ep_desc_t *)(p + offset);
             bool is_in = (ep->bEndpointAddress & USB_B_ENDPOINT_ADDRESS_EP_DIR_MASK) != 0;
             bool is_int = (ep->bmAttributes & USB_BM_ATTRIBUTES_XFERTYPE_MASK) ==
                           USB_BM_ATTRIBUTES_XFER_INT;
@@ -553,7 +618,7 @@ static bool raw_keyboard_attach(usb_device_handle_t handle,
     s_diag.raw_claim_err = err;
     if (err != ESP_OK) return false;
 
-    usb_transfer_t *transfer = NULL;
+    usb_transfer_t * transfer = NULL;
     err = usb_host_transfer_alloc(packet_size, 0, &transfer);
     s_diag.raw_transfer_alloc_err = err;
     if (err != ESP_OK || !transfer) {
@@ -592,19 +657,19 @@ static bool raw_keyboard_attach(usb_device_handle_t handle,
     return true;
 }
 
-static void probe_config_descriptor(const usb_config_desc_t *config_desc) {
+static void probe_config_descriptor(const usb_config_desc_t * config_desc) {
     if (!config_desc) return;
     s_diag.probe_seen_ifaces = config_desc->bNumInterfaces;
     s_diag.probe_keyboard_iface = -1;
 
-    const uint8_t *p = (const uint8_t *)config_desc;
+    const uint8_t * p = (const uint8_t *)config_desc;
     uint8_t kbd_alt = 0;
     for (int offset = 0; offset < config_desc->wTotalLength;) {
         uint8_t length = p[offset];
         uint8_t type = p[offset + 1];
         if (length < 2 || offset + length > config_desc->wTotalLength) break;
         if (type == USB_B_DESCRIPTOR_TYPE_INTERFACE && length >= sizeof(usb_intf_desc_t)) {
-            const usb_intf_desc_t *intf = (const usb_intf_desc_t *)(p + offset);
+            const usb_intf_desc_t * intf = (const usb_intf_desc_t *)(p + offset);
             if (intf->bInterfaceClass == USB_CLASS_HID &&
                 intf->bInterfaceProtocol == HID_PROTOCOL_KEYBOARD) {
                 s_diag.probe_keyboard_iface = intf->bInterfaceNumber;
@@ -638,7 +703,7 @@ static void probe_scan_devices(void) {
         if (err != ESP_OK || !handle) continue;
 
         s_diag.probe_seen_addr = address;
-        const usb_device_desc_t *dev_desc = NULL;
+        const usb_device_desc_t * dev_desc = NULL;
         err = usb_host_get_device_descriptor(handle, &dev_desc);
         s_diag.probe_desc_err = err;
         if (err == ESP_OK && dev_desc) {
@@ -647,7 +712,7 @@ static void probe_scan_devices(void) {
             s_diag.probe_seen_class = dev_desc->bDeviceClass;
         }
 
-        const usb_config_desc_t *config_desc = NULL;
+        const usb_config_desc_t * config_desc = NULL;
         err = usb_host_get_active_config_descriptor(handle, &config_desc);
         s_diag.probe_config_err = err;
         bool keep_open = false;
@@ -664,7 +729,7 @@ static void probe_scan_devices(void) {
     }
 }
 
-static void usb_probe_client_task(void *arg) {
+static void usb_probe_client_task(void * arg) {
     (void)arg;
     TickType_t last_scan = 0;
     while (true) {
@@ -713,7 +778,7 @@ static void start_probe_client(void) {
     }
 }
 
-static void usb_lib_task(void *arg) {
+static void usb_lib_task(void * arg) {
     const usb_host_config_t host_config = {
         .skip_phy_setup = false,
         .intr_flags = ESP_INTR_FLAG_LOWMED,
@@ -741,7 +806,7 @@ static void usb_lib_task(void *arg) {
     }
 }
 
-static void hid_event_task(void *arg) {
+static void hid_event_task(void * arg) {
     (void)arg;
     usb_kbd_event_t evt;
     while (true) {

@@ -12,7 +12,7 @@
 
 #include "esp32_audio_options.h"
 
-extern void esp32_audio_status_string(char *out, size_t out_len);
+extern void esp32_audio_status_string(char * out, size_t out_len);
 
 static int esp32_audio_pin_invalid(int pin) {
     return pin <= 0 || pin > NBRPINS || (PinDef[pin].mode & UNUSED);

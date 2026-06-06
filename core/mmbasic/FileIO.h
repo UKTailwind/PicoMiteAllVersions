@@ -75,8 +75,6 @@ void FilePutStr(int count, char * c, int fnbr);
 char FilePutChar(char c, int fnbr);
 void CheckSDCard(void);
 void LoadOptions(void);
-int LoadOptionsAtBoot(void);
-const char *OptionsInvalidReason(void);
 void CrunchData(unsigned char ** p, int c);
 int FileEOF(int fnbr);
 void ClearSavedVars(void);

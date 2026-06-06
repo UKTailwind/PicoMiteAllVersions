@@ -18,10 +18,10 @@
 #include "esp_lcd_panel_rgb.h"
 #include "esp_log.h"
 
-static const char *TAG = "vga_lcdcam";
+static const char * TAG = "vga_lcdcam";
 
 static esp_lcd_panel_handle_t s_panel = NULL;
-static uint8_t *s_fb = NULL;
+static uint8_t * s_fb = NULL;
 static bool s_cpu_bounce_scanout = false;
 
 /*
@@ -33,40 +33,43 @@ static bool s_cpu_bounce_scanout = false;
  */
 static uint32_t vga_pclk_hz(uint8_t clock_mode) {
     switch (clock_mode) {
-        case VGA_LCDCAM_CLOCK_25MHZ:
-        case VGA_LCDCAM_CLOCK_25MHZ240:
-            return 25000000;
-        case VGA_LCDCAM_CLOCK_STANDARD:
-        case VGA_LCDCAM_CLOCK_PLL240:
-        default:
-            return 25175000;
+    case VGA_LCDCAM_CLOCK_25MHZ:
+    case VGA_LCDCAM_CLOCK_25MHZ240:
+        return 25000000;
+    case VGA_LCDCAM_CLOCK_STANDARD:
+    case VGA_LCDCAM_CLOCK_PLL240:
+    default:
+        return 25175000;
     }
 }
 
 static lcd_clock_source_t vga_clock_source(uint8_t clock_mode) {
     switch (clock_mode) {
-        case VGA_LCDCAM_CLOCK_PLL240:
-        case VGA_LCDCAM_CLOCK_25MHZ240:
-            return LCD_CLK_SRC_PLL240M;
-        case VGA_LCDCAM_CLOCK_STANDARD:
-        case VGA_LCDCAM_CLOCK_25MHZ:
-        default:
-            return LCD_CLK_SRC_DEFAULT;
+    case VGA_LCDCAM_CLOCK_PLL240:
+    case VGA_LCDCAM_CLOCK_25MHZ240:
+        return LCD_CLK_SRC_PLL240M;
+    case VGA_LCDCAM_CLOCK_STANDARD:
+    case VGA_LCDCAM_CLOCK_25MHZ:
+    default:
+        return LCD_CLK_SRC_DEFAULT;
     }
 }
 
-static const char *vga_clock_name(uint8_t clock_mode) {
+static const char * vga_clock_name(uint8_t clock_mode) {
     switch (clock_mode) {
-        case VGA_LCDCAM_CLOCK_PLL240: return "PLL240";
-        case VGA_LCDCAM_CLOCK_25MHZ: return "25MHZ";
-        case VGA_LCDCAM_CLOCK_25MHZ240: return "25MHZ240";
-        case VGA_LCDCAM_CLOCK_STANDARD:
-        default:
-            return "STANDARD";
+    case VGA_LCDCAM_CLOCK_PLL240:
+        return "PLL240";
+    case VGA_LCDCAM_CLOCK_25MHZ:
+        return "25MHZ";
+    case VGA_LCDCAM_CLOCK_25MHZ240:
+        return "25MHZ240";
+    case VGA_LCDCAM_CLOCK_STANDARD:
+    default:
+        return "STANDARD";
     }
 }
 
-static void vga_apply_drive(const vga_lcdcam_pins_t *pins) {
+static void vga_apply_drive(const vga_lcdcam_pins_t * pins) {
     gpio_drive_cap_t drive = (pins->drive_cap <= GPIO_DRIVE_CAP_3)
                                  ? (gpio_drive_cap_t)pins->drive_cap
                                  : GPIO_DRIVE_CAP_DEFAULT;
@@ -100,7 +103,7 @@ static esp_lcd_rgb_timing_t vga_640x480_60(uint8_t sync_flags, uint8_t clock_mod
     return t;
 }
 
-bool vga_lcdcam_s3_init(const vga_lcdcam_pins_t *pins, uint8_t **fb_out) {
+bool vga_lcdcam_s3_init(const vga_lcdcam_pins_t * pins, uint8_t ** fb_out) {
     if (s_panel) {
         if (fb_out) *fb_out = s_fb;
         return s_fb != NULL;
@@ -110,7 +113,7 @@ bool vga_lcdcam_s3_init(const vga_lcdcam_pins_t *pins, uint8_t **fb_out) {
     esp_lcd_rgb_panel_config_t cfg = {
         .clk_src = vga_clock_source(pins->clock_mode),
         .timings = vga_640x480_60(pins->sync_flags, pins->clock_mode),
-        .data_width = 8,      /* RGB332 — one byte per pixel out an 8-bit bus */
+        .data_width = 8, /* RGB332 — one byte per pixel out an 8-bit bus */
         .bits_per_pixel = 8,
         .num_fbs = 1,
         /* Feed the LCD peripheral from internal RAM bounce buffers. Direct
@@ -120,14 +123,26 @@ bool vga_lcdcam_s3_init(const vga_lcdcam_pins_t *pins, uint8_t **fb_out) {
         .bounce_buffer_size_px = 16 * VGA_LCDCAM_HRES,
         .hsync_gpio_num = pins->hsync_gpio,
         .vsync_gpio_num = pins->vsync_gpio,
-        .de_gpio_num = -1,    /* VGA has no data-enable line */
+        .de_gpio_num = -1, /* VGA has no data-enable line */
         .pclk_gpio_num = pins->pclk_gpio,
         .disp_gpio_num = -1,
         .data_gpio_nums = {
-            pins->data_gpio[0], pins->data_gpio[1], pins->data_gpio[2],
-            pins->data_gpio[3], pins->data_gpio[4], pins->data_gpio[5],
-            pins->data_gpio[6], pins->data_gpio[7],
-            -1, -1, -1, -1, -1, -1, -1, -1,
+            pins->data_gpio[0],
+            pins->data_gpio[1],
+            pins->data_gpio[2],
+            pins->data_gpio[3],
+            pins->data_gpio[4],
+            pins->data_gpio[5],
+            pins->data_gpio[6],
+            pins->data_gpio[7],
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
         },
         .flags = {
             .fb_in_psram = 1,
@@ -151,7 +166,7 @@ bool vga_lcdcam_s3_init(const vga_lcdcam_pins_t *pins, uint8_t **fb_out) {
         return false;
     }
 
-    void *fb = NULL;
+    void * fb = NULL;
     err = esp_lcd_rgb_panel_get_frame_buffer(s_panel, 1, &fb);
     if (err != ESP_OK || fb == NULL) {
         ESP_LOGE(TAG, "get_frame_buffer failed: %s", esp_err_to_name(err));
@@ -171,9 +186,13 @@ bool vga_lcdcam_s3_init(const vga_lcdcam_pins_t *pins, uint8_t **fb_out) {
     return true;
 }
 
-uint8_t *vga_lcdcam_s3_framebuffer(void) { return s_fb; }
+uint8_t * vga_lcdcam_s3_framebuffer(void) {
+    return s_fb;
+}
 
-bool vga_lcdcam_s3_active(void) { return s_panel != NULL && s_fb != NULL; }
+bool vga_lcdcam_s3_active(void) {
+    return s_panel != NULL && s_fb != NULL;
+}
 
 void vga_lcdcam_s3_flush_region(int x1, int y1, int x2, int y2) {
     if (!s_fb) return;
@@ -209,7 +228,7 @@ void vga_lcdcam_s3_clear(uint8_t colour) {
     vga_lcdcam_s3_flush_all();
 }
 
-void vga_lcdcam_s3_present_rgb332_2x(const uint8_t *src, int src_w, int src_h,
+void vga_lcdcam_s3_present_rgb332_2x(const uint8_t * src, int src_w, int src_h,
                                      int src_stride, int x1, int y1, int x2, int y2) {
     if (!s_fb || !src || src_w <= 0 || src_h <= 0 || src_stride < src_w) return;
     const int out_w = src_w * 2;
@@ -225,9 +244,9 @@ void vga_lcdcam_s3_present_rgb332_2x(const uint8_t *src, int src_w, int src_h,
     const int xoff = (VGA_LCDCAM_HRES - out_w) / 2;
     const int yoff = (VGA_LCDCAM_VRES - out_h) / 2;
     for (int y = y1; y <= y2; y++) {
-        const uint8_t *s = src + (size_t)y * src_stride + x1;
-        uint8_t *d0 = s_fb + (size_t)(yoff + y * 2) * VGA_LCDCAM_HRES + xoff + x1 * 2;
-        uint8_t *d1 = d0 + VGA_LCDCAM_HRES;
+        const uint8_t * s = src + (size_t)y * src_stride + x1;
+        uint8_t * d0 = s_fb + (size_t)(yoff + y * 2) * VGA_LCDCAM_HRES + xoff + x1 * 2;
+        uint8_t * d1 = d0 + VGA_LCDCAM_HRES;
         for (int x = x1; x <= x2; x++) {
             uint8_t c = *s++;
             *d0++ = c;
@@ -261,7 +280,7 @@ static uint8_t rgb332_dither3(uint8_t c, int x, int y) {
     return out;
 }
 
-void vga_lcdcam_s3_present_rgb332_2x_dither3(const uint8_t *src, int src_w, int src_h,
+void vga_lcdcam_s3_present_rgb332_2x_dither3(const uint8_t * src, int src_w, int src_h,
                                              int src_stride, int x1, int y1, int x2, int y2) {
     if (!s_fb || !src || src_w <= 0 || src_h <= 0 || src_stride < src_w) return;
     const int out_w = src_w * 2;
@@ -277,13 +296,13 @@ void vga_lcdcam_s3_present_rgb332_2x_dither3(const uint8_t *src, int src_w, int 
     const int xoff = (VGA_LCDCAM_HRES - out_w) / 2;
     const int yoff = (VGA_LCDCAM_VRES - out_h) / 2;
     for (int y = y1; y <= y2; y++) {
-        const uint8_t *s = src + (size_t)y * src_stride + x1;
+        const uint8_t * s = src + (size_t)y * src_stride + x1;
         for (int x = x1; x <= x2; x++) {
             const uint8_t c = *s++;
             const int px = xoff + x * 2;
             const int py = yoff + y * 2;
-            uint8_t *d0 = s_fb + (size_t)py * VGA_LCDCAM_HRES + px;
-            uint8_t *d1 = d0 + VGA_LCDCAM_HRES;
+            uint8_t * d0 = s_fb + (size_t)py * VGA_LCDCAM_HRES + px;
+            uint8_t * d1 = d0 + VGA_LCDCAM_HRES;
             d0[0] = rgb332_dither3(c, px, py);
             d0[1] = rgb332_dither3(c, px + 1, py);
             d1[0] = rgb332_dither3(c, px, py + 1);

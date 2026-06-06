@@ -39,7 +39,36 @@ extern void esp32_usb_keyboard_start_hid(void);
 extern int esp32_usb_keyboard_has_keyboard(void);
 extern void esp32_usb_keyboard_print_status(void);
 
-static const char *TAG = "app_main";
+static const char * TAG = "app_main";
+
+static int esp32_saved_options_valid(const char ** reason) {
+    if (Option.Magic != MagicKey) {
+        if (reason) *reason = "bad magic";
+        return 0;
+    }
+    if (Option.Width <= 0) {
+        if (reason) *reason = "bad width";
+        return 0;
+    }
+    if (Option.Height <= 0) {
+        if (reason) *reason = "bad height";
+        return 0;
+    }
+    if (!(Option.Tab == 2 || Option.Tab == 3 || Option.Tab == 4 || Option.Tab == 8)) {
+        if (reason) *reason = "bad tab";
+        return 0;
+    }
+    if (Option.PROG_FLASH_SIZE != MAX_PROG_SIZE) {
+        if (reason) *reason = "program flash size mismatch";
+        return 0;
+    }
+    if (!(Option.USBRole == USB_ROLE_SERIAL || Option.USBRole == USB_ROLE_KEYBOARD)) {
+        if (reason) *reason = "bad usb role";
+        return 0;
+    }
+    if (reason) *reason = "valid";
+    return 1;
+}
 
 static void esp32_keyboard_mode_recovery(void) {
     if (!esp32_usb_role_is_keyboard()) return;
@@ -74,9 +103,12 @@ void app_main(void) {
      * cause it to deref garbage. */
     flash_progmemory = flash_prog_buf;
 
-    if (!LoadOptionsAtBoot()) {
-        ESP_LOGE(TAG, "saved options rejected at boot: %s; using RAM defaults only",
-                 OptionsInvalidReason());
+    LoadOptions();
+    const char * options_reason = NULL;
+    if (!esp32_saved_options_valid(&options_reason)) {
+        ESP_LOGE(TAG, "saved options rejected at boot: %s; resetting to board defaults",
+                 options_reason ? options_reason : "invalid");
+        ResetOptions(true);
     }
 
     esp32_usb_role_resolve_boot();

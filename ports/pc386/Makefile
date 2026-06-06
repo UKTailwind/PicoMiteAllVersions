@@ -225,6 +225,7 @@ CORE_DRV_SRCS = audio_mp3/audio_mp3_real.c third_party/hxcmod/hxcmod.c \
                 spi_lcd/spi_lcd_mem332_stub.c \
                 display_merge/display_merge_stub.c \
                 vga_pio/vga_ops_stub.c \
+                vga_pio/vga_mode_stub.c \
                 $(PC386_GFX_3D_SRC) \
                 upng_sprite/upng_sprite_stub.c \
                 gui_touch/gui_touch_stub.c \

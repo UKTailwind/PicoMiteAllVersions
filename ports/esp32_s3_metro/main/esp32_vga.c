@@ -48,12 +48,12 @@ extern unsigned char *WriteBuf, *DisplayBuf, *FrameBuf, *LayerBuf, *SecondFrame,
 extern unsigned char OptionConsole;
 extern volatile int DISPLAY_TYPE;
 extern void (*DrawRectangle)(int x1, int y1, int x2, int y2, int c);
-extern void (*DrawBitmap)(int x1, int y1, int width, int height, int scale, int fc, int bc, unsigned char *bitmap);
+extern void (*DrawBitmap)(int x1, int y1, int width, int height, int scale, int fc, int bc, unsigned char * bitmap);
 extern void (*ScrollLCD)(int lines);
-extern void (*DrawBuffer)(int x1, int y1, int x2, int y2, unsigned char *c);
-extern void (*ReadBuffer)(int x1, int y1, int x2, int y2, unsigned char *c);
-extern void (*DrawBufferFast)(int x1, int y1, int x2, int y2, int blank, unsigned char *c);
-extern void (*ReadBufferFast)(int x1, int y1, int x2, int y2, unsigned char *c);
+extern void (*DrawBuffer)(int x1, int y1, int x2, int y2, unsigned char * c);
+extern void (*ReadBuffer)(int x1, int y1, int x2, int y2, unsigned char * c);
+extern void (*DrawBufferFast)(int x1, int y1, int x2, int y2, int blank, unsigned char * c);
+extern void (*ReadBufferFast)(int x1, int y1, int x2, int y2, unsigned char * c);
 extern void (*DrawPixel)(int x1, int y1, int c);
 extern void ApplyDefaultConsoleColours(void);
 
@@ -74,8 +74,8 @@ extern void ApplyDefaultConsoleColours(void);
 #define ESP32_VGA_MODE_320X240_W 320
 #define ESP32_VGA_MODE_320X240_H 240
 
-static uint8_t *s_vga_scanout_fb = NULL;
-static uint8_t *s_vga_logical_fb = NULL;
+static uint8_t * s_vga_scanout_fb = NULL;
+static uint8_t * s_vga_logical_fb = NULL;
 static int s_vga_mode = ESP32_VGA_MODE_640X480;
 
 static uint8_t vga_sync_flags(void) {
@@ -110,19 +110,22 @@ static uint8_t vga_3bit_default_clock_mode(void) {
     return VGA_LCDCAM_CLOCK_25MHZ;
 }
 
-static const char *vga_clock_name(uint8_t mode) {
+static const char * vga_clock_name(uint8_t mode) {
     switch (mode) {
-        case VGA_LCDCAM_CLOCK_PLL240: return "PLL240";
-        case VGA_LCDCAM_CLOCK_25MHZ: return "25MHZ";
-        case VGA_LCDCAM_CLOCK_25MHZ240: return "25MHZ240";
-        case VGA_LCDCAM_CLOCK_STANDARD:
-        default:
-            return "STANDARD";
+    case VGA_LCDCAM_CLOCK_PLL240:
+        return "PLL240";
+    case VGA_LCDCAM_CLOCK_25MHZ:
+        return "25MHZ";
+    case VGA_LCDCAM_CLOCK_25MHZ240:
+        return "25MHZ240";
+    case VGA_LCDCAM_CLOCK_STANDARD:
+    default:
+        return "STANDARD";
     }
 }
 
-static int parse_vga_clock_mode(unsigned char *arg) {
-    unsigned char *p = arg;
+static int parse_vga_clock_mode(unsigned char * arg) {
+    unsigned char * p = arg;
     skipspace(p);
     if (checkstring(p, (unsigned char *)"STANDARD")) return VGA_LCDCAM_CLOCK_STANDARD;
     if (checkstring(p, (unsigned char *)"PLL240")) return VGA_LCDCAM_CLOCK_PLL240;
@@ -161,8 +164,8 @@ static void esp32_vga_bind_rgb332_draw(void) {
     DrawPixel = DrawPixel256;
 }
 
-static uint8_t *esp32_vga_alloc_logical_fb(size_t bytes) {
-    uint8_t *p = heap_caps_malloc(bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+static uint8_t * esp32_vga_alloc_logical_fb(size_t bytes) {
+    uint8_t * p = heap_caps_malloc(bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (!p) p = heap_caps_malloc(bytes, MALLOC_CAP_8BIT);
     return p;
 }
@@ -251,7 +254,7 @@ void esp32_vga_display_init(void) {
         pins.hsync_gpio < 0 || pins.vsync_gpio < 0)
         return;
 
-    uint8_t *fb = NULL;
+    uint8_t * fb = NULL;
     if (!vga_lcdcam_s3_init(&pins, &fb) || fb == NULL) return;
 
     s_vga_scanout_fb = fb;
@@ -317,12 +320,12 @@ void cmd_mode(void) {
 }
 
 /* Parse one GPIO token (plain chip GPIO number) into a stored pin index. */
-static int parse_vga_gpio(unsigned char *arg) {
+static int parse_vga_gpio(unsigned char * arg) {
     /* Accept either a "GPn" pin name or a raw chip GPIO number, matching
      * how pins are written elsewhere (e.g. OPTION AUDIO). A bare getint()
      * would treat "GP8" as an auto-created variable (= 0), silently
      * mis-storing the pin. */
-    unsigned char *p = arg;
+    unsigned char * p = arg;
     skipspace(p);
     int gpio;
     if ((p[0] == 'G' || p[0] == 'g') && (p[1] == 'P' || p[1] == 'p') && isdigit(p[2]))
@@ -335,16 +338,16 @@ static int parse_vga_gpio(unsigned char *arg) {
     return pin;
 }
 
-static int parse_vga_sync_polarity(unsigned char *arg) {
-    unsigned char *p = arg;
+static int parse_vga_sync_polarity(unsigned char * arg) {
+    unsigned char * p = arg;
     skipspace(p);
     if (checkstring(p, (unsigned char *)"NEGATIVE")) return 0;
     if (checkstring(p, (unsigned char *)"POSITIVE")) return 1;
     return (int)getint(p, 0, 1);
 }
 
-int esp32_vga_option_setter(unsigned char *line) {
-    unsigned char *tp = checkstring(line, (unsigned char *)"VGA");
+int esp32_vga_option_setter(unsigned char * line) {
+    unsigned char * tp = checkstring(line, (unsigned char *)"VGA");
     if (!tp) return 0;
     if (CurrentLinePtr) error("Invalid in a program");
 
@@ -359,7 +362,7 @@ int esp32_vga_option_setter(unsigned char *line) {
         return 1;
     }
 
-    unsigned char *sp = checkstring(tp, (unsigned char *)"SYNC");
+    unsigned char * sp = checkstring(tp, (unsigned char *)"SYNC");
     if (sp) {
         getargs(&sp, 3, (unsigned char *)","); /* 2 args -> 3 tokens */
         if (argc != 3) error("Syntax: OPTION VGA SYNC NEGATIVE|POSITIVE,NEGATIVE|POSITIVE");
@@ -398,7 +401,7 @@ int esp32_vga_option_setter(unsigned char *line) {
     /* 3-bit (8-colour) mode for a 1-bit-per-channel DAC (e.g. the Serial
      * Wombat board). Only the three channel MSBs are wired; the remaining
      * five RGB332 bus bits stay unconnected (-1, skipped by esp_lcd). */
-    unsigned char *bp = checkstring(tp, (unsigned char *)"3BIT");
+    unsigned char * bp = checkstring(tp, (unsigned char *)"3BIT");
     if (bp) {
         uint8_t sync_flags = vga_3bit_default_sync_flags();
         getargs(&bp, 9, (unsigned char *)","); /* 5 pins -> 9 tokens */

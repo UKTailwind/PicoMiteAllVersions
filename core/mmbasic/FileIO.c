@@ -80,11 +80,6 @@ extern void cmd_files_restore_program_context(void);
 extern void cmd_files_pump_console_key(int * c);
 extern void port_apply_load_overrides(void);
 
-static int s_options_save_suppressed;
-static int s_runtime_options_valid;
-static struct option_s s_runtime_options;
-static const char *s_options_invalid_reason = "not checked";
-
 static void options_post_load(void) {
     RGB121map[0] = BLACK;
     RGB121map[1] = BLUE;
@@ -108,39 +103,6 @@ static void options_post_load(void) {
      * (PicoCalc forces ST7796 + I2C keyboard + audio pins) and
      * host/host_runtime.c (no-op). */
     port_apply_load_overrides();
-}
-
-static int options_struct_valid(const struct option_s *opt, const char **reason) {
-    if (opt->Magic != MagicKey) {
-        if (reason) *reason = "bad magic";
-        return 0;
-    }
-    if (opt->Width <= 0) {
-        if (reason) *reason = "bad width";
-        return 0;
-    }
-    if (opt->Height <= 0) {
-        if (reason) *reason = "bad height";
-        return 0;
-    }
-    if (!(opt->Tab == 2 || opt->Tab == 3 || opt->Tab == 4 || opt->Tab == 8)) {
-        if (reason) *reason = "bad tab";
-        return 0;
-    }
-    if (opt->PROG_FLASH_SIZE != MAX_PROG_SIZE) {
-        if (reason) *reason = "program flash size mismatch";
-        return 0;
-    }
-    if (!(opt->USBRole == USB_ROLE_SERIAL || opt->USBRole == USB_ROLE_KEYBOARD)) {
-        if (reason) *reason = "bad usb role";
-        return 0;
-    }
-    if (reason) *reason = "valid";
-    return 1;
-}
-
-const char *OptionsInvalidReason(void) {
-    return s_options_invalid_reason;
 }
 extern void cmd_load_post_cleanup(void);
 extern int port_mount_sd_drive(void);
@@ -3816,31 +3778,10 @@ void CheckSDCard(void) {
     diskchecktimer = DISKCHECKRATE;
 }
 void LoadOptions(void) {
-    if (s_runtime_options_valid) {
-        memcpy((void *)&Option, &s_runtime_options, sizeof(struct option_s));
-    } else if (hal_flash_read_options(&Option, sizeof(struct option_s)) != 0) {
+    if (hal_flash_read_options(&Option, sizeof(struct option_s)) != 0) {
         memset((void *)&Option, 0, sizeof(struct option_s));
-        s_options_invalid_reason = "hal read failed";
     }
     options_post_load();
-}
-
-int LoadOptionsAtBoot(void) {
-    s_runtime_options_valid = 0;
-    LoadOptions();
-    const char *reason = NULL;
-    if (options_struct_valid(&Option, &reason)) {
-        s_options_invalid_reason = reason;
-        return 1;
-    }
-
-    s_options_invalid_reason = reason ? reason : "invalid";
-    s_options_save_suppressed++;
-    ResetOptions(true);
-    s_options_save_suppressed--;
-    memcpy(&s_runtime_options, &Option, sizeof(struct option_s));
-    s_runtime_options_valid = 1;
-    return 0;
 }
 
 void ResetOptions(bool startup) {
@@ -4185,14 +4126,8 @@ void ClearSavedVars(void) {
 }
 void SaveOptions(void) {
     uSec(100000);
-    if (s_options_save_suppressed) {
-        memcpy(&s_runtime_options, &Option, sizeof(struct option_s));
-        s_runtime_options_valid = 1;
-        return;
-    }
     fileio_flash_write_begin();
     hal_flash_write_options(&Option, sizeof(struct option_s));
     fileio_flash_write_end();
-    s_runtime_options_valid = 0;
 }
 /*  @endcond */

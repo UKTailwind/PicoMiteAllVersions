@@ -27,7 +27,7 @@ extern void flash_range_erase(uint32_t off, uint32_t count);
 extern void flash_range_program(uint32_t off, const uint8_t * data, size_t len);
 extern unsigned char esp32_flash_option_buf[];
 
-static const char *TAG = "mm_options";
+static const char * TAG = "mm_options";
 static int s_nvs_ready;
 
 #define MM_OPTIONS_PARTITION "mmslots"
@@ -203,7 +203,7 @@ int hal_flash_read_options(void * buf, size_t len) {
         return -EIO;
     }
 
-    uint8_t *tmp = malloc(stored_len);
+    uint8_t * tmp = malloc(stored_len);
     if (!tmp) {
         memset(buf, 0, len);
         nvs_close(nvs);

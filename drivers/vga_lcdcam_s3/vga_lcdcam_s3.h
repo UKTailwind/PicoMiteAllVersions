@@ -47,8 +47,8 @@ typedef struct {
 #define VGA_LCDCAM_SYNC_VSYNC_IDLE_LOW 0x02u
 
 #define VGA_LCDCAM_CLOCK_STANDARD 0u
-#define VGA_LCDCAM_CLOCK_PLL240   1u
-#define VGA_LCDCAM_CLOCK_25MHZ    2u
+#define VGA_LCDCAM_CLOCK_PLL240 1u
+#define VGA_LCDCAM_CLOCK_25MHZ 2u
 #define VGA_LCDCAM_CLOCK_25MHZ240 3u
 
 /*
@@ -61,10 +61,10 @@ typedef struct {
  * Safe to call once; a second call returns the existing framebuffer
  * without re-initialising.
  */
-bool vga_lcdcam_s3_init(const vga_lcdcam_pins_t *pins, uint8_t **fb_out);
+bool vga_lcdcam_s3_init(const vga_lcdcam_pins_t * pins, uint8_t ** fb_out);
 
 /* The live framebuffer pointer, or NULL if init has not succeeded. */
-uint8_t *vga_lcdcam_s3_framebuffer(void);
+uint8_t * vga_lcdcam_s3_framebuffer(void);
 
 /* True once the panel is running. */
 bool vga_lcdcam_s3_active(void);
@@ -72,9 +72,9 @@ bool vga_lcdcam_s3_active(void);
 void vga_lcdcam_s3_flush_region(int x1, int y1, int x2, int y2);
 void vga_lcdcam_s3_flush_all(void);
 void vga_lcdcam_s3_clear(uint8_t colour);
-void vga_lcdcam_s3_present_rgb332_2x(const uint8_t *src, int src_w, int src_h,
+void vga_lcdcam_s3_present_rgb332_2x(const uint8_t * src, int src_w, int src_h,
                                      int src_stride, int x1, int y1, int x2, int y2);
-void vga_lcdcam_s3_present_rgb332_2x_dither3(const uint8_t *src, int src_w, int src_h,
+void vga_lcdcam_s3_present_rgb332_2x_dither3(const uint8_t * src, int src_w, int src_h,
                                              int src_stride, int x1, int y1, int x2, int y2);
 
 #ifdef __cplusplus

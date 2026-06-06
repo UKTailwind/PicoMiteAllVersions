@@ -60,8 +60,8 @@ void esp32_usb_role_print_options(void) {
     MMPrintString("\r\n");
 }
 
-int esp32_usb_role_option_setter(unsigned char *cmdline) {
-    unsigned char *tp = checkstring(cmdline, (unsigned char *)"USB");
+int esp32_usb_role_option_setter(unsigned char * cmdline) {
+    unsigned char * tp = checkstring(cmdline, (unsigned char *)"USB");
     if (!tp) return 0;
     if (CurrentLinePtr) error("Invalid in a program");
 

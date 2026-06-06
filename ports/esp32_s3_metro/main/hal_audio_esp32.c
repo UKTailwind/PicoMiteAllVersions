@@ -629,11 +629,13 @@ void hal_audio_init(void) {
     s_ready = true;
 }
 
-void esp32_audio_status_string(char *out, size_t out_len) {
+void esp32_audio_status_string(char * out, size_t out_len) {
     if (!out || out_len == 0) return;
-    const char *backend = "OFF";
-    if (s_backend == AUDIO_BACKEND_I2S) backend = "I2S";
-    else if (s_backend == AUDIO_BACKEND_PDM) backend = "PDM";
+    const char * backend = "OFF";
+    if (s_backend == AUDIO_BACKEND_I2S)
+        backend = "I2S";
+    else if (s_backend == AUDIO_BACKEND_PDM)
+        backend = "PDM";
     snprintf(out, out_len,
              "%s ready=%d bclk=%d ws=%d data=%d chan=%d mode=%d en=%d write=%d "
              "wr=%u nz=%u bytes=%u playing=%d",

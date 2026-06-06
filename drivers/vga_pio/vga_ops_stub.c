@@ -18,10 +18,10 @@
 #define STUB_SCREENMODE7 35
 
 extern volatile int DISPLAY_TYPE;
-extern void *GetMemory(int msize);
-extern void FreeMemory(unsigned char *addr);
-extern void (*DrawBufferFast)(int x1, int y1, int x2, int y2, int blank, unsigned char *c);
-extern void (*ReadBufferFast)(int x1, int y1, int x2, int y2, unsigned char *c);
+extern void * GetMemory(int msize);
+extern void FreeMemory(unsigned char * addr);
+extern void (*DrawBufferFast)(int x1, int y1, int x2, int y2, int blank, unsigned char * c);
+extern void (*ReadBufferFast)(int x1, int y1, int x2, int y2, unsigned char * c);
 
 int hal_vga_ops_handle_cls(int c) {
     (void)c;
@@ -83,7 +83,7 @@ int hal_vga_ops_handle_blit_move(int x1, int y1, int x2, int y2, int w, int h) {
     if (DISPLAY_TYPE == STUB_SCREENMODE4 || DISPLAY_TYPE == STUB_SCREENMODE5 ||
         DISPLAY_TYPE == STUB_SCREENMODE6 || DISPLAY_TYPE == STUB_SCREENMODE7) {
         const int bytes_per_pixel = DISPLAY_TYPE == STUB_SCREENMODE4 ? 2 : 1;
-        unsigned char *buff = GetMemory(h * bytes_per_pixel);
+        unsigned char * buff = GetMemory(h * bytes_per_pixel);
         if (x1 >= x2) {
             while (w-- > 0) {
                 ReadBufferFast(x1, y1, x1, y1 + h - 1, buff);
@@ -133,13 +133,3 @@ volatile int ytileheight = 0;
 /* Called from Memory.c::InitHeap — no-op on non-VGA (no framebuffer
  * planes to rebind). */
 void vga_memory_init_planes(void) {}
-
-/* setmode is a VGA-only entry for switching SCREENMODE (1-5) live.
- * Draw.h extern-declares it unconditionally; Commands.c calls it from
- * cmd_new / cmd_end. Non-VGA ports don't have QVGA SCREENMODEs and
- * Option.DISPLAY_TYPE never takes a SCREENMODE value there, so the
- * stub is safely unreachable at runtime. */
-__attribute__((weak)) void setmode(int mode, bool clear) {
-    (void)mode;
-    (void)clear;
-}
