@@ -40,7 +40,8 @@
  * port-local WEB commands and HAL sources. This macro gates the legacy
  * Pico WEB compile path, so it stays disabled here. */
 #define HAL_PORT_HAS_WIFI 0
-#define HAL_PORT_HAS_GUICONTROLS 0
+#define HAL_PORT_HAS_GUICONTROLS 1
+#define HAL_PORT_GUI_MAX_CONTROLS 64
 #define HAL_PORT_KEYBOARD_USB_HOST 0
 #define HAL_PORT_HAS_I2C_KEYPAD 0
 

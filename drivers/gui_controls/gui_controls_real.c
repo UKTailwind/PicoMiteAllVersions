@@ -14,9 +14,13 @@
 #include "shared/gfx/gfx_console_shared.h"
 #include "hal/hal_gui_controls.h"
 
+#ifndef HAL_PORT_GUI_MAX_CONTROLS
+#define HAL_PORT_GUI_MAX_CONTROLS MAXCONTROLS
+#endif
+
 extern int InvokingCtrl;
 
-static struct s_ctrl CTRLS[MAXCONTROLS];
+static struct s_ctrl CTRLS[HAL_PORT_GUI_MAX_CONTROLS];
 struct s_ctrl * Ctrl = CTRLS;
 
 void hal_gui_controls_alloc_array(void) {}
@@ -45,7 +49,7 @@ int hal_gui_controls_option_set(unsigned char * cmdline) {
     if (!tp) return 0;
     getargs(&tp, 1, (unsigned char *)",");
     if (CurrentLinePtr) error("Invalid in a program");
-    Option.MaxCtrls = getint(argv[0], 0, MAXCONTROLS - 1);
+    Option.MaxCtrls = getint(argv[0], 0, HAL_PORT_GUI_MAX_CONTROLS - 1);
     if (Option.MaxCtrls) Option.MaxCtrls++;
     SaveOptions();
     _excep_code = RESET_COMMAND;
@@ -151,8 +155,11 @@ void hal_gui_controls_timer_tick(void) {
     }
 }
 
-extern void PO2Int(char * s1, int n);
-
 void hal_gui_controls_print_options(void) {
-    if (Option.MaxCtrls) PO2Int("GUI CONTROLS", Option.MaxCtrls - 1);
+    if (Option.MaxCtrls) {
+        char line[40];
+        snprintf(line, sizeof(line), "OPTION GUI CONTROLS %d\r\n",
+                 Option.MaxCtrls - 1);
+        MMPrintString(line);
+    }
 }

@@ -28,6 +28,7 @@
 #include "OptionCommands.h"
 #include "runtime/runtime.h"
 #include "vm_sys_pin.h"
+#include "hal/hal_gui_controls.h"
 #include "hal/hal_time.h"
 #include "esp32_board_profile.h"
 #include "esp32_audio_options.h"
@@ -100,6 +101,7 @@ void printoptions(void) {
     esp32_usb_role_print_options();
     esp32_audio_print_options();
     esp32_vga_print_options();
+    hal_gui_controls_print_options();
     /* PSRAM presence: the slab is set up by hal_psram_init() at boot
      * from heap_caps_aligned_alloc(MALLOC_CAP_SPIRAM). PSRAM_CS_PIN
      * is the rp2350 channel and stays at 0 on ESP32, so emit a
@@ -326,6 +328,7 @@ void cmd_option(void) {
     if (esp32_board_profile_option_setter(cmdline)) return;
     if (esp32_audio_option_setter(cmdline)) return;
     if (esp32_vga_option_setter(cmdline)) return;
+    if (hal_gui_controls_option_set(cmdline)) return;
     if (option_command_handle_common(cmdline, false)) {
         if (Option.DISPLAY_TYPE == ILI9341) Option.Refresh = 0;
         return;

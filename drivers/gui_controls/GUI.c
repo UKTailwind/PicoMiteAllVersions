@@ -2292,7 +2292,7 @@ void fun_ctrlval(void) {
     if (!Option.DISPLAY_TYPE) error("Display not configured");
     if (!Option.MaxCtrls) error("No memory allocated for GUI controls");
     if (*ep == '#') ep++;
-    r = getint(ep, 1, Option.MaxCtrls);
+    r = getint(ep, 1, Option.MaxCtrls - 1);
     if (Ctrl[r].type == 0) error("Control #% does not exist", r);
     if (Ctrl[r].type == CTRL_NBRBOX) {
         if (r == InvokingCtrl) {               // is the keypad for the number box being displayed?
@@ -2331,7 +2331,7 @@ void cmd_ctrlval(void) {
     if (HRes == 0) error("LCD Panel not configured");
     if (!Option.MaxCtrls) error("No memory allocated for GUI controls");
     if (*cmdline == '#') cmdline++;
-    r = getint(cmdline, 1, Option.MaxCtrls);
+    r = getint(cmdline, 1, Option.MaxCtrls - 1);
     if (Ctrl[r].type == 0) error("Control #% does not exist", r);
     while (*cmdline && tokenfunction(*cmdline) != op_equal) cmdline++; // search for the = symbol
     if (!*cmdline) error("Syntax");
