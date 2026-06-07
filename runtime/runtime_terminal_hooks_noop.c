@@ -7,7 +7,7 @@
  * and cmd_colour through Draw.c's framebuffer path; the terminal hooks
  * stay no-ops so that path runs. ESP32 supplies a strong override in
  * esp32_terminal.c that emits ANSI escapes instead — which is why
- * esp32_s3_metro deliberately does NOT link this TU.
+ * esp32_s3 deliberately does NOT link this TU.
  *
  * Previously duplicated as three byte-identical bodies
  * (ports/pico_sdk_common/terminal_hooks_noop.c,

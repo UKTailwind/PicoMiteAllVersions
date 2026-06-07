@@ -9,7 +9,7 @@
  *     loop + console_adapter.stdout_flush + console_adapter.telnet_putc(0,-1)
  *   ports/pico_sdk_common/pico_console.c:
  *     loop with last byte flush=1 + fflush(stdout)
- *   ports/esp32_s3_metro/main/esp32_mmbasic_console_glue.c:
+ *   ports/esp32_s3/main/esp32_mmbasic_console_glue.c:
  *     loop flush=0 + fflush(stdout)
  *   ports/pc386/pc386_runtime.c:
  *     loop flush=0, no flush (pc386_libc.c::fflush is a no-op shim)

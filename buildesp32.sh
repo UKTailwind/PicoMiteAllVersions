@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build the ESP32-S3 Metro port. This is intentionally opt-in; ESP-IDF is
+# Build the ESP32-S3 port. This is intentionally opt-in; ESP-IDF is
 # heavyweight and is not part of the default host/device build gate.
 #
 # Usage:
@@ -13,7 +13,7 @@
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")" && pwd)"
-port_dir="$root/ports/esp32_s3_metro"
+port_dir="$root/ports/esp32_s3"
 idf_path="${IDF_PATH:-$HOME/esp/esp-idf}"
 
 if [ "${SKIP_HAL_PURITY:-0}" != "1" ]; then

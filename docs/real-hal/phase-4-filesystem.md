@@ -53,3 +53,15 @@ F3 CLOSED. Promote-to-STRICT lands in the same commit as steps 14+15.
 - `tools/check_hal_purity.sh` passes for FileIO.c and `hal/hal_filesystem.h`.
 
 After 4b + 7 + 9, FileIO.c is clean; only then may Phase 11 sweep verify.
+
+## Follow-Up: BASIC Source Loading Boundary
+
+`RUN "file.bas"` should be a core source-loading workflow: parse the command in
+core, open/read through the filesystem HAL, tokenize with common BASIC
+semantics, and only delegate hardware-backed program storage or persistence
+below the HAL. ESP32-S3 currently has a tactical port-local
+`SaveProgramToFlash()` wrapper that uses the common host-load flags so
+`OPTION CONTINUATION LINES ON` works for loaded files, but the wrapper still
+exposes the wrong layering. A future cleanup should collapse that policy into
+a shared loader and leave the port with only filesystem/program-storage
+primitives.

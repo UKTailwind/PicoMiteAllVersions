@@ -10,7 +10,7 @@
  * in ports/host_native/host_runtime.c and ports/pc386/pc386_runtime.c.
  *
  * Pico (ports/pico_sdk_common/pico_console.c) and ESP32
- * (ports/esp32_s3_metro/main/esp32_mmbasic_console_glue.c) supply
+ * (ports/esp32_s3/main/esp32_mmbasic_console_glue.c) supply
  * real implementations and deliberately do not link this TU.
  *
  * docs/port-duplication-audit.md Finding 10.

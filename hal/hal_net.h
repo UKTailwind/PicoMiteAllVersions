@@ -86,7 +86,7 @@ int hal_net_wifi_scan(char * out, size_t out_len, size_t * written,
  * silent ConnectionRefused errors at the BASIC layer.
  *
  * BSD sockets: set `SO_REUSEADDR` on the socket before `bind()`
- *   (see ports/esp32_s3_metro/main/hal_net_esp32.c).
+ *   (see ports/esp32_s3/main/hal_net_esp32.c).
  * lwip raw API: set `SOF_REUSEADDR` on the pcb via `ip_set_option` before
  *   `tcp_bind` AND ensure `LWIP_SO_REUSE`/`SO_REUSE` is enabled in
  *   lwipopts (see drivers/net_lwip_raw/hal_net_lwip.c, lwipopts.h).

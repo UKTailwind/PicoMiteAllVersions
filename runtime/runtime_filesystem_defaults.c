@@ -13,7 +13,7 @@
  * Previously duplicated byte-identically in:
  *   - ports/pico_sdk_common/cmd_files_hooks.c
  *   - ports/host_native/host_runtime.c
- *   - ports/esp32_s3_metro/main/esp32_cmd_files_hooks.c
+ *   - ports/esp32_s3/main/esp32_cmd_files_hooks.c
  *
  * pc386 deliberately does NOT link this TU — it has FatFs on every
  * volume (no LFS) and uses DOS-style A:/B:/C: drive-letter routing,

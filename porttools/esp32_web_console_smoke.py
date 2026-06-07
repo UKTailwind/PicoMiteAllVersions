@@ -358,9 +358,11 @@ def websocket_smoke(host: str, port: int, timeout: float, expect_display: bool) 
                         )
             elif opcode == 0xA:
                 saw_pong = payload == b"ping"
-            if saw_hello and saw_status and saw_display and saw_pong and final_pixel_ok:
+            display_ok = saw_display or not expect_display
+            if saw_hello and saw_status and display_ok and saw_pong and final_pixel_ok:
                 break
-        if not (saw_hello and saw_status and saw_display and saw_pong and final_pixel_ok):
+        display_ok = saw_display or not expect_display
+        if not (saw_hello and saw_status and display_ok and saw_pong and final_pixel_ok):
             raise RuntimeError(
                 "missing frames: "
                 f"hello={saw_hello} status={saw_status} "

@@ -7,7 +7,7 @@
  *   MMtelnet.c              (Pico)              — buggy: drops the whole
  *                                                 TCP segment if it starts
  *                                                 with IAC
- *   ports/esp32_s3_metro/main/esp32_telnet.c     — correct 5-state machine
+ *   ports/esp32_s3/main/esp32_telnet.c           — correct 5-state machine
  *   ports/host_native/host_web.c                 — correct 5-state machine
  *
  * The shared parser implements the canonical 5-state machine

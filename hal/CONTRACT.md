@@ -109,7 +109,7 @@ MQTT client operations, and event queues.
   or restored; a backend that refuses rebind produces silent
   `ConnectionRefused` at the BASIC layer with no listener actually bound.
   - BSD socket backends: set `SO_REUSEADDR` via `setsockopt` before
-    `bind()`. See `ports/esp32_s3_metro/main/hal_net_esp32.c`.
+    `bind()`. See `ports/esp32_s3/main/hal_net_esp32.c`.
   - lwIP raw API backends: enable `LWIP_SO_REUSE`/`SO_REUSE` in `lwipopts.h`
     AND call `ip_set_option(pcb, SOF_REUSEADDR)` before `tcp_bind`. See
     `drivers/net_lwip_raw/hal_net_lwip.c`, `lwipopts.h`.

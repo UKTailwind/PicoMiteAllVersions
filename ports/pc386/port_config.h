@@ -3,7 +3,7 @@
  *
  * Inherits HAL_PORT_* defaults from ports/host_native/port_config.h via
  * a relative include (same pattern as ports/host_wasm/port_config.h
- * and ports/esp32_s3_metro/port_config.h), then overrides what differs
+ * and ports/esp32_s3/port_config.h), then overrides what differs
  * on a freestanding 32-bit x86 target.
  *
  * The kernel Makefile lists this directory before ports/host_native on

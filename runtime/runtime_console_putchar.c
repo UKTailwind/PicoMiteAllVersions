@@ -3,7 +3,7 @@
  *
  * Previously duplicated in four places: runtime/runtime_console.c,
  * ports/pico_sdk_common/pico_console.c, ports/pc386/pc386_runtime.c, and
- * ports/esp32_s3_metro/main/esp32_mmbasic_console_glue.c. All four copies
+ * ports/esp32_s3/main/esp32_mmbasic_console_glue.c. All four copies
  * had byte-identical bodies (`putConsole(c, flush)` + MMCharPos tracking).
  * Consolidated per docs/port-duplication-audit.md Finding 1 — partial:
  * MMPrintString / SSPrintString remain per-port because each port's

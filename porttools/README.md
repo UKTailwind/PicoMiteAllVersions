@@ -199,8 +199,8 @@ Implemented checks:
   strings, arrays, `SUB`/`FUNCTION`, `SELECT CASE`, `DATA`/`READ`/`RESTORE`,
   VM-side file I/O, and a Sieve of Eratosthenes benchmark that verifies 168
   primes up to 1000.
-- `gpio`: safe Metro checks on GP13 DOUT/DIN and GP1 ARAW, then verifies
-  current `SETPIN ..., PWM` and `SERVO` unsupported errors remain explicit.
+- `gpio`: probes a conservative board-safe GPIO candidate for DOUT/DIN/ARAW,
+  then verifies current `SETPIN ..., PWM` and `SERVO` unsupported errors remain explicit.
 - `flash`: opt-in flash-slot persistence using `FLASH ERASE`, `FLASH SAVE`,
   RTS reset/resync, `FLASH LOAD`, `RUN`, `FLASH RUN`, and slot cleanup.
   `VAR SAVE`/`VAR RESTORE` is additionally gated by `--var-save` because it

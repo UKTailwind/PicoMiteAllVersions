@@ -70,6 +70,14 @@ VGA, HDMI, and DVI-WiFi aligned.
    and WebRP2350/PicoCalc SPI-LCD FASTGFX behavior. A source-only clean build is
    not sufficient.
 
+8. **Display availability comes from drivers, not port-family names.**
+   A loaded/linked display driver should register its operation table and
+   capability bits during display init. Shared code should ask those capability
+   bits questions such as "has scanout", "has BASIC screen modes", "has
+   framebuffer copy", or "has VGA-style timing", rather than checking a broad
+   port-family macro. `HAL_PORT_IS_VGA` is a legacy family discriminator, not a
+   safe name for "this board has a VGA connector".
+
 ## Current Structure
 
 ### Source Inclusion Matrix
@@ -342,12 +350,21 @@ pattern exists in the VGA/HDMI display family.
 - Split QVGA, HDMI/DVI, and RP2350-only acceleration where source inclusion
   can express the difference.
 - Keep local controller/timing details inside the selected driver files.
+- Replace `HAL_PORT_IS_VGA` call sites with explicit display-driver
+  capabilities. At minimum split the legacy meaning into separate capabilities:
+  VGA-family scanout, Pico PIO VGA implementation, BASIC screen-mode support,
+  QVGA/tile-array layout, and absence/presence of SPI-LCD/touch option storage.
+- Rename or retire `HAL_PORT_IS_VGA` once those uses are drained. The current
+  name is misleading for ports such as ESP32-S3 LCD_CAM VGA, where a VGA output
+  exists but the Pico PIO VGA assumptions do not.
 
 Exit criteria:
 
 - VGA/HDMI source lists express scanout family selection.
 - Remaining gates, if any, are documented as local driver implementation
   details rather than HAL-boundary decisions.
+- Shared display code uses driver capability bits or hooks rather than
+  `HAL_PORT_IS_VGA` to decide behavior.
 
 ### Phase 5: Tooling and Regression Gates
 

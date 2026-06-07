@@ -22,7 +22,7 @@
  * ESP32 also does NOT link this TU — its body adds an autorun
  * early-return ahead of the longjmp (LOAD "file",R needs nextstmt to
  * stay at ProgMemory so the freshly-loaded program runs). That
- * override lives in ports/esp32_s3_metro/main/esp32_peripheral_stubs.c.
+ * override lives in ports/esp32_s3/main/esp32_peripheral_stubs.c.
  *
  * docs/port-duplication-audit.md Finding 9.
  */

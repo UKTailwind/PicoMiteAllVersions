@@ -2,7 +2,7 @@
  * hal/generic/hal_watchdog_noop.c — no-op watchdog impl.
  *
  * Linked by every port that has no hardware watchdog timer to manage:
- * host_native, mmbasic_stdio, esp32_s3_metro, pc386. The Pico SDK ports
+ * host_native, mmbasic_stdio, esp32_s3, pc386. The Pico SDK ports
  * have their own real impl in ports/pico_sdk_common/.
  *
  * Don't add behavior here — if a future port needs a real watchdog,

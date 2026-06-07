@@ -149,10 +149,10 @@ shopt -u nullglob
 # macro, but must not grow target-macro gates for other ports or inherit
 # host_native runtime/peripheral sources or header paths again.
 shopt -s nullglob
-ESP32_MAIN_C_FILES=(ports/esp32_s3_metro/main/*.c)
+ESP32_MAIN_C_FILES=(ports/esp32_s3/main/*.c)
 shopt -u nullglob
-ESP32_CMAKE=ports/esp32_s3_metro/main/CMakeLists.txt
-ESP32_PLATFORM=ports/esp32_s3_metro/main/esp32_platform.h
+ESP32_CMAKE=ports/esp32_s3/main/CMakeLists.txt
+ESP32_PLATFORM=ports/esp32_s3/main/esp32_platform.h
 
 # Files tracked informationally (report counts, do not fail).
 INFO_FILES=(

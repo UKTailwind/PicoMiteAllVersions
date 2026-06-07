@@ -165,6 +165,13 @@ def build_cases() -> list[Case]:
     add("tab_function", 'PRINT TAB(10);"AT10"',
         r"AT10", no_error_check)
 
+    # --- Pixel-positioned PRINT ---------------------------------------------
+    # The PicoMite manual documents PRINT @(x,y) for cursor positioning in
+    # pixels; there is no LOCATE command in this command set.
+    add("print_at_position",
+        ['CLS', 'PRINT @(0, MM.INFO(FONTHEIGHT)) "PRINT_AT_OK"'],
+        r"PRINT_AT_OK", no_error_check)
+
     # --- CLS roundtrip ----------------------------------------------------
     # CLS clears, then a subsequent PRINT must still work.
     add("cls_then_print",

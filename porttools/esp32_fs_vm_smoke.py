@@ -198,7 +198,7 @@ class Esp32Smoke:
         self.write_program(path, fs_program(self.drive, self.prefix))
         self.run_program(f'RUN "{path}"', "ESP32_FS_SMOKE_OK", timeout=self.long_timeout)
         self.pass_check(
-            "A: filesystem and BASIC file I/O",
+            f"{self.drive} filesystem and BASIC file I/O",
             "mkdir/chdir/open/read/write/append/copy/rename/dir/kill/rmdir/errors",
         )
 
@@ -294,33 +294,50 @@ class Esp32Smoke:
         self.basic.reset_app()
         self.basic.sync(timeout=self.long_timeout, boot_wait=max(self.boot_wait, 1.0))
 
+    def find_setpin_candidate(self, mode: str, candidates: Sequence[str], options: str = "") -> str:
+        suffix = f", {options}" if options else ""
+        last = ""
+        for pin in candidates:
+            self.command(f"SETPIN {pin}, OFF", check_error=False)
+            result = self.command(f"SETPIN {pin}, {mode}{suffix}", check_error=False)
+            last = result
+            if "Error :" not in result and "Error:" not in result:
+                return pin
+        detail = " ".join(line.strip() for line in last.splitlines() if line.strip())
+        raise RuntimeError(f"no usable GPIO candidate for SETPIN {mode}; last={detail}")
+
     def gpio_smoke(self) -> None:
         print("=== gpio ===", flush=True)
-        self.command("SETPIN GP13, DOUT")
-        self.command("PIN(GP13)=1")
-        high = self.command('PRINT "ESP32_GP13_HIGH=" + STR$(PIN(GP13))')
-        self.command("PIN(GP13)=0")
-        low = self.command('PRINT "ESP32_GP13_LOW=" + STR$(PIN(GP13))')
-        if marker_int(high, "ESP32_GP13_HIGH=") != 1 or marker_int(low, "ESP32_GP13_LOW=") != 0:
-            raise RuntimeError("GP13 DOUT latch readback failed")
-        self.command("SETPIN GP13, DIN, PULLUP")
-        din = self.command('PRINT "ESP32_GP13_DIN=" + STR$(PIN(GP13))')
-        if "ESP32_GP13_DIN=" not in din:
-            raise RuntimeError("GP13 DIN readback did not produce a marker")
-        self.command("SETPIN GP1, ARAW")
-        araw = self.command('PRINT "ESP32_GP1_ARAW=" + STR$(PIN(GP1))')
-        value = marker_int(araw, "ESP32_GP1_ARAW=")
+        safe_digital = ("GP2", "GP3", "GP9", "GP14", "GP21", "GP35", "GP36", "GP37")
+        safe_analog = ("GP2", "GP3", "GP9", "GP14")
+        dout_pin = self.find_setpin_candidate("DOUT", safe_digital)
+        self.command(f"PIN({dout_pin})=1")
+        high = self.command(f'PRINT "ESP32_DOUT_HIGH=" + STR$(PIN({dout_pin}))')
+        self.command(f"PIN({dout_pin})=0")
+        low = self.command(f'PRINT "ESP32_DOUT_LOW=" + STR$(PIN({dout_pin}))')
+        if marker_int(high, "ESP32_DOUT_HIGH=") != 1 or marker_int(low, "ESP32_DOUT_LOW=") != 0:
+            raise RuntimeError(f"{dout_pin} DOUT latch readback failed")
+        din_pin = self.find_setpin_candidate("DIN", safe_digital, "PULLUP")
+        din = self.command(f'PRINT "ESP32_DIN=" + STR$(PIN({din_pin}))')
+        if "ESP32_DIN=" not in din:
+            raise RuntimeError(f"{din_pin} DIN readback did not produce a marker")
+        araw_pin = self.find_setpin_candidate("ARAW", safe_analog)
+        araw = self.command(f'PRINT "ESP32_ARAW=" + STR$(PIN({araw_pin}))')
+        value = marker_int(araw, "ESP32_ARAW=")
         if value < 0 or value > 65535:
-            raise RuntimeError(f"GP1 ARAW read out of range: {value}")
-        pwm = self.command("SETPIN GP13, PWM", check_error=False)
+            raise RuntimeError(f"{araw_pin} ARAW read out of range: {value}")
+        self.command(f"SETPIN {dout_pin}, OFF", check_error=False)
+        pwm = self.command(f"SETPIN {dout_pin}, PWM", check_error=False)
         if "PWM not supported on this port yet" not in pwm:
             raise RuntimeError("SETPIN PWM did not report the expected unsupported error")
         servo = self.command("SERVO 0, 50", check_error=False)
         if "Servo not supported on this port yet" not in servo:
             raise RuntimeError("SERVO did not report the expected unsupported error")
-        self.command("SETPIN GP13, OFF", check_error=False)
-        self.command("SETPIN GP1, OFF", check_error=False)
-        self.pass_check("GPIO DOUT/DIN/ARAW and unsupported PWM/SERVO", "GP13, GP1")
+        self.command(f"SETPIN {dout_pin}, OFF", check_error=False)
+        self.command(f"SETPIN {din_pin}, OFF", check_error=False)
+        self.command(f"SETPIN {araw_pin}, OFF", check_error=False)
+        self.pass_check("GPIO DOUT/DIN/ARAW and unsupported PWM/SERVO",
+                        f"{dout_pin}, {din_pin}, {araw_pin}")
 
     def ws2812_smoke(self) -> None:
         print("=== ws2812 ===", flush=True)

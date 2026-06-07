@@ -58,7 +58,7 @@ in `port_sources.cmake` and reflects an axis orthogonal to chip family.
 | `HAL_PORT_KEYBOARD_USB_HOST` *(renamed)* | USB-host vs PS/2-matrix keyboard backend |
 | `HAL_PORT_HAS_WIFI` | CYW43 + lwIP stack vs no networking |
 | `HAL_PORT_HAS_HDMI` | HSTX HDMI scanout vs VGA-PIO scanout (within VGA family) |
-| `HAL_PORT_IS_VGA` | VGA-family discriminator (covers VGA-PIO + HDMI + DVI) |
+| `HAL_PORT_IS_VGA` | Provisional legacy VGA-family discriminator only. It currently covers VGA-PIO + HDMI + DVI and is badly named for non-Pico VGA implementations. Drain it into display-driver capability bits before treating new VGA backends as "VGA" ports. |
 | `HAL_PORT_HAS_I2C_KEYPAD` | PicoCalc keypad-MCU axis |
 | `HAL_PORT_HAS_GUICONTROLS` | GUI widget suite (rp2350 only by RAM budget) |
 | `HAL_PORT_HAS_MP3` | MP3 decoder (rp2350 only by RAM/CPU budget) |
@@ -98,6 +98,18 @@ in `port_sources.cmake` and reflects an axis orthogonal to chip family.
    stubs).
 2. Delete the macro.
 
-After all four sub-batches: **17 → 7 macros**, all of which earn their
-keep. port_config.h files shrink by ~50%. The "is this PicoMite" naming
-embarrassment is gone.
+**Batch 19e — drain `HAL_PORT_IS_VGA` into display capabilities**:
+
+1. Audit every `HAL_PORT_IS_VGA` site and classify whether it really means
+   VGA-family scanout, Pico PIO VGA implementation, BASIC screen modes,
+   QVGA/tile-array layout, HDMI/DVI sharing, or non-SPI-LCD option storage.
+2. Add a display-driver capability surface populated by the linked/initialized
+   display backend.
+3. Replace shared code checks with capability queries or operation hooks.
+4. Rename any remaining narrow build-time selector to the exact thing it means,
+   or delete it if source-list composition already expresses the choice.
+
+After batches 19a through 19d: **17 → 7 macros**. After 19e, the remaining
+display macros better match the actual driver capabilities instead of the
+legacy VGA-family bucket. port_config.h files shrink by ~50%. The "is this
+PicoMite" naming embarrassment is gone.

@@ -575,6 +575,18 @@ Initial flags:
 Keep Pico `SaveProgramToFlash()` in place for now, but have non-device ports
 stop carrying private tokenization copies.
 
+### Follow-Up: Source-Load Policy Boundary
+
+ESP32-S3 exposed a remaining source-loader policy leak: its port-local
+`SaveProgramToFlash()` wrapper selected the batch-load flags, so `RUN
+"file.bas"` ignored `OPTION CONTINUATION LINES ON`. The immediate ESP32 fix is
+to use the common host-load flags, but the port should not choose BASIC source
+semantics at all. Future cleanup should replace port-local source-load policy
+selection with a common `RUN`/`LOAD` source-load function: parse the command in
+core, open/read through the filesystem HAL, tokenize and apply continuation
+rules in core, then call a narrow program-storage/persistence primitive only
+for the hardware-backed part.
+
 Validation:
 
 ```sh

@@ -13,7 +13,7 @@
 #      mounts it as A:. B: is reserved for a second floppy if attached.
 #
 # Both populated from the shared MMBasic demo set vendored under
-# ports/esp32_s3_metro/main/demos/ — same hello/fizzbuzz/mand/sieve
+# ports/esp32_s3/main/demos/ — same hello/fizzbuzz/mand/sieve
 # corpus as the ESP32 port.
 #
 # Re-running refreshes the boot/helper images from scratch, but preserves an
@@ -43,7 +43,7 @@ A_IMG="$DISK_DIR/a.img"
 C_IMG="$DISK_DIR/c.img"
 DIRECT_C_IMG="$DISK_DIR/c-direct.img"
 F_IMG="$DISK_DIR/pc386-floppy.img"
-DEMOS_DIR="$REPO_ROOT/ports/esp32_s3_metro/main/demos"
+DEMOS_DIR="$REPO_ROOT/ports/esp32_s3/main/demos"
 MAND_MENU_SRC="$REPO_ROOT/demos/bench/mand.bas"
 PICO_BLOCKS_PC386_SRC="$PORT_DIR/demos/pico_blocks_20fps.bas"
 PICO_VADERS_SRC="$REPO_ROOT/ports/host_wasm/demos/Picovaders.bas"

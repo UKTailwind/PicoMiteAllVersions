@@ -1,10 +1,11 @@
-# ESP32-S3 Board Profile Plan: Metro + Freenove ILI9341
+# ESP32-S3 Board Profile Plan: Generic Port + Board Profiles
 
 ## Goal
 
-Build one ESP32-S3 port that keeps the existing Adafruit Metro ESP32-S3 support
-and adds Freenove FNK0104A/B 2.8 inch ILI9341 Display support through a board
-profile layer.
+Build one ESP32-S3 port that boots sanely over USB Serial/JTAG on ordinary
+ESP32-S3 hardware, keeps the existing Adafruit Metro ESP32-S3 support as a board
+profile, and adds Freenove FNK0104A/B 2.8 inch ILI9341 Display support as
+another board profile.
 
 The shared ESP32-S3 runtime should remain common:
 
@@ -17,6 +18,10 @@ The shared ESP32-S3 runtime should remain common:
 - Shared audio synth/decoder path, with board-specific I2S wiring.
 - Future local LCD support selected by board profile and `OPTION` state, not by
   forking the ESP32-S3 port.
+- A generic serial-first profile that does not assume board peripherals. On
+  unknown ESP32-S3 boards it should still boot, expose the REPL, mount `A:`,
+  and allow WiFi configuration without touching SD, LCD, touch, audio, or LED
+  pins.
 
 ## Source Facts
 
@@ -39,20 +44,43 @@ ILI9341 variants first:
 The ST77922 and 4.0 inch ST7796 variants should be later board profiles because
 their display and pin shape differs.
 
-## Board Profiles
+## Port And Board Profiles
 
-Add a profile selector to the existing `ports/esp32_s3_metro` ESP-IDF project:
+Rename the ESP32-S3 port directory away from the Metro board name:
 
-```sh
-idf.py -DMMBASIC_ESP32_BOARD=metro build
-idf.py -DMMBASIC_ESP32_BOARD=freenove_ili9341 build
+```text
+ports/esp32_s3_metro -> ports/esp32_s3
 ```
 
-Keep `metro` as the default so current builds do not change.
+The port name should describe the MCU family, not the first board used for
+bring-up. Board behavior belongs in board profiles.
 
-Create `ports/esp32_s3_metro/esp32_board_profile.h` with profile macros for:
+Build one ESP32-S3 firmware image. Do not create separate Metro and Freenove
+firmware builds. The firmware should include a small board-profile table and
+boot with conservative generic defaults until the user selects a profile from
+MMBasic.
+
+Use the existing MMBasic configuration surface:
+
+```basic
+CONFIGURE LIST
+CONFIGURE METRO
+CONFIGURE FREENOVE ILI9341
+```
+
+`CONFIGURE <profile>` is already an alias for `OPTION RESET <profile>` in the
+shared command surface. The ESP32-S3 port should implement
+`port_print_supported_boards()` and `port_factory_reset_board()` so this works
+the same way as existing Pico/VGA factory profiles.
+
+Use generic as the reset/default profile. The default must be conservative:
+serial REPL, `A:`, and WiFi only. It should not claim board-specific SD, LCD,
+touch, audio, or LED pins. `OPTION RESET` returns to this generic profile.
+
+Create `ports/esp32_s3/esp32_board_profile.h` with profile macros for:
 
 - Human-readable profile/device name.
+- Stable profile id used by persisted options and driver lookup.
 - Board-owned SD socket pins.
 - Board-owned LCD pins.
 - Touch controller pins.
@@ -60,11 +88,31 @@ Create `ports/esp32_s3_metro/esp32_board_profile.h` with profile macros for:
 - WS2812 / LED pins if needed.
 - Pins that should be hidden or reserved from BASIC GPIO use while onboard
   peripherals are enabled.
+- Whether each onboard peripheral exists at all on the selected profile.
 
-Avoid duplicating the whole port. If the directory name becomes misleading, do a
-separate low-risk rename later after both profiles build.
+Avoid duplicating the whole port. The selected board profile should provide
+constants and optional peripheral setup data at runtime; it should not clone the
+ESP32-S3 runtime or require a different firmware build.
 
 ## Pin Matrix
+
+### Generic ESP32-S3
+
+The generic profile is intentionally sparse.
+
+| Peripheral | Default |
+|---|---|
+| Console | USB Serial/JTAG |
+| `A:` | LittleFS |
+| `B:` | disabled until a board profile supplies SD pins/backend |
+| WiFi | enabled |
+| LCD | disabled |
+| Touch | disabled |
+| Audio | off unless user configures generic audio pins explicitly |
+| Onboard LED / RGB | disabled unless a profile supplies a pin |
+
+Acceptance for unknown ESP32-S3 hardware: firmware boots to the REPL without
+requiring SD, LCD, audio, touch, or board LED wiring.
 
 ### Metro
 
@@ -146,21 +194,38 @@ The touch controller and ES8311 share the same I2C pins on Freenove ILI9341.
 
 ### Phase 1: Board Profile Scaffold
 
-- Add `MMBASIC_ESP32_BOARD` CMake cache variable.
-- Default to `metro`.
-- Generate one compile definition:
-  - `MMBASIC_ESP32_BOARD_METRO=1`
-  - `MMBASIC_ESP32_BOARD_FREENOVE_ILI9341=1`
+- Rename `ports/esp32_s3_metro` to `ports/esp32_s3`.
+- Rename build output and CI artifact names away from `metro` where they refer
+  to the port.
 - Add `esp32_board_profile.h`.
-- Move current Metro SD and audio defaults into the Metro profile.
+- Add one compiled board-profile table containing generic, Metro, and Freenove
+  ILI9341 entries.
+- Add `port_set_default_options()` generic defaults: USB Serial/JTAG REPL,
+  `A:`, WiFi-capable, no board-owned peripheral pins.
+- Add `port_print_supported_boards()` entries for:
+  - `GENERIC`
+  - `METRO`
+  - `FREENOVE ILI9341`
+- Add `port_factory_reset_board()` support for `METRO` and `FREENOVE ILI9341`
+  using the existing `CONFIGURE <profile>` / `OPTION RESET <profile>` path.
+- Store the selected profile in persisted options using a stable id, not by
+  guessing from pin numbers. Keep `Option.platform` as the human-readable name
+  if that remains the local convention.
+- Move current Metro SD and audio defaults into the Metro factory profile.
+- Add a generic profile with no board-owned SD/LCD/touch/audio pins.
 - Add Freenove ILI9341 profile constants.
 - Update `HAL_PORT_DEVICE_NAME` and banner/profile strings from the selected
   profile.
 
 Acceptance:
 
-- `metro` build produces the same defaults as before.
-- `freenove_ili9341` build compiles with board-specific constants.
+- Single ESP32-S3 build boots as generic ESP32-S3 over USB Serial/JTAG.
+- Generic defaults expose the REPL, `A:`, and WiFi without requiring known board
+  peripherals.
+- `CONFIGURE LIST` shows generic, Metro, and Freenove profiles.
+- `CONFIGURE METRO` produces the same defaults as the current Metro build.
+- `CONFIGURE FREENOVE ILI9341` applies Freenove board-specific constants.
+- `OPTION RESET` returns to generic board defaults.
 - No local display or audio behavior changes yet.
 
 ### Phase 2: SD `B:` Drive
@@ -177,6 +242,7 @@ Acceptance:
 
 Acceptance:
 
+- Generic profile leaves `B:` disabled or reports it unsupported cleanly.
 - Metro `B:` still mounts on current hardware.
 - Freenove `B:` mounts and passes:
   - `FILES "B:"`
@@ -197,6 +263,8 @@ Acceptance:
 
 Acceptance:
 
+- Generic profile leaves keyboard behavior serial-first and does not claim
+  keyboard pins.
 - Existing keyboard behavior is unchanged for Metro.
 - Freenove profile does not reserve or consume keyboard pins accidentally.
 - If keyboard is attached, console input works before display integration.
@@ -215,7 +283,8 @@ Acceptance:
 - `OPTION WIFI ...`
 - `WEB CONNECT`
 - `PRINT MM.INFO$(IP ADDRESS)`
-- Existing network conformance smoke still passes on Metro and Freenove.
+- Existing network conformance smoke still passes with generic defaults and
+  after `CONFIGURE METRO` / `CONFIGURE FREENOVE ILI9341`.
 
 ### Phase 5: ILI9341 Display
 
@@ -251,7 +320,8 @@ Acceptance:
 - `CLS`, `TEXT`, `LINE`, `BOX`, `PIXEL`, `COLOUR` render correctly.
 - Web console framebuffer remains available and does not conflict with the
   local LCD.
-- Metro remains serial/web-console only unless a display profile is selected.
+- Generic and Metro remain serial/web-console only unless a display profile is
+  selected.
 
 ### Phase 6: Touch
 
@@ -297,8 +367,9 @@ Implementation:
   existing ESP32 audio backend. The Freenove driver should only provide setup
   and pin/config data.
 - Add a compiled profile table selected by board config/source list:
-  - Metro profile table has no `FREENOVE` entry.
-  - Freenove ILI9341 profile table includes `FREENOVE`.
+  - Generic profile has no board-specific audio profile entries.
+  - Metro profile has no `FREENOVE` entry.
+  - Freenove ILI9341 profile includes `FREENOVE`.
 - Avoid runtime board checks such as `if (board == freenove)` in the main audio
   backend. The main backend asks the selected audio profile for hooks and pin
   configuration.
@@ -334,6 +405,8 @@ Acceptance:
 - `OPTION AUDIO FREENOVE` followed by `PLAY TONE`, `PLAY SOUND`, and file
   playback produces audio on the Freenove speaker output.
 - `OPTION AUDIO I2S ...` remains generic and does not initialize ES8311.
+- Generic ESP32-S3 profile audio remains off unless configured by explicit generic
+  audio options.
 - Metro external-I2S/PDM behavior is unchanged.
 - `MM.INFO$(AUDIO)` distinguishes `FREENOVE`, `I2S`, `PDM`, and `OFF`.
 - `OPTION AUDIO DISABLE` does not initialize ES8311 and releases or avoids
@@ -361,16 +434,33 @@ Acceptance:
 - `MM.INFO$(PIN GPn)` or equivalent reports a useful owner state if the current
   pin state machinery supports it.
 
-## Build And Smoke Matrix
+## Build And Configuration Smoke Matrix
 
-### Metro
+There should be one firmware build:
 
 ```sh
-idf.py -DMMBASIC_ESP32_BOARD=metro build
+idf.py build
 ```
+
+The matrix below is a runtime configuration smoke matrix for that one image.
+
+### Generic ESP32-S3 Defaults
 
 Smoke:
 
+- Boot banner and USB REPL.
+- `PRINT MM.VER`
+- `FILES "A:"`
+- `FILES "B:"` fails cleanly or reports unavailable.
+- WiFi scan/join if antenna/hardware allows normal ESP32-S3 WiFi operation.
+- No SD/LCD/touch/audio pins are reserved by default.
+
+### Metro
+
+Smoke:
+
+- `CONFIGURE METRO`
+- Reboot into Metro profile.
 - Boot banner and REPL.
 - `PRINT MM.VER`
 - `FILES "A:"`
@@ -380,19 +470,17 @@ Smoke:
 
 ### Freenove ILI9341
 
-```sh
-idf.py -DMMBASIC_ESP32_BOARD=freenove_ili9341 build
-```
-
 Smoke order:
 
-1. Boot banner and USB REPL.
-2. `FILES "A:"`.
-3. SD `B:` mount over SDSPI.
-4. WiFi join and `MM.INFO$(IP ADDRESS)`.
-5. LCD clear/text/graphics.
-6. Audio tone through onboard speaker output.
-7. Touch read, if FNK0104B.
+1. `CONFIGURE FREENOVE ILI9341`.
+2. Reboot into Freenove profile.
+3. Boot banner and USB REPL.
+4. `FILES "A:"`.
+5. SD `B:` mount over SDSPI.
+6. WiFi join and `MM.INFO$(IP ADDRESS)`.
+7. LCD clear/text/graphics.
+8. Audio tone through onboard speaker output.
+9. Touch read, if FNK0104B.
 
 ## Open Questions
 
@@ -407,14 +495,21 @@ Smoke order:
   gain and leave user volume in the existing software path?
 - Should the Freenove display auto-enable as console on first boot, or should it
   require an `OPTION LCDPANEL` command?
-- Should the ESP32-S3 port directory be renamed after profiles land?
+- Should CI publish one generic ESP32-S3 image only, or also include generated
+  helper text showing the `CONFIGURE` commands for supported boards?
 
 ## Recommended First PR
 
 Keep the first PR small:
 
-- Add board profile selector and profile header.
-- Move Metro SD/audio constants into profile macros.
+- Rename the port directory and build target from Metro-specific naming to
+  generic ESP32-S3 naming.
+- Add the board profile table and profile header.
+- Add the conservative generic default profile.
+- Add `CONFIGURE LIST`, `CONFIGURE METRO`, and
+  `CONFIGURE FREENOVE ILI9341` through `port_print_supported_boards()` and
+  `port_factory_reset_board()`.
+- Move Metro SD/audio constants into the Metro runtime profile.
 - Add Freenove ILI9341 constants.
 - Make SD backend use profile pins in SDSPI mode.
 - Make default I2S WS use profile macro rather than `BCLK+1`.
@@ -424,4 +519,4 @@ Keep the first PR small:
 
 Do not include LCD rendering, FT6336U, or the full ES8311 register driver in
 that first PR. Those should follow once the profile split is proven by clean
-Metro and Freenove builds.
+generic, Metro, and Freenove builds.

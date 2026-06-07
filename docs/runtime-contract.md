@@ -39,6 +39,17 @@ local implementations.
 | `CallCFunction`, `CallExecuteProgram` | runtime adapter operation | `host_runtime.c`, `esp32_runtime.c`, `pc386_runtime.c`; Pico references real device implementations outside this set | CFunction/editor execution trampoline surface. ESP32/host/PC386 are no-op shims. |
 | `mmbasic_timegm`, `mmbasic_gmtime`, `timegm` | obsolete shim | `host_runtime.c`, `esp32_compat.c`, `pc386_runtime.c` | Time ABI compatibility around `host_platform.h` macro renames and libc differences. |
 
+### Source-Load TODO
+
+`SaveProgramToFlash()` remains an abstraction leak: non-Pico ports still choose
+source-tokenizer policy flags inside port files even though continuation-line
+handling, tokenization, and `RUN "file.bas"` semantics are core BASIC behavior.
+ESP32-S3 temporarily uses the common host-load flags so `OPTION CONTINUATION
+LINES ON` works for loaded files. The long-term shape should be a common
+`RUN`/`LOAD` source-load function that opens and reads through the filesystem
+HAL, tokenizes in core, and delegates only program-memory backing or persistence
+to a narrow HAL/port primitive.
+
 ## Pico SDK Firmware Runtime Split
 
 `PicoMite.c` now holds Pico global backing storage and declarations. Pico
