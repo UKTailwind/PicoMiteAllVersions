@@ -110,6 +110,13 @@ static int slot_vartbl_entry_matches(int vi, BCSlot * slot, int require_array) {
     return (nlen >= MAXVARLEN || v->name[nlen] == 0);
 }
 
+static int sync_find_existing_slot(BCSlot * slot, int require_array) {
+    for (int vi = 0; vi < MAXVARS; vi++) {
+        if (slot_vartbl_entry_matches(vi, slot, require_array)) return vi;
+    }
+    return -1;
+}
+
 static int sync_resolve_scalar_slot(uint16_t i, BCSlot * slot, unsigned char * namebuf) {
     if (!slot_map_initialized ||
         !slot_vartbl_entry_matches(slot_to_vartbl[i], slot, 0)) {
@@ -268,10 +275,10 @@ static void sync_mmbasic_to_vm(BCVMState * vm) {
         BCSlot * slot = &cs->slots[i];
         if (slot_name_len_checked(slot->name, 0) < 0) continue;
         if (vm->arrays[i].data) continue; /* arrays handled separately below */
-        if (slot_to_vartbl[i] < 0) continue;
-        if (!slot_vartbl_entry_matches(slot_to_vartbl[i], slot, 0)) {
-            slot_to_vartbl[i] = -1;
-            continue;
+        if (slot_to_vartbl[i] < 0 ||
+            !slot_vartbl_entry_matches(slot_to_vartbl[i], slot, 0)) {
+            slot_to_vartbl[i] = sync_find_existing_slot(slot, 0);
+            if (slot_to_vartbl[i] < 0) continue;
         }
 
         struct s_vartbl * v = &g_vartbl[slot_to_vartbl[i]];
