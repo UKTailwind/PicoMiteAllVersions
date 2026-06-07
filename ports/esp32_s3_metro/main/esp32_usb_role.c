@@ -66,17 +66,6 @@ int esp32_usb_role_option_setter(unsigned char * cmdline) {
     if (!tp) return 0;
     if (CurrentLinePtr) error("Invalid in a program");
 
-    if (checkstring(tp, (unsigned char *)"STATUS")) {
-        extern void esp32_usb_keyboard_print_status(void);
-        MMPrintString("Saved USB role: ");
-        MMPrintString(ESP32_OPTION_USB_ROLE == USB_ROLE_KEYBOARD ? "KEYBOARD\r\n" : "SERIAL\r\n");
-        MMPrintString("Effective USB role: ");
-        MMPrintString(esp32_usb_role_is_keyboard() ? "KEYBOARD\r\n" : "SERIAL\r\n");
-        if (s_forced_serial) MMPrintString("BOOT forced serial for this boot\r\n");
-        esp32_usb_keyboard_print_status();
-        return 1;
-    }
-
     int role = -1;
     if (checkstring(tp, (unsigned char *)"SERIAL")) {
         role = USB_ROLE_SERIAL;

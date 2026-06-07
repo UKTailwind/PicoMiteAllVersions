@@ -37,7 +37,6 @@ extern int esp32_usb_role_is_keyboard(void);
 extern void esp32_usb_role_prepare_keyboard_host(void);
 extern void esp32_usb_keyboard_start_host(void);
 extern int esp32_usb_keyboard_has_keyboard(void);
-extern void esp32_usb_keyboard_print_status(void);
 
 static const char * TAG = "app_main";
 
@@ -73,7 +72,6 @@ static int esp32_saved_options_valid(const char ** reason) {
 static void esp32_keyboard_mode_recovery(void) {
     if (!esp32_usb_role_is_keyboard()) return;
 
-    esp32_usb_keyboard_print_status();
     for (int i = 0; i < 100; i++) {
         if (esp32_usb_keyboard_has_keyboard()) {
             MMPrintString("USB keyboard attached\r\n\r\n");
@@ -83,7 +81,6 @@ static void esp32_keyboard_mode_recovery(void) {
     }
 
     MMPrintString("\r\nUSB keyboard not enumerated yet; staying in USB KEYBOARD mode\r\n");
-    esp32_usb_keyboard_print_status();
 }
 
 void app_main(void) {
@@ -123,10 +120,6 @@ void app_main(void) {
             vTaskDelay(pdMS_TO_TICKS(200));
         }
         printf("\n");
-    } else if (esp32_usb_role_is_keyboard()) {
-        /* USB host startup is done after VGA is alive. Starting it here
-         * leaves keyboard-mode boots with no local diagnostics if host
-         * setup interferes with display bring-up. */
     }
 
     extern short gui_font_width, gui_font_height;
@@ -159,16 +152,13 @@ void app_main(void) {
     ClearRuntime(true);
     (void)esp32_web_console_display_init();
 
-    /* Bring up VGA before USB host, Wi-Fi, and LittleFS. In keyboard mode
-     * this is the only guaranteed local diagnostic path. */
+    /* Bring up VGA before USB host, Wi-Fi, and LittleFS. */
     extern void esp32_vga_display_init(void);
     esp32_vga_display_init();
 
     if (esp32_usb_role_is_keyboard()) {
-        MMPrintString("USB KEYBOARD MODE: starting host\r\n");
         esp32_usb_role_prepare_keyboard_host();
         esp32_usb_keyboard_start_host();
-        MMPrintString("USB KEYBOARD MODE: raw HID probe active\r\n");
         esp32_keyboard_mode_recovery();
     }
 

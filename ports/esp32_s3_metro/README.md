@@ -124,7 +124,6 @@ Changing the USB role saves the option and reboots. `LIST OPTIONS` prints the sa
 ```basic
 OPTION USB SERIAL
 OPTION USB KEYBOARD
-OPTION USB STATUS
 ```
 
 In keyboard mode, connect a USB keyboard to the Metro USB-C port through a suitable host cable or adapter. Local VGA remains the display console. Key repeat uses the standard MMBasic default timing: 600 ms before repeat starts, then 150 ms between repeated keys.
@@ -258,7 +257,7 @@ Host-side smoke tooling lives in [`../../porttools`](../../porttools/README.md).
 Use `basic_serial.py` for prompt-driven command checks and
 `esp32_fs_vm_smoke.py` for the Stage G0 device smoke suite. The network suite
 chains to `network_conformance.py`; `esp32_tcp_smoke.py` remains available for
-narrow TCP client request/stream debugging.
+narrow TCP client request/stream checks.
 
 Known-good quick checks:
 
