@@ -174,6 +174,19 @@ bool option_command_handle_common(unsigned char * cmdline, bool clear_display_on
         return true;
     }
 
+    tp = checkstring(cmdline, (unsigned char *)"AUTOREFRESH");
+    if (tp) {
+        if (checkstring(tp, (unsigned char *)"OFF")) {
+            Option.Refresh = 0;
+            return true;
+        }
+        if (checkstring(tp, (unsigned char *)"ON")) {
+            Option.Refresh = 1;
+            return true;
+        }
+        error("Syntax");
+    }
+
     tp = checkstring(cmdline, (unsigned char *)"F1");
     if (tp) {
         option_set_fkey(tp, Option.F1key, sizeof(Option.F1key), 64);

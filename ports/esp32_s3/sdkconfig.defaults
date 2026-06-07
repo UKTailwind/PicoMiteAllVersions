@@ -35,6 +35,17 @@ CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP=y
 # internal RAM before USB host and WiFi have started.
 CONFIG_ESP_MAIN_TASK_STACK_SIZE=16384
 
+# --- CPU --------------------------------------------------------------------
+# Run the ESP32-S3 at the top supported application CPU clock by default.
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ=240
+
+# --- Compiler ---------------------------------------------------------------
+# Use -O2 for the application image. The BASIC interpreter and bytecode bridge
+# are branch-heavy enough that ESP-IDF's debug -Og default is not representative
+# for performance comparisons.
+CONFIG_COMPILER_OPTIMIZATION_PERF=y
+
 # --- Watchdog ---------------------------------------------------------------
 # Disable the task watchdog entirely. With it on (~5s default), long-running
 # BASIC FOR loops would trip it and reboot. Hard requirement for any

@@ -32,6 +32,7 @@
 #include "hal/hal_time.h"
 #include "esp32_board_profile.h"
 #include "esp32_audio_options.h"
+#include "esp32_ft6336u_touch.h"
 
 extern void port_print_supported_boards(void);
 extern int port_factory_reset_board(unsigned char * p);
@@ -63,6 +64,40 @@ static int esp32_parse_gpio_info_pin_arg(unsigned char * arg) {
     if ((p[0] == 'G' || p[0] == 'g') && (p[1] == 'P' || p[1] == 'p') && isdigit(p[2]))
         return codemap(getint(p + 2, 0, 48));
     return codemap(getint(p, 0, 48));
+}
+
+static int esp32_touch_calibrate_option_setter(unsigned char * cmdline) {
+    unsigned char * p = checkstring(cmdline, (unsigned char *)"TOUCH CALIBRATE");
+    if (!p) return 0;
+    int persist = 1;
+    if (!esp32_board_profile_current()->has_touch)
+        error("Touch not supported on this platform");
+    if (checkstring(p, (unsigned char *)"DEFAULT")) {
+        esp32_ft6336u_touch_set_default_calibration();
+    } else if (checkstring(p, (unsigned char *)"OFF")) {
+        esp32_ft6336u_touch_set_identity_calibration();
+        persist = 0;
+    } else {
+        getargs(&p, 7, (unsigned char *)",");
+        if (argc != 7) error("Argument count");
+        Option.TOUCH_SWAPXY = 0;
+        Option.TOUCH_XZERO = getinteger(argv[0]);
+        Option.TOUCH_YZERO = getinteger(argv[2]);
+        Option.TOUCH_XSCALE = getnumber(argv[4]) / 10000.0f;
+        Option.TOUCH_YSCALE = getnumber(argv[6]) / 10000.0f;
+    }
+    if (persist) SaveOptions();
+    return 1;
+}
+
+static void esp32_touch_calibrate_print_option(void) {
+    if (!esp32_board_profile_current()->has_touch) return;
+    char line[96];
+    snprintf(line, sizeof(line), "OPTION TOUCH CALIBRATE %d,%d,%.0f,%.0f\r\n",
+             Option.TOUCH_XZERO, Option.TOUCH_YZERO,
+             (double)(Option.TOUCH_XSCALE * 10000.0f),
+             (double)(Option.TOUCH_YSCALE * 10000.0f));
+    MMPrintString(line);
 }
 
 /* PNG decoder + CMM2-program loader stubs. PNG support comes from
@@ -101,6 +136,7 @@ void printoptions(void) {
     esp32_usb_role_print_options();
     esp32_audio_print_options();
     esp32_vga_print_options();
+    esp32_touch_calibrate_print_option();
     hal_gui_controls_print_options();
     /* PSRAM presence: the slab is set up by hal_psram_init() at boot
      * from heap_caps_aligned_alloc(MALLOC_CAP_SPIRAM). PSRAM_CS_PIN
@@ -328,11 +364,9 @@ void cmd_option(void) {
     if (esp32_board_profile_option_setter(cmdline)) return;
     if (esp32_audio_option_setter(cmdline)) return;
     if (esp32_vga_option_setter(cmdline)) return;
+    if (esp32_touch_calibrate_option_setter(cmdline)) return;
     if (hal_gui_controls_option_set(cmdline)) return;
-    if (option_command_handle_common(cmdline, false)) {
-        if (Option.DISPLAY_TYPE == ILI9341) Option.Refresh = 0;
-        return;
-    }
+    if (option_command_handle_common(cmdline, false)) return;
     if (esp32_wifi_option_setter(cmdline)) return;
     error("Option not supported on this port");
 }

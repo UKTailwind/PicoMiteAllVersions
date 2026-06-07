@@ -11,6 +11,7 @@
 #include "Hardware_Includes.h"
 #include "esp32_board_profile.h"
 #include "esp32_option_ext.h"
+#include "esp32_ft6336u_touch.h"
 
 extern int esp32_ft6336u_touch_is_ready(void);
 
@@ -239,6 +240,11 @@ void esp32_board_profile_apply_defaults(const esp32_board_profile_t * profile) {
         Option.DefaultBC = BLACK;
         Option.ColourCode = 1;
     }
+
+    if (profile->has_touch)
+        esp32_ft6336u_touch_set_default_calibration();
+    else
+        esp32_ft6336u_touch_set_identity_calibration();
 
     if (profile->audio.sink == ESP32_AUDIO_SINK_I2S_DAC) {
         Option.audio_i2s_bclk = profile_pin(profile->audio.bclk);

@@ -207,6 +207,11 @@ Implemented checks:
   leaves a persistent saved variable.
 - `ws2812`: GP46 onboard NeoPixel red/green/blue/off command sequence. The
   suite reports `SKIP` unless `--ws2812-visual` is passed.
+- `display-perf`: uploads and runs a generated `RUN`-mode LCD primitive
+  batching benchmark. It times full clears, filled boxes, menu text, dense and
+  sparse `PIXEL`, lines, and small boxes, then fails if the display path falls
+  below the Freenove ILI9341 thresholds. This is opt-in because it requires an
+  active local LCD profile.
 - `network`: reports `SKIP` unless `--run-network` is passed, then chains to
   `network_conformance.py` through this repo's `porttools/` path. It defaults
   to the full `all` conformance suite. Use `--network-suite`,
@@ -242,6 +247,14 @@ python3.11 porttools/esp32_fs_vm_smoke.py network \
   --run-network \
   --network-suite tcp-client \
   --port /dev/cu.usbmodem101
+```
+
+Run the Freenove display primitive performance gate:
+
+```sh
+python3.11 porttools/esp32_fs_vm_smoke.py display-perf \
+  --port /dev/cu.usbmodem2101 \
+  --long-timeout 180
 ```
 
 Useful options:

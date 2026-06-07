@@ -76,14 +76,23 @@ static void esp32_runtime_network_service(void) {
 }
 
 static void esp32_runtime_gui_service(void) {
+    if (!hal_gui_controls_service_needed()) {
+        s_next_gui_tick_us = 0;
+        return;
+    }
     if (s_gui_service_active) return;
     s_gui_service_active = 1;
 
     int64_t now = esp_timer_get_time();
-    if (!s_next_gui_tick_us || now >= s_next_gui_tick_us) {
+    if (!s_next_gui_tick_us) s_next_gui_tick_us = now;
+    int ticks = 0;
+    while (now >= s_next_gui_tick_us && ticks < 50) {
         hal_gui_controls_timer_tick();
-        s_next_gui_tick_us = now + 1000;
+        s_next_gui_tick_us += 1000;
+        ticks++;
     }
+    if (ticks == 50 && now >= s_next_gui_tick_us)
+        s_next_gui_tick_us = now + 1000;
     hal_gui_controls_periodic();
 
     s_gui_service_active = 0;

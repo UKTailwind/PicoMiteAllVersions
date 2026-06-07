@@ -34,6 +34,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
+#include "hal/hal_gui_controls.h"
 #include "float.h"
 #define BTN_SIDE_BRIGHT -25
 #define BTN_SIDE_DULL -50
@@ -396,6 +397,7 @@ int GetCtrlParams(int type, unsigned char * p) {
 
     if (argc > a + 1) error("Argument count");
     Ctrl[r].type = type;
+    hal_gui_controls_note_create();
     if (type == CTRL_GAUGE || type == CTRL_BARGAUGE) {
         Ctrl[r].value = Ctrl[r].min;
     } else {
@@ -529,6 +531,7 @@ void cmd_gui(void) {
                     FreeMemorySafe((void **)&Ctrl[r].s);
                     if (Ctrl[r].fmt) FreeMemorySafe((void **)&Ctrl[r].fmt);
                     memset(&Ctrl[r], 0, sizeof(struct s_ctrl));
+                    hal_gui_controls_note_delete();
                 }
             return;
         } else {
@@ -539,6 +542,7 @@ void cmd_gui(void) {
                 FreeMemorySafe((void **)&Ctrl[r].s);
                 if (Ctrl[r].fmt) FreeMemorySafe((void **)&Ctrl[r].fmt);
                 memset(&Ctrl[r], 0, sizeof(struct s_ctrl));
+                hal_gui_controls_note_delete();
             }
         }
         return;
@@ -2451,6 +2455,7 @@ void ResetGUI(void) {
 
     SetupPage = 0;
     CurrentPages = 1;
+    hal_gui_controls_note_reset();
     for (i = 1; i < Option.MaxCtrls; i++) {
         if (Ctrl[i].s) FreeMemorySafe((void **)&Ctrl[i].s);
         if (Ctrl[i].fmt) FreeMemorySafe((void **)&Ctrl[i].fmt);

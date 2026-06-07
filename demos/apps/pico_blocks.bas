@@ -379,6 +379,8 @@ prevPadX% = Int(px!)
 prevBallLaunched% = ballLaunched%
 prevExpX% = 0 : prevExpY% = 0
 BeepServe
+' Drop any key bytes left over from the command that launched the game.
+Do While Inkey$ <> "" : Loop
 ' ---- Main loop ----
 Do
 k$ = Inkey$

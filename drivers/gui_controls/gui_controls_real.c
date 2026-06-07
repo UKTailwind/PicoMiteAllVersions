@@ -22,8 +22,29 @@ extern int InvokingCtrl;
 
 static struct s_ctrl CTRLS[HAL_PORT_GUI_MAX_CONTROLS];
 struct s_ctrl * Ctrl = CTRLS;
+static int active_controls;
 
 void hal_gui_controls_alloc_array(void) {}
+
+void hal_gui_controls_note_create(void) {
+    active_controls++;
+}
+
+void hal_gui_controls_note_delete(void) {
+    if (active_controls > 0) active_controls--;
+}
+
+void hal_gui_controls_note_reset(void) {
+    active_controls = 0;
+}
+
+int hal_gui_controls_has_active(void) {
+    return Ctrl != NULL && active_controls > 0;
+}
+
+int hal_gui_controls_service_needed(void) {
+    return hal_gui_controls_has_active() || CheckGuiFlag || ClickTimer;
+}
 
 void hal_gui_controls_clear_for_program(void) {
     for (int i = 1; i < Option.MaxCtrls; i++) {
@@ -76,7 +97,8 @@ char * hal_gui_controls_pending_interrupt(void) {
 
 void hal_gui_controls_periodic(void) {
     if (Ctrl == NULL) return;
-    if (!(DelayedDrawKeyboard || DelayedDrawFmtBox || calibrate)) ProcessTouch();
+    int active = hal_gui_controls_has_active();
+    if (active && !(DelayedDrawKeyboard || DelayedDrawFmtBox || calibrate)) ProcessTouch();
     if (CheckGuiFlag) CheckGui();
 }
 
@@ -132,14 +154,19 @@ void hal_gui_controls_set_beep_timer(int ms) {
 }
 
 void hal_gui_controls_routine_check_touch(void) {
-    if (Ctrl && TOUCH_GETIRQTRIS && !calibrate) ProcessTouch();
+    if (Ctrl && TOUCH_GETIRQTRIS && Option.MaxCtrls > 1 && !calibrate &&
+        hal_gui_controls_has_active())
+        ProcessTouch();
 }
 
 void hal_gui_controls_timer_tick(void) {
+    int active = hal_gui_controls_has_active();
+    if (!active && !CheckGuiFlag && !ClickTimer) return;
+
     TouchTimer++;
     if (CheckGuiFlag) CheckGuiTimeouts();
 
-    if (TOUCH_GETIRQTRIS) {
+    if (active && TOUCH_GETIRQTRIS) {
         if (TOUCH_DOWN) {
             if (!TouchState) {
                 TouchState = TouchDown = true;

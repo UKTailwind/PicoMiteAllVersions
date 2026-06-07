@@ -32,6 +32,10 @@
 
 #define TOUCH_W 320
 #define TOUCH_H 240
+#define FREENOVE_TOUCH_DEFAULT_XZERO 9
+#define FREENOVE_TOUCH_DEFAULT_YZERO 20
+#define FREENOVE_TOUCH_DEFAULT_XSCALE 1.013665f
+#define FREENOVE_TOUCH_DEFAULT_YSCALE 1.139668f
 
 static const char * TAG = "ft6336u";
 static int s_init_attempted;
@@ -76,6 +80,38 @@ static int clampi(int v, int lo, int hi) {
     if (v < lo) return lo;
     if (v > hi) return hi;
     return v;
+}
+
+static int calibrated_axis(int v, int zero, float scale, int max) {
+    int corrected = (int)((float)(v - zero) * scale + 0.5f);
+    return clampi(corrected, 0, max);
+}
+
+static void publish_default_calibration_if_needed(void) {
+    if (Option.TOUCH_XZERO || Option.TOUCH_YZERO ||
+        Option.TOUCH_XSCALE != 0.0f || Option.TOUCH_YSCALE != 0.0f)
+        return;
+    Option.TOUCH_SWAPXY = 0;
+    Option.TOUCH_XZERO = FREENOVE_TOUCH_DEFAULT_XZERO;
+    Option.TOUCH_YZERO = FREENOVE_TOUCH_DEFAULT_YZERO;
+    Option.TOUCH_XSCALE = FREENOVE_TOUCH_DEFAULT_XSCALE;
+    Option.TOUCH_YSCALE = FREENOVE_TOUCH_DEFAULT_YSCALE;
+}
+
+void esp32_ft6336u_touch_set_default_calibration(void) {
+    Option.TOUCH_SWAPXY = 0;
+    Option.TOUCH_XZERO = FREENOVE_TOUCH_DEFAULT_XZERO;
+    Option.TOUCH_YZERO = FREENOVE_TOUCH_DEFAULT_YZERO;
+    Option.TOUCH_XSCALE = FREENOVE_TOUCH_DEFAULT_XSCALE;
+    Option.TOUCH_YSCALE = FREENOVE_TOUCH_DEFAULT_YSCALE;
+}
+
+void esp32_ft6336u_touch_set_identity_calibration(void) {
+    Option.TOUCH_SWAPXY = 0;
+    Option.TOUCH_XZERO = 0;
+    Option.TOUCH_YZERO = 0;
+    Option.TOUCH_XSCALE = 1.0f;
+    Option.TOUCH_YSCALE = 1.0f;
 }
 
 static int known_chip(uint8_t id) {
@@ -141,6 +177,7 @@ void esp32_ft6336u_touch_init(void) {
     (void)esp32_freenove_i2c_write_reg8(FT6336U_ADDR, FT_REG_THRESHOLD, 22);
     (void)esp32_freenove_i2c_write_reg8(FT6336U_ADDR, FT_REG_TOUCHRATE_ACTIVE, 0x01);
 
+    publish_default_calibration_if_needed();
     s_ready = 1;
     esp32_board_profile_reserve_touch_pins();
     ESP_LOGI(TAG, "FT6x36 touch ready, chip id 0x%02x", id);
@@ -150,7 +187,7 @@ int esp32_ft6336u_touch_is_ready(void) {
     return s_ready;
 }
 
-int esp32_ft6336u_touch_read(int index, int * x, int * y) {
+int esp32_ft6336u_touch_read_raw_mapped(int index, int * x, int * y) {
     if (!s_init_attempted) esp32_ft6336u_touch_init();
     if (!s_ready || index < 0 || index > 1) return 0;
 
@@ -168,6 +205,17 @@ int esp32_ft6336u_touch_read(int index, int * x, int * y) {
 
     if (x) *x = clampi(raw_y, 0, TOUCH_W - 1);
     if (y) *y = clampi((TOUCH_H - 1) - raw_x, 0, TOUCH_H - 1);
+    return 1;
+}
+
+int esp32_ft6336u_touch_read(int index, int * x, int * y) {
+    int raw_x = 0;
+    int raw_y = 0;
+    if (!esp32_ft6336u_touch_read_raw_mapped(index, &raw_x, &raw_y)) return 0;
+    if (x) *x = calibrated_axis(raw_x, Option.TOUCH_XZERO, Option.TOUCH_XSCALE,
+                                TOUCH_W - 1);
+    if (y) *y = calibrated_axis(raw_y, Option.TOUCH_YZERO, Option.TOUCH_YSCALE,
+                                TOUCH_H - 1);
     return 1;
 }
 

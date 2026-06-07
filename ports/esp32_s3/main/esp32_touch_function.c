@@ -19,11 +19,22 @@ static int read_axis(int index, int want_y) {
     return want_y ? y : x;
 }
 
+static int read_raw_axis(int index, int want_y) {
+    int x = 0, y = 0;
+    if (!esp32_ft6336u_touch_read_raw_mapped(index, &x, &y))
+        return ESP32_TOUCH_ERROR;
+    return want_y ? y : x;
+}
+
 void fun_touch(void) {
     if (checkstring(ep, (unsigned char *)"X"))
         iret = read_axis(0, 0);
     else if (checkstring(ep, (unsigned char *)"Y"))
         iret = read_axis(0, 1);
+    else if (checkstring(ep, (unsigned char *)"RAWX"))
+        iret = read_raw_axis(0, 0);
+    else if (checkstring(ep, (unsigned char *)"RAWY"))
+        iret = read_raw_axis(0, 1);
     else if (checkstring(ep, (unsigned char *)"X2"))
         iret = read_axis(1, 0);
     else if (checkstring(ep, (unsigned char *)"Y2"))

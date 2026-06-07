@@ -78,11 +78,6 @@ static void publish_capacitive_option_state(void) {
     Option.TOUCH_CAP = 1;
     Option.TOUCH_CS = gpio_to_pin(profile->touch.reset);
     Option.TOUCH_IRQ = gpio_to_pin(profile->touch.interrupt);
-    Option.TOUCH_SWAPXY = 0;
-    Option.TOUCH_XZERO = 1;
-    Option.TOUCH_YZERO = 1;
-    Option.TOUCH_XSCALE = 1.0f;
-    Option.TOUCH_YSCALE = 1.0f;
     if (!Option.THRESHOLD_CAP) Option.THRESHOLD_CAP = 22;
 }
 

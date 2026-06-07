@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import re
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -136,6 +137,7 @@ class Esp32Smoke:
             join_drive(self.drive, f"{self.prefix}_bridge_dim.bas"),
             join_drive(self.drive, f"{self.prefix}_vm.bas"),
             join_drive(self.drive, f"{self.prefix}_sieve.bas"),
+            join_drive(self.drive, f"{self.prefix}_display_perf.bas"),
         ]
 
     def cleanup_generated_programs(self) -> None:
@@ -373,12 +375,148 @@ class Esp32Smoke:
             f"PSRAM SIZE={psram_size} marched_mb={mb}",
         )
 
+    def display_perf_smoke(self) -> None:
+        print("=== display perf ===", flush=True)
+        self.select_drive()
+        path = join_drive(self.drive, f"{self.prefix}_display_perf.bas")
+        self.write_program(path, display_perf_program())
+        try:
+            output = self.run_program(
+                f'RUN "{path}"',
+                "GBENCH END",
+                timeout=max(self.long_timeout, 180),
+            )
+        finally:
+            self.command("OPTION AUTOREFRESH OFF", check_error=False)
+            self.command("OPTION CONSOLE BOTH", check_error=False)
+            self.command("CLS", check_error=False)
+            self.command('PRINT "DISPLAY_PERF_DONE"', check_error=False)
+            self.command("REFRESH", check_error=False)
+        metrics = parse_display_perf_metrics(output)
+        thresholds = {
+            "CLS_FULL": 800.0,
+            "BOX_BANDS": 800.0,
+            "MENU_BOX_TEXT": 850.0,
+            "PIXEL_DENSE": 10500.0,
+            "PIXEL_SPARSE": 3000.0,
+            "LINES_DIAG": 3000.0,
+            "BOX_SMALL": 2200.0,
+        }
+        missing = [name for name in thresholds if name not in metrics]
+        if missing:
+            raise RuntimeError(f"display perf smoke missing metric(s): {', '.join(missing)}")
+        slow = [
+            f"{name}={metrics[name]:.1f}ms>{limit:.1f}ms"
+            for name, limit in thresholds.items()
+            if metrics[name] > limit
+        ]
+        detail = ", ".join(f"{name}={metrics[name]:.1f}ms" for name in thresholds)
+        if slow:
+            raise RuntimeError("display perf regression: " + ", ".join(slow) + "\n" + detail)
+        self.pass_check("RUN display primitive batching benchmark", detail)
+
 
 def marker_int(text: str, marker: str) -> int:
     for line in text.splitlines():
         if line.startswith(marker):
             return int(float(line[len(marker) :].strip()))
     raise RuntimeError(f"missing integer marker {marker!r}")
+
+
+def parse_display_perf_metrics(text: str) -> dict[str, float]:
+    metrics: dict[str, float] = {}
+    pattern = re.compile(r"^(CLS_FULL|BOX_BANDS|MENU_BOX_TEXT|PIXEL_DENSE|PIXEL_SPARSE|LINES_DIAG|BOX_SMALL)\s*,\s*\d+\s*,\s*([0-9.]+)")
+    for line in text.splitlines():
+        match = pattern.search(line.strip())
+        if match:
+            metrics[match.group(1)] = float(match.group(2))
+    return metrics
+
+
+def display_perf_program() -> list[str]:
+    return [
+        "OPTION EXPLICIT",
+        "OPTION CONSOLE SERIAL",
+        "OPTION AUTOREFRESH OFF",
+        "DIM INTEGER I%, X%, Y%, N%",
+        "DIM FLOAT T0, DT",
+        'PRINT "GBENCH START "; MM.HRES; "x"; MM.VRES',
+        "CLS RGB(BLACK)",
+        "BOX 0,239,1,1,0,RGB(BLACK),RGB(BLACK)",
+        "' CLS full-screen clear",
+        "N% = 10",
+        "T0 = TIMER",
+        "FOR I% = 1 TO N%",
+        "  CLS RGB(BLACK)",
+        "NEXT I%",
+        "DT = TIMER - T0",
+        'PRINT "CLS_FULL,"; N%; ","; DT',
+        "BOX 0,239,1,1,0,RGB(BLACK),RGB(BLACK)",
+        "' Filled horizontal bands",
+        "N% = 50",
+        "T0 = TIMER",
+        "FOR I% = 1 TO N%",
+        "  Y% = (I% * 7) MOD 224",
+        "  BOX 0,Y%,320,16,0,RGB(0,0,80),RGB(0,0,80)",
+        "NEXT I%",
+        "DT = TIMER - T0",
+        'PRINT "BOX_BANDS,"; N%; ","; DT',
+        "BOX 0,239,1,1,0,RGB(BLACK),RGB(BLACK)",
+        "' Menu-style box plus text",
+        "N% = 50",
+        "T0 = TIMER",
+        "FOR I% = 1 TO N%",
+        "  BOX 0,0,320,16,0,RGB(0,0,80),RGB(0,0,80)",
+        '  TEXT 6,2,"Z)oom O)ut R)eset P)alette Esc","LT",1,1,RGB(255,255,255),RGB(0,0,80)',
+        "NEXT I%",
+        "DT = TIMER - T0",
+        'PRINT "MENU_BOX_TEXT,"; N%; ","; DT',
+        "BOX 0,239,1,1,0,RGB(BLACK),RGB(BLACK)",
+        "' Dense pixel writes followed by one flush trigger",
+        "N% = 25",
+        "T0 = TIMER",
+        "FOR Y% = 0 TO N% - 1",
+        "  FOR X% = 0 TO 319",
+        "    PIXEL X%,Y%,RGB(255,255,0)",
+        "  NEXT X%",
+        "NEXT Y%",
+        "BOX 0,239,1,1,0,RGB(BLACK),RGB(BLACK)",
+        "DT = TIMER - T0",
+        'PRINT "PIXEL_DENSE,"; N% * 320; ","; DT',
+        "' Sparse pixel writes followed by one flush trigger",
+        "N% = 1000",
+        "T0 = TIMER",
+        "FOR I% = 1 TO N%",
+        "  X% = (I% * 37) MOD 320",
+        "  Y% = (I% * 53) MOD 240",
+        "  PIXEL X%,Y%,RGB(0,255,255)",
+        "NEXT I%",
+        "BOX 0,239,1,1,0,RGB(BLACK),RGB(BLACK)",
+        "DT = TIMER - T0",
+        'PRINT "PIXEL_SPARSE,"; N%; ","; DT',
+        "' Diagonal line primitives",
+        "N% = 150",
+        "T0 = TIMER",
+        "FOR I% = 0 TO N% - 1",
+        "  LINE 0,I% MOD 240,319,(I% * 7) MOD 240,1,RGB(255,0,255)",
+        "NEXT I%",
+        "BOX 0,239,1,1,0,RGB(BLACK),RGB(BLACK)",
+        "DT = TIMER - T0",
+        'PRINT "LINES_DIAG,"; N%; ","; DT',
+        "' Small filled boxes",
+        "N% = 500",
+        "T0 = TIMER",
+        "FOR I% = 1 TO N%",
+        "  X% = (I% * 17) MOD 310",
+        "  Y% = (I% * 11) MOD 230",
+        "  BOX X%,Y%,10,10,0,RGB(0,180,0),RGB(0,180,0)",
+        "NEXT I%",
+        "DT = TIMER - T0",
+        'PRINT "BOX_SMALL,"; N%; ","; DT',
+        "BOX 0,239,1,1,0,RGB(BLACK),RGB(BLACK)",
+        'PRINT "GBENCH END"',
+        "OPTION CONSOLE BOTH",
+    ]
 
 
 def fs_program(drive: str, prefix: str) -> list[str]:
@@ -636,7 +774,7 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
         "suites",
         nargs="*",
         default=[],
-        metavar="{all,info,fs,program,vm,flash,gpio,ws2812,psram,network}",
+        metavar="{all,info,fs,program,vm,flash,gpio,ws2812,psram,display-perf,network}",
         help="suite(s) to run; default: all",
     )
     parser.add_argument("--port", default=default_port(), help="serial device path")
@@ -673,7 +811,19 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
 
 
 def expand_suites(suites: Sequence[str]) -> list[str]:
-    allowed = {"all", "info", "fs", "program", "vm", "flash", "gpio", "ws2812", "psram", "network"}
+    allowed = {
+        "all",
+        "info",
+        "fs",
+        "program",
+        "vm",
+        "flash",
+        "gpio",
+        "ws2812",
+        "psram",
+        "display-perf",
+        "network",
+    }
     unknown = [suite for suite in suites if suite not in allowed]
     if unknown:
         raise ValueError(f"unknown suite(s): {', '.join(unknown)}")
@@ -773,6 +923,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     "gpio": smoke.gpio_smoke,
                     "ws2812": smoke.ws2812_smoke,
                     "psram": smoke.psram_smoke,
+                    "display-perf": smoke.display_perf_smoke,
                 }
                 for suite in serial_suites:
                     runners[suite]()
@@ -794,6 +945,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 1
     except Exception as exc:
         if smoke is not None:
+            try:
+                smoke.cleanup_generated_programs()
+            except Exception:
+                pass
             all_checks.extend(smoke.checks)
         all_checks.append(Check("esp32 smoke", "FAIL", str(exc)))
         print_summary(all_checks)

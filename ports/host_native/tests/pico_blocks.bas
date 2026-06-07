@@ -409,6 +409,8 @@ prevBallLaunched% = ballLaunched%
 prevExpX% = 0 : prevExpY% = 0
 
 BeepServe
+' Drop any key bytes left over from the command that launched the game.
+DO WHILE INKEY$ <> "" : LOOP
 
 ' ---- Main loop ----
 DO

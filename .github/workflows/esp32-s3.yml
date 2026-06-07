@@ -9,7 +9,7 @@ on:
       - 'core/**'
       - 'drivers/**'
       - 'hal/**'
-      - 'ports/esp32_s3_metro/**'
+      - 'ports/esp32_s3/**'
       - 'runtime/**'
       - 'shared/**'
       - 'third_party/**'
@@ -24,7 +24,7 @@ on:
       - 'core/**'
       - 'drivers/**'
       - 'hal/**'
-      - 'ports/esp32_s3_metro/**'
+      - 'ports/esp32_s3/**'
       - 'runtime/**'
       - 'shared/**'
       - 'third_party/**'
@@ -41,7 +41,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build ESP32-S3 Metro firmware
+      - name: Build ESP32-S3 firmware
         shell: bash
         run: |
           docker run --rm \
@@ -51,7 +51,7 @@ jobs:
             bash -lc 'git config --global --add safe.directory /project &&
                       . "$IDF_PATH/export.sh" >/dev/null &&
                       ./buildesp32.sh &&
-                      chmod -R a+rw ports/esp32_s3_metro/build ports/esp32_s3_metro/sdkconfig'
+                      chmod -R a+rw ports/esp32_s3/build ports/esp32_s3/sdkconfig'
 
       - name: Stage ESP32-S3 artifacts
         shell: bash
@@ -63,33 +63,33 @@ jobs:
             bash -lc 'set -euo pipefail
                       . "$IDF_PATH/export.sh" >/dev/null
                       mkdir -p artifacts
-                      build=ports/esp32_s3_metro/build
+                      build=ports/esp32_s3/build
                       cp "$build/bootloader/bootloader.bin" \
-                         artifacts/MMBasic-Anywhere-esp32-s3-metro-bootloader.bin
+                         artifacts/MMBasic-Anywhere-esp32-s3-bootloader.bin
                       cp "$build/partition_table/partition-table.bin" \
-                         artifacts/MMBasic-Anywhere-esp32-s3-metro-partition-table.bin
-                      cp "$build/mmbasic_anywhere_metro.bin" \
-                         artifacts/MMBasic-Anywhere-esp32-s3-metro-app.bin
+                         artifacts/MMBasic-Anywhere-esp32-s3-partition-table.bin
+                      cp "$build/mmbasic_anywhere_esp32_s3.bin" \
+                         artifacts/MMBasic-Anywhere-esp32-s3-app.bin
                       python -m esptool --chip esp32s3 merge_bin \
-                         -o artifacts/MMBasic-Anywhere-esp32-s3-metro-merged.bin \
+                         -o artifacts/MMBasic-Anywhere-esp32-s3-merged.bin \
                          --flash_mode dio \
                          --flash_freq 80m \
-                         --flash_size 16MB \
+                         --flash_size 4MB \
                          0x0 "$build/bootloader/bootloader.bin" \
                          0x8000 "$build/partition_table/partition-table.bin" \
-                         0x10000 "$build/mmbasic_anywhere_metro.bin"
+                         0x10000 "$build/mmbasic_anywhere_esp32_s3.bin"
                       chmod -R a+rw artifacts'
-          cat > artifacts/MMBasic-Anywhere-esp32-s3-metro-flash.txt <<'EOF'
+          cat > artifacts/MMBasic-Anywhere-esp32-s3-flash.txt <<'EOF'
           Flash the merged image:
 
-              esptool.py --chip esp32s3 -p /dev/cu.usbmodem* write_flash 0x0 MMBasic-Anywhere-esp32-s3-metro-merged.bin
+              esptool.py --chip esp32s3 -p /dev/cu.usbmodem* write_flash 0x0 MMBasic-Anywhere-esp32-s3-merged.bin
 
           Or flash the split images:
 
               esptool.py --chip esp32s3 -p /dev/cu.usbmodem* write_flash \
-                  0x0 MMBasic-Anywhere-esp32-s3-metro-bootloader.bin \
-                  0x8000 MMBasic-Anywhere-esp32-s3-metro-partition-table.bin \
-                  0x10000 MMBasic-Anywhere-esp32-s3-metro-app.bin
+                  0x0 MMBasic-Anywhere-esp32-s3-bootloader.bin \
+                  0x8000 MMBasic-Anywhere-esp32-s3-partition-table.bin \
+                  0x10000 MMBasic-Anywhere-esp32-s3-app.bin
           EOF
           ls -la artifacts
 
