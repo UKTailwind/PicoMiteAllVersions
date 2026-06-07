@@ -162,6 +162,8 @@ void app_main(void) {
     esp32_ili9341_lcd_init();
     extern void esp32_ft6336u_touch_init(void);
     esp32_ft6336u_touch_init();
+    extern void InitTouch(void);
+    InitTouch();
     extern void esp32_vga_display_init(void);
     esp32_vga_display_init();
 

@@ -25,6 +25,7 @@
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
+#include "hal/hal_gui_controls.h"
 #include "bc_alloc.h"
 #include "runtime/runtime.h"
 #include "shared/audio/audio_runtime.h"
@@ -53,6 +54,8 @@ static char s_save_error_message[MAXERRMSG];
 static int s_save_errno;
 static char s_interrupt_return_token[3];
 static int s_network_service_active;
+static int64_t s_next_gui_tick_us;
+static int s_gui_service_active;
 
 static inline CommandToken esp32_commandtbl_decode(const unsigned char * p) {
     return ((CommandToken)(p[0] & 0x7f)) | ((CommandToken)(p[1] & 0x7f) << 7);
@@ -72,8 +75,23 @@ static void esp32_runtime_network_service(void) {
     ProcessWeb(0);
 }
 
+static void esp32_runtime_gui_service(void) {
+    if (s_gui_service_active) return;
+    s_gui_service_active = 1;
+
+    int64_t now = esp_timer_get_time();
+    if (!s_next_gui_tick_us || now >= s_next_gui_tick_us) {
+        hal_gui_controls_timer_tick();
+        s_next_gui_tick_us = now + 1000;
+    }
+    hal_gui_controls_periodic();
+
+    s_gui_service_active = 0;
+}
+
 static void esp32_runtime_service(void) {
     esp32_runtime_pump_input();
+    esp32_runtime_gui_service();
     /* Cooperative decode pump for file playback during interpreter polls. */
     audio_runtime_service();
     mmbasic_runtime_poll_service_once(&s_network_service_active,

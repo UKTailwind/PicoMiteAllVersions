@@ -8,6 +8,7 @@
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
+#include "hal/hal_gui_controls.h"
 #include "esp32_ft6336u_touch.h"
 
 #define ESP32_TOUCH_ERROR -1
@@ -31,6 +32,8 @@ void fun_touch(void) {
         iret = esp32_ft6336u_touch_down() ? 1 : 0;
     else if (checkstring(ep, (unsigned char *)"UP"))
         iret = esp32_ft6336u_touch_down() ? 0 : 1;
+    else if (hal_gui_controls_get_touch_attr(ep, &iret))
+        ;
     else
         error("Invalid argument");
     targ = T_INT;
