@@ -25,6 +25,7 @@ static void emit(const char * s) {
 }
 
 bool port_terminal_handle_cls(void) {
+    if (Option.DISPLAY_TYPE != 0) return false;
     emit("\033[2J\033[H");
     return true;
 }

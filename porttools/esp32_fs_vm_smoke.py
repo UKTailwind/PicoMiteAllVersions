@@ -89,6 +89,9 @@ class Esp32Smoke:
             check_error=check_error,
         ).clean_text
 
+    def select_drive(self) -> None:
+        self.command(self.drive, check_error=False)
+
     def note(self, name: str, status: str, detail: str = "") -> None:
         self.checks.append(Check(name, status, detail))
         suffix = f" - {detail}" if detail else ""
@@ -102,6 +105,7 @@ class Esp32Smoke:
 
     def cleanup_temp_tree(self) -> None:
         root = join_drive(self.drive, self.prefix)
+        self.select_drive()
         for command in (
             "ON ERROR SKIP : CLOSE #1",
             "ON ERROR SKIP : CLOSE #2",
@@ -137,10 +141,12 @@ class Esp32Smoke:
     def cleanup_generated_programs(self) -> None:
         if self.keep_files:
             return
+        self.select_drive()
         for path in self.program_paths():
             self.command(f'ON ERROR SKIP : KILL "{path}"', check_error=False)
 
     def write_program(self, path: str, lines: Iterable[str]) -> None:
+        self.select_drive()
         self.command(f'ON ERROR SKIP : KILL "{path}"', check_error=False)
         self.command(f'OPEN "{path}" FOR OUTPUT AS #1')
         try:
@@ -171,7 +177,11 @@ class Esp32Smoke:
         self.detect_b_drive()
 
     def detect_b_drive(self) -> None:
-        listing = self.command('FILES "B:"', timeout=self.long_timeout, check_error=False)
+        listing = self.basic.command_with_pagination(
+            'FILES "B:"',
+            timeout=self.long_timeout,
+            check_error=False,
+        ).clean_text
         lower = listing.lower()
         if "error" in lower or "not configured" in lower or "no sd" in lower or "mount" in lower:
             detail = "B: absent or unconfigured; SD card is not required"
@@ -182,6 +192,7 @@ class Esp32Smoke:
 
     def fs_smoke(self) -> None:
         print("=== filesystem ===", flush=True)
+        self.select_drive()
         self.cleanup_temp_tree()
         path = join_drive(self.drive, f"{self.prefix}_fs.bas")
         self.write_program(path, fs_program(self.drive, self.prefix))
@@ -193,6 +204,7 @@ class Esp32Smoke:
 
     def program_smoke(self) -> None:
         print("=== program lifecycle ===", flush=True)
+        self.select_drive()
         src = join_drive(self.drive, f"{self.prefix}_save_src.bas")
         dst = join_drive(self.drive, f"{self.prefix}_save_copy.bas")
         empty = join_drive(self.drive, f"{self.prefix}_empty.bas")
@@ -221,6 +233,7 @@ class Esp32Smoke:
 
     def vm_smoke(self) -> None:
         print("=== bytecode vm ===", flush=True)
+        self.select_drive()
         bridge_dim_path = join_drive(self.drive, f"{self.prefix}_bridge_dim.bas")
         self.write_program(bridge_dim_path, bridged_dim_regression_program("ESP32_BRIDGE_DIM_OK"))
         self.command("NEW")
@@ -246,6 +259,7 @@ class Esp32Smoke:
 
     def flash_smoke(self) -> None:
         print("=== flash ===", flush=True)
+        self.select_drive()
         path = join_drive(self.drive, f"{self.prefix}_flash.bas")
         self.write_program(path, flash_source_program(self.flash_slot))
         self.command(f'LOAD "{path}"', timeout=self.long_timeout)
@@ -354,6 +368,7 @@ def fs_program(drive: str, prefix: str) -> list[str]:
     root = join_drive(drive, prefix)
     return [
         "OPTION EXPLICIT",
+        drive,
         "ON ERROR SKIP : CLOSE #1",
         "ON ERROR SKIP : CLOSE #2",
         f'ON ERROR SKIP : CHDIR "{drive}/"',

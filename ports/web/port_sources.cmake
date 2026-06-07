@@ -70,6 +70,7 @@ target_sources(PicoMite PRIVATE
 
     # Non-VGA / non-HDMI stub.
     ${CMAKE_SOURCE_DIR}/drivers/vga_pio/vga_ops_stub.c
+    ${CMAKE_SOURCE_DIR}/drivers/vga_pio/vga_mode_stub.c
 
     # WEB has gui_touch (needed for SSD1963 + Touch flows). gfx_3d is
     # excluded — closeall3d stub already in shared/net/MMtcpserver.c.
@@ -107,4 +108,3 @@ target_link_libraries(PicoMite pico_cyw43_arch_lwip_poll)
 pico_define_boot_stage2(slower_boot2 ${PICO_DEFAULT_BOOT_STAGE2_FILE})
 target_compile_definitions(slower_boot2 PRIVATE PICO_FLASH_SPI_CLKDIV=4)
 pico_set_boot_stage2(PicoMite slower_boot2)
-

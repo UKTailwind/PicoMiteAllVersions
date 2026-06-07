@@ -140,12 +140,24 @@ jobs:
             echo "Web build: <https://jvanderberg.github.io/PicoMiteAllVersions/>"
           } > notes.md
 
-          # 'gh release edit' doesn't replace assets cleanly; simplest
-          # is delete-then-recreate so stale uf2s from previous commits
-          # can't linger.
-          gh release delete latest --cleanup-tag --yes 2>/dev/null || true
-          gh release create latest \
-              --title "Latest build" \
-              --notes-file notes.md \
-              --target "${{ github.sha }}" \
-              release/*.uf2
+          # Keep the rolling release in place so other workflows, such as
+          # ESP32-S3, can attach their own artifacts. Remove only stale UF2
+          # assets before uploading this build's device firmware.
+          git tag -f latest "${{ github.sha }}"
+          git push -f origin refs/tags/latest
+          if gh release view latest >/dev/null 2>&1; then
+            gh release edit latest \
+                --title "Latest build" \
+                --notes-file notes.md
+            gh release view latest --json assets \
+                --jq '.assets[] | select(.name | endswith(".uf2")) | .name' |
+              while IFS= read -r asset; do
+                [ -n "$asset" ] && gh release delete-asset latest "$asset" --yes
+              done
+          else
+            gh release create latest \
+                --title "Latest build" \
+                --notes-file notes.md \
+                --target "${{ github.sha }}"
+          fi
+          gh release upload latest release/*.uf2 --clobber

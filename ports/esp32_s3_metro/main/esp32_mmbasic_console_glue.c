@@ -30,6 +30,9 @@ extern void esp32_console_write_bytes(const char * text, int len);
 extern int esp32_console_read_byte_nonblock(void);
 extern int esp32_console_read_byte_blocking_ms(int ms);
 extern void esp32_console_push_back_byte(int c);
+extern int esp32_usb_keyboard_pop_key(void);
+extern int esp32_usb_keyboard_input_available(void);
+extern int esp32_usb_role_is_serial(void);
 
 volatile int esp32_console_display_rendering;
 
@@ -53,7 +56,7 @@ int port_editor_vt100_enabled(void) {
  * in esp32_console_init. */
 
 char SerialConsolePutC(char c, int flush) {
-    if (Option.Telnet != -1) {
+    if (Option.Telnet != -1 && esp32_usb_role_is_serial()) {
         esp32_console_write_bytes(&c, 1);
         if (flush) fflush(stdout);
     }
@@ -99,12 +102,15 @@ int getConsole(void) {
     if (c >= 0) return c;
     c = esp32_web_console_pop_key();
     if (c >= 0) return c;
+    c = esp32_usb_keyboard_pop_key();
+    if (c >= 0) return c;
     return esp32_console_read_byte_nonblock();
 }
 
 int kbhitConsole(void) {
     if (ConsoleRxBufHead != ConsoleRxBufTail) return 1;
     if (esp32_web_console_input_available()) return 1;
+    if (esp32_usb_keyboard_input_available()) return 1;
     int c = esp32_console_read_byte_nonblock();
     if (c < 0) return 0;
     esp32_console_push_back_byte(c);
@@ -162,13 +168,18 @@ int MMInkey(void) {
         c = esp32_web_console_pop_key();
         if (c >= 0) from_web = 1;
     }
+    int from_keyboard = 0;
+    if (c < 0) {
+        c = esp32_usb_keyboard_pop_key();
+        if (c >= 0) from_keyboard = 1;
+    }
     if (c < 0) c = esp32_console_read_byte_nonblock();
     if (c < 0) return -1;
     /* Web console delivers fully-decoded key codes; only raw byte streams
      * (USB stdin + telnet ring buffer) need escape-sequence assembly.
      * esp32_decode_escape_sequence drains continuation bytes from whichever
      * source they arrived on. */
-    if (from_web) return c; /* web console delivers pre-decoded key codes */
+    if (from_web || from_keyboard) return c; /* already decoded key codes */
     if (c == 0x1b) return mmbasic_escdecode_run(esp32_escdecode_read_byte_ms);
     return mmbasic_console_normalise_byte(c);
 }
@@ -191,7 +202,16 @@ int MMgetchar(void) {
             c = esp32_web_console_pop_key();
             if (c >= 0) from_web = 1;
         }
+        int from_keyboard = 0;
+        if (c < 0) {
+            c = esp32_usb_keyboard_pop_key();
+            if (c >= 0) from_keyboard = 1;
+        }
         if (c < 0) c = esp32_console_read_byte_blocking_ms(1);
+        if (from_keyboard && c >= 0) {
+            ShowCursor(0);
+            return c;
+        }
     } while (c < 0);
     ShowCursor(0);
     if (from_web) return c; /* web console delivers pre-decoded key codes */

@@ -53,6 +53,8 @@ TARGET_EXPECTATIONS: dict[str, dict[str, object]] = {
         "nocache_error_text": None,
         # PSRAM enabled per OPTION PSRAM in OPTION LIST.
         "option_list_marker": "OPTION PSRAM",
+        "heap_includes_psram": True,
+        "dim_uses_psram": True,
         # RAM FILE LOAD is fully wired on RP2350.
         "ram_file_load_supported": True,
         "ram_file_load_error_text": None,
@@ -68,6 +70,11 @@ TARGET_EXPECTATIONS: dict[str, dict[str, object]] = {
         # OPTION LIST marker is the same on both ports since Phase 5
         # decommissioned the ESP32-specific surface.
         "option_list_marker": "OPTION PSRAM",
+        # ESP32 publishes the reserved PSRAM slab via MM.INFO(PSRAM SIZE)
+        # and uses it for the RAM command surface. MM.INFO(HEAP) remains
+        # the small internal MMBasic heap.
+        "heap_includes_psram": False,
+        "dim_uses_psram": False,
         # Phase 4 stubs RAM FILE LOAD on ESP32 pending mmslots wiring.
         "ram_file_load_supported": False,
         "ram_file_load_error_text": "RAM FILE LOAD not supported on this port",
@@ -269,11 +276,11 @@ class DryRunBasic:
         if "PSRAM_SMOKE_PSRAMSIZE=" in command:
             return f"PSRAM_SMOKE_PSRAMSIZE={self.expected_psram_bytes}\r\n> "
         if "PSRAM_SMOKE_HEAP_BEFORE=" in command:
-            return "PSRAM_SMOKE_HEAP_BEFORE=204800\r\n> "
+            return f"PSRAM_SMOKE_HEAP_BEFORE={self._heap_value()}\r\n> "
         if "PSRAM_SMOKE_HEAP_AFTER=" in command:
-            return "PSRAM_SMOKE_HEAP_AFTER=204500\r\n> "
+            return f"PSRAM_SMOKE_HEAP_AFTER={self._heap_value() - 524288}\r\n> "
         if "PSRAM_SMOKE_HEAP=" in command:
-            return "PSRAM_SMOKE_HEAP=204800\r\n> "
+            return f"PSRAM_SMOKE_HEAP={self._heap_value()}\r\n> "
         # OPTION LIST
         if upper.startswith("OPTION LIST"):
             return (
@@ -411,10 +418,6 @@ class DryRunBasic:
         # PRINT statements used to probe values.
         if "PSRAM_SMOKE_DIM_OK" in command:
             return "PSRAM_SMOKE_DIM_OK\r\n> "
-        if "PSRAM_SMOKE_HEAP_AFTER=" in command:
-            return "PSRAM_SMOKE_HEAP_AFTER=204500\r\n> "
-        if "PSRAM_SMOKE_HEAP_BEFORE=" in command:
-            return "PSRAM_SMOKE_HEAP_BEFORE=204800\r\n> "
         if "PSRAM_SMOKE_STRING_OK" in command:
             return "PSRAM_SMOKE_STRING_OK\r\n> "
         if STRESS_MARKER in command:
@@ -436,6 +439,11 @@ class DryRunBasic:
         # it so RAM SAVE can snapshot the buffer.
         self._paste_buffer.append(command)
         return "> "
+
+    def _heap_value(self) -> int:
+        if bool(TARGET_EXPECTATIONS[self.target]["heap_includes_psram"]):
+            return self.expected_psram_bytes + 204800
+        return 204800
 
 
 # ---------------------------------------------------------------------------
@@ -687,25 +695,37 @@ class PsramSmokeHarness:
         except Exception as exc:
             self.report.failed("boot/option_list", str(exc))
 
-        # MM.INFO(HEAP) is the combined SRAM+PSRAM free heap when PSRAM is
-        # enabled. It should therefore be non-zero and larger than the
-        # published PSRAM heap by roughly the remaining SRAM heap.
+        # MM.INFO(HEAP) is target-specific. RP2350 reports the combined
+        # BASIC heap including PSRAM; ESP32 keeps this as the small
+        # internal MMBasic heap and reports the reserved PSRAM slab through
+        # MM.INFO(PSRAM SIZE).
         try:
             text = self.cmd('PRINT "PSRAM_SMOKE_HEAP=" + STR$(MM.INFO(HEAP))')
             heap = marker_int(text, "PSRAM_SMOKE_HEAP=")
             self.heap_free_bytes = heap
-            if heap > self.psram_size_bytes:
-                self.report.passed(
-                    "boot/heap_combined",
-                    f"MM.INFO(HEAP) = {heap} (combined SRAM+PSRAM free)",
-                )
-            else:
+            if heap <= 0:
                 self.report.failed(
-                    "boot/heap_combined",
-                    f"MM.INFO(HEAP) = {heap}; expected > PSRAM size ({self.psram_size_bytes})",
+                    "boot/heap_report",
+                    f"MM.INFO(HEAP) = {heap}; expected positive heap",
+                )
+            elif bool(self.expect["heap_includes_psram"]):
+                if heap > self.psram_size_bytes:
+                    self.report.passed(
+                        "boot/heap_report",
+                        f"MM.INFO(HEAP) = {heap} (combined SRAM+PSRAM free)",
+                    )
+                else:
+                    self.report.failed(
+                        "boot/heap_report",
+                        f"MM.INFO(HEAP) = {heap}; expected > PSRAM size ({self.psram_size_bytes})",
+                    )
+            else:
+                self.report.passed(
+                    "boot/heap_report",
+                    f"MM.INFO(HEAP) = {heap} (internal heap; PSRAM reported separately)",
                 )
         except Exception as exc:
-            self.report.failed("boot/heap_combined", str(exc))
+            self.report.failed("boot/heap_report", str(exc))
 
     # --- 2. March test ------------------------------------------------
 
@@ -1098,6 +1118,17 @@ class PsramSmokeHarness:
 
     def check_memory_routing(self) -> None:
         print("=== 6. Memory.c PSRAM routing ===", flush=True)
+
+        if not bool(self.expect["dim_uses_psram"]):
+            self.report.skipped(
+                "routing/integer_array",
+                "DIM allocations use the internal MMBasic heap on this target",
+            )
+            self.report.skipped(
+                "routing/string_array",
+                "DIM allocations use the internal MMBasic heap on this target",
+            )
+            return
 
         # Choose N so big%(N) is comfortably larger than the inferred SRAM
         # heap. MM.INFO(HEAP) reports combined SRAM+PSRAM free, so a

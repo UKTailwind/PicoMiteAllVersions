@@ -78,6 +78,32 @@ extern const char * port_filesystem_prefix(int filesystem);
 extern void cmd_files_save_program_context(void);
 extern void cmd_files_restore_program_context(void);
 extern void cmd_files_pump_console_key(int * c);
+extern void port_apply_load_overrides(void);
+
+static void options_post_load(void) {
+    RGB121map[0] = BLACK;
+    RGB121map[1] = BLUE;
+    RGB121map[2] = MYRTLE;
+    RGB121map[3] = COBALT;
+    RGB121map[4] = MIDGREEN;
+    RGB121map[5] = CERULEAN;
+    RGB121map[6] = GREEN;
+    RGB121map[7] = CYAN;
+    RGB121map[8] = RED;
+    RGB121map[9] = MAGENTA;
+    RGB121map[10] = RUST;
+    RGB121map[11] = FUCHSIA;
+    RGB121map[12] = BROWN;
+    RGB121map[13] = LILAC;
+    RGB121map[14] = YELLOW;
+    RGB121map[15] = WHITE;
+
+    /* Per-board overrides applied after the saved Option struct is read
+     * from flash. Implementations live in ports/<board>/port_defaults.c
+     * (PicoCalc forces ST7796 + I2C keyboard + audio pins) and
+     * host/host_runtime.c (no-op). */
+    port_apply_load_overrides();
+}
 extern void cmd_load_post_cleanup(void);
 extern int port_mount_sd_drive(void);
 extern void port_apply_load_overrides(void);
@@ -3752,32 +3778,10 @@ void CheckSDCard(void) {
     diskchecktimer = DISKCHECKRATE;
 }
 void LoadOptions(void) {
-    int i = sizeof(struct option_s);
-    unsigned char * pp = (unsigned char *)flash_option_contents;
-    unsigned char * qq = (unsigned char *)&Option;
-    while (i--) *qq++ = *pp++;
-    RGB121map[0] = BLACK;
-    RGB121map[1] = BLUE;
-    RGB121map[2] = MYRTLE;
-    RGB121map[3] = COBALT;
-    RGB121map[4] = MIDGREEN;
-    RGB121map[5] = CERULEAN;
-    RGB121map[6] = GREEN;
-    RGB121map[7] = CYAN;
-    RGB121map[8] = RED;
-    RGB121map[9] = MAGENTA;
-    RGB121map[10] = RUST;
-    RGB121map[11] = FUCHSIA;
-    RGB121map[12] = BROWN;
-    RGB121map[13] = LILAC;
-    RGB121map[14] = YELLOW;
-    RGB121map[15] = WHITE;
-
-    /* Per-board overrides applied after the saved Option struct is read
-     * from flash. Implementations live in ports/<board>/port_defaults.c
-     * (PicoCalc forces ST7796 + I2C keyboard + audio pins) and
-     * host/host_runtime.c (no-op). */
-    port_apply_load_overrides();
+    if (hal_flash_read_options(&Option, sizeof(struct option_s)) != 0) {
+        memset((void *)&Option, 0, sizeof(struct option_s));
+    }
+    options_post_load();
 }
 
 void ResetOptions(bool startup) {

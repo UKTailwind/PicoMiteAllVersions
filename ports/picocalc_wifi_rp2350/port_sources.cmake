@@ -75,6 +75,7 @@ target_sources(PicoMite PRIVATE
 
     # Non-VGA stub. WEB has gui_touch.
     ${CMAKE_SOURCE_DIR}/drivers/vga_pio/vga_ops_stub.c
+    ${CMAKE_SOURCE_DIR}/drivers/vga_pio/vga_mode_stub.c
     ${CMAKE_SOURCE_DIR}/drivers/gui_touch/gui_touch.c
 
 )

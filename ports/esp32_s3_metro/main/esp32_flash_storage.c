@@ -5,8 +5,8 @@
  *
  *   flash_prog_buf[]          — RAM mirror of the program-memory region
  *                               (currently 2 × MAX_PROG_SIZE).
- *   mmslots partition         — real flash backing for VAR SAVE plus
- *                               numbered SAVE/LOAD slots.
+ *   mmslots partition         — real flash backing for options, VAR SAVE
+ *                               plus numbered SAVE/LOAD slots.
  *   esp32_flash_option_buf[]  — RAM mirror of the Options blob.
  *   flash_target_contents     — mmap view of the numbered slot region.
  *   flash_option_contents     — pointer to esp32_flash_option_buf.
@@ -36,10 +36,11 @@
 extern unsigned char flash_prog_buf[];
 
 #define FLASH_PROG_REGION_SIZE (MAX_PROG_SIZE + 4096) /* matches esp32_compat.c */
+#define OPTIONS_REGION_SIZE 4096u
 #define SAVED_VARS_REGION_BASE ((uint32_t)(FLASH_TARGET_OFFSET + FLASH_ERASE_SIZE))
 #define SLOT_REGION_BASE ((uint32_t)(SAVED_VARS_REGION_BASE + SAVEDVARS_FLASH_SIZE))
 #define SLOT_REGION_SIZE ((uint32_t)(MAXFLASHSLOTS * MAX_PROG_SIZE))
-#define MMSLOTS_REGION_SIZE ((uint32_t)(SAVEDVARS_FLASH_SIZE + SLOT_REGION_SIZE))
+#define MMSLOTS_REGION_SIZE ((uint32_t)(OPTIONS_REGION_SIZE + SAVEDVARS_FLASH_SIZE + SLOT_REGION_SIZE))
 
 static const esp_partition_t * s_mmslots_part;
 static esp_partition_mmap_handle_t s_mmslots_mmap;
@@ -85,8 +86,8 @@ int esp32_flash_storage_init(void) {
     }
 
     s_mmslots_view = (const uint8_t *)mapped;
-    SavedVarsFlash = (unsigned char *)s_mmslots_view;
-    flash_target_contents = s_mmslots_view + SAVEDVARS_FLASH_SIZE;
+    SavedVarsFlash = (unsigned char *)(s_mmslots_view + OPTIONS_REGION_SIZE);
+    flash_target_contents = s_mmslots_view + OPTIONS_REGION_SIZE + SAVEDVARS_FLASH_SIZE;
     ESP_LOGI(TAG, "partition: size=%lu slots=%d slot_size=%u",
              (unsigned long)s_mmslots_part->size,
              MAXFLASHSLOTS,
@@ -120,7 +121,7 @@ static inline int off_in_mmslots_region(uint32_t off, uint32_t count) {
 }
 
 static uint32_t mmslots_partition_offset(uint32_t legacy_off) {
-    return legacy_off - SAVED_VARS_REGION_BASE;
+    return OPTIONS_REGION_SIZE + legacy_off - SAVED_VARS_REGION_BASE;
 }
 
 static int program_region_offset(uint32_t off, uint32_t count, uint32_t * out) {

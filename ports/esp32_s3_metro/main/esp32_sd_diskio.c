@@ -38,15 +38,38 @@ static sdmmc_card_t * s_cardp;
 static sdmmc_host_t s_host;
 static sdspi_dev_handle_t s_sdspi_handle = -1;
 static int s_host_inited;
+static spi_host_device_t s_spi_host_id = SDSPI_DEFAULT_HOST;
+static int s_spi_bus_inited;
 
 static DSTATUS sd_not_ready(void) {
     SDCardStat |= STA_NOINIT | STA_NODISK;
     return SDCardStat;
 }
 
+static void deinit_sdspi_card(sdmmc_host_t * host,
+                              sdspi_dev_handle_t handle,
+                              spi_host_device_t host_id,
+                              int remove_device,
+                              int host_inited,
+                              int bus_inited) {
+    if (remove_device && handle != -1) {
+        (void)host->deinit_p(handle);
+    }
+    if (host_inited) {
+        (void)sdspi_host_deinit();
+    }
+    if (bus_inited) {
+        (void)spi_bus_free(host_id);
+    }
+}
+
 static esp_err_t init_sdspi_card(void) {
     sdmmc_host_t host = SDSPI_HOST_DEFAULT();
     host.max_freq_khz = METRO_SD_SPI_FREQ_KHZ;
+    spi_host_device_t host_id = host.slot;
+    int bus_inited = 0;
+    int host_inited = 0;
+    int device_inited = 0;
 
     spi_bus_config_t bus_cfg = {
         .mosi_io_num = METRO_SD_PIN_MOSI,
@@ -58,16 +81,19 @@ static esp_err_t init_sdspi_card(void) {
     };
 
     esp_err_t err = spi_bus_initialize(host.slot, &bus_cfg, SDSPI_DEFAULT_DMA);
-    if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
+    if (err != ESP_OK) {
         ESP_LOGE(TAG, "spi_bus_initialize failed: %s", esp_err_to_name(err));
         return err;
     }
+    bus_inited = 1;
 
     err = host.init();
-    if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
+    if (err != ESP_OK) {
         ESP_LOGE(TAG, "sdspi_host_init failed: %s", esp_err_to_name(err));
+        deinit_sdspi_card(&host, -1, host_id, 0, 0, bus_inited);
         return err;
     }
+    host_inited = 1;
 
     sdspi_device_config_t dev_cfg = SDSPI_DEVICE_CONFIG_DEFAULT();
     dev_cfg.host_id = host.slot;
@@ -77,26 +103,30 @@ static esp_err_t init_sdspi_card(void) {
     err = sdspi_host_init_device(&dev_cfg, &handle);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "sdspi_host_init_device failed: %s", esp_err_to_name(err));
+        deinit_sdspi_card(&host, -1, host_id, 0, host_inited, bus_inited);
         return err;
     }
+    device_inited = 1;
     if (handle != host.slot) host.slot = handle;
 
     memset(&s_card, 0, sizeof(s_card));
     err = sdmmc_card_init(&host, &s_card);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "sdmmc_card_init failed: %s", esp_err_to_name(err));
-        (void)host.deinit_p(host.slot);
+        deinit_sdspi_card(&host, handle, host_id, device_inited, host_inited, bus_inited);
         return err;
     }
     if (s_card.csd.sector_size != METRO_SD_SECTOR_SIZE) {
         ESP_LOGE(TAG, "unsupported sector size: %d", s_card.csd.sector_size);
-        (void)host.deinit_p(host.slot);
+        deinit_sdspi_card(&host, handle, host_id, device_inited, host_inited, bus_inited);
         return ESP_ERR_NOT_SUPPORTED;
     }
 
     s_host = host;
     s_sdspi_handle = handle;
     s_host_inited = 1;
+    s_spi_host_id = host_id;
+    s_spi_bus_inited = 1;
     s_cardp = &s_card;
     SDCardStat &= (BYTE) ~(STA_NOINIT | STA_NODISK | STA_PROTECT);
 
@@ -150,7 +180,8 @@ static DRESULT with_sector_scratch(BYTE * scratch,
 DRESULT disk_read(BYTE pdrv, BYTE * buff, LBA_t sector, UINT count) {
     if (pdrv != 0 || !s_cardp) return RES_NOTRDY;
     if (!buff || count == 0) return RES_PARERR;
-    BYTE * scratch = (BYTE *)heap_caps_malloc(METRO_SD_SECTOR_SIZE, MALLOC_CAP_DMA | MALLOC_CAP_8BIT);
+    BYTE * scratch = (BYTE *)heap_caps_malloc(METRO_SD_SECTOR_SIZE,
+                                              MALLOC_CAP_DMA | MALLOC_CAP_8BIT);
     if (!scratch) return RES_ERROR;
     DRESULT r = with_sector_scratch(scratch, buff, NULL, sector, count, 0);
     heap_caps_free(scratch);
@@ -161,7 +192,8 @@ DRESULT disk_write(BYTE pdrv, const BYTE * buff, LBA_t sector, UINT count) {
     if (pdrv != 0 || !s_cardp) return RES_NOTRDY;
     if (!buff || count == 0) return RES_PARERR;
     if (SDCardStat & STA_PROTECT) return RES_WRPRT;
-    BYTE * scratch = (BYTE *)heap_caps_malloc(METRO_SD_SECTOR_SIZE, MALLOC_CAP_DMA | MALLOC_CAP_8BIT);
+    BYTE * scratch = (BYTE *)heap_caps_malloc(METRO_SD_SECTOR_SIZE,
+                                              MALLOC_CAP_DMA | MALLOC_CAP_8BIT);
     if (!scratch) return RES_ERROR;
     DRESULT r = with_sector_scratch(scratch, NULL, buff, sector, count, 1);
     heap_caps_free(scratch);
@@ -210,11 +242,12 @@ DWORD get_fattime(void) {
 }
 
 void esp32_sd_diskio_reset(void) {
-    if (s_host_inited && s_sdspi_handle >= 0) {
-        (void)s_host.deinit_p(s_host.slot);
-    }
+    deinit_sdspi_card(&s_host, s_sdspi_handle, s_spi_host_id,
+                      s_sdspi_handle != -1, s_host_inited, s_spi_bus_inited);
     s_cardp = NULL;
     s_sdspi_handle = -1;
     s_host_inited = 0;
+    s_spi_bus_inited = 0;
+    s_spi_host_id = SDSPI_DEFAULT_HOST;
     SDCardStat = STA_NOINIT | STA_NODISK;
 }

@@ -17,6 +17,8 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
+extern int esp32_usb_role_is_serial(void);
+
 void esp32_console_init(void) {
     static int done = 0;
     if (done) return;
@@ -48,6 +50,7 @@ void esp32_console_init(void) {
  * goes to USB Serial/JTAG via the driver installed above. */
 
 void esp32_console_write_bytes(const char * text, int len) {
+    if (!esp32_usb_role_is_serial()) return;
     fwrite(text, 1, len, stdout);
 }
 
@@ -67,6 +70,7 @@ int esp32_console_raw_mode_is_active(void) {
 static int s_pushback = -1;
 
 int esp32_console_read_byte_nonblock(void) {
+    if (!esp32_usb_role_is_serial()) return -1;
     if (s_pushback >= 0) {
         int c = s_pushback;
         s_pushback = -1;
@@ -78,6 +82,7 @@ int esp32_console_read_byte_nonblock(void) {
 }
 
 int esp32_console_read_byte_blocking_ms(int ms) {
+    if (!esp32_usb_role_is_serial()) return -1;
     if (s_pushback >= 0) {
         int c = s_pushback;
         s_pushback = -1;

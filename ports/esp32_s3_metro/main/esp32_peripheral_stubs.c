@@ -70,8 +70,12 @@ int MemLoadProgram(unsigned char * fname, unsigned char * ram) {
  * surface currently owned by this port. */
 void printoptions(void) {
     extern void esp32_wifi_print_options(void);
+    extern void esp32_vga_print_options(void);
+    extern void esp32_usb_role_print_options(void);
     esp32_wifi_print_options();
+    esp32_usb_role_print_options();
     esp32_audio_print_options();
+    esp32_vga_print_options();
     /* PSRAM presence: the slab is set up by hal_psram_init() at boot
      * from heap_caps_aligned_alloc(MALLOC_CAP_SPIRAM). PSRAM_CS_PIN
      * is the rp2350 channel and stays at 0 on ESP32, so emit a
@@ -189,12 +193,14 @@ void cmd_endprogram(void) {}
 void cmd_files_pump_console_key(int * c) {
     extern int esp32_console_read_byte_nonblock(void);
     extern int esp32_web_console_pop_key(void);
+    extern int esp32_usb_keyboard_pop_key(void);
 
     /* FILES already calls ProcessWeb() before this hook. Consume the
      * resulting web/serial key directly instead of re-entering MMInkey()
      * and its own network poll from inside the pager loop. */
     if (*c == -1) {
         int k = esp32_web_console_pop_key();
+        if (k == -1) k = esp32_usb_keyboard_pop_key();
         if (k == -1) k = esp32_console_read_byte_nonblock();
         if (k != -1)
             *c = k;
@@ -261,11 +267,15 @@ void cmd_onewire(void) {}
 
 void cmd_option(void) {
     extern int esp32_wifi_option_setter(unsigned char * cmdline);
+    extern int esp32_vga_option_setter(unsigned char * cmdline);
+    extern int esp32_usb_role_option_setter(unsigned char * cmdline);
     if (checkstring(cmdline, (unsigned char *)"LIST")) {
         printoptions();
         return;
     }
+    if (esp32_usb_role_option_setter(cmdline)) return;
     if (esp32_audio_option_setter(cmdline)) return;
+    if (esp32_vga_option_setter(cmdline)) return;
     if (option_command_handle_common(cmdline, false)) return;
     if (esp32_wifi_option_setter(cmdline)) return;
     error("Option not supported on this port");

@@ -44,6 +44,7 @@ static void fastgfx_present(void) {
     if (!fastgfx_back_buf) return;
     if (FRAMEBUFFER == NULL || framebuffersize == 0) return;
     memcpy((void *)FRAMEBUFFER, fastgfx_back_buf, framebuffersize);
+    hal_vga_ops_fastgfx_present();
 }
 
 void bc_fastgfx_create(void) {

@@ -168,6 +168,40 @@ class BasicSerial:
             raise TimeoutError(f"timeout waiting for prompt after {command!r}\n{result.clean_text}")
         return result
 
+    def command_with_pagination(
+        self,
+        command: str,
+        timeout: float = 10.0,
+        check_error: bool = True,
+    ) -> CommandResult:
+        """Run a command and advance any MMBasic `PRESS ANY KEY` pagers."""
+        assert self.serial is not None
+        self.serial.write((command + "\r").encode("latin1"))
+        self.serial.flush()
+        end = time.monotonic() + timeout
+        out = bytearray()
+        marker = b"PRESS ANY KEY"
+        last_marker_pos = -1
+        while time.monotonic() < end:
+            chunk = self.serial.read(4096)
+            if chunk:
+                out.extend(chunk)
+                clean = strip_ansi(bytes(out))
+                marker_pos = clean.rfind(marker)
+                if marker_pos > last_marker_pos:
+                    self.serial.write(b" ")
+                    self.serial.flush()
+                    last_marker_pos = marker_pos
+                if self._has_prompt(bytes(out)):
+                    result = CommandResult(command, bytes(out))
+                    if check_error and ("Error :" in result.clean_text or "Error:" in result.clean_text):
+                        raise RuntimeError(f"BASIC error after {command!r}\n{result.clean_text}")
+                    return result
+            else:
+                time.sleep(0.005)
+        result = CommandResult(command, bytes(out))
+        raise TimeoutError(f"timeout waiting for prompt after {command!r}\n{result.clean_text}")
+
 
 def load_script(path: str) -> list[str]:
     commands: list[str] = []

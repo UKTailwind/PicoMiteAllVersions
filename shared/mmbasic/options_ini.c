@@ -172,6 +172,7 @@ static const mm_options_ini_field_t option_fields[] = {
     OPT_FIELD(pc386_sb_irq, MM_OPT_INI_U8),
     OPT_FIELD(pc386_sb_dma, MM_OPT_INI_U8),
     OPT_FIELD(pc386_sb_dma16, MM_OPT_INI_U8),
+    OPT_FIELD(WebConsole, MM_OPT_INI_U8),
 };
 
 static char * trim(char * s) {

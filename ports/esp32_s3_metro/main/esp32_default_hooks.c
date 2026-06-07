@@ -20,6 +20,8 @@
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
+#include "esp32_option_ext.h"
+#include "port_config.h"
 #include "hal/hal_calendar.h"
 #include "hal/hal_time.h"
 #include "shared/net/mm_net_lifecycle.h"
@@ -70,10 +72,18 @@ void port_runtime_disable_watchdog(void) {}
 /* Error-banner font selection — only meaningful when there's an LCD. */
 void port_select_error_prompt_font(void) {}
 
-/* Default Options after factory-reset / no-saved-options. ESP32-specific
- * defaults (heap size, banner colours) come from port_config.h via the
- * normal LoadOptions() path; this hook is no-op. */
-void port_set_default_options(void) {}
+/* Default Options after factory-reset / no-saved-options. The shared
+ * option layer owns when these are persisted; the port only supplies the
+ * board defaults. */
+void port_set_default_options(void) {
+    Option.DISPLAY_CONSOLE = 0;
+    Option.audio_i2s_bclk = codemap(HAL_PORT_AUDIO_I2S_BCLK_PIN);
+    Option.audio_i2s_data = codemap(HAL_PORT_AUDIO_I2S_DOUT_PIN);
+    ESP32_OPTION_USB_ROLE = USB_ROLE_SERIAL;
+
+    extern int esp32_vga_apply_default_options_if_unset(void);
+    esp32_vga_apply_default_options_if_unset();
+}
 
 /* funtbl[] hash-table queries — pico drives a real hash; host + ESP32
  * fall back to linear scans (return 0 = "not handled, do linear scan"). */

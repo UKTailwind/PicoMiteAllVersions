@@ -39,6 +39,7 @@ target_sources(PicoMite PRIVATE
 
     # Non-VGA stub.
     ${CMAKE_SOURCE_DIR}/drivers/vga_pio/vga_ops_stub.c
+    ${CMAKE_SOURCE_DIR}/drivers/vga_pio/vga_mode_stub.c
 
     # Non-WEB feature backends.
     ${CMAKE_SOURCE_DIR}/drivers/gfx_3d/gfx_3d.c

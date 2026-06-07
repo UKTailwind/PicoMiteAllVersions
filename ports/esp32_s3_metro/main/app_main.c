@@ -13,6 +13,7 @@
 #include <string.h>
 #include <setjmp.h>
 #include "esp_log.h"
+#include "esp_system.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -20,6 +21,7 @@
 #include "Hardware_Includes.h"
 #include "hal/hal_psram.h"
 #include "runtime/runtime.h"
+#include "esp32_option_ext.h"
 
 extern jmp_buf mark;
 extern unsigned char flash_prog_buf[];
@@ -27,51 +29,62 @@ extern const uint8_t * flash_progmemory;
 extern void flash_range_erase(uint32_t off, uint32_t count);
 extern void esp32_console_init(void);
 extern void MMBasic_PrintBanner(void);
-extern int esp32_flash_storage_load_options(void);
 extern int esp32_flash_storage_init(void);
 extern int esp32_web_console_display_init(void);
+extern void esp32_usb_role_resolve_boot(void);
+extern int esp32_usb_role_is_serial(void);
+extern int esp32_usb_role_is_keyboard(void);
+extern void esp32_usb_role_prepare_keyboard_host(void);
+extern void esp32_usb_keyboard_start_host(void);
+extern int esp32_usb_keyboard_has_keyboard(void);
 
-static int esp32_options_valid(void) {
-    return Option.Magic == MagicKey &&
-           Option.Width > 0 &&
-           Option.Height > 0 &&
-           (Option.Tab == 2 || Option.Tab == 3 || Option.Tab == 4 || Option.Tab == 8) &&
-           Option.PROG_FLASH_SIZE == MAX_PROG_SIZE;
+static const char * TAG = "app_main";
+
+static int esp32_saved_options_valid(const char ** reason) {
+    if (Option.Magic != MagicKey) {
+        if (reason) *reason = "bad magic";
+        return 0;
+    }
+    if (Option.Width <= 0) {
+        if (reason) *reason = "bad width";
+        return 0;
+    }
+    if (Option.Height <= 0) {
+        if (reason) *reason = "bad height";
+        return 0;
+    }
+    if (!(Option.Tab == 2 || Option.Tab == 3 || Option.Tab == 4 || Option.Tab == 8)) {
+        if (reason) *reason = "bad tab";
+        return 0;
+    }
+    if (Option.PROG_FLASH_SIZE != MAX_PROG_SIZE) {
+        if (reason) *reason = "program flash size mismatch";
+        return 0;
+    }
+    if (!(ESP32_OPTION_USB_ROLE == USB_ROLE_SERIAL || ESP32_OPTION_USB_ROLE == USB_ROLE_KEYBOARD)) {
+        if (reason) *reason = "bad usb role";
+        return 0;
+    }
+    if (reason) *reason = "valid";
+    return 1;
 }
 
-static void esp32_apply_terminal_option_defaults(void) {
-    Option.DISPLAY_CONSOLE = 0; /* no LCD - REPL is serial-only */
-    Option.Width = 80;
-    Option.Height = 24;
-    Option.Tab = 4;
-    Option.DefaultFont = 0x01;
-    Option.ColourCode = 0;
-    Option.DefaultFC = 0x00ff00;
-    Option.DefaultBC = 0x000000;
-    Option.Baudrate = 115200;
-    Option.repeat = 0;
-    Option.PIN = 0;
-    Option.Autorun = 0;
-    Option.Invert = 0;
-    Option.Listcase = 0;
-    Option.continuation = 0;
-    Option.audio_i2s_bclk = codemap(HAL_PORT_AUDIO_I2S_BCLK_PIN);
-    Option.audio_i2s_data = codemap(HAL_PORT_AUDIO_I2S_DOUT_PIN);
+static void esp32_keyboard_mode_recovery(void) {
+    if (!esp32_usb_role_is_keyboard()) return;
+
+    for (int i = 0; i < 100; i++) {
+        if (esp32_usb_keyboard_has_keyboard()) {
+            MMPrintString("USB keyboard attached\r\n\r\n");
+            return;
+        }
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
+
+    MMPrintString("\r\nUSB keyboard not enumerated yet; staying in USB KEYBOARD mode\r\n");
 }
 
 void app_main(void) {
-    /* Console first so any printf/MMPrintString is captured cleanly. */
-    esp32_console_init();
     esp_log_level_set("gpio", ESP_LOG_WARN);
-
-    /* Brief pause so the host monitor has a chance to attach before
-     * the banner flies past. */
-    for (int i = 0; i < 5; i++) {
-        printf(".");
-        fflush(stdout);
-        vTaskDelay(pdMS_TO_TICKS(200));
-    }
-    printf("\n");
 
     /* Acquire the PSRAM slab and publish PSRAMbase / PSRAMsize before
      * any code reads them. mmbasic_runtime_init_common's heap init does
@@ -87,12 +100,26 @@ void app_main(void) {
      * cause it to deref garbage. */
     flash_progmemory = flash_prog_buf;
 
-    esp32_flash_storage_load_options();
     LoadOptions();
-    if (!esp32_options_valid()) {
+    const char * options_reason = NULL;
+    if (!esp32_saved_options_valid(&options_reason)) {
+        ESP_LOGE(TAG, "saved options rejected at boot: %s; resetting to board defaults",
+                 options_reason ? options_reason : "invalid");
         ResetOptions(true);
-        esp32_apply_terminal_option_defaults();
-        SaveOptions();
+    }
+
+    esp32_usb_role_resolve_boot();
+    if (esp32_usb_role_is_serial()) {
+        esp32_console_init();
+
+        /* Brief pause so the host monitor has a chance to attach before
+         * the banner flies past. */
+        for (int i = 0; i < 5; i++) {
+            printf(".");
+            fflush(stdout);
+            vTaskDelay(pdMS_TO_TICKS(200));
+        }
+        printf("\n");
     }
 
     extern short gui_font_width, gui_font_height;
@@ -113,7 +140,9 @@ void app_main(void) {
     vm_sys_file_reset();
     vm_sys_pin_reset();
     extern void esp32_audio_reserve_option_pins(void);
+    extern void esp32_vga_reserve_option_pins(void);
     esp32_audio_reserve_option_pins();
+    esp32_vga_reserve_option_pins();
 
     /* ClearRuntime initialises OptionConsole (= 3 BOTH) and several other
      * runtime globals MMBasic expects to be sane before the first
@@ -121,12 +150,21 @@ void app_main(void) {
      * gate is false and PRINT / cmd_print produce no output until the
      * first error() call retroactively sets OptionConsole=1. */
     ClearRuntime(true);
-    if (esp32_web_console_display_init()) SaveOptions();
+    (void)esp32_web_console_display_init();
 
-    /* Mirror the Pico pattern: always call WebConnect at boot. The
-     * lifecycle no-ops cleanly when Option.SSID is empty, and on success
-     * it opens whichever network services are enabled (telnet, web
-     * console) via mm_net_lifecycle_on_network_ready(). */
+    /* Bring up VGA before USB host, Wi-Fi, and LittleFS. */
+    extern void esp32_vga_display_init(void);
+    esp32_vga_display_init();
+
+    if (esp32_usb_role_is_keyboard()) {
+        esp32_usb_role_prepare_keyboard_host();
+        esp32_usb_keyboard_start_host();
+        esp32_keyboard_mode_recovery();
+    }
+
+    /* Mirror the Pico pattern: always call WebConnect at boot. In keyboard
+     * mode USB host starts first because Wi-Fi consumes scarce internal RAM
+     * needed by the USB host controller and transfer tasks. */
     extern void WebConnect(void);
     WebConnect();
 

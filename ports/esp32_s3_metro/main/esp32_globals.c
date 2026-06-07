@@ -20,6 +20,14 @@ int PromptFC = 0xFFFFFF;
 int PromptBC = 0;
 int PromptFont = 1;
 
+/* VGA (RGB332 over LCD_CAM) framebuffer state. WriteBuf / FrameBuf /
+ * LayerBuf come from drivers/vga_pio/vga_ops_stub.c; these complete the
+ * set the RGB332 draw primitives and esp32_vga_display_init() reference. */
+int ScreenSize = 0;
+unsigned char * DisplayBuf = NULL;
+unsigned char * SecondFrame = NULL;
+unsigned char * SecondLayer = NULL;
+
 /* External-interrupt cleanup helper. ESP32 stdio scope has no GPIO
  * BASIC interrupts wired; nothing to clear. */
 void ClearExternalIO(void) {}

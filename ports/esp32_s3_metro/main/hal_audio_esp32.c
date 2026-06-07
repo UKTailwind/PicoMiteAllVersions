@@ -16,6 +16,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdatomic.h>
@@ -38,6 +39,9 @@
 
 #define AUDIO_RATE HAL_PORT_AUDIO_SAMPLE_RATE
 #define FRAMES_PER_CHUNK 256 /* stereo frames per write */
+#define AUDIO_I2S_PORT I2S_NUM_1
+#define AUDIO_DMA_DESC_NUM 2
+#define AUDIO_DMA_FRAME_NUM 64
 
 typedef enum {
     AUDIO_BACKEND_NONE = 0,
@@ -60,6 +64,16 @@ static portMUX_TYPE s_tone_mux = portMUX_INITIALIZER_UNLOCKED;
 static _Atomic bool s_paused;
 static volatile bool s_ready;
 static audio_backend_t s_backend;
+static esp_err_t s_chan_err = ESP_OK;
+static esp_err_t s_mode_err = ESP_OK;
+static esp_err_t s_enable_err = ESP_OK;
+static esp_err_t s_write_err = ESP_OK;
+static int s_bclk_gpio = -1;
+static int s_ws_gpio = -1;
+static int s_data_gpio = -1;
+static uint32_t s_write_count;
+static uint32_t s_nonzero_write_count;
+static size_t s_last_write_bytes;
 
 /* Audio-DMA channel globals referenced by core SOUND/ADC bookkeeping.
  * The shared synth path does not use them, but the symbols must exist. */
@@ -93,6 +107,13 @@ static _Atomic int s_pending_rate; /* requested by sample_begin/end */
 
 static int default_audio_rate(void) {
     return AUDIO_RATE;
+}
+
+static i2s_chan_config_t audio_i2s_chan_config(void) {
+    i2s_chan_config_t cfg = I2S_CHANNEL_DEFAULT_CONFIG(AUDIO_I2S_PORT, I2S_ROLE_MASTER);
+    cfg.dma_desc_num = AUDIO_DMA_DESC_NUM;
+    cfg.dma_frame_num = AUDIO_DMA_FRAME_NUM;
+    return cfg;
 }
 
 static int active_audio_rate(void) {
@@ -477,7 +498,21 @@ static void audio_task(void * arg) {
             memset(buf, 0, sizeof(buf));
             atomic_store_explicit(&s_stream_inflight_frames, 0, memory_order_release);
         }
-        i2s_channel_write(s_tx, buf, sizeof(buf), &wr, portMAX_DELAY);
+        bool nonzero = false;
+        for (int n = 0; n < FRAMES_PER_CHUNK * 2; n++) {
+            if (buf[n] != 0) {
+                nonzero = true;
+                break;
+            }
+        }
+        esp_err_t write_err = i2s_channel_write(s_tx, buf, sizeof(buf), &wr,
+                                                portMAX_DELAY);
+        s_write_err = write_err;
+        s_last_write_bytes = wr;
+        if (write_err == ESP_OK) {
+            s_write_count++;
+            if (nonzero) s_nonzero_write_count++;
+        }
         if (file_mode &&
             atomic_load_explicit(&s_stream_eof_seen, memory_order_acquire) &&
             atomic_load_explicit(&s_stream_drain_frames, memory_order_acquire) == 0 &&
@@ -516,9 +551,13 @@ void hal_audio_init(void) {
         int bclk_gpio = option_gpio(Option.audio_i2s_bclk, HAL_PORT_AUDIO_I2S_BCLK_PIN);
         int data_gpio = option_gpio(Option.audio_i2s_data, HAL_PORT_AUDIO_I2S_DOUT_PIN);
         int ws_gpio = bclk_gpio + 1;
-        i2s_chan_config_t chan_cfg = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_0, I2S_ROLE_MASTER);
-        if (i2s_new_channel(&chan_cfg, &s_tx, NULL) != ESP_OK) {
-            ESP_LOGE(TAG, "i2s_new_channel failed");
+        s_bclk_gpio = bclk_gpio;
+        s_ws_gpio = ws_gpio;
+        s_data_gpio = data_gpio;
+        i2s_chan_config_t chan_cfg = audio_i2s_chan_config();
+        s_chan_err = i2s_new_channel(&chan_cfg, &s_tx, NULL);
+        if (s_chan_err != ESP_OK) {
+            ESP_LOGE(TAG, "i2s_new_channel failed: %s", esp_err_to_name(s_chan_err));
             return;
         }
         i2s_std_config_t std_cfg = {
@@ -534,17 +573,26 @@ void hal_audio_init(void) {
                 .invert_flags = {.mclk_inv = false, .bclk_inv = false, .ws_inv = false},
             },
         };
-        if (i2s_channel_init_std_mode(s_tx, &std_cfg) != ESP_OK) {
-            ESP_LOGE(TAG, "i2s_channel_init_std_mode failed");
+        s_mode_err = i2s_channel_init_std_mode(s_tx, &std_cfg);
+        if (s_mode_err != ESP_OK) {
+            ESP_LOGE(TAG, "i2s_channel_init_std_mode failed: %s", esp_err_to_name(s_mode_err));
             return;
         }
-        i2s_channel_enable(s_tx);
+        s_enable_err = i2s_channel_enable(s_tx);
+        if (s_enable_err != ESP_OK) {
+            ESP_LOGE(TAG, "i2s_channel_enable failed: %s", esp_err_to_name(s_enable_err));
+            return;
+        }
     } else if (s_backend == AUDIO_BACKEND_PDM) {
         int left_gpio = PinDef[Option.AUDIO_L].GPno;
         int right_gpio = PinDef[Option.AUDIO_R].GPno;
-        i2s_chan_config_t chan_cfg = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_0, I2S_ROLE_MASTER);
-        if (i2s_new_channel(&chan_cfg, &s_tx, NULL) != ESP_OK) {
-            ESP_LOGE(TAG, "i2s_new_channel failed");
+        s_bclk_gpio = -1;
+        s_ws_gpio = left_gpio;
+        s_data_gpio = right_gpio;
+        i2s_chan_config_t chan_cfg = audio_i2s_chan_config();
+        s_chan_err = i2s_new_channel(&chan_cfg, &s_tx, NULL);
+        if (s_chan_err != ESP_OK) {
+            ESP_LOGE(TAG, "i2s_new_channel failed: %s", esp_err_to_name(s_chan_err));
             return;
         }
         i2s_pdm_tx_config_t pdm_cfg = {
@@ -560,11 +608,16 @@ void hal_audio_init(void) {
                 .invert_flags = {.clk_inv = false},
             },
         };
-        if (i2s_channel_init_pdm_tx_mode(s_tx, &pdm_cfg) != ESP_OK) {
-            ESP_LOGE(TAG, "i2s_channel_init_pdm_tx_mode failed");
+        s_mode_err = i2s_channel_init_pdm_tx_mode(s_tx, &pdm_cfg);
+        if (s_mode_err != ESP_OK) {
+            ESP_LOGE(TAG, "i2s_channel_init_pdm_tx_mode failed: %s", esp_err_to_name(s_mode_err));
             return;
         }
-        i2s_channel_enable(s_tx);
+        s_enable_err = i2s_channel_enable(s_tx);
+        if (s_enable_err != ESP_OK) {
+            ESP_LOGE(TAG, "i2s_channel_enable failed: %s", esp_err_to_name(s_enable_err));
+            return;
+        }
     }
     atomic_store_explicit(&s_stream_rate, default_rate, memory_order_release); /* channel starts at the synth rate */
     atomic_store_explicit(&s_pending_rate, default_rate, memory_order_release);
@@ -574,6 +627,23 @@ void hal_audio_init(void) {
         return;
     }
     s_ready = true;
+}
+
+void esp32_audio_status_string(char * out, size_t out_len) {
+    if (!out || out_len == 0) return;
+    const char * backend = "OFF";
+    if (s_backend == AUDIO_BACKEND_I2S)
+        backend = "I2S";
+    else if (s_backend == AUDIO_BACKEND_PDM)
+        backend = "PDM";
+    snprintf(out, out_len,
+             "%s ready=%d bclk=%d ws=%d data=%d chan=%d mode=%d en=%d write=%d "
+             "wr=%u nz=%u bytes=%u playing=%d",
+             backend, s_ready ? 1 : 0, s_bclk_gpio, s_ws_gpio, s_data_gpio,
+             (int)s_chan_err, (int)s_mode_err, (int)s_enable_err,
+             (int)s_write_err, (unsigned)s_write_count,
+             (unsigned)s_nonzero_write_count, (unsigned)s_last_write_bytes,
+             (int)CurrentlyPlaying);
 }
 
 void hal_audio_tone(double left_hz, double right_hz,
