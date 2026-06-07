@@ -27,10 +27,14 @@ void hal_gui_controls_alloc_array(void) {}
 
 void hal_gui_controls_clear_for_program(void) {
     for (int i = 1; i < Option.MaxCtrls; i++) {
-        memset(&Ctrl[i], 0, sizeof(struct s_ctrl));
-        Ctrl[i].state = Ctrl[i].type = 0;
+        /* ClearRuntime() has just reinitialised the MMBasic heap, so any
+         * old control-owned allocations have already been reclaimed.  Null
+         * the pointers before ResetGUI() so it can restore GUI globals
+         * without trying to free stale heap addresses. */
         Ctrl[i].s = NULL;
+        Ctrl[i].fmt = NULL;
     }
+    ResetGUI();
 }
 
 void hal_gui_controls_post_irq_redraw(void) {
