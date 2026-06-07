@@ -1,0 +1,142 @@
+name: Build ESP32-S3 firmware
+
+on:
+  pull_request:
+    paths:
+      - '*.c'
+      - '*.h'
+      - 'buildesp32.sh'
+      - 'core/**'
+      - 'drivers/**'
+      - 'hal/**'
+      - 'ports/esp32_s3_metro/**'
+      - 'runtime/**'
+      - 'shared/**'
+      - 'third_party/**'
+      - 'tools/check_hal_purity.sh'
+      - '.github/workflows/esp32-s3.yml'
+  push:
+    branches: [main]
+    paths:
+      - '*.c'
+      - '*.h'
+      - 'buildesp32.sh'
+      - 'core/**'
+      - 'drivers/**'
+      - 'hal/**'
+      - 'ports/esp32_s3_metro/**'
+      - 'runtime/**'
+      - 'shared/**'
+      - 'third_party/**'
+      - 'tools/check_hal_purity.sh'
+      - '.github/workflows/esp32-s3.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build ESP32-S3 Metro firmware
+        shell: bash
+        run: |
+          docker run --rm \
+            -v "$PWD:/project" \
+            -w /project \
+            espressif/idf:v5.3 \
+            bash -lc 'git config --global --add safe.directory /project &&
+                      . "$IDF_PATH/export.sh" >/dev/null &&
+                      ./buildesp32.sh &&
+                      chmod -R a+rw ports/esp32_s3_metro/build ports/esp32_s3_metro/sdkconfig'
+
+      - name: Stage ESP32-S3 artifacts
+        shell: bash
+        run: |
+          docker run --rm \
+            -v "$PWD:/project" \
+            -w /project \
+            espressif/idf:v5.3 \
+            bash -lc 'set -euo pipefail
+                      . "$IDF_PATH/export.sh" >/dev/null
+                      mkdir -p artifacts
+                      build=ports/esp32_s3_metro/build
+                      cp "$build/bootloader/bootloader.bin" \
+                         artifacts/MMBasic-Anywhere-esp32-s3-metro-bootloader.bin
+                      cp "$build/partition_table/partition-table.bin" \
+                         artifacts/MMBasic-Anywhere-esp32-s3-metro-partition-table.bin
+                      cp "$build/mmbasic_anywhere_metro.bin" \
+                         artifacts/MMBasic-Anywhere-esp32-s3-metro-app.bin
+                      python -m esptool --chip esp32s3 merge_bin \
+                         -o artifacts/MMBasic-Anywhere-esp32-s3-metro-merged.bin \
+                         --flash_mode dio \
+                         --flash_freq 80m \
+                         --flash_size 16MB \
+                         0x0 "$build/bootloader/bootloader.bin" \
+                         0x8000 "$build/partition_table/partition-table.bin" \
+                         0x10000 "$build/mmbasic_anywhere_metro.bin"
+                      chmod -R a+rw artifacts'
+          cat > artifacts/MMBasic-Anywhere-esp32-s3-metro-flash.txt <<'EOF'
+          Flash the merged image:
+
+              esptool.py --chip esp32s3 -p /dev/cu.usbmodem* write_flash 0x0 MMBasic-Anywhere-esp32-s3-metro-merged.bin
+
+          Or flash the split images:
+
+              esptool.py --chip esp32s3 -p /dev/cu.usbmodem* write_flash \
+                  0x0 MMBasic-Anywhere-esp32-s3-metro-bootloader.bin \
+                  0x8000 MMBasic-Anywhere-esp32-s3-metro-partition-table.bin \
+                  0x10000 MMBasic-Anywhere-esp32-s3-metro-app.bin
+          EOF
+          ls -la artifacts
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: esp32-s3-firmware
+          path: artifacts/*
+          if-no-files-found: error
+
+  release:
+    needs: build
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: esp32-s3-firmware
+          path: release-esp32
+
+      - name: Upload ESP32-S3 artifacts to latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sha=$(git rev-parse --short HEAD)
+          date=$(git log -1 --format=%cI)
+          summary=$(git log -1 --format='%s')
+
+          git tag -f latest "${{ github.sha }}"
+          git push -f origin refs/tags/latest
+
+          if ! gh release view latest >/dev/null 2>&1; then
+            {
+              echo "Rolling build from \`main\`."
+              echo ""
+              echo "**Commit:** [\`$sha\`](https://github.com/${{ github.repository }}/commit/${{ github.sha }}) — $summary"
+              echo "**Built:** $date"
+            } > notes.md
+            gh release create latest \
+                --title "Latest build" \
+                --notes-file notes.md \
+                --target "${{ github.sha }}"
+          fi
+
+          gh release upload latest release-esp32/* --clobber
