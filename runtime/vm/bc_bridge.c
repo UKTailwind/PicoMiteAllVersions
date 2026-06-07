@@ -76,6 +76,67 @@ static int sync_find_action(uint8_t slot_type) {
     }
 }
 
+static int slot_name_len_checked(const char * name, int strip_type_suffix) {
+    if (!name || !name[0] || !isnamestart((unsigned char)name[0])) return -1;
+
+    int nlen = 0;
+    while (nlen <= MAXVARLEN && name[nlen] != 0) nlen++;
+    if (nlen <= 0 || nlen > MAXVARLEN) return -1;
+
+    if (strip_type_suffix) {
+        char suffix = name[nlen - 1];
+        if (suffix == '$' || suffix == '%' || suffix == '!') nlen--;
+    }
+
+    return nlen;
+}
+
+static int slot_name_len_for_vartbl(const char * name) {
+    return slot_name_len_checked(name, 1);
+}
+
+static int slot_vartbl_entry_matches(int vi, BCSlot * slot, int require_array) {
+    if (vi < 0 || vi >= MAXVARS) return 0;
+    if (TypeMask(slot->type) == 0) return 0;
+    struct s_vartbl * v = &g_vartbl[vi];
+    if (!v->name[0]) return 0;
+    if ((v->type & T_BLOCKED) || TypeMask(v->type) != TypeMask(slot->type)) return 0;
+    if (require_array && v->dims[0] == 0) return 0;
+    if (!require_array && v->dims[0] != 0) return 0;
+
+    int nlen = slot_name_len_for_vartbl(slot->name);
+    if (nlen <= 0) return 0;
+    if (strncasecmp((char *)v->name, slot->name, nlen) != 0) return 0;
+    return (nlen >= MAXVARLEN || v->name[nlen] == 0);
+}
+
+static int sync_resolve_scalar_slot(uint16_t i, BCSlot * slot, unsigned char * namebuf) {
+    if (!slot_map_initialized ||
+        !slot_vartbl_entry_matches(slot_to_vartbl[i], slot, 0)) {
+        findvar(namebuf, sync_find_action(slot->type));
+        slot_to_vartbl[i] = g_VarIndex;
+    }
+    return slot_to_vartbl[i];
+}
+
+static int sync_resolve_array_slot(uint16_t i, BCSlot * slot, unsigned char * namebuf, int nlen) {
+    if (!slot_map_initialized ||
+        !slot_vartbl_entry_matches(slot_to_vartbl[i], slot, 1)) {
+        int action = sync_find_action(slot->type);
+        namebuf[nlen] = '(';
+        namebuf[nlen + 1] = ')';
+        namebuf[nlen + 2] = 0;
+        if (findvar(namebuf, action | V_EMPTY_OK | V_NOFIND_NULL) != NULL) {
+            slot_to_vartbl[i] = g_VarIndex;
+        } else {
+            namebuf[nlen] = 0;
+            findvar(namebuf, action);
+            slot_to_vartbl[i] = g_VarIndex;
+        }
+    }
+    return slot_to_vartbl[i];
+}
+
 static void sync_vm_to_mmbasic(BCVMState * vm) {
     BCCompiler * cs = vm->compiler;
     if (!cs) return;
@@ -83,23 +144,18 @@ static void sync_vm_to_mmbasic(BCVMState * vm) {
     for (uint16_t i = 0; i < cs->slot_count; i++) {
         BCSlot * slot = &cs->slots[i];
 
-        if (!slot->name[0] || !isnamestart((unsigned char)slot->name[0])) continue;
+        int nlen = slot_name_len_checked(slot->name, 0);
+        if (nlen < 0) continue;
         if (vm->arrays[i].data || slot->is_array) continue;
         if (slot->type == T_STRUCT) continue; // handled by the struct-only pass below
 
         if (!slot->is_const && (!vm->global_valid || !vm->global_valid[i])) continue;
 
         unsigned char namebuf[MAXVARLEN + 2];
-        int nlen = strlen(slot->name);
         memcpy(namebuf, slot->name, nlen);
         namebuf[nlen] = 0;
 
-        if (!slot_map_initialized || slot_to_vartbl[i] < 0) {
-            findvar(namebuf, sync_find_action(slot->type));
-            slot_to_vartbl[i] = g_VarIndex;
-        }
-
-        int vi = slot_to_vartbl[i];
+        int vi = sync_resolve_scalar_slot(i, slot, namebuf);
         struct s_vartbl * v = &g_vartbl[vi];
 
         /* Const-inlined globals (source_compile_const sets slot->is_const
@@ -137,13 +193,13 @@ static void sync_vm_to_mmbasic(BCVMState * vm) {
      * opcodes can compute multi-dim linear indices without re-reading g_vartbl. */
     for (uint16_t i = 0; i < cs->slot_count; i++) {
         BCSlot * slot = &cs->slots[i];
-        if (!slot->name[0] || !isnamestart((unsigned char)slot->name[0])) continue;
+        int nlen = slot_name_len_checked(slot->name, 0);
+        if (nlen < 0) continue;
         if (slot->type != T_STRUCT) continue;
 
         /* Direct scan over g_vartbl by name — findvar requires a matching
          * subscript for arrays, which we don't have at this call site. */
         int vi = -1;
-        int nlen = strlen(slot->name);
         for (int gv = 0; gv < MAXVARS; gv++) {
             if (g_vartbl[gv].name[0] == 0) continue;
             if ((g_vartbl[gv].type & T_STRUCT) == 0) continue;
@@ -173,38 +229,21 @@ static void sync_vm_to_mmbasic(BCVMState * vm) {
     /* Sync arrays — point MMBasic's array data to VM's array data */
     for (uint16_t i = 0; i < cs->slot_count; i++) {
         BCSlot * slot = &cs->slots[i];
-        if (!slot->name[0] || !isnamestart((unsigned char)slot->name[0])) continue;
+        int nlen = slot_name_len_checked(slot->name, 0);
+        if (nlen < 0) continue;
         if (!slot->is_array) continue;
         if (!vm->arrays[i].data) continue;
 
         unsigned char namebuf[MAXVARLEN + 4];
-        int nlen = strlen(slot->name);
         memcpy(namebuf, slot->name, nlen);
         namebuf[nlen] = 0;
 
         BCArray * arr = &vm->arrays[i];
-        int action = sync_find_action(slot->type);
-
-        if (!slot_map_initialized || slot_to_vartbl[i] < 0) {
-            namebuf[nlen] = '(';
-            namebuf[nlen + 1] = ')';
-            namebuf[nlen + 2] = 0;
-            if (findvar(namebuf, action | V_EMPTY_OK | V_NOFIND_NULL) != NULL) {
-                slot_to_vartbl[i] = g_VarIndex;
-            } else {
-                namebuf[nlen] = 0;
-                findvar(namebuf, action);
-                slot_to_vartbl[i] = g_VarIndex;
-            }
-
-            struct s_vartbl * v = &g_vartbl[slot_to_vartbl[i]];
-            for (int d = 0; d < MAXDIM; d++) {
-                v->dims[d] = (d < arr->ndims) ? arr->dims[d] : 0;
-            }
+        sync_resolve_array_slot(i, slot, namebuf, nlen);
+        struct s_vartbl * v = &g_vartbl[slot_to_vartbl[i]];
+        for (int d = 0; d < MAXDIM; d++) {
+            v->dims[d] = (d < arr->ndims) ? arr->dims[d] : 0;
         }
-
-        int vi = slot_to_vartbl[i];
-        struct s_vartbl * v = &g_vartbl[vi];
 
         if (slot->type == T_INT) {
             v->val.ia = (int64_t *)arr->data;
@@ -227,9 +266,13 @@ static void sync_mmbasic_to_vm(BCVMState * vm) {
 
     for (uint16_t i = 0; i < cs->slot_count; i++) {
         BCSlot * slot = &cs->slots[i];
-        if (!slot->name[0] || !isnamestart((unsigned char)slot->name[0])) continue;
+        if (slot_name_len_checked(slot->name, 0) < 0) continue;
         if (vm->arrays[i].data) continue; /* arrays handled separately below */
         if (slot_to_vartbl[i] < 0) continue;
+        if (!slot_vartbl_entry_matches(slot_to_vartbl[i], slot, 0)) {
+            slot_to_vartbl[i] = -1;
+            continue;
+        }
 
         struct s_vartbl * v = &g_vartbl[slot_to_vartbl[i]];
 
@@ -264,17 +307,13 @@ static void sync_mmbasic_to_vm(BCVMState * vm) {
      * (STRINGSIZE per element), T_STR is included in this pass. */
     for (uint16_t i = 0; i < cs->slot_count; i++) {
         BCSlot * slot = &cs->slots[i];
-        if (!slot->name[0] || !isnamestart((unsigned char)slot->name[0])) continue;
+        int nlen = slot_name_len_checked(slot->name, 1);
+        if (nlen < 0) continue;
         if (!slot->is_array) continue;
         if (vm->arrays[i].data) continue;
         if (slot->type == T_STRUCT) continue;
 
         /* Strip trailing type suffix — g_vartbl stores names without it. */
-        int nlen = (int)strlen(slot->name);
-        if (nlen > 0) {
-            char last = slot->name[nlen - 1];
-            if (last == '$' || last == '%' || last == '!') nlen--;
-        }
         int vi = -1;
         for (int gv = 0; gv < MAXVARS; gv++) {
             if (g_vartbl[gv].name[0] == 0) continue;
@@ -328,12 +367,12 @@ static void sync_mmbasic_to_vm(BCVMState * vm) {
      * bc_free-ing interpreter-owned memory at program teardown. */
     for (uint16_t i = 0; i < cs->slot_count; i++) {
         BCSlot * slot = &cs->slots[i];
-        if (!slot->name[0] || !isnamestart((unsigned char)slot->name[0])) continue;
+        int nlen = slot_name_len_checked(slot->name, 0);
+        if (nlen < 0) continue;
         if (!vm->arrays[i].data) continue;
         if (slot->type == T_STRUCT) continue; // struct rebinding pass handles these
 
         unsigned char namebuf[MAXVARLEN + 4];
-        int nlen = strlen(slot->name);
         memcpy(namebuf, slot->name, nlen);
 
         int action = sync_find_action(slot->type);
@@ -386,11 +425,11 @@ static void sync_mmbasic_to_vm(BCVMState * vm) {
      * so multi-dim element indexing can use vm->arrays[i].dims. */
     for (uint16_t i = 0; i < cs->slot_count; i++) {
         BCSlot * slot = &cs->slots[i];
-        if (!slot->name[0] || !isnamestart((unsigned char)slot->name[0])) continue;
+        int nlen = slot_name_len_checked(slot->name, 0);
+        if (nlen < 0) continue;
         if (slot->type != T_STRUCT) continue;
 
         int vi = -1;
-        int nlen = strlen(slot->name);
         for (int gv = 0; gv < MAXVARS; gv++) {
             if (g_vartbl[gv].name[0] == 0) continue;
             if ((g_vartbl[gv].type & T_STRUCT) == 0) continue;
@@ -443,10 +482,10 @@ static int sync_vm_locals_to_mmbasic(BCVMState * vm, int * local_map) {
         if (slot < 0 || slot >= VM_MAX_LOCALS) continue;
 
         BCLocalMeta * meta = &cs->local_meta[locals_base + i];
-        if (!meta->name[0] || !isnamestart((unsigned char)meta->name[0])) continue;
+        int nlen = slot_name_len_checked(meta->name, 0);
+        if (nlen < 0) continue;
 
         unsigned char namebuf[MAXVARLEN + 4];
-        int nlen = strlen(meta->name);
         memcpy(namebuf, meta->name, nlen);
         namebuf[nlen] = 0;
 

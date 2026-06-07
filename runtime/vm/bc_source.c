@@ -112,6 +112,7 @@ static void source_emit_int_conversion(BCCompiler * cs, uint8_t type);
 static void source_emit_syscall(BCCompiler * cs, uint16_t sysid, uint8_t argc,
                                 const uint8_t * aux, uint8_t auxlen);
 static void source_emit_syscall_noaux(BCCompiler * cs, uint16_t sysid, uint8_t argc);
+static int source_ctrlval_numeric_hint = 0;
 
 static void source_skip_space(const char ** pp) {
     while (**pp == ' ' || **pp == '\t') (*pp)++;
@@ -2076,7 +2077,10 @@ static uint8_t source_parse_primary(BCSourceFrontend * fe, BCCompiler * cs, cons
                 /* Determine return type and bridge opcode */
                 uint8_t ret_type;
                 uint8_t bridge_op;
-                if (tok_flags & T_STR) {
+                if (source_ctrlval_numeric_hint && source_name_eq(name, name_len, "CTRLVAL")) {
+                    ret_type = T_NBR;
+                    bridge_op = OP_BRIDGE_FUN_F;
+                } else if (tok_flags & T_STR) {
                     ret_type = T_STR;
                     bridge_op = OP_BRIDGE_FUN_S;
                 } else if (tok_flags & T_INT) {
@@ -3448,6 +3452,54 @@ static void source_emit_bridge_for_stmt(BCCompiler * cs, const char * stmt) {
 
     memcpy(inpbuf, saved_inpbuf, STRINGSIZE);
     memcpy(tknbuf, saved_tknbuf, STRINGSIZE);
+}
+
+static int source_stmt_contains_ctrlval_call(const char * stmt) {
+    const char * p = stmt;
+    int in_str = 0;
+    source_skip_space(&p);
+    if (strncasecmp(p, "REM", 3) == 0 && !isnamechar((unsigned char)p[3])) return 0;
+    while (*p && *p != '\n') {
+        if (*p == '"') {
+            in_str = !in_str;
+            p++;
+            continue;
+        }
+        if (!in_str && *p == '\'') break;
+        if (!in_str && strncasecmp(p, "CTRLVAL", 7) == 0) {
+            const char prev = (p == stmt) ? '\0' : p[-1];
+            const char * q = p + 7;
+            while (*q == ' ' || *q == '\t') q++;
+            if (!isnamechar((unsigned char)prev) && *q == '(') return 1;
+        }
+        p++;
+    }
+    return 0;
+}
+
+static int source_text_has_string_signal(const char * text) {
+    const char * p = text;
+    while (*p && *p != '\n') {
+        if (*p == '"') return 1;
+        if (*p == '\'') break;
+        if (*p == '$') return 1;
+        p++;
+    }
+    return 0;
+}
+
+static size_t source_stmt_len_before_comment(const char * stmt) {
+    const char * p = stmt;
+    int in_str = 0;
+    while (*p && *p != '\n') {
+        if (*p == '"') {
+            in_str = !in_str;
+        } else if (!in_str && *p == '\'') {
+            break;
+        }
+        p++;
+    }
+    return (size_t)(p - stmt);
 }
 
 // Phase 13: DIM arg contains `(` sized array but no `AS <struct>` and no
@@ -7635,7 +7687,11 @@ static void source_compile_if(BCSourceFrontend * fe, BCCompiler * cs, const char
     memcpy(cond, p, cond_len);
     cond[cond_len] = '\0';
     const char * cond_p = cond;
+    int saved_ctrlval_numeric_hint = source_ctrlval_numeric_hint;
+    source_ctrlval_numeric_hint = source_stmt_contains_ctrlval_call(cond) &&
+                                  !source_text_has_string_signal(cond);
     uint8_t cond_type = source_parse_expression(fe, cs, &cond_p);
+    source_ctrlval_numeric_hint = saved_ctrlval_numeric_hint;
     if (cs->has_error) {
         *pp = p;
         return;
@@ -7715,7 +7771,11 @@ static void source_compile_elseif(BCSourceFrontend * fe, BCCompiler * cs, const 
     memcpy(cond, p, cond_len);
     cond[cond_len] = '\0';
     const char * cond_p = cond;
+    int saved_ctrlval_numeric_hint = source_ctrlval_numeric_hint;
+    source_ctrlval_numeric_hint = source_stmt_contains_ctrlval_call(cond) &&
+                                  !source_text_has_string_signal(cond);
     uint8_t cond_type = source_parse_expression(fe, cs, &cond_p);
+    source_ctrlval_numeric_hint = saved_ctrlval_numeric_hint;
     if (cond_type == T_STR) bc_set_error(cs, "ELSEIF requires a numeric condition");
     source_statement_end(cs, cond_p);
     if (cs->has_error) {
@@ -7892,10 +7952,26 @@ static void source_compile_statement(BCSourceFrontend * fe, BCCompiler * cs, con
                      (strncasecmp(probe, "EXIT", 4) == 0 && !isnamechar((unsigned char)probe[4])) ||
                      (strncasecmp(probe, "LOCAL", 5) == 0 && !isnamechar((unsigned char)probe[5])) ||
                      (strncasecmp(probe, "STATIC", 6) == 0 && !isnamechar((unsigned char)probe[6]));
+        int is_if_stmt = (strncasecmp(probe, "IF", 2) == 0 && !isnamechar((unsigned char)probe[2])) ||
+                         (strncasecmp(probe, "ELSEIF", 6) == 0 && !isnamechar((unsigned char)probe[6]));
         if (!is_def && source_stmt_references_bridged_subfun(cs, stmt)) {
             const char * line_end = stmt;
             while (*line_end && *line_end != ':' && *line_end != '\'') line_end++;
             size_t len = (size_t)(line_end - stmt);
+            if (len >= STRINGSIZE) len = STRINGSIZE - 1;
+            char tmp[STRINGSIZE];
+            memcpy(tmp, stmt, len);
+            tmp[len] = 0;
+            source_emit_bridge_for_stmt(cs, tmp);
+            return;
+        }
+
+        /* CTRLVAL() is dynamically typed: numeric for most controls, string
+         * for captions/text/display boxes. The source compiler cannot infer
+         * that from syntax, so route statements that touch it through the
+         * interpreter instead of guessing the bridge return opcode. */
+        if (!is_def && !is_if_stmt && source_stmt_contains_ctrlval_call(stmt)) {
+            size_t len = source_stmt_len_before_comment(stmt);
             if (len >= STRINGSIZE) len = STRINGSIZE - 1;
             char tmp[STRINGSIZE];
             memcpy(tmp, stmt, len);
