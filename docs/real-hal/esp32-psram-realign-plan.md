@@ -223,17 +223,25 @@ Surface to cover:
    - `RAM RUN 0` → falls back to flash program slot (sentinel).
 
 5. **`RAM FILE LOAD`**
-   - Drop a small `.bas` onto the device filesystem (A:/SD).
-   - `RAM FILE LOAD 2, "test.bas"` → no error.
-   - `RAM LIST 2` matches the source file contents.
+   - RP2350: drop a small `.bas` onto the device filesystem (A:/SD).
+   - RP2350: `RAM FILE LOAD 2, "test.bas"` → no error.
+   - RP2350: `RAM LIST 2` matches the source file contents.
+   - ESP32: current expected behavior is an explicit
+     "RAM FILE LOAD not supported on this port" error. `RAM SAVE`,
+     `RAM LOAD`, `RAM RUN`, `RAM CHAIN`, and `RAM RUN 0` are still
+     exercised through the shared RAM slot surface.
 
 6. **`Memory.c` routing observable from BASIC**
-   - Allocate an array larger than `heap_memory_size/2` (DIM
+   - RP2350: allocate an array larger than `heap_memory_size/2` (DIM
      `big%(N)`). With PSRAM enabled, this must succeed even when the
      SRAM heap couldn't hold it.
-   - Measurable: before allocation, `MM.INFO(HEAP)` is X; after,
+   - RP2350 measurable: before allocation, `MM.INFO(HEAP)` is X; after,
      `MM.INFO(HEAP)` ≈ X (the array landed in PSRAM, not SRAM).
-   - Repeat with a string array to exercise the string-heap path.
+   - RP2350: repeat with a string array to exercise the string-heap path.
+   - ESP32: current expected behavior is that normal `DIM` allocations
+     use the internal MMBasic heap. ESP32 PSRAM is owned by the `RAM`
+     command surface and by explicit port allocations, not by generic
+     BASIC arrays/strings.
 
 7. **Negative cases**
    - `RAM SAVE 99` → expect "Invalid slot" / range error.

@@ -94,8 +94,9 @@ class TcpSmokeServers:
                     except socket.timeout:
                         pass
                     first = data.splitlines()[0].decode("latin1", "replace") if data.splitlines() else ""
-                    self.log.http_first_line = first
-                    self.log.http_bytes = len(data)
+                    if data:
+                        self.log.http_first_line = first
+                        self.log.http_bytes = len(data)
                     body = (
                         f"ESP32_CLIENT_OK\nFROM={addr[0]}\n"
                         f"REQUEST={first}\nBYTES={len(data)}\n"
@@ -132,7 +133,8 @@ class TcpSmokeServers:
                             data += chunk
                     except socket.timeout:
                         pass
-                    self.log.stream_request = data
+                    if data:
+                        self.log.stream_request = data
                     if data:
                         conn.sendall(b"ACK " + data)
                         for i in range(4):
@@ -145,6 +147,7 @@ class TcpSmokeServers:
 def run_smoke(args: argparse.Namespace) -> tuple[str, ServerLog]:
     mac_ip = args.host or local_ip_for(args.gateway)
     commands = [
+        "NEW",
         "OPTION BASE 0",
         args.connect_command,
         "DIM INTEGER A%(4096/8)",

@@ -37,13 +37,14 @@ def main() -> int:
             basic.reset_app()
         transcript.append(clean(basic.sync(timeout=args.long_timeout, boot_wait=args.boot_wait)))
 
-        def cmd(line: str, timeout: float | None = None) -> str:
-            result = basic.command(line, timeout=timeout or args.timeout)
+        def cmd(line: str, timeout: float | None = None, *, paginate: bool = False) -> str:
+            runner = basic.command_with_pagination if paginate else basic.command
+            result = runner(line, timeout=timeout or args.timeout)
             text = result.clean_text
             transcript.append(text)
             return text
 
-        listing = cmd('FILES "B:"', timeout=args.long_timeout)
+        listing = cmd('FILES "B:"', timeout=args.long_timeout, paginate=True)
         if args.expect_file and not re.search(rf"\b{re.escape(args.expect_file)}\b", listing, re.I):
             raise SystemExit(f"missing expected SD file in listing: {args.expect_file}")
 
@@ -99,6 +100,7 @@ def main() -> int:
 
         cmd(f'RENAME "{tmp1}" AS "{tmp2}"')
         cmd(f'KILL "{tmp2}"')
+        cmd('DRIVE "A:"')
 
     print("ESP32 SD smoke: PASS")
     if args.expect_file:

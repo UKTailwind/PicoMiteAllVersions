@@ -128,17 +128,17 @@ scanning the final phase, so raise `--timeout` rather than only
 ESP32-S3 PSRAM smoke:
 
 ```sh
-python3.11 porttools/esp32_fs_vm_smoke.py psram \
+python3.11 porttools/psram_smoke.py --target esp32 \
   --port /dev/cu.usbmodem2101 \
-  --timeout 12 \
-  --long-timeout 120
+  --long-timeout 120 \
+  --very-long-timeout 180
 ```
 
-The ESP32 suite is deliberately separate from Pico `RAM TEST`: it allocates
-with `heap_caps_malloc(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT)`, marches only the
-allocated block, frees it, and then checks that the BASIC prompt still works.
-It also verifies that generic `MM.INFO(PSRAM SIZE)` remains 0 so `Memory.c`
-does not enter the RP2350 PSRAM allocator on ESP32.
+The ESP32 target publishes the reserved PSRAM slab through the shared
+`MM.INFO(PSRAM SIZE)` / `RAM` command surface. `RAM TEST NOCACHE` remains an
+expected ESP32 error because the S3 has no cache-bypass PSRAM alias.
+`RAM FILE LOAD` is not implemented on ESP32; the harness checks that the error
+is explicit while still exercising `RAM SAVE` / `RAM LOAD` / `RAM RUN`.
 
 Known-good checks from the ESP32 bringup:
 
