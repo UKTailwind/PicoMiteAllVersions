@@ -151,6 +151,13 @@ unsigned char *HeapBottom(void);
  * ============================================================================ */
 void m_alloc(int type);
 void *GetMemory(int msize);
+void *CallocMemory(size_t num, size_t size); /* GetMemory wrapper for code that calls calloc() */
+/* NULL-returning variants (no error()/longjmp) for lwIP's pbuf alloc — see Memory.c */
+void *GetMemoryNull(int msize);
+void *CallocMemoryNull(size_t num, size_t size);
+#ifdef rp2350
+void *GetPSMemoryNull(int msize);
+#endif
 void *GetSystemMemory(int msize);
 void *GetTempMemory(int NbrBytes);
 #if defined(rp2350)
@@ -165,7 +172,7 @@ void *ReAllocMemory(void *addr, size_t msize);
 /* ============================================================================
  * Function declarations - Memory deallocation
  * ============================================================================ */
-void FreeMemory(unsigned char *addr);
+void FreeMemory(void *addr);
 void FreeMemorySafe(void **addr);
 void ClearTempMemory(void);
 void ClearSpecificTempMemory(void *addr);

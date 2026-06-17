@@ -119,7 +119,11 @@ bool PIO1 = true;
 bool PIO2 = false;
 #endif
 #endif
-#ifdef PICOMITEVGA
+/* HDMIWEB also defines PICOMITEVGA, but its PIO flags must come from the
+   PICOMITEWEB block below (cyw43 WiFi SPI on PIO2, I2S audio on PIO1, both
+   hidden from MMBasic). Exclude it here so PIO0/PIO1/PIO2 aren't defined
+   twice. */
+#if defined(PICOMITEVGA) && !defined(PICOMITEHDMIWEB)
 #ifdef rp2350
 #ifdef HDMI
 bool PIO0 = true;
@@ -638,6 +642,25 @@ int getGPpin(unsigned char *pinarg, int pio, int base)
 }
 
 /*  @endcond */
+// Return true if a user PIO state machine is currently running. The PIO0/PIO1/
+// PIO2 flags are true only for PIOs available to MMBasic; every internal user
+// (I2S audio sets its flag false in start_i2s(); cyw43 and VGA/HDMI are
+// statically false) hides its PIO, so any enabled SM on a still-"true" PIO must
+// be a user program (custom PIO, WS2812/BITSTREAM, etc.). Used to block a
+// runtime CPU-speed change, which would silently corrupt user PIO timing - the
+// clkdiv was computed by the user's program and cannot be re-derived.
+bool UserPIOActive(void)
+{
+        if (PIO0 && (pio0->ctrl & 0xfu))
+                return true;
+        if (PIO1 && (pio1->ctrl & 0xfu))
+                return true;
+#ifdef rp2350
+        if (PIO2 && (pio2->ctrl & 0xfu))
+                return true;
+#endif
+        return false;
+}
 void MIPS16 cmd_pio(void)
 {
         unsigned char *tp;
@@ -1209,13 +1232,17 @@ void MIPS16 cmd_pio(void)
                 else
                         StandardError(6);
 
+                uint32_t rxunder = 1u << (PIO_FDEBUG_RXUNDER_LSB + sm);
                 while (nbr--)
                 {
+                        pio->fdebug = rxunder;          // clear sticky underflow before the read
                         *dd = pio_sm_get(pio, sm);
-                        if (pio->fdebug & (1 << (sm + 16)))
-                                *dd = -1;
-                        if (nbr)
-                                dd++;
+                        if (pio->fdebug & rxunder)      // this read drained an empty FIFO
+                        {
+                                *dd = -1;               // -> data is invalid, mark it
+                                pio->fdebug = rxunder;  // clear the flag we just consumed
+                        }
+                        dd++;
                 }
                 return;
         }
@@ -2235,7 +2262,9 @@ void MIPS16 cmd_pio(void)
         tp = checkstring(cmdline, (unsigned char *)"PROGRAM");
         if (tp)
         {
-                struct pio_program program;
+                struct pio_program program = {0}; // zero pio_version/used_gpio_ranges:
+                                                  // SDK rejects the load (no instructions
+                                                  // written) if pio_version is stack garbage
                 getcsargs(&tp, 3);
                 if (argc != 3)
                         SyntaxError();
@@ -2263,7 +2292,8 @@ void MIPS16 cmd_pio(void)
                 for (int sm = 0; sm < 4; sm++)
                         hw_clear_bits(&pio->ctrl, 1 << (PIO_CTRL_SM_ENABLE_LSB + sm));
                 pio_clear_instruction_memory(pio);
-                pio_add_program(pio, &program);
+                if (pio_add_program(pio, &program) < 0) // negative = SDK refused the load
+                        error("PIO program load failed");
                 return;
         }
         tp = checkstring(cmdline, (unsigned char *)"SYNC");
@@ -3100,6 +3130,62 @@ void cmd_web(void)
         ;
 }
 
+/* ---- cJSON memory: bump arena over the firmware heap -----------------------------
+   cJSON defaults to newlib malloc/free, which here draw from the tiny C-runtime heap
+   between __end__ and __HeapLimit (~20 KB on the WEB RP2350 build). A JSON of any real
+   size exhausts it, and the pico-sdk __wrap_malloc/__wrap_realloc guard turns an
+   over-limit / NULL allocation into panic() -> reboot (the exception trap lands inside
+   __wrap_realloc). So cJSON must use the firmware's large MMHeap/PSRAM instead.
+
+   But GetMemory hands out whole 256-byte pages, while cJSON makes one tiny (~40 byte)
+   allocation per node plus one per object key / string value - a direct GetMemoryNull
+   hook would waste ~85% of every page and do an O(pages) bitmap scan per allocation.
+   cJSON parsing only ever grows (the whole tree is released at once via cJSON_Delete),
+   so a bump arena fits perfectly: take page-sized blocks from GetMemoryNull, sub-allocate
+   cheaply, and release everything in one json_arena_reset(). The free hook is therefore a
+   no-op and fun_json calls json_arena_reset() on every exit path. With custom hooks cJSON
+   also avoids realloc (it uses allocate+copy+free), so the SDK realloc guard is never hit. */
+#define JSON_ARENA_BLOCK 4096
+static void *json_arena_head = NULL;        // newest block; its first word -> previous block
+static unsigned char *json_arena_cur = NULL;
+static unsigned char *json_arena_end = NULL;
+
+static void json_arena_reset(void)
+{
+        void *b = json_arena_head;
+        while (b)
+        {
+                void *prev = *(void **)b; // link stored at the start of each block
+                FreeMemory(b);
+                b = prev;
+        }
+        json_arena_head = NULL;
+        json_arena_cur = json_arena_end = NULL;
+}
+
+static void *CJSON_CDECL json_malloc_hook(size_t sz)
+{
+        size_t n = (sz + 7u) & ~(size_t)7u; // keep every allocation 8-byte aligned
+        if (json_arena_cur == NULL || json_arena_cur + n > json_arena_end)
+        {
+                size_t blk = n + 8; // 8-byte header holds the block link
+                if (blk < JSON_ARENA_BLOCK)
+                        blk = JSON_ARENA_BLOCK;
+                unsigned char *b = (unsigned char *)GetMemoryNull((int)blk);
+                if (b == NULL)
+                        return NULL; // cJSON treats NULL as out-of-memory and unwinds
+                *(void **)b = json_arena_head; // chain the new block
+                json_arena_head = b;
+                json_arena_cur = b + 8;
+                json_arena_end = b + blk;
+        }
+        void *p = json_arena_cur;
+        json_arena_cur += n;
+        return p;
+}
+
+static void CJSON_CDECL json_free_hook(void *ptr) { (void)ptr; } // whole arena freed by json_arena_reset()
+
 void fun_json(void)
 {
         char *json_string = NULL;
@@ -3124,14 +3210,35 @@ void fun_json(void)
                         StandardError(35);
                 }
                 dest = (long long int *)ptr1;
-                json_string = (char *)&dest[1];
+                // The LongString / WEB-buffer convention stores the byte count in
+                // dest[0] and the raw payload (NOT null-terminated) in dest[1..].
+                // cJSON_Parse() begins with strlen() on its argument, so it must be
+                // given a null-terminated string. Copy exactly dest[0] bytes (clamped
+                // to the array's capacity) into temp memory and terminate it. Passing
+                // &dest[1] directly lets strlen run off the end of the array: harmless
+                // when the following RAM happens to hold a zero, but a hard-fault /
+                // reboot once the buffer lives in PSRAM (unmapped region follows).
+                int64_t slen = dest[0];
+                int64_t cap = (int64_t)g_vartbl[g_VarIndex].dims[0] * 8; // bytes after dest[0]
+                if (slen < 0)
+                        slen = 0;
+                if (slen > cap)
+                        slen = cap;
+                json_string = (char *)GetTempMemory(slen + 1);
+                memcpy(json_string, (char *)&dest[1], slen);
+                json_string[slen] = 0;
         }
         else
                 StandardError(35);
-        cJSON_InitHooks(NULL);
+        cJSON_Hooks json_hooks = {json_malloc_hook, json_free_hook};
+        cJSON_InitHooks(&json_hooks);
+        json_arena_reset(); // ensure a clean arena (frees any stragglers from an aborted call)
         cJSON *parse = cJSON_Parse(json_string);
         if (parse == NULL)
+        {
+                json_arena_reset(); // a failed parse still allocated partial nodes (free hook is a no-op)
                 error("Invalid JSON data");
+        }
         root = parse;
         p = (char *)getCstring((unsigned char *)argv[2]);
         int len = strlen(p);
@@ -3186,13 +3293,13 @@ void fun_json(void)
 
         if (cJSON_IsObject(root))
         {
-                cJSON_Delete(parse);
+                json_arena_reset();
                 error("Not an item");
                 return;
         }
         if (cJSON_IsInvalid(root))
         {
-                cJSON_Delete(parse);
+                json_arena_reset();
                 error("Not an item");
                 return;
         }
@@ -3204,7 +3311,7 @@ void fun_json(void)
                         IntToStr(a, (int64_t)tempd, 10);
                 else
                         FloatToStr(a, tempd, 0, STR_AUTO_PRECISION, ' '); // set the string value to be saved
-                cJSON_Delete(parse);
+                json_arena_reset();
                 sret = (unsigned char *)a;
                 sret = CtoM(sret);
                 targ = T_STR;
@@ -3214,7 +3321,7 @@ void fun_json(void)
         {
                 int64_t tempint;
                 tempint = root->valueint;
-                cJSON_Delete(parse);
+                json_arena_reset();
                 if (tempint)
                         strcpy((char *)sret, "true");
                 else
@@ -3226,13 +3333,13 @@ void fun_json(void)
         if (cJSON_IsString(root))
         {
                 strcpy(a, root->valuestring);
-                cJSON_Delete(parse);
+                json_arena_reset();
                 sret = (unsigned char *)a;
                 sret = CtoM(sret);
                 targ = T_STR;
                 return;
         }
-        cJSON_Delete(parse);
+        json_arena_reset();
         targ = T_STR;
         sret = (unsigned char *)a;
 }

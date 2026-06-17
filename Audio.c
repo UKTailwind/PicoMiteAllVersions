@@ -780,17 +780,11 @@ void CloseAudio(int all)
 	setrate(-1);
 	return;
 }
-void setrate(int rate)
+int AudioCurrentRate = 0; // active PWM/I2S audio rate in Hz (-1 = idle); kept
+						  // at file scope so the wrap and I2S divider can be
+						  // re-derived after a runtime CPU clock change.
+static void apply_audio_rate(int rate)
 {
-	static int lastrate = 0;
-	if (rate == lastrate)
-		return;
-	if (rate == -1)
-	{
-		lastrate = rate;
-		return;
-	}
-	lastrate = rate;
 	AUDIO_WRAP = (Option.CPU_Speed * 1000) / rate - 1;
 	pwm_set_wrap(AUDIO_SLICE, AUDIO_WRAP);
 	if (Option.AUDIO_L)
@@ -803,6 +797,28 @@ void setrate(int rate)
 		float clockdiv = (Option.CPU_Speed * 1000.0f) / (float)(rate * 128);
 		pio_sm_set_clkdiv(pioi2s, i2ssm, clockdiv);
 	}
+}
+void setrate(int rate)
+{
+	if (rate == AudioCurrentRate)
+		return;
+	if (rate == -1)
+	{
+		AudioCurrentRate = rate;
+		return;
+	}
+	AudioCurrentRate = rate;
+	apply_audio_rate(rate);
+}
+// Re-derive the PWM wrap and I2S clock divider for the active audio rate after
+// the CPU clock changes - both scale with Option.CPU_Speed, so without this the
+// 44.1 kHz PWM sample interrupt would tick at the wrong rate and shift the audio
+// pitch. No-op when audio is idle. Bypasses setrate()'s same-rate short-circuit,
+// which would otherwise refuse to re-apply the unchanged rate.
+void ResetAudioRate(void)
+{
+	if (AudioCurrentRate > 0)
+		apply_audio_rate(AudioCurrentRate);
 }
 #if !defined(PICOMITEMIN)
 void playvs1053(int mode)

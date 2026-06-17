@@ -3234,103 +3234,128 @@ void fun_math(void)
 			targ = T_NBR;
 			return;
 		}
-		tp = checkstring(ep, (unsigned char *)"CROSSING");
-		if (tp)
-		{
-			MMFLOAT *a1float = NULL;
-			int64_t *a1int = NULL;
-			int arraylength = 0;
-			MMFLOAT crossing = 0.0;
-			int direction = 1;
-			int found = -1;
-			getcsargs(&tp, 5);
-			if (argc < 1)
-				SyntaxError();
-			;
-			if (argc >= 3 && *argv[2])
-				crossing = getnumber(argv[2]);
-			if (argc == 5)
-				direction = getint(argv[4], -1, 1);
-			if (direction == 0)
-				error("Valid are -1 and 1");
-			arraylength = parsenumberarray(argv[0], &a1float, &a1int, 1, 1, dims, false, NULL);
-			for (int i = 0; i < arraylength - 3; i++)
-			{
-				if (a1float)
-				{
-					if (a1float[i] < crossing && a1float[i + 2] > crossing && (a1float[i + 1] >= a1float[i] && a1float[i + 1] <= a1float[i + 2]) && direction == 1)
-					{
-						found = i + 1;
-						break;
-					}
-					if (a1float[i] > crossing && a1float[i + 2] < crossing && (a1float[i + 1] <= a1float[i] && a1float[i + 1] >= a1float[i + 2]) && direction == -1)
-					{
-						found = i + 1;
-						break;
-					}
-				}
-				else
-				{
-					if (a1int[i] < crossing && a1int[i + 2] > crossing && (a1int[i + 1] >= a1int[i] && a1int[i + 1] <= a1int[i + 2]) && direction == 1)
-					{
-						found = i + 1;
-						break;
-					}
-					if (a1int[i] > crossing && a1int[i + 2] < crossing && (a1int[i + 1] <= a1int[i] && a1int[i + 1] >= a1int[i + 2]) && direction == -1)
-					{
-						found = i + 1;
-						break;
-					}
-				}
-			}
-			if (found == -1)
-			{ // try a slower moving slope
-				for (int i = 0; i < arraylength - 5; i++)
-				{
-					if (a1float)
-					{
-						if (a1float[i + 1] <= crossing && a1float[i + 3] >= crossing && (a1float[i + 2] >= a1float[i + 1] && a1float[i + 2] <= a1float[i + 3]) && direction == 1)
-						{
-							if (a1float[i] < a1float[i + 2] && a1float[i + 4] > a1float[i + 2])
-							{
-								found = i + 2;
-								break;
-							}
-						}
-						if (a1float[i + 1] >= crossing && a1float[i + 3] <= crossing && (a1float[i + 2] <= a1float[i + 1] && a1float[i + 2] >= a1float[i + 3]) && direction == -1)
-						{
-							if (a1float[i] > a1float[i + 2] && a1float[i + 4] < a1float[i + 2])
-							{
-								found = i + 2;
-								break;
-							}
-						}
-					}
-					else
-					{
-						if (a1int[i + 1] <= crossing && a1int[i + 3] >= crossing && (a1int[i + 2] >= a1int[i + 1] && a1int[i + 2] <= a1int[i + 3]) && direction == 1)
-						{
-							if (a1int[i] < a1int[i + 2] && a1int[i + 4] > a1int[i + 2])
-							{
-								found = i + 2;
-								break;
-							}
-						}
-						if (a1int[i + 1] >= crossing && a1int[i + 3] <= crossing && (a1int[i + 2] <= a1int[i + 1] && a1int[i + 2] >= a1int[i + 3]) && direction == -1)
-						{
-							if (a1int[i] > a1int[i + 2] && a1int[i + 4] < a1int[i + 2])
-							{
-								found = i + 2;
-								break;
-							}
-						}
-					}
-				}
-			}
-			targ = T_INT;
-			iret = found;
-			return;
-		}
+tp = checkstring(ep, (unsigned char *)"CROSSING");
+if (tp)
+{
+    MMFLOAT *a1float = NULL;
+    int64_t *a1int = NULL;
+    int arraylength = 0;
+    MMFLOAT crossing = 0.0;
+    int direction = 1;
+    int found = -1;
+    getcsargs(&tp, 5);
+    if (argc < 1)
+        SyntaxError();
+
+    if (argc >= 3 && *argv[2])
+        crossing = getnumber(argv[2]);
+    if (argc == 5)
+        direction = getint(argv[4], -1, 1);
+    if (direction == 0)
+        error("Valid are -1 and 1");
+    arraylength = parsenumberarray(argv[0], &a1float, &a1int, 1, 1, dims, false, NULL);
+
+    // Pass 1: fast crossing detection using triplets.
+    // Returns the index of the middle element (i+1), i.e. the first sample
+    // known to be on the far side of the crossing direction.
+    // Fixed bound: i+2 must be a valid index, so i < arraylength - 2.
+    for (int i = 0; i < arraylength - 2; i++)
+    {
+        if (a1float)
+        {
+            if (direction == 1 &&
+                a1float[i] < crossing && a1float[i + 2] > crossing &&
+                (a1float[i + 1] >= a1float[i] && a1float[i + 1] <= a1float[i + 2]))
+            {
+                found = i + 1;
+                break;
+            }
+            if (direction == -1 &&
+                a1float[i] > crossing && a1float[i + 2] < crossing &&
+                (a1float[i + 1] <= a1float[i] && a1float[i + 1] >= a1float[i + 2]))
+            {
+                found = i + 1;
+                break;
+            }
+        }
+        else
+        {
+            if (direction == 1 &&
+                a1int[i] < crossing && a1int[i + 2] > crossing &&
+                (a1int[i + 1] >= a1int[i] && a1int[i + 1] <= a1int[i + 2]))
+            {
+                found = i + 1;
+                break;
+            }
+            if (direction == -1 &&
+                a1int[i] > crossing && a1int[i + 2] < crossing &&
+                (a1int[i + 1] <= a1int[i] && a1int[i + 1] >= a1int[i + 2]))
+            {
+                found = i + 1;
+                break;
+            }
+        }
+    }
+
+    if (found == -1)
+    {
+        // Pass 2: slower crossing detection using a 5-element window.
+        // Returns the index of the centre element (i+2).
+        // Fixed bound: i+4 must be a valid index, so i < arraylength - 4.
+        for (int i = 0; i < arraylength - 4; i++)
+        {
+            if (a1float)
+            {
+                if (direction == 1 &&
+                    a1float[i + 1] <= crossing && a1float[i + 3] >= crossing &&
+                    (a1float[i + 2] >= a1float[i + 1] && a1float[i + 2] <= a1float[i + 3]))
+                {
+                    if (a1float[i] < a1float[i + 2] && a1float[i + 4] > a1float[i + 2])
+                    {
+                        found = i + 2;
+                        break;
+                    }
+                }
+                if (direction == -1 &&
+                    a1float[i + 1] >= crossing && a1float[i + 3] <= crossing &&
+                    (a1float[i + 2] <= a1float[i + 1] && a1float[i + 2] >= a1float[i + 3]))
+                {
+                    if (a1float[i] > a1float[i + 2] && a1float[i + 4] < a1float[i + 2])
+                    {
+                        found = i + 2;
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                if (direction == 1 &&
+                    a1int[i + 1] <= crossing && a1int[i + 3] >= crossing &&
+                    (a1int[i + 2] >= a1int[i + 1] && a1int[i + 2] <= a1int[i + 3]))
+                {
+                    if (a1int[i] < a1int[i + 2] && a1int[i + 4] > a1int[i + 2])
+                    {
+                        found = i + 2;
+                        break;
+                    }
+                }
+                if (direction == -1 &&
+                    a1int[i + 1] >= crossing && a1int[i + 3] <= crossing &&
+                    (a1int[i + 2] <= a1int[i + 1] && a1int[i + 2] >= a1int[i + 3]))
+                {
+                    if (a1int[i] > a1int[i + 2] && a1int[i + 4] < a1int[i + 2])
+                    {
+                        found = i + 2;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    targ = T_INT;
+    iret = found;
+    return;
+}
 		tp = checkstring(ep, (unsigned char *)"CORREL");
 		if (tp)
 		{

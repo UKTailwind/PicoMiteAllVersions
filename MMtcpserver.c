@@ -38,6 +38,10 @@ static TCP_SERVER_T *tcp_server_init(void)
            silently dropped (their lwIP PCBs would leak in CLOSE_WAIT). */
         if (TCPstate)
                 return TCPstate;
+        /* C heap (NOT the MMBasic heap): the TCP server persists in the
+           background across program RUNs, but InitHeap(true) wipes the MMBasic
+           heap on every RUN — a CallocMemory'd TCPstate would be reclaimed
+           while lwIP still holds the pointer, faulting on the next packet. */
         TCPstate = (TCP_SERVER_T *)calloc(1, sizeof(TCP_SERVER_T));
         if (!TCPstate)
                 return NULL;

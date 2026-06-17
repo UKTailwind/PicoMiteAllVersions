@@ -285,7 +285,9 @@ int cmd_tcpclient(void)
         state->TCP_PORT = port;
         state->buffer_write = NULL;
         int dots = 0;
-        for (const char *p = IP; *p; p++) if (*p == '.') dots++;
+        for (const char *p = IP; *p; p++)
+            if (*p == '.')
+                dots++;
         if (dots == 3 && ip4addr_aton(IP, &remote_addr))
         {
             state->remote_addr = remote_addr;
@@ -344,7 +346,9 @@ int cmd_tcpclient(void)
         state->TCP_PORT = port;
         state->buffer_write = &streampointer;
         int dots = 0;
-        for (const char *p = IP; *p; p++) if (*p == '.') dots++;
+        for (const char *p = IP; *p; p++)
+            if (*p == '.')
+                dots++;
         if (dots == 3 && ip4addr_aton(IP, &remote_addr))
         {
             state->remote_addr = remote_addr;
@@ -412,7 +416,9 @@ int cmd_tcpclient(void)
         state->buffer_write = NULL;
         state->tls = true;
         int dots = 0;
-        for (const char *p = IP; *p; p++) if (*p == '.') dots++;
+        for (const char *p = IP; *p; p++)
+            if (*p == '.')
+                dots++;
         bool is_ip = (dots == 3 && ip4addr_aton(IP, &remote_addr));
         if (is_ip)
         {
@@ -473,7 +479,9 @@ int cmd_tcpclient(void)
         state->buffer_write = &streampointer;
         state->tls = true;
         int dots = 0;
-        for (const char *p = IP; *p; p++) if (*p == '.') dots++;
+        for (const char *p = IP; *p; p++)
+            if (*p == '.')
+                dots++;
         bool is_ip = (dots == 3 && ip4addr_aton(IP, &remote_addr));
         if (is_ip)
         {
@@ -546,7 +554,7 @@ int cmd_tcpclient(void)
         if (!Timer4)
             error("No response from server");
         else
-            Timer4 = 200;
+            Timer4 = 500;
         while (Timer4)
             ProcessWeb(0);
         return 1;

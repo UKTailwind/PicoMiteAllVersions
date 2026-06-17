@@ -583,6 +583,7 @@ void MIPS16 SerialOpen(unsigned char *spec)
 		ExtCfg(UART0TXpin, EXT_COM_RESERVED, 0);
 
 		setupuart(0, s2, parity, b7, baud, inv);
+		com1_baud = baud; // remember so the baud can be re-applied if CPU speed changes
 		com1 = true;
 		uSec(1000);
 		com1Rx_head = com1Rx_tail = 0;
@@ -613,6 +614,7 @@ void MIPS16 SerialOpen(unsigned char *spec)
 		com2Tx_head = com2Tx_tail = 0;
 		ExtCfg(UART1TXpin, EXT_COM_RESERVED, 0); // reserve the pin for com use
 		setupuart(1, s2, parity, b7, baud, inv);
+		com2_baud = baud; // remember so the baud can be re-applied if CPU speed changes
 		com2 = true;
 		uSec(1000);
 		com2Rx_head = com2Rx_tail = 0;

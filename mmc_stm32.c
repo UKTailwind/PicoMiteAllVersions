@@ -135,6 +135,7 @@ void __not_in_flash_func(DefaultAudio)(uint16_t left, uint16_t right)
 {
 	pwm_set_both_levels(AUDIO_SLICE, (left * AUDIO_WRAP) >> 12, (right * AUDIO_WRAP) >> 12);
 }
+#ifndef PICOMITEMIN
 void __not_in_flash_func(SPIAudio)(uint16_t left, uint16_t right)
 {
 	uint16_t l = 0x7000 | left, r = 0xF000 | right;
@@ -145,6 +146,7 @@ void __not_in_flash_func(SPIAudio)(uint16_t left, uint16_t right)
 	spi_write16_blocking((AUDIO_SPI == 1 ? spi0 : spi1), &l, 1);
 	gpio_put(AUDIO_CS_PIN, GPIO_PIN_SET);
 }
+#endif
 void (*AudioOutput)(uint16_t left, uint16_t right) = (void (*)(uint16_t, uint16_t))DefaultAudio;
 
 /*--------------------------------------------------------------------------
@@ -2888,6 +2890,7 @@ void InitReservedIO(void)
 			gpio_set_slew_rate(AUDIO_L_PIN, GPIO_SLEW_RATE_SLOW);
 			gpio_set_slew_rate(AUDIO_R_PIN, GPIO_SLEW_RATE_SLOW);
 		}
+#ifndef PICOMITEMIN
 		else
 		{ // SPI Audio (DAC or VS1053)
 			ExtCfg(Option.AUDIO_CS_PIN, EXT_BOOT_RESERVED, 0);
@@ -2939,6 +2942,7 @@ void InitReservedIO(void)
 				spi_set_format((AUDIO_SPI == 1 ? spi0 : spi1), 16, true, true, SPI_MSB_FIRST);
 			}
 		}
+#endif
 		if (!AUDIO_USES_VS1053)
 		{ // PWM or DAC audio
 			AUDIO_SLICE = Option.AUDIO_SLICE;
@@ -2950,10 +2954,12 @@ void InitReservedIO(void)
 				pwm_set_chan_level(AUDIO_SLICE, PWM_CHAN_B, AUDIO_WRAP >> 1);
 				AudioOutput = DefaultAudio;
 			}
+#ifndef PICOMITEMIN
 			else
 			{
 				AudioOutput = SPIAudio;
 			}
+#endif
 			AudioOutput(2000, 2000);
 			pwm_clear_irq(AUDIO_SLICE);
 			irq_set_exclusive_handler(PWM_IRQ_WRAP, on_pwm_wrap);

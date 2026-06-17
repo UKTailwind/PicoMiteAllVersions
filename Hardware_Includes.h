@@ -474,6 +474,10 @@ extern unsigned char WatchdogSet;
 extern unsigned char IgnorePIN;
 extern MMFLOAT VCC;
 extern uint32_t restart_reason;
+/* Live clk_sys speed in kHz after a runtime change (CPUSpeedRuntime), 0 =
+   still at boot speed. The error-path reload (ReloadOptionsKeepLive)
+   re-asserts it into Option.CPU_Speed. */
+extern volatile uint32_t LiveCPUSpeed;
 extern int calibrate;
 
 /* ============================================================================
@@ -494,6 +498,7 @@ extern const struct s_PinDef PinDef[NBRPINS + 1];
  * ============================================================================ */
 extern uint16_t AUDIO_L_PIN, AUDIO_R_PIN, AUDIO_SLICE;
 extern uint16_t AUDIO_WRAP;
+void ResetAudioRate(void); // re-derive PWM wrap / I2S divider after a CPU clock change
 
 /* ============================================================================
  * External variables - SD card
@@ -613,12 +618,11 @@ extern uint32_t map16quads[16];
 extern uint32_t map16pairs[16];
 extern const uint32_t MAP256DEF[256];
 extern volatile int32_t v_scanline;
-#ifdef PICOMITEHDMIBTH
-/* Live HDMIBTH scanout resolution (definition in PicoMite.c). Shared with
-   FileIO.c so LoadOptions() can re-assert it into Option.Resolution after
-   reloading the Option struct from flash. */
+/* Live HDMI scanout resolution, -1 until the first live RESOLUTION switch
+   (definition in PicoMite.c). Shared with FileIO.c so the error-path reload
+   (ReloadOptionsKeepLive) can re-assert it into Option.Resolution after
+   refreshing the Option struct from flash. */
 extern volatile int HDMIres;
-#endif
 extern uint16_t *tilefcols;
 extern uint16_t *tilebcols;
 extern uint8_t *tilefcols_w;
@@ -906,7 +910,12 @@ bool picomite_tls_verify_is_required(void);
 #endif
 #endif
 
-#ifdef PICOMITEWEB
+/* PICOMITEVGA is excluded here: HDMIWEB defines both PICOMITEWEB and
+   PICOMITEVGA, but its display is HDMI (like HDMIBTH), not the SPI-LCD that
+   SSD1963.h drives. SSD1963.h's `#define nop asm("NOP")` also collides with
+   Include.h's `void nop()` (pulled in by every PICOMITEVGA TU). HDMIWEB still
+   gets Touch.h / GUI.h from the PICOMITEVGA+GUICONTROLS block below. */
+#if defined(PICOMITEWEB) && !defined(PICOMITEVGA)
 #include "SSD1963.h"
 #include "Touch.h"
 #ifdef rp2350

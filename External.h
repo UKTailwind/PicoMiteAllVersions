@@ -467,6 +467,14 @@ void setBacklight(int level, int frequency);
  * Function declarations - Utility functions
  * ============================================================================ */
 void SoftReset(int code);
+/* Runtime (no reboot) clk_sys change. Compiled for the non-display builds
+   (CPU SPEED command) and for all HDMI builds, where the live RESOLUTION
+   switch uses it to move between the per-resolution CPU speeds (on the
+   cut-down HDMIBTH/HDMIWEB builds: the 640x480 252/315/378 MHz options). */
+#if !defined(PICOMITEVGA) || defined(HDMI)
+int CPUSpeedRuntime(uint32_t speed);
+#endif
+bool UserPIOActive(void); // true if a user PIO state machine is running
 int codemap(int pin);
 int codecheck(unsigned char *line);
 int getpinarg(unsigned char *arg);

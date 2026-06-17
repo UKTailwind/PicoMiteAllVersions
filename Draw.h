@@ -362,6 +362,7 @@ extern void (*ReadBuffer)(int x1, int y1, int x2, int y2, unsigned char *c);
 extern void (*DrawBLITBuffer)(int x1, int y1, int x2, int y2, unsigned char *c);
 extern void (*ReadBLITBuffer)(int x1, int y1, int x2, int y2, unsigned char *c);
 extern void (*ReadBufferFast)(int x1, int y1, int x2, int y2, unsigned char *c);
+extern void (*DrawBufferFast)(int x1, int y1, int x2, int y2, int blank, unsigned char *c);
 
 /* ============================================================================
  * Mouse / virtual cursor overlay (PICOMITEVGA, all variants)
@@ -445,8 +446,8 @@ void DisplayPutC(char c);
 void ShowCursor(int show);
 // void CheckDisplay(void);
 void setmode(int mode, bool clear);
-#ifdef PICOMITEHDMIBTH
-void restartHDMIBTH(int newres);
+#ifdef HDMI
+void restartHDMI(int newres);
 #endif
 
 /* ============================================================================

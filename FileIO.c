@@ -4551,7 +4551,7 @@ void MIPS16 CloseAllFiles(void)
 #ifndef PICOMITEMIN
     tilemap_closeall();
 #endif
-#ifndef PICOMITEWEB
+#if !defined(PICOMITEWEB) || defined(PICOMITEHDMIWEB)
     closeall3d();
 #ifdef RAYCASTER
     ray_close();
@@ -6563,6 +6563,11 @@ void CheckSDCard(void)
 #endif
     diskchecktimer = DISKCHECKRATE;
 }
+/* Pure refresh of the in-RAM Option struct from flash. This is on the
+   boot-critical path (first thing main() does) so it deliberately contains
+   NO runtime-state logic: if a runtime command (CPU SPEED, RESOLUTION) has
+   moved the hardware away from the saved values, it is the CALLER's job to
+   preserve that — the error routine uses ReloadOptionsKeepLive() below. */
 void LoadOptions(void)
 {
     int i = sizeof(struct option_s);
@@ -6595,16 +6600,47 @@ void LoadOptions(void)
     if (OSK_IsUserDisabled())
         OptionVResreserved = 0;
 #endif
-#ifdef PICOMITEHDMIBTH
-    /* The byte-copy above just reverted Option.Resolution to the flash
-       value (always 1024x600 — OPTION RESOLUTION is gated off for this
-       build). But the RESOLUTION command can have switched the live
-       scanout to 640 without saving to flash. Re-assert the actual live
-       resolution so the error-handler / soft-reset reload never desyncs
-       Option.Resolution from what core1 is scanning (which corrupted the
-       display and made RESOLUTION 1024 a no-op). See HDMIres in PicoMite.c. */
-    Option.Resolution = HDMIres;
+}
+
+/* Error-path reload of the Option struct. The error routine refreshes
+   Option from flash to guarantee a clean, uncorrupted state — but unlike a
+   boot, execution then CONTINUES on hardware that a runtime command may
+   have reconfigured without persisting it. Blindly loading flash would
+   leave Option describing a machine that no longer exists:
+     - CPU speed: CPU SPEED (non-display builds) / the live RESOLUTION
+       switch (full HDMI builds) reprogram PLL_SYS at runtime; the live
+       speed is shadowed in LiveCPUSpeed, and every later UART-baud /
+       SPI / PWM derivation reads Option.CPU_Speed.
+     - Resolution (HDMI builds): RESOLUTION switches the core1 scanout
+       without a reboot; the live value is shadowed in HDMIres. Reverting
+       it corrupted the display, made a switch back a no-op, and (via the
+       fields below) left the console geometry sized for the wrong screen.
+       DefaultFont and the console Height/Width were re-derived from the
+       live geometry by cmd_resolution / SetFont, so they are part of the
+       same reality and are restored with it.
+   So: snapshot the live reality, refresh everything from flash, then
+   re-assert the reality. When no runtime change is in force the flash
+   values ARE the reality and stand exactly as loaded. */
+void ReloadOptionsKeepLive(void)
+{
+#ifdef HDMI
+    int liveres = HDMIres;
+    int liveDefaultFont = Option.DefaultFont;
+    int liveHeight = Option.Height;
+    int liveWidth = Option.Width;
 #endif
+    LoadOptions();
+#ifdef HDMI
+    if (liveres >= 0 && Option.Resolution != liveres)
+    {
+        Option.Resolution = liveres;
+        Option.DefaultFont = liveDefaultFont;
+        Option.Height = liveHeight;
+        Option.Width = liveWidth;
+    }
+#endif
+    if (LiveCPUSpeed)
+        Option.CPU_Speed = LiveCPUSpeed;
 }
 
 void ResetOptions(bool startup)
@@ -6643,12 +6679,14 @@ void ResetOptions(bool startup)
     Option.HDMId0 = 0;
     Option.HDMId1 = 6;
     Option.HDMId2 = 4;
-#ifdef PICOMITEHDMIBTH
-    /* HDMIBTH targets fixed 1024x600 mode. FreqX (250 MHz) is the
-       CPU_Speed paired with that DVI timing. Other resolutions will
-       be stripped out in a later step. */
-    Option.Resolution = R1024x600;
-    Option.CPU_Speed = CPUFreqs[Option.Resolution];
+#ifdef HDMICUTDOWN
+    /* HDMIBTH/HDMIWEB factory default matches the full HDMI build:
+       640x480 at 315 MHz (75 Hz). 1024x600 (252 MHz) and the other
+       640x480 speeds are selected with OPTION RESOLUTION (saved) or the
+       RESOLUTION command (live). Note R640x480x8 must NOT be used to
+       index CPUFreqs[] — its enum value is past the end of that table. */
+    Option.Resolution = R640x480x8;
+    Option.CPU_Speed = Freq480P;
 #endif
 #endif
     Option.USBKeyboard = CONFIG_US;
@@ -6764,7 +6802,16 @@ void ResetOptions(bool startup)
     Option.VGA_BLUE = 24;
     uint8_t txbuf[4] = {0x9f};
     uint8_t rxbuf[4] = {0};
+#if defined(PICOMITEWEB) || defined(PICOMITEBT) || defined(PICOMITEBTH) || defined(PICOMITEHDMIBTH)
+    /* CYW43 builds: the heartbeat LED is on the wireless chip, there is
+       no GPIO heartbeat, so don't default to GP25 — a non-zero pin here
+       makes OPTION LIST report a phantom HEARTBEAT PIN. The boot-time
+       options-validity check in main() exempts these builds from the
+       heartbeatpin==0 test. */
+    Option.heartbeatpin = 0;
+#else
     Option.heartbeatpin = 43;
+#endif
 #ifdef rp2350
     if (!rp2350a)
     {

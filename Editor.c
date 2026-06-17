@@ -967,6 +967,19 @@ static void fm_local_cache_prepare(void)
         fm_local_cache_valid = 1;
     }
 }
+
+/* Fold a 24-bit RGB colour into a single distinct byte (RGB3:3:2) for the
+ * local-display dirty-check cache.  A plain (unsigned char) cast kept only the
+ * blue channel, so CYAN (0x00FFFF) and WHITE (0xFFFFFF) - the active/inactive
+ * highlight pair - both stored 0xFF.  That made an active<->inactive colour
+ * change with unchanged text invisible to the dirty check, so the drive header
+ * bar never repainted on Tab on the HDMI panel (serial has no cache and was
+ * fine).  RGB3:3:2 keeps the whole FM palette (BLACK/WHITE/CYAN/YELLOW) distinct. */
+static inline unsigned char fm_color_key(int c)
+{
+    unsigned int u = (unsigned int)c;
+    return (unsigned char)(((u >> 16) & 0xE0) | (((u >> 8) & 0xE0) >> 3) | ((u & 0xFF) >> 6));
+}
 #else
 static inline void fm_local_cache_invalidate(void)
 {
@@ -1467,8 +1480,8 @@ static void fm_draw_field(int x, int y, int width, const char *text, const char 
             {
                 int idx = y * fm_local_cache_w + (x + i);
                 if (fm_local_chars[idx] != line[i] ||
-                    fm_local_fc[idx] != (unsigned char)fc ||
-                    fm_local_bc[idx] != (unsigned char)bc)
+                    fm_local_fc[idx] != fm_color_key(fc) ||
+                    fm_local_bc[idx] != fm_color_key(bc))
                 {
                     draw_needed = 1;
                     break;
@@ -1495,8 +1508,8 @@ static void fm_draw_field(int x, int y, int width, const char *text, const char 
             {
                 int idx = y * fm_local_cache_w + (x + i);
                 fm_local_chars[idx] = line[i];
-                fm_local_fc[idx] = (unsigned char)fc;
-                fm_local_bc[idx] = (unsigned char)bc;
+                fm_local_fc[idx] = fm_color_key(fc);
+                fm_local_bc[idx] = fm_color_key(bc);
             }
         }
 #else
@@ -2239,117 +2252,99 @@ static int fm_draw_panel_entries(fm_panel_t *panel, int active, int x, int width
 static const char *fm_top_help_line(int width)
 {
     if (width >= 78)
-        return "F1:Help  A/B/C:Drive  S:Sort  L/F9:List  SPACE:Mark  /:Type-select";
+        return "F1:Help  A/B/C:Drive  S:Sort  F3:List  SPACE:Mark  /:Type-select";
     if (width >= 64)
-        return "F1:Help  A/B/C:Drive  S:Sort  L/F9:List  SPACE:Mark";
+        return "F1:Help  A/B/C:Drive  S:Sort  F3:List  SPACE:Mark";
     if (width >= 50)
-        return "F1:Help  A/B/C:Drv  S:Sort  L/F9:List";
-    return "F1:Help  S:Sort  L/F9:List";
+        return "F1:Help  A/B/C:Drv  S:Sort  F3:List";
+    return "F1:Help  S:Sort  F3:List";
 }
 
-static int fm_help_draw_wrapped_line(int y, int width, const char *text)
+/* Draw one help-table line: up to two (key, action) pairs in aligned columns.
+ * Keys are highlighted (yellow), actions normal (white).  Each cell is drawn
+ * with fm_draw_field which pads/truncates to its width, so columns stay aligned
+ * regardless of the text length.  Pass an empty k2 for a single-pair row.     */
+static int fm_help_row(int y, int half, int kw,
+                       const char *k1, const char *a1,
+                       const char *k2, const char *a2)
 {
-    const char *p;
-
-    if (width <= 0 || y >= Option.Height - 1)
-        return y;
-    if (text == NULL || text[0] == 0)
+    fm_draw_field(0, y, kw, k1, FM_ANSI_STATUS, YELLOW, BLACK);
+    fm_draw_field(kw, y, half - kw, a1, FM_ANSI_NORMAL, WHITE, BLACK);
+    if (k2 != NULL && k2[0])
     {
-        fm_draw_field(0, y, width, "", FM_ANSI_NORMAL, WHITE, BLACK);
-        return y + 1;
+        fm_draw_field(half, y, kw, k2, FM_ANSI_STATUS, YELLOW, BLACK);
+        fm_draw_field(half + kw, y, Option.Width - half - kw, a2, FM_ANSI_NORMAL, WHITE, BLACK);
     }
-
-    p = text;
-    while (*p && y < Option.Height - 1)
+    else
     {
-        int remaining;
-        int take;
-        int i;
-        int last_space;
-        int outlen;
-        char line[STRINGSIZE * 2];
-
-        while (*p == ' ')
-            p++;
-        if (!*p)
-            break;
-
-        remaining = strlen(p);
-        if (remaining <= width)
-        {
-            fm_draw_field(0, y, width, p, FM_ANSI_NORMAL, WHITE, BLACK);
-            y++;
-            break;
-        }
-
-        take = width;
-        last_space = -1;
-        for (i = 0; i < take; i++)
-        {
-            if (p[i] == ' ')
-                last_space = i;
-        }
-        if (last_space > 0)
-            take = last_space;
-
-        outlen = take;
-        while (outlen > 0 && p[outlen - 1] == ' ')
-            outlen--;
-        if (outlen <= 0)
-            outlen = take;
-
-        if (outlen >= (int)sizeof(line))
-            outlen = sizeof(line) - 1;
-        memcpy(line, p, outlen);
-        line[outlen] = 0;
-        fm_draw_field(0, y, width, line, FM_ANSI_NORMAL, WHITE, BLACK);
-        y++;
-
-        p += take;
-        while (*p == ' ')
-            p++;
+        fm_draw_field(half, y, Option.Width - half, "", FM_ANSI_NORMAL, WHITE, BLACK);
     }
-
-    return y;
+    return y + 1;
 }
 
 static void fm_show_help_screen(void)
 {
-    static const char *help_lines[] = {
-        "Arrows/Home/End/PgUp/PgDn or ^E/^X/^U/^K/^P/^L: move selection",
-        "TAB/LEFT/RIGHT or ^S/^D: switch active panel",
-        "ENTER: open dir, run .BAS, play audio, view .BMP/.JPG/.PNG",
-        "L or F9: list selected file using paged LIST",
-        "F2/^W: edit selected file (ESC/F1/F2 exits editor back to FM)",
-        "A/B/C: change active drive   F3/^R set filter   F4/^T clear filter",
-        "SPACE:mark/unmark  *:mark all  \\:clear marks  F5/^Y copy  DEL/^] delete  X rec del",
-        "F6/^O stop  F7/F8 +/- vol  F10/^B mkdir  G:go  N:new  ^N:rename  D:dup  M:move",
-        "/:type-select (name sort, ENTER open, ESC cancel)",
-        "CTRL-C ignored in FM (except LIST, where it exits listing)"};
-    int i, c;
-    int y;
-    int clipped;
+    int i, c, y;
+    int half = Option.Width / 2;
+    int kw = 9; /* key column width (fits "Enter F2", "Home/End", etc.) */
+    int bottom = Option.Height - 1;
+    int clipped = 0;
+
+    if (half < kw + 4)
+        half = kw + 4; /* keep an action column even on the narrowest screens */
 
     for (i = 0; i < Option.Height; i++)
         fm_draw_field(0, i, Option.Width, "", FM_ANSI_NORMAL, WHITE, BLACK);
 
-    fm_draw_field(0, 0, Option.Width, "FM HELP  (press any key)", FM_ANSI_TITLE, CYAN, BLACK);
+    fm_draw_field(0, 0, Option.Width, "FM HELP", FM_ANSI_TITLE, CYAN, BLACK);
+
     y = 2;
-    clipped = 0;
-    for (i = 0; i < (int)(sizeof(help_lines) / sizeof(help_lines[0])); i++)
-    {
-        if (y >= Option.Height - 1)
-        {
-            clipped = 1;
-            break;
-        }
-        y = fm_help_draw_wrapped_line(y, Option.Width, help_lines[i]);
-    }
+/* Draw a command row, but stop (and flag truncation) once we reach the
+ * footer line so the listing never overruns a short screen.                */
+#define FM_HELP_ROW(k1, a1, k2, a2)                                  \
+    do                                                               \
+    {                                                                \
+        if (y < bottom)                                              \
+            y = fm_help_row(y, half, kw, (k1), (a1), (k2), (a2));    \
+        else                                                         \
+            clipped = 1;                                             \
+    } while (0)
+#define FM_HELP_HEAD(txt)                                                          \
+    do                                                                            \
+    {                                                                             \
+        if (y < bottom)                                                           \
+            fm_draw_field(0, y++, Option.Width, (txt), FM_ANSI_TITLE, CYAN, BLACK);\
+        else                                                                      \
+            clipped = 1;                                                          \
+    } while (0)
+
+    FM_HELP_ROW("Enter F2", "Open / run", "L  F3", "List file");
+    FM_HELP_ROW("E  F4", "Edit file", "Y  F5", "Copy");
+    FM_HELP_ROW("D", "Duplicate", "M", "Move");
+    FM_HELP_ROW("N", "New file", "R", "Rename");
+    FM_HELP_ROW("DEL", "Delete", "X", "Recursive del");
+    FM_HELP_ROW("K  F11", "Make dir", "G", "Go to path");
+    FM_HELP_ROW("A B C", "Change drive", "S", "Sort");
+    FM_HELP_ROW("F  F9", "Set filter", "W  F10", "Clear filter");
+    FM_HELP_ROW("/", "Type-select", "H  ?", "Help");
+    FM_HELP_ROW("T  F6", "Stop audio", "- +", "Volume up/dn");
+    FM_HELP_ROW("Space", "Mark/unmark", "* \\", "Mark all/clr");
+    FM_HELP_ROW("ESC", "Exit FM", "", "");
+
+    if (y < bottom)
+        y++; /* blank separator before the navigation block */
+    FM_HELP_HEAD("Move / panel (no arrow or function keys needed)");
+    FM_HELP_ROW("Up/Dn", "Move  ^E ^X", "PgUp/Dn", "Page  ^P ^L");
+    FM_HELP_ROW("Home/End", "Ends  ^U ^K", "Tab L/R", "Panel ^S ^D");
+    FM_HELP_ROW("Bksp", "Parent dir", "", "");
+
+#undef FM_HELP_ROW
+#undef FM_HELP_HEAD
 
     if (clipped)
-        fm_draw_field(0, Option.Height - 1, Option.Width, "Press any key to return to FM (help truncated)", FM_ANSI_STATUS, YELLOW, BLACK);
+        fm_draw_field(0, bottom, Option.Width, "Press any key to return to FM (help truncated)", FM_ANSI_STATUS, YELLOW, BLACK);
     else
-        fm_draw_field(0, Option.Height - 1, Option.Width, "Press any key to return to FM", FM_ANSI_STATUS, YELLOW, BLACK);
+        fm_draw_field(0, bottom, Option.Width, "Press any key to return to FM", FM_ANSI_STATUS, YELLOW, BLACK);
 
     c = -1;
     while (c == -1)
@@ -4951,6 +4946,7 @@ fm_relaunch:
             }
             need_full_redraw = 1;
             break;
+        case F2:
         case '\r':
         case '\n':
             if (p->count > 0 && p->selected >= 0 && p->selected < p->count &&
@@ -5142,7 +5138,7 @@ fm_relaunch:
             need_full_redraw = 1;
             break;
         case 'L':
-        case F9:
+        case F3:
             if (p->count <= 0 || p->selected < 0 || p->selected >= p->count ||
                 !fm_get_entry_at(p, p->selected, &entry, errmsg, sizeof(errmsg)))
             {
@@ -5155,8 +5151,8 @@ fm_relaunch:
             }
             need_full_redraw = 1;
             break;
-        case CTRLKEY('R'):
-        case F3:
+        case 'F':
+        case F9:
             if (fm_prompt_filter(p))
             {
                 p->selected = p->top = 0;
@@ -5168,13 +5164,14 @@ fm_relaunch:
                 snprintf(status, sizeof(status), "Filter unchanged");
             need_full_redraw = 1;
             break;
-        case CTRLKEY('Q'):
+        case 'H':
+        case '?':
         case F1:
             fm_show_help_screen();
             need_full_redraw = 1;
             break;
-        case CTRLKEY('W'):
-        case F2:
+        case 'E':
+        case F4:
             if (p->count <= 0 || p->selected < 0 || p->selected >= p->count ||
                 !fm_get_entry_at(p, p->selected, &entry, errmsg, sizeof(errmsg)))
             {
@@ -5218,8 +5215,8 @@ fm_relaunch:
             edit_from_fm = 1;
             done = 1;
             break;
-        case CTRLKEY('T'):
-        case F4:
+        case 'W':
+        case F10:
             strcpy(p->filter, "*");
             p->selected = p->top = 0;
             p->count = 0;
@@ -5227,7 +5224,7 @@ fm_relaunch:
             snprintf(status, sizeof(status), "Filter cleared");
             need_full_redraw = 1;
             break;
-        case CTRLKEY('Y'):
+        case 'Y':
         case F5:
             if (!fm_build_panel_cache(&panels[active], errmsg, sizeof(errmsg)))
                 snprintf(status, sizeof(status), "%s", errmsg);
@@ -5239,7 +5236,7 @@ fm_relaunch:
             panels[active ^ 1].cache_valid = 0;
             need_full_redraw = 1;
             break;
-        case CTRLKEY('O'):
+        case 'T':
         case F6:
             if (CurrentlyPlaying != P_NOTHING)
             {
@@ -5263,13 +5260,12 @@ fm_relaunch:
             fm_adjust_volume(FM_VOLUME_STEP, status, sizeof(status));
             fm_draw_field(0, Option.Height - 1, Option.Width, status, FM_ANSI_STATUS, YELLOW, BLACK);
             break;
-        case CTRLKEY('N'):
+        case 'R':
             fm_rename_selected(p, status, sizeof(status));
             p->cache_valid = 0;
             fm_sync_other_panel_cache(panels, active);
             need_full_redraw = 1;
             break;
-        case CTRLKEY(']'):
         case DEL:
             if (!fm_build_panel_cache(p, errmsg, sizeof(errmsg)))
                 snprintf(status, sizeof(status), "%s", errmsg);
@@ -5292,8 +5288,8 @@ fm_relaunch:
             fm_sync_other_panel_cache(panels, active);
             need_full_redraw = 1;
             break;
-        case CTRLKEY('B'):
-        case F10:
+        case 'K':
+        case F11:
             fm_make_directory(p, status, sizeof(status));
             p->cache_valid = 0;
             fm_sync_other_panel_cache(panels, active);
@@ -5501,7 +5497,10 @@ int find_longest_line_length(const char *text, int *linein)
  * The following section will be excluded from the documentation.
  */
 #ifndef PICOMITE
-#ifndef PICOMITEWEB
+/* HDMIWEB has a local display + USB mouse, so it needs the editor mouse-state
+   globals the same as the other VGA/HDMI builds (it defines PICOMITEWEB only
+   for its WiFi stack). */
+#if !defined(PICOMITEWEB) || defined(PICOMITEHDMIWEB)
 static short lastx1 = 9999, lasty1 = 9999;
 static uint16_t lastfc, lastbc;
 static bool leftpushed = false, rightpushed = false, middlepushed = false;
@@ -6138,7 +6137,10 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
         do
         {
 #ifndef PICOMITE
-#ifndef PICOMITEWEB
+/* HDMIWEB defines PICOMITEWEB but, unlike the mouseless SPI-LCD WebMite, it
+   has a local HDMI display + USB mouse — so include the editor mouse-cursor
+   handling for it, the same as HDMIUSB/HDMIBTH. */
+#if !defined(PICOMITEWEB) || defined(PICOMITEHDMIWEB)
             c = -1;
 #ifdef USBKEYBOARD
             if (HID[1].Device_type == 2 && DISPLAY_TYPE == SCREENMODE1)
@@ -7404,7 +7406,9 @@ void MarkMode(unsigned char *cb, unsigned char *buf)
     {
         c = -1;
 #ifndef PICOMITE
-#ifndef PICOMITEWEB
+/* HDMIWEB: local HDMI display + USB mouse, so include mouse handling (see
+   FullScreenEditor for the rationale). */
+#if !defined(PICOMITEWEB) || defined(PICOMITEHDMIWEB)
 #ifdef USBKEYBOARD
         if (HID[1].Device_type == 2 && DISPLAY_TYPE == SCREENMODE1)
         {
@@ -7892,7 +7896,7 @@ void MarkMode(unsigned char *cb, unsigned char *buf)
                 cury = ln - edy;
                 PositionCursor(txtp);
 #ifndef PICOMITE
-#ifndef PICOMITEWEB
+#if !defined(PICOMITEWEB) || defined(PICOMITEHDMIWEB)
 #ifdef USBKEYBOARD
                 if (HID[1].Device_type == 2 && DISPLAY_TYPE == SCREENMODE1)
                 {
@@ -7947,7 +7951,7 @@ void MarkMode(unsigned char *cb, unsigned char *buf)
             }
             PositionCursor(txtp);
 #ifndef PICOMITE
-#ifndef PICOMITEWEB
+#if !defined(PICOMITEWEB) || defined(PICOMITEHDMIWEB)
 #ifdef USBKEYBOARD
             if (HID[1].Device_type == 2 && DISPLAY_TYPE == SCREENMODE1)
             {
@@ -8303,6 +8307,15 @@ void SetColour(unsigned char *p, int DoVT100)
         //        ".PROGRAM", ".END PROGRAM", ".SIDE", ".LABEL" , ".LINE",".WRAP", ".WRAP TARGET",
         NULL};
 
+    // these functions are rewritten to other tokens during tokenise() (see MMBasic.c)
+    // so they no longer have their own entry in the command or token tables and would
+    // otherwise not be colour coded.  The MM.xxx functions handled by fun_tilde() are
+    // dealt with separately below using the overlaid_functions[] table.
+    // the list must be terminated with a NULL
+    char *hiddenfunctions[] = {
+        "BIN$(", "OCT$(", "HEX$(", "LCASE$(", "UCASE$(", "LEFT$(", "RIGHT$(", "MIN(", "MAX(", "MM.INFO$(",
+        NULL};
+
     // cmdfile everything back to normal
     if (p == NULL)
     {
@@ -8525,6 +8538,31 @@ void SetColour(unsigned char *p, int DoVT100)
             inkeyword = true;
             return;
         }
+
+        // check for functions that tokenise() rewrites to other tokens
+        for (pp = (unsigned char **)hiddenfunctions; *pp; pp++)
+            if (EditCompStr((char *)p, (char *)*pp))
+                break;
+        if (*pp)
+        {
+            gui_fcolour = GUI_C_KEYWORD;
+            if (DoVT100)
+                PrintString(VT100_C_KEYWORD);
+            inkeyword = true;
+            return;
+        }
+
+        // check for the MM.xxx functions handled by fun_tilde(); these are rewritten
+        // to the ~() token during tokenise() so are not in the token table either
+        for (i = 0; i < MMEND; i++)
+            if (EditCompStr((char *)p, (char *)overlaid_functions[i]))
+            {
+                gui_fcolour = GUI_C_KEYWORD;
+                if (DoVT100)
+                    PrintString(VT100_C_KEYWORD);
+                inkeyword = true;
+                return;
+            }
     }
 
     // try to keep track of if we are in general text or not

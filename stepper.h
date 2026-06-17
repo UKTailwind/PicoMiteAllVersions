@@ -63,6 +63,25 @@ Pins may be specified as a physical pin number or GPxx.
 ‘max_accel’ is in mm/s^2 (deg/s^2 for the A axis).
 ‘home_backoff_mm’ is the homing switch clear/backoff distance in mm (default 3.0).  The A axis is not homed by G28.
 A reasonable default jerk is automatically calculated when axes are configured.
+The emitted step rate is capped at 50kHz (one step every two 100kHz ISR ticks, to guarantee
+an adequate low interval between pulses).  If max_velocity x steps_per_mm exceeds 50000 steps/s
+the axis cannot reach the requested speed; a non-fatal warning is printed reporting the actual
+maximum achievable (50000 / steps_per_mm, expressed in mm/min, or deg/min for A).
+
+STEPPER TUNE X|Y|Z|A [,dir_invert] [,steps_per_mm] [,max_velocity] [,max_accel] [,home_backoff_mm]
+Live-adjust the motion parameters of an already-configured axis without closing and
+re-initialising the stepper subsystem.  Useful for interactively tuning an axis.
+Pins are never changed by this command (use STEPPER AXIS to reassign pins).
+Only permitted when no motion is executing and the G-code buffer is empty.
+Any subset of parameters may be supplied; omit a value (leave the comma) to keep the
+current setting, e.g. STEPPER TUNE X,,80 changes only steps_per_mm.
+Units match STEPPER AXIS (max_velocity in mm/min, deg/min for A; max_accel in mm/s^2).
+Changing steps_per_mm preserves the raw step count (the motor has not physically moved),
+rescales the configured soft limits to keep the same mm working envelope, and invalidates
+the known machine position.  After changing steps_per_mm you must re-home (G28) or re-issue
+STEPPER POSITION before further motion can be queued.
+As with STEPPER AXIS, if the resulting max_velocity x steps_per_mm exceeds the 50kHz step-rate
+cap a non-fatal warning is printed reporting the actual maximum achievable speed.
 
 STEPPER JERK jerk_mm_s^3
 Manually override the global jerk limit used for S-curve motion planning.
@@ -316,6 +335,11 @@ typedef enum
 // Fundamental timing constants
 #define ISR_FREQ 100000                // 100KHz interrupt frequency (Hz)
 #define STEP_ACCUMULATOR_MAX 100000000 // 100M threshold for step timing
+
+// Maximum emitted step rate (steps/s). The ISR allows at most one step every two ticks
+// (each stepping tick is followed by a forced idle tick) so the inter-pulse low interval
+// is always a full ISR period; the hard ceiling is therefore half the ISR frequency.
+#define STEPPER_MAX_STEP_RATE_HZ (ISR_FREQ / 2)
 
 // STEP pulse width in microseconds.
 // Many stepper drivers require a minimum high time (often >= 1us). Keeping this

@@ -2286,7 +2286,8 @@ void cmd_port(void)
                 pin = pincode;
             if (IsInvalidPin(pin) || !(ExtCurrentConfig[pin] == EXT_DIG_OUT))
                 error("Invalid output pin");
-            mask |= (1 << PinDef[pin].GPno);
+            gpio_set_drive_strength(PinDef[pin].GPno, GPIO_DRIVE_STRENGTH_8MA);
+            mask |= (1ll << PinDef[pin].GPno);
             if (value & 1)
                 setmask |= (1ll << PinDef[pin].GPno);
             value >>= 1;
@@ -2920,7 +2921,7 @@ void setBacklight(int level, int setfrequency)
         pwm_set_chan_level(BacklightSlice, BacklightChannel, high);
         pwm_set_enabled(BacklightSlice, true);
     }
-    else if (Option.DISPLAY_TYPE <= I2C_PANEL)
+    else if (Option.DISPLAY_TYPE >= SSD1306I2C && Option.DISPLAY_TYPE <= I2C_PANEL)
     {
         level *= 255;
         level /= 100;
@@ -5094,7 +5095,7 @@ void MIPS16 cmd_device(void)
         cmd_lcd();
         return;
     }
-#ifndef PICOMITEVGA
+#if !defined(PICOMITEVGA) || (defined(HDMI) && !defined(HDMICUTDOWN))
     tp = checkstring(cmdline, (unsigned char *)"CAMERA");
     if (tp)
     {
@@ -5666,7 +5667,7 @@ void MIPS16 ClearExternalIO(void)
     int i;
     MemoryShareStop();
     CloseAudio(1);
-#ifndef PICOMITEVGA
+#if !defined(PICOMITEVGA) || (defined(HDMI) && !defined(HDMICUTDOWN))
     cameraclose();
 #endif
     InterruptUsed = false;

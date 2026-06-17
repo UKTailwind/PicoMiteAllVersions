@@ -41,5 +41,20 @@ extern char MMErrMsg[];
 #define LWIP_PLATFORM_DIAG(x) {MMerrno=17;}
 #include <stdio.h>
 #include <stdlib.h>
+
+/* NOTE: lwIP's heap (pbufs + DHCP etc.) deliberately stays on the C library
+   heap (MEM_LIBC_MALLOC=1 from lwipopts_examples_common.h). It must NOT be
+   routed to the MMBasic heap: lwIP's mem_malloc serves both transient pbufs
+   AND persistent state — notably the DHCP struct (held by the netif across the
+   WiFi session, see lwip/core/ipv4/dhcp.c). The MMBasic heap is wiped by
+   InitHeap(true) on every program RUN, so persistent lwIP state placed there
+   would be reclaimed under lwIP's feet and fault on the next DHCP renewal.
+   The big transient that motivated moving things off the C heap (the ~28 KB
+   mbedtls TLS handshake) is handled separately via MBEDTLS_PLATFORM_CALLOC_MACRO
+   in mbedtls_config.h — that is the ONLY allocator routed to the MMBasic heap,
+   and TLS sessions never persist across a RUN. All lwIP-facing state structs
+   (TCP server, TCP client, NTP) stay on the C heap via calloc precisely because
+   any of them can outlive a RUN. Size the C heap to hold pbufs + DHCP + those
+   calloc'd structs. */
 #endif
 /*  @endcond */

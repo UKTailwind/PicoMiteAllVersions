@@ -35,6 +35,23 @@ extern "C"
 {
 #endif
 #define CALCPROMPT
+
+/* ============================================================================
+ * Cut-down HDMI display builds
+ * ----------------------------------------------------------------------------
+ * HDMICUTDOWN marks the HDMI variants that use the reduced scanout pipeline:
+ * the 96000-byte framebuffer pool (vs 153600), the limited resolution set,
+ * the RGB332 R640x480x8 special mode, and the live (no-reboot) RESOLUTION
+ * switch. Currently HDMIBTH and HDMIWEB. This is purely the *display* concern;
+ * the BLE-HID-host concern stays gated separately on
+ * (PICOMITEBTH || PICOMITEHDMIBTH) so HDMIWEB (WiFi, no Bluetooth) does not
+ * drag in btstack.
+ *
+ * HDMICUTDOWN is defined via target_compile_definitions in CMakeLists.txt
+ * (NOT here) so it is a global -D visible to every translation unit regardless
+ * of include order — AllCommands.h, for one, is pulled in before this file.
+ * ============================================================================ */
+
 /* ============================================================================
  * Platform-specific configuration - PICOMITEVGA
  * ============================================================================ */
@@ -66,14 +83,42 @@ extern "C"
 #define FLASH_TARGET_OFFSET (1392 * 1024)
 #define HEAP_MEMORY_SIZE (180 * 1024)
 #define MagicKey 0x4DB1F60E
+#elif defined(PICOMITEHDMIWEB)
+/* HDMIWEB: HDMIUSB-style display stack + USB host + WebMite WiFi /
+   lwIP / mbedtls TLS (no Bluetooth). The cyw43 WiFi firmware blob plus
+   the lwIP + mbedtls code push the firmware image past HDMIUSB's 1072 KB
+   limit, so FLASH_TARGET_OFFSET is set well above it (16 KB-aligned per
+   [[flash-target-offset-16-kb-alignment]]). HEAP_MEMORY_SIZE is smaller
+   than HDMIBTH's 180 KB because the lwIP MEM_SIZE pool + mbedtls cert
+   transients + USB host buffers all live in BSS alongside the GUICONTROLS
+   Ctrl[] array. HDMIWEB reuses HDMIBTH's shrunk 96000-byte framebuffer
+   pool (FRAMEBUFFER_POOL_SIZE below). Both FLASH_TARGET_OFFSET and
+   HEAP_MEMORY_SIZE are provisional — tune against build_limits.txt /
+   GetHighestHexAddress.py. Bump MagicKey when Option layout/defaults
+   change so stale cached options get rewritten. */
+#define FLASH_TARGET_OFFSET (1520 * 1024)
+/* 136 KB MMBasic program/variable heap (arrays, strings, max program size) —
+   kept large deliberately. This is NOT the framebuffer (the 96 KB cut-down HDMI
+   pool is added separately in AllMemory[]). NOTE the TLS tension: a handshake
+   transiently mallocs ~28-35 KB from the C heap (SSL in/out buffers + RSA
+   cert-chain parse; MEM_LIBC_MALLOC=1) which competes for the RAM between
+   __bss_end__ and the stack — long RSA chains (www.microsoft.com) can overrun
+   it. Do NOT shrink this to "fix" TLS; instead route mbedtls to PSRAM and/or
+   make malloc-fail graceful (see [[hdmiweb-build]]). Watch
+   [[heap-bss-overlap-on-rp2350]]. */
+#define HEAP_MEMORY_SIZE (144 * 1024)
+/* Bumped 0x57EB1A44 -> 0x57EB1A45 when the factory default resolution
+   changed from 1024x600 to 640x480@315000 so existing devices pick up
+   the new default via ResetOptions on first boot. */
+#define MagicKey 0x57EB1A45
 #else
-#define FLASH_TARGET_OFFSET (1072 * 1024)
+#define FLASH_TARGET_OFFSET (1088 * 1024)
 #define HEAP_MEMORY_SIZE (156 * 1024)
 #define MagicKey 0xD340BBCD
 #endif
 #else
 #define MagicKey 0xD1F6F86C
-#define FLASH_TARGET_OFFSET (1024 * 1024)
+#define FLASH_TARGET_OFFSET (1040 * 1024)
 #define HEAP_MEMORY_SIZE (160 * 1024)
 #endif
 #else // rp2350 VGA
@@ -170,13 +215,15 @@ extern "C"
 #define MODE3SIZE_X ((MODE_H_X_ACTIVE_PIXELS / 2) * (MODE_V_X_ACTIVE_LINES / 2) / 2)
 #define MODE5SIZE_X ((MODE_H_X_ACTIVE_PIXELS / 4) * (MODE_V_X_ACTIVE_LINES / 4))
 
-#ifdef PICOMITEHDMIBTH
+#ifdef HDMICUTDOWN
 /* Permanent framebuffer pool extension inside AllMemory[]. Sized to
    the largest layout the build can produce in mode 1: the
    1024x600x1bpp bitmap (MODE1SIZE_X = 76800) plus the tilefcols_w
    and tilebcols_w arrays that settiles() writes immediately after
    the framebuffer (1 byte per 8x8 cell, two arrays = 2 * 128 * 75 =
-   19200). Total = 96000 bytes vs. 153600 for the default HDMI pool. */
+   19200). Total = 96000 bytes vs. 153600 for the default HDMI pool.
+   HDMIWEB reuses the same shrunk pool to claw back RAM for the WiFi /
+   lwIP / TLS stack. */
 #define FRAMEBUFFER_POOL_SIZE \
    (MODE1SIZE_X + 2 * ((MODE_H_X_ACTIVE_PIXELS / 8) * (MODE_V_X_ACTIVE_LINES / 8)))
 #endif
@@ -214,25 +261,31 @@ extern "C"
       R720x400 = 8,
       R800x480 = 9,
       R1024x600 = 10,
-#ifdef PICOMITEHDMIBTH
-      /* HDMIBTH-only: a "special" 640x480 that is RGB332 (8-bit) rather
-         than the normal full-colour RGB555 640x480. It shares the
+#ifdef HDMICUTDOWN
+      /* HDMIBTH/HDMIWEB-only: a "special" 640x480 that is RGB332 (8-bit)
+         rather than the normal full-colour RGB555 640x480. It shares the
          1024x600 8-bit tile pipeline so it costs no extra framebuffer
          and is deliberately kept OUT of the FullColour macro. Selected
          at runtime by the RESOLUTION command (no reboot). */
       R640x480x8 = 11,
+      /* HDMIBTH/HDMIWEB-only: the RGB332 (8-bit) 720x400, the sibling of
+         R640x480x8. Kept as its own enum (rather than reusing the full
+         build's RGB555 R720x400 = 8) so it stays OUT of FullColour and is
+         driven by the same 8-bit tile pipeline / HDMIloopBTH640. Runs at
+         283.2 MHz (Freq400); selected by OPTION/RESOLUTION. */
+      R720x400x8 = 12,
 #endif
    } Resolution_TypeDef;
    static const int CPUFreqs[] = {FreqDefault, Freq720P, Freq480P, Freq252P, Freq378P, FreqXGA, FreqSVGA, Freq848, Freq400, FreqY, FreqX};
 /* Display capability macros */
 #define FullColour (Option.Resolution == R640x480f252 || Option.Resolution == R640x480f378 || \
                     Option.Resolution == R640x480f315 || Option.Resolution == R720x400)
-#ifdef PICOMITEHDMIBTH
+#ifdef HDMICUTDOWN
 /* R640x480x8 behaves like 1024x600 (8-bit/RGB332, tile-based) so it is
    treated as a MediumRes mode for font/tile-height selection. */
 #define MediumRes (Option.Resolution == R800x600 || Option.Resolution == R848x480 ||  \
                    Option.Resolution == R800x480 || Option.Resolution == R1024x600 || \
-                   Option.Resolution == R640x480x8)
+                   Option.Resolution == R640x480x8 || Option.Resolution == R720x400x8)
 #else
 #define MediumRes (Option.Resolution == R800x600 || Option.Resolution == R848x480 || \
                    Option.Resolution == R800x480 || Option.Resolution == R1024x600)
@@ -245,6 +298,14 @@ extern "C"
  * ============================================================================ */
 #ifdef PICOMITEWEB
 #define MaxPcb 8
+
+/* HDMIWEB also defines PICOMITEWEB (it reuses the entire WEB networking
+   layer) but it is fundamentally a PICOMITEVGA/HDMI build: the display
+   block above already owns MAX_CPU/MIN_CPU, MAXSUBFUN/MAXVARS, MagicKey,
+   HEAP_MEMORY_SIZE and FLASH_TARGET_OFFSET. Skip the WebMite budget here
+   so the two definitions don't collide; MaxPcb and the lwipopts include
+   below are still shared. */
+#ifndef PICOMITEHDMIWEB
 #define MAX_CPU 396000
 #define MIN_CPU 126000
 
@@ -262,8 +323,8 @@ extern "C"
    altcp_tls_mbedtls.c which doesn't include configuration.h). Defining it
    here too would produce a redefine warning because -D and #define
    without a body resolve to different macro bodies. */
-#define HEAP_MEMORY_SIZE (192 * 1024)
-#define FLASH_TARGET_OFFSET (1440 * 1024)
+#define HEAP_MEMORY_SIZE (256 * 1024)
+#define FLASH_TARGET_OFFSET (1456 * 1024)
 #else
 #define MagicKey 0x6AA79987
 #define MAXSUBFUN 256
@@ -273,6 +334,7 @@ extern "C"
 #define HEAP_MEMORY_SIZE (88 * 1024)
 #define FLASH_TARGET_OFFSET (1152 * 1024)
 #endif
+#endif /* !PICOMITEHDMIWEB */
 
 #include "lwipopts_examples_common.h"
 
@@ -294,7 +356,7 @@ extern "C"
 
 #ifdef USBKEYBOARD
 #define MagicKey 0x029A7245
-#define FLASH_TARGET_OFFSET (1120 * 1024)
+#define FLASH_TARGET_OFFSET (1136 * 1024)
 /* Was 304 KB. Reduced by 4 KB to make headroom for the BSS growth
    from the cursor module (~650 bytes for user_cursor.pixels +
    state) and the click/cursor ownership tracking. Heap and BSS
@@ -316,7 +378,7 @@ extern "C"
 #undef MAX_CPU
 #define MAX_CPU 396000
 #define MagicKey 0x90E5E945
-#define FLASH_TARGET_OFFSET (1376 * 1024)
+#define FLASH_TARGET_OFFSET (1392 * 1024)
 #define HEAP_MEMORY_SIZE (272 * 1024)
 #elif defined(PICOMITEBTH)
 /* PICOMITEBTH = PicoMite + USB CDC console + BLE HID host. Same CYW43
@@ -328,13 +390,13 @@ extern "C"
 #undef MAX_CPU
 #define MAX_CPU 396000
 #define MagicKey 0x6FACAA50
-#define FLASH_TARGET_OFFSET (1408 * 1024)
+#define FLASH_TARGET_OFFSET (1424 * 1024)
 #define HEAP_MEMORY_SIZE (256 * 1024)
 #else
-#define FLASH_TARGET_OFFSET (1088 * 1024)
+#define FLASH_TARGET_OFFSET (1104 * 1024)
 /* See note above PICOUSBRP2350 HEAP_MEMORY_SIZE. */
 #define HEAP_MEMORY_SIZE (300 * 1024)
-#define MagicKey 0x29645F8B
+#define MagicKey 0x29672F8B
 #endif
 
 #else                     // RP2040
@@ -352,10 +414,10 @@ extern "C"
 #ifdef PICOMITEMIN
 #define FLASH_TARGET_OFFSET (704 * 1024)
 #define MagicKey 0x452EC40A
-#define HEAP_MEMORY_SIZE (132 * 1024)
+#define HEAP_MEMORY_SIZE (128 * 1024)
 #else
 #define HEAP_MEMORY_SIZE (120 * 1024)
-#define FLASH_TARGET_OFFSET (912 * 1024)
+#define FLASH_TARGET_OFFSET (928 * 1024)
 #define MagicKey 0x5E503A67
 #endif
 #endif
@@ -651,6 +713,14 @@ extern "C"
 #define WEBRP2350 (defined(rp2350) && defined(PICOMITEWEB))
 #define BTRP2350 (defined(rp2350) && defined(PICOMITEBT))
 #define PICOCALC ((defined(PICOMITE) || defined(PICOMITEWEB)) && !defined(USBKEYBOARD))
+/* BLIT MEMORY332 (the RGB332 count+value RLE blitter) is only meaningful where
+ * there is an RGB332 display: the RP2350 SPI-display PicoMite builds (PICO /
+ * PICOUSB / PICOBT / PICOBTH RP2350, via the NEXTGEN buffered RGB332 panels)
+ * and the HDMI builds (the R640x480x8 RGB332 mode). It does NOT apply to any
+ * RP2040 build, to the VGA builds, or to WEBRP2350, so the command, its decoder
+ * and its dispatch are compiled out on those. NEXTGEN itself is only defined
+ * when PICOMITERP2350, which is exactly the non-VGA half of this gate. */
+#define BLITMEMORY332 (PICOMITERP2350 || (defined(PICOMITEVGA) && defined(HDMI)))
    /* ============================================================================
     * Type definitions - MM operations enum
     * ============================================================================ */

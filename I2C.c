@@ -2072,9 +2072,18 @@ void classicproc(void)
   nunstruct[0].x0 = ((nunbuff[4] >> 1) | (nunbuff[5] << 7)) ^ 0b111111111111111;
 }
 
-#ifndef PICOMITEVGA
+// Camera is available on the SPI-panel builds as before, and additionally on the
+// full-fat HDMI builds (plain HDMI + HDMIUSB) which have a mode-4 320x240 RGB555
+// framebuffer to render into. HDMICUTDOWN (HDMIWEB/HDMIBTH) is excluded - those
+// variants have no spare command/function token slots.
+#if !defined(PICOMITEVGA) || (defined(HDMI) && !defined(HDMICUTDOWN))
 #if defined(rp2350) || defined(PICOMITEWEB) || defined(PICOMITE)
 #define ov7670_address 0x21
+#define ov2640_address 0x30
+#define CAM_OV7670 0
+#define CAM_OV2640 1
+int CameraType = CAM_OV7670;          // selected by the CAMERA OPEN keyword (default OV7670)
+uint8_t camera_address = ov7670_address; // SCCB/I2C address for ov7670_set/readregister
 #define top 120
 #define left 160
 uint8_t PCLK = 0;
@@ -2087,6 +2096,9 @@ uint8_t XCLKGP = 0;
 uint8_t PCLKGP = 0;
 uint8_t VSYNCGP = 0;
 uint8_t HREFGP = 0;
+// Active capture geometry. Default 160x120 (QQVGA); QVGA (320x240) is RP2350-only.
+int CameraWidth = 160;
+int CameraHeight = 120;
 // extern volatile int ExtCurrentConfig[];
 void cameraclose(void)
 {
@@ -2123,7 +2135,7 @@ int readregister(int reg)
     I2C_Sendlen = 1; // send one byte
     I2C_Rcvlen = 0;
     *I2C_Send_Buffer = reg;        // the first register to read
-    I2C_Addr = ov7670_address;     // address of the device
+    I2C_Addr = camera_address;     // address of the device
     i2c_masterCommand(1, NULL, 1); // Foreground - update mmI2Cvalue
   }
   else
@@ -2131,7 +2143,7 @@ int readregister(int reg)
     I2C2_Sendlen = 1; // send one byte
     I2C2_Rcvlen = 0;
     *I2C_Send_Buffer = reg;         // the first register to read
-    I2C2_Addr = ov7670_address;     // address of the device
+    I2C2_Addr = camera_address;     // address of the device
     i2c2_masterCommand(1, NULL, 1); // Foreground - update mmI2Cvalue
   }
   if (mmI2Cvalue)
@@ -2146,7 +2158,7 @@ int readregister(int reg)
     I2C_Rcvbuf_Int = NULL;
     I2C_Rcvlen = 1; // get 7 bytes
     I2C_Sendlen = 0;
-    I2C_Addr = ov7670_address;     // address of the device
+    I2C_Addr = camera_address;     // address of the device
     i2c_masterCommand(1, buff, 1); // Foreground - update mmI2Cvalue
   }
   else
@@ -2155,7 +2167,7 @@ int readregister(int reg)
     I2C2_Rcvbuf_Int = NULL;
     I2C2_Rcvlen = 1; // get 7 bytes
     I2C2_Sendlen = 0;
-    I2C2_Addr = ov7670_address;     // address of the device
+    I2C2_Addr = camera_address;     // address of the device
     i2c2_masterCommand(1, buff, 1); // Foreground - update mmI2Cvalue
   }
   uSec(1000);
@@ -2171,7 +2183,7 @@ void ov7670_set(char a, char b)
     I2C_Rcvlen = 0;
     I2C_Send_Buffer[0] = a;        // the first register to read
     I2C_Send_Buffer[1] = b;        // the first register to read
-    I2C_Addr = ov7670_address;     // address of the device
+    I2C_Addr = camera_address;     // address of the device
     i2c_masterCommand(1, NULL, 1); // Foreground - update mmI2Cvalue
   }
   else
@@ -2180,7 +2192,7 @@ void ov7670_set(char a, char b)
     I2C2_Rcvlen = 0;
     I2C_Send_Buffer[0] = a;         // the first register to read
     I2C_Send_Buffer[1] = b;         // the first register to read
-    I2C2_Addr = ov7670_address;     // address of the device
+    I2C2_Addr = camera_address;     // address of the device
     i2c2_masterCommand(1, NULL, 1); // Foreground - update mmI2Cvalue
   }
   if (mmI2Cvalue)
@@ -2198,6 +2210,51 @@ void ov7670_set(char a, char b)
     error("Camera Config Failure");
   uSec(1000);
   return;
+}
+
+// SCCB write with no read-back verify. Used for the OV2640 init: many of its
+// DSP / bank-select (0xFF) / write-pointer registers do not read back the value
+// written, so ov7670_set's verify would false-fail.
+void sccb_write(unsigned char a, unsigned char b)
+{
+  if (I2C0locked)
+  {
+    I2C_Sendlen = 2;
+    I2C_Rcvlen = 0;
+    I2C_Send_Buffer[0] = a;
+    I2C_Send_Buffer[1] = b;
+    I2C_Addr = camera_address;
+    i2c_masterCommand(1, NULL, 1);
+  }
+  else
+  {
+    I2C2_Sendlen = 2;
+    I2C2_Rcvlen = 0;
+    I2C_Send_Buffer[0] = a;
+    I2C_Send_Buffer[1] = b;
+    I2C2_Addr = camera_address;
+    i2c2_masterCommand(1, NULL, 1);
+  }
+  if (mmI2Cvalue)
+  {
+    cameraclose();
+    error("I2C failure");
+  }
+  uSec(1000);
+}
+
+// Drive a camera register table: {reg,value} pairs ending with {0xFF,0xFF}.
+// verify=1 -> ov7670_set (read-back checked, OV7670). verify=0 -> sccb_write
+// (no read-back; required for the OV2640 whose DSP/bank/pointer regs don't read back).
+void load_camera_regs(const OV7670_command *t, int verify)
+{
+  for (int i = 0; !(t[i].reg == 0xFF && t[i].value == 0xFF); i++)
+  {
+    if (verify)
+      ov7670_set(t[i].reg, t[i].value);
+    else
+      sccb_write(t[i].reg, t[i].value);
+  }
 }
 
 void OV7670_test_pattern(OV7670_pattern pattern)
@@ -2243,6 +2300,136 @@ static const OV7670_command
         {OV7670_REG_RGB444, 0},
         {OV7670_REG_COM15, OV7670_COM15_RGB565 | OV7670_COM15_R00FF},
         {0xFF, 0xFF}};
+
+// OV7670 RGB565 register init - table driven (was ~200 inline ov7670_set calls).
+// Driven with verify=1; {REG_COM7,COM7_RESET} entries get the 500ms reset delay
+// inside ov7670_set. Saturation and frame size are applied separately afterwards.
+static const OV7670_command OV7670_init[] = {
+    {REG_COM7, COM7_RESET}, {REG_COM7, COM7_RESET}, {REG_RGB444, 0},
+    {REG_COM10, 0x02}, {REG_MVFP, 0x37}, {REG_COM11, 0x0A},
+    {REG_COM7, COM7_RGB}, {REG_COM1, 0}, {REG_COM15, COM15_RGB565},
+    {REG_COM9, 0x2A}, {REG_TSLB, 0x04}, {REG_COM13, 0xc8},
+    {REG_HSTART, 0x13}, {REG_HSTOP, 0x01}, {REG_HREF, 0xb6},
+    {REG_VSTART, 0x02}, {REG_VSTOP, 0x7a}, {REG_VREF, 0x0a},
+    {REG_COM5, 0x61}, {REG_COM6, 0x4b}, {0x16, 0x02},
+    {0x21, 0x02}, {0x22, 0x91}, {0x29, 0x07},
+    {0x33, 0x0b}, {0x35, 0x0b}, {0x37, 0x1d},
+    {0x38, 0x71}, {0x39, 0x2a}, {REG_COM12, 0x78},
+    {0x4d, 0x40}, {0x4e, 0x20}, {REG_GFIX, 0},
+    {0x74, 0x10}, {0x8d, 0x4f}, {0x8e, 0},
+    {0x8f, 0}, {0x90, 0}, {0x91, 0},
+    {0x96, 0}, {0x9a, 0}, {0xb0, 0x84},
+    {0xb1, 0x0c}, {0xb2, 0x0e}, {0xb3, 0x82},
+    {0xb8, 0x0a}, {0x7a, 0x20}, {0x7b, 0x10},
+    {0x7c, 0x1e}, {0x7d, 0x35}, {0x7e, 0x5a},
+    {0x7f, 0x69}, {0x80, 0x76}, {0x81, 0x80},
+    {0x82, 0x88}, {0x83, 0x8f}, {0x84, 0x96},
+    {0x85, 0xa3}, {0x86, 0xaf}, {0x87, 0xc4},
+    {0x88, 0xd7}, {0x89, 0xe8}, {0x13, COM8_FASTAEC | COM8_AECSTEP | COM8_BFILT},
+    {0x00, 0}, {0x10, 0}, {0x0d, 0x40},
+    {0x14, 0x18}, {0xa5, 0x05}, {0xab, 0x07},
+    {0x24, 0x95}, {0x25, 0x33}, {0x26, 0xe3},
+    {0x9f, 0x78}, {0xa0, 0x68}, {0xa1, 0x03},
+    {0xa6, 0xd8}, {0xa7, 0xd8}, {0xa8, 0xf0},
+    {0xa9, 0x90}, {0xaa, 0x94}, {0x13, COM8_FASTAEC | COM8_AECSTEP | COM8_BFILT | COM8_AGC | COM8_AEC},
+    {0x0e, 0x61}, {0x0f, 0x4b}, {0x16, 0x02},
+    {0x21, 0x02}, {0x22, 0x91}, {0x29, 0x07},
+    {0x33, 0x0b}, {0x35, 0x0b}, {0x37, 0x1d},
+    {0x38, 0x71}, {0x39, 0x2a}, {0x4d, 0x40},
+    {0x4e, 0x20}, {0x69, 0}, {0x74, 0x10},
+    {0x8d, 0x4f}, {0x8e, 0}, {0x8f, 0},
+    {0x90, 0}, {0x91, 0}, {0x96, 0},
+    {0x9a, 0}, {0xb0, 0x84}, {0xb1, 0x0c},
+    {0xb2, 0x0e}, {0xb3, 0x82}, {0xb8, 0x0a},
+    {0x43, 0x0a}, {0x44, 0xf0}, {0x45, 0x34},
+    {0x46, 0x58}, {0x47, 0x28}, {0x48, 0x3a},
+    {0x59, 0x88}, {0x5a, 0x88}, {0x5b, 0x44},
+    {0x5c, 0x67}, {0x5d, 0x49}, {0x5e, 0x0e},
+    {0x6c, 0x0a}, {0x6d, 0x55}, {0x6e, 0x11},
+    {0x6f, 0x9f}, {0x6a, 0x40}, {0x01, 0x40},
+    {0x02, 0x60}, {0x4f, 0x80}, {0x50, 0x80},
+    {0x51, 0x00}, {0x52, 0x22}, {0x53, 0x5e},
+    {0x54, 0x80}, {0x56, 0x40}, {0x58, 0x9e},
+    {0x59, 0x88}, {0x5a, 0x88}, {0x5b, 0x44},
+    {0x5c, 0x67}, {0x5d, 0x49}, {0x5e, 0x0e},
+    {0x69, 0x00}, {0x6a, 0x40}, {0x6b, 0x0a},
+    {0x6c, 0x0a}, {0x6d, 0x55}, {0x6e, 0x11},
+    {0x6f, 0x9f}, {0xb0, 0x84}, {0x13, COM8_FASTAEC | COM8_AECSTEP | COM8_BFILT | COM8_AGC | COM8_AEC | COM8_AWB},
+    {0x4f, 0x80}, {0x50, 0x80}, {0x51, 0},
+    {0x52, 0x22}, {0x53, 0x5e}, {0x54, 0x80},
+    {0x58, 0x9e}, {0x41, 0x08}, {0x3f, 0},
+    {0x75, 0x05}, {0x76, 0xe1}, {0x4c, 0},
+    {0x77, 0x01}, {0x3d, 0xc3}, {0x4b, 0x09},
+    {0x41, 0x38}, {0x56, 0x40}, {0x34, 0x11},
+    {0x3b, COM11_EXP | COM11_HZAUTO}, {0xa4, 0x88}, {0x96, 0},
+    {0x97, 0x30}, {0x98, 0x20}, {0x99, 0x30},
+    {0x9a, 0x84}, {0x9b, 0x29}, {0x9c, 0x03},
+    {0x9d, 0x4c}, {0x9e, 0x3f}, {0x78, 0x04},
+    {0x79, 0x01}, {0xc8, 0xf0}, {0x79, 0x0f},
+    {0xc8, 0x00}, {0x79, 0x10}, {0xc8, 0x7e},
+    {0x79, 0x0a}, {0xc8, 0x80}, {0x79, 0x0b},
+    {0xc8, 0x01}, {0x79, 0x0c}, {0xc8, 0x0f},
+    {0x79, 0x0d}, {0xc8, 0x20}, {0x79, 0x09},
+    {0xc8, 0x80}, {0x79, 0x02}, {0xc8, 0xc0},
+    {0x79, 0x03}, {0xc8, 0x40}, {0x79, 0x05},
+    {0xc8, 0x30}, {0x79, 0x26},
+    {0xFF, 0xFF}};
+
+// OV2640 RGB565 QVGA (320x240) init - canonical ArduCAM OV2640_QVGA table.
+// Bank-switched: reg 0xFF selects sensor(1)/DSP(0) bank. Output format RGB565
+// (DSP IMAGE_MODE 0xDA=0x08). Driven with verify=0 (sccb_write) - OV2640 DSP/
+// pointer regs don't read back. {0xFF,0xFF} terminator (0xFF=bank reg, never 0xFF value).
+static const OV7670_command OV2640_QVGA[] = {
+    {0xff, 0x00}, {0x2c, 0xff}, {0x2e, 0xdf}, {0xff, 0x01},
+    {0x3c, 0x32}, {0x11, 0x00}, {0x09, 0x02}, {0x04, 0xa8},
+    {0x13, 0xe5}, {0x14, 0x48}, {0x2c, 0x0c}, {0x33, 0x78},
+    {0x3a, 0x33}, {0x3b, 0xfb}, {0x3e, 0x00}, {0x43, 0x11},
+    {0x16, 0x10}, {0x39, 0x02}, {0x35, 0x88}, {0x22, 0x0a},
+    {0x37, 0x40}, {0x23, 0x00}, {0x34, 0xa0}, {0x06, 0x02},
+    {0x06, 0x88}, {0x07, 0xc0}, {0x0d, 0xb7}, {0x0e, 0x01},
+    {0x4c, 0x00}, {0x4a, 0x81}, {0x21, 0x99}, {0x24, 0x40},
+    {0x25, 0x38}, {0x26, 0x82}, {0x5c, 0x00}, {0x63, 0x00},
+    {0x46, 0x22}, {0x0c, 0x3a}, {0x5d, 0x55}, {0x5e, 0x7d},
+    {0x5f, 0x7d}, {0x60, 0x55}, {0x61, 0x70}, {0x62, 0x80},
+    {0x7c, 0x05}, {0x20, 0x80}, {0x28, 0x30}, {0x6c, 0x00},
+    {0x6d, 0x80}, {0x6e, 0x00}, {0x70, 0x02}, {0x71, 0x94},
+    {0x73, 0xc1}, {0x3d, 0x34}, {0x12, 0x04}, {0x5a, 0x57},
+    {0x4f, 0xbb}, {0x50, 0x9c}, {0xff, 0x00}, {0xe5, 0x7f},
+    {0xf9, 0xc0}, {0x41, 0x24}, {0xe0, 0x14}, {0x76, 0xff},
+    {0x33, 0xa0}, {0x42, 0x20}, {0x43, 0x18}, {0x4c, 0x00},
+    {0x87, 0xd0}, {0x88, 0x3f}, {0xd7, 0x03}, {0xd9, 0x10},
+    {0xd3, 0x82}, {0xc8, 0x08}, {0xc9, 0x80}, {0x7c, 0x00},
+    {0x7d, 0x00}, {0x7c, 0x03}, {0x7d, 0x48}, {0x7d, 0x48},
+    {0x7c, 0x08}, {0x7d, 0x20}, {0x7d, 0x10}, {0x7d, 0x0e},
+    {0x90, 0x00}, {0x91, 0x0e}, {0x91, 0x1a}, {0x91, 0x31},
+    {0x91, 0x5a}, {0x91, 0x69}, {0x91, 0x75}, {0x91, 0x7e},
+    {0x91, 0x88}, {0x91, 0x8f}, {0x91, 0x96}, {0x91, 0xa3},
+    {0x91, 0xaf}, {0x91, 0xc4}, {0x91, 0xd7}, {0x91, 0xe8},
+    {0x91, 0x20}, {0x92, 0x00}, {0x93, 0x06}, {0x93, 0xe3},
+    {0x93, 0x03}, {0x93, 0x03}, {0x93, 0x00}, {0x93, 0x02},
+    {0x93, 0x00}, {0x93, 0x00}, {0x93, 0x00}, {0x93, 0x00},
+    {0x93, 0x00}, {0x93, 0x00}, {0x93, 0x00}, {0x96, 0x00},
+    {0x97, 0x08}, {0x97, 0x19}, {0x97, 0x02}, {0x97, 0x0c},
+    {0x97, 0x24}, {0x97, 0x30}, {0x97, 0x28}, {0x97, 0x26},
+    {0x97, 0x02}, {0x97, 0x98}, {0x97, 0x80}, {0x97, 0x00},
+    {0x97, 0x00}, {0xa4, 0x00}, {0xa8, 0x00}, {0xc5, 0x11},
+    {0xc6, 0x51}, {0xbf, 0x80}, {0xc7, 0x10}, {0xb6, 0x66},
+    {0xb8, 0xa5}, {0xb7, 0x64}, {0xb9, 0x7c}, {0xb3, 0xaf},
+    {0xb4, 0x97}, {0xb5, 0xff}, {0xb0, 0xc5}, {0xb1, 0x94},
+    {0xb2, 0x0f}, {0xc4, 0x5c}, {0xa6, 0x00}, {0xa7, 0x20},
+    {0xa7, 0xd8}, {0xa7, 0x1b}, {0xa7, 0x31}, {0xa7, 0x00},
+    {0xa7, 0x18}, {0xa7, 0x20}, {0xa7, 0xd8}, {0xa7, 0x19},
+    {0xa7, 0x31}, {0xa7, 0x00}, {0xa7, 0x18}, {0xa7, 0x20},
+    {0xa7, 0xd8}, {0xa7, 0x19}, {0xa7, 0x31}, {0xa7, 0x00},
+    {0xa7, 0x18}, {0x7f, 0x00}, {0xe5, 0x1f}, {0xe1, 0x77},
+    {0xdd, 0x7f}, {0xc2, 0x0e}, {0xff, 0x00}, {0xe0, 0x04},
+    {0xc0, 0xc8}, {0xc1, 0x96}, {0x86, 0x3d}, {0x51, 0x90},
+    {0x52, 0x2c}, {0x53, 0x00}, {0x54, 0x00}, {0x55, 0x88},
+    {0x57, 0x00}, {0x50, 0x92}, {0x5a, 0x50}, {0x5b, 0x3c},
+    {0x5c, 0x00}, {0xd3, 0x04}, {0xe0, 0x00}, {0xff, 0x00},
+    {0x05, 0x00}, {0xda, 0x08}, {0xd7, 0x03}, {0xe0, 0x00},
+    {0x05, 0x00},
+    {0xFF, 0xFF}};
 
 void OV7670_frame_control(uint8_t size, uint8_t vstart,
                           uint16_t hstart, uint8_t edge_offset,
@@ -2418,6 +2605,8 @@ void __not_in_flash_func(capture)(char *buff)
 #else
 void __not_in_flash_func(capture)(char *buff)
 {
+  const int width = CameraWidth;   // 160 (QQVGA) or 320 (QVGA)
+  const int height = CameraHeight; // 120 (QQVGA) or 240 (QVGA)
   char *k = buff;
   while (ST_VSYNC)
   {
@@ -2435,7 +2624,7 @@ void __not_in_flash_func(capture)(char *buff)
   while (ST_PCLK)
   {
   } // wait for clock to go back low /
-  for (int i = 0; i < 160; i++)
+  for (int i = 0; i < width; i++)
   {
     while (!ST_PCLK)
     {
@@ -2458,12 +2647,12 @@ void __not_in_flash_func(capture)(char *buff)
   {
   } // wait for the first line to end*/
   k = buff;
-  for (int j = 0; j < 119; j++)
+  for (int j = 0; j < height - 1; j++)
   {
     while (!ST_HREF)
     {
     } // wait for the first line to end
-    for (int i = 0; i < 160; i++)
+    for (int i = 0; i < width; i++)
     {
       while (!ST_PCLK)
       {
@@ -2512,12 +2701,72 @@ void MIPS16 cmd_camera(void)
   if ((tp = checkstring(cmdline, (unsigned char *)"OPEN")))
   {
     int pin1, pin2, pin3, pin4, pin5, pin6;
-    getcsargs(&tp, 11);
-    if (argc != 11)
+    // Optional leading camera-type keyword: CAMERA OPEN [OV7670|OV2640,] pins...
+    // If omitted, default to OV7670 for backward compatibility.
+    unsigned char *ct;
+    int gotkw = 0;
+    CameraType = CAM_OV7670;
+    camera_address = ov7670_address;
+    if ((ct = checkstring(tp, (unsigned char *)"OV2640")))
+    {
+      CameraType = CAM_OV2640;
+      camera_address = ov2640_address;
+      tp = ct;
+      gotkw = 1;
+    }
+    else if ((ct = checkstring(tp, (unsigned char *)"OV7670")))
+    {
+      tp = ct;
+      gotkw = 1;
+    }
+    if (gotkw) // step past the comma separating the keyword from the first pin
+    {
+      while (*tp == ' ')
+        tp++;
+      if (*tp == ',')
+        tp++;
+    }
+    getcsargs(&tp, 13);
+    if (!(argc == 11 || argc == 13))
       SyntaxError();
     ;
+    // Optional trailing resolution keyword (QQVGA default, QVGA = 320x240, RP2350 only)
+    CameraWidth = 160;
+    CameraHeight = 120;
+    if (CameraType == CAM_OV2640)
+    {
+      // The OV2640 init table is fixed QVGA RGB565 (any trailing keyword is ignored).
+#ifndef rp2350
+      error("OV2640 is only supported on RP2350");
+#endif
+      CameraWidth = 320;
+      CameraHeight = 240;
+    }
+    else if (argc == 13)
+    {
+      if (checkstring(argv[12], (unsigned char *)"QVGA"))
+      {
+#ifndef rp2350
+        error("QVGA (320x240) is only supported on RP2350");
+#endif
+        CameraWidth = 320;
+        CameraHeight = 240;
+      }
+      else if (!checkstring(argv[12], (unsigned char *)"QQVGA"))
+        error("Invalid resolution");
+    }
+#if defined(HDMI) && !defined(HDMICUTDOWN)
+    // On HDMI the camera renders straight into the mode-4 320x240 RGB555 framebuffer
+    if (DISPLAY_TYPE != SCREENMODE4)
+      error("CAMERA requires MODE 4 (320x240 RGB555)");
+    // MODE 4 is only 320x240 at 640x480; at 720x400 it is 360x200 which a QVGA
+    // (320x240) capture cannot fit, so block that combination here.
+    if (CameraWidth == 320 && Option.Resolution == R720x400)
+      error("QVGA not available at 720x400 - use 640x480 resolution");
+#else
     if (!(Option.DISPLAY_TYPE > I2C_PANEL && Option.DISPLAY_TYPE < BufferedPanel))
       error("Invalid display type");
+#endif
     if (!(I2C0locked || I2C1locked))
       StandardError(44);
     if (XCLK)
@@ -2591,233 +2840,39 @@ void MIPS16 cmd_camera(void)
     uSec(1000);
     PinSetBit(pin5, LATSET);
     uSec(1000);
-    if (readregister(REG_PID) != 118)
-      error("Camera not found");
-    ov7670_set(REG_COM7, COM7_RESET); // RESET CAMERA
-    ov7670_set(REG_COM7, COM7_RESET); // RESET CAMERA
-    ov7670_set(REG_RGB444, 0);
-    ov7670_set(REG_COM10, 0x02); // 0x02   VSYNC negative (http://nasulica.homelinux.org/?p=959)
-    ov7670_set(REG_MVFP, 0x37);
-    // 		ov7670_set( REG_CLKRC, 0x40);
-    ov7670_set(REG_COM11, 0x0A);
-    ov7670_set(REG_COM7, COM7_RGB);
-    ov7670_set(REG_COM1, 0);
-    ov7670_set(REG_COM15, COM15_RGB565);
-    ov7670_set(REG_COM9, 0x2A);
-    ov7670_set(REG_TSLB, 0x04); // 0D = UYVY  04 = YUYV
-    ov7670_set(REG_COM13, 0x88);
-    ov7670_set(REG_HSTART, 0x13);
-    ov7670_set(REG_HSTOP, 0x01);
-    ov7670_set(REG_HREF, 0xb6);
-    ov7670_set(REG_VSTART, 0x02);
-    ov7670_set(REG_VSTOP, 0x7a);
-    ov7670_set(REG_VREF, 0x0a);
-    ov7670_set(REG_COM5, 0x61);
-    ov7670_set(REG_COM6, 0x4b);
-    ov7670_set(0x16, 0x02);
-    ov7670_set(0x21, 0x02);
-    ov7670_set(0x22, 0x91);
-    ov7670_set(0x29, 0x07);
-    ov7670_set(0x33, 0x0b);
-    ov7670_set(0x35, 0x0b);
-    ov7670_set(0x37, 0x1d);
-    ov7670_set(0x38, 0x71);
-    ov7670_set(0x39, 0x2a);
-    ov7670_set(REG_COM12, 0x78);
-
-    ov7670_set(0x4d, 0x40);
-    ov7670_set(0x4e, 0x20);
-    ov7670_set(REG_GFIX, 0);
-    ov7670_set(0x74, 0x10);
-    ov7670_set(0x8d, 0x4f);
-    ov7670_set(0x8e, 0);
-    ov7670_set(0x8f, 0);
-    ov7670_set(0x90, 0);
-    ov7670_set(0x91, 0);
-    ov7670_set(0x96, 0);
-    ov7670_set(0x9a, 0);
-
-    ov7670_set(0xb0, 0x84);
-    ov7670_set(0xb1, 0x0c);
-    ov7670_set(0xb2, 0x0e);
-    ov7670_set(0xb3, 0x82); //
-    ov7670_set(0xb8, 0x0a);
-    ov7670_set(0x7a, 0x20); // gamma correction
-    ov7670_set(0x7b, 0x10);
-    ov7670_set(0x7c, 0x1e);
-    ov7670_set(0x7d, 0x35);
-    ov7670_set(0x7e, 0x5a);
-    ov7670_set(0x7f, 0x69);
-    ov7670_set(0x80, 0x76);
-    ov7670_set(0x81, 0x80);
-    ov7670_set(0x82, 0x88);
-    ov7670_set(0x83, 0x8f);
-    ov7670_set(0x84, 0x96);
-    ov7670_set(0x85, 0xa3);
-    ov7670_set(0x86, 0xaf);
-    ov7670_set(0x87, 0xc4);
-    ov7670_set(0x88, 0xd7);
-    ov7670_set(0x89, 0xe8);
-    // AGC and AEC parameters. Note we start by disabling those features,
-    // then turn them only after tweaking the values.
-    ov7670_set(0x13, COM8_FASTAEC | COM8_AECSTEP | COM8_BFILT);
-    ov7670_set(0x00, 0);
-    ov7670_set(0x10, 0);
-    ov7670_set(0x0d, 0x40);
-    ov7670_set(0x14, 0x18);
-    ov7670_set(0xa5, 0x05);
-    ov7670_set(0xab, 0x07);
-    ov7670_set(0x24, 0x95);
-    ov7670_set(0x25, 0x33);
-    ov7670_set(0x26, 0xe3);
-    ov7670_set(0x9f, 0x78);
-    ov7670_set(0xa0, 0x68);
-    ov7670_set(0xa1, 0x03);
-    ov7670_set(0xa6, 0xd8);
-    ov7670_set(0xa7, 0xd8);
-    ov7670_set(0xa8, 0xf0);
-    ov7670_set(0xa9, 0x90);
-    ov7670_set(0xaa, 0x94);
-    ov7670_set(0x13, COM8_FASTAEC | COM8_AECSTEP | COM8_BFILT | COM8_AGC | COM8_AEC);
-    // Almost all of these are magic "reserved" values. */
-    ov7670_set(0x0e, 0x61);
-    ov7670_set(0x0f, 0x4b);
-    ov7670_set(0x16, 0x02);
-    // 		ov7670_set(0x1e, 0x27);
-    ov7670_set(0x21, 0x02);
-    ov7670_set(0x22, 0x91);
-    ov7670_set(0x29, 0x07);
-    ov7670_set(0x33, 0x0b);
-    ov7670_set(0x35, 0x0b);
-    ov7670_set(0x37, 0x1d);
-    ov7670_set(0x38, 0x71);
-    ov7670_set(0x39, 0x2a);
-    // 		ov7670_set(0x3c, 0x78);
-    ov7670_set(0x4d, 0x40);
-    ov7670_set(0x4e, 0x20);
-    ov7670_set(0x69, 0);
-    // 		ov7670_set(0x6b, 0x0a);
-    ov7670_set(0x74, 0x10);
-    ov7670_set(0x8d, 0x4f);
-    ov7670_set(0x8e, 0);
-    ov7670_set(0x8f, 0);
-    ov7670_set(0x90, 0);
-    ov7670_set(0x91, 0);
-    ov7670_set(0x96, 0);
-    ov7670_set(0x9a, 0);
-    ov7670_set(0xb0, 0x84);
-    ov7670_set(0xb1, 0x0c);
-    ov7670_set(0xb2, 0x0e);
-    ov7670_set(0xb3, 0x82);
-    ov7670_set(0xb8, 0x0a);
-    // More reserved magic, some of which tweaks white balance */
-    ov7670_set(0x43, 0x0a);
-    ov7670_set(0x44, 0xf0);
-    ov7670_set(0x45, 0x34);
-    ov7670_set(0x46, 0x58);
-    ov7670_set(0x47, 0x28);
-    ov7670_set(0x48, 0x3a);
-    ov7670_set(0x59, 0x88);
-    ov7670_set(0x5a, 0x88);
-    ov7670_set(0x5b, 0x44);
-    ov7670_set(0x5c, 0x67);
-    ov7670_set(0x5d, 0x49);
-    ov7670_set(0x5e, 0x0e);
-    ov7670_set(0x6c, 0x0a);
-    ov7670_set(0x6d, 0x55);
-    ov7670_set(0x6e, 0x11);
-    ov7670_set(0x6f, 0x9f);
-    ov7670_set(0x6a, 0x40);
-    ov7670_set(0x01, 0x40);
-    ov7670_set(0x02, 0x60);
-    // COLOR SETTING
-    ov7670_set(0x4f, 0x80);
-    ov7670_set(0x50, 0x80);
-    ov7670_set(0x51, 0x00);
-    ov7670_set(0x52, 0x22);
-    ov7670_set(0x53, 0x5e);
-    ov7670_set(0x54, 0x80);
-    ov7670_set(0x56, 0x40);
-    ov7670_set(0x58, 0x9e);
-    ov7670_set(0x59, 0x88);
-    ov7670_set(0x5a, 0x88);
-    ov7670_set(0x5b, 0x44);
-    ov7670_set(0x5c, 0x67);
-    ov7670_set(0x5d, 0x49);
-    ov7670_set(0x5e, 0x0e);
-    ov7670_set(0x69, 0x00);
-    ov7670_set(0x6a, 0x40);
-    ov7670_set(0x6b, 0x0a);
-    ov7670_set(0x6c, 0x0a);
-    ov7670_set(0x6d, 0x55);
-    ov7670_set(0x6e, 0x11);
-    ov7670_set(0x6f, 0x9f);
-
-    ov7670_set(0xb0, 0x84);
-    ov7670_set(0x13, COM8_FASTAEC | COM8_AECSTEP | COM8_BFILT | COM8_AGC | COM8_AEC | COM8_AWB);
-    // Matrix coefficients */
-    ov7670_set(0x4f, 0x80);
-    ov7670_set(0x50, 0x80);
-    ov7670_set(0x51, 0);
-    ov7670_set(0x52, 0x22);
-    ov7670_set(0x53, 0x5e);
-    ov7670_set(0x54, 0x80);
-    ov7670_set(0x58, 0x9e);
-
-    ov7670_set(0x41, 0x08);
-    ov7670_set(0x3f, 0);
-    ov7670_set(0x75, 0x05);
-    ov7670_set(0x76, 0xe1);
-    ov7670_set(0x4c, 0);
-    ov7670_set(0x77, 0x01);
-    ov7670_set(0x3d, 0xc3);
-    ov7670_set(0x4b, 0x09);
-    ov7670_set(0x41, 0x38);
-    ov7670_set(0x56, 0x40);
-
-    ov7670_set(0x34, 0x11);
-    ov7670_set(0x3b, COM11_EXP | COM11_HZAUTO);
-    ov7670_set(0xa4, 0x88);
-    ov7670_set(0x96, 0);
-    ov7670_set(0x97, 0x30);
-    ov7670_set(0x98, 0x20);
-    ov7670_set(0x99, 0x30);
-    ov7670_set(0x9a, 0x84);
-    ov7670_set(0x9b, 0x29);
-    ov7670_set(0x9c, 0x03);
-    ov7670_set(0x9d, 0x4c);
-    ov7670_set(0x9e, 0x3f);
-    ov7670_set(0x78, 0x04);
-    // Extra-weird stuff. Some sort of multiplexor register */
-    ov7670_set(0x79, 0x01);
-    ov7670_set(0xc8, 0xf0);
-    ov7670_set(0x79, 0x0f);
-    ov7670_set(0xc8, 0x00);
-    ov7670_set(0x79, 0x10);
-    ov7670_set(0xc8, 0x7e);
-    ov7670_set(0x79, 0x0a);
-    ov7670_set(0xc8, 0x80);
-    ov7670_set(0x79, 0x0b);
-    ov7670_set(0xc8, 0x01);
-    ov7670_set(0x79, 0x0c);
-    ov7670_set(0xc8, 0x0f);
-    ov7670_set(0x79, 0x0d);
-    ov7670_set(0xc8, 0x20);
-    ov7670_set(0x79, 0x09);
-    ov7670_set(0xc8, 0x80);
-    ov7670_set(0x79, 0x02);
-    ov7670_set(0xc8, 0xc0);
-    ov7670_set(0x79, 0x03);
-    ov7670_set(0xc8, 0x40);
-    ov7670_set(0x79, 0x05);
-    ov7670_set(0xc8, 0x30);
-    ov7670_set(0x79, 0x26);
-    //			for (int i = 0; OV7670_init[i].reg <= OV7670_REG_LAST; i++) {
-    //				ov7670_set(OV7670_init[i].reg, OV7670_init[i].value);
-    //			}
-    saturation(1);
-    OV7670_set_size(OV7670_SIZE_DIV4);
-    ov7670_set(REG_COM10, 0x02); // 0x02   VSYNC negative (http://nasulica.homelinux.org/?p=959)
+    if (CameraType == CAM_OV2640)
+    {
+      // OV2640: bank-switch reset, confirm the sensor, then load RGB565 QVGA (no verify).
+      sccb_write(0xFF, 0x01);      // sensor bank
+      sccb_write(0x12, 0x80);      // COM7 soft reset
+      uSec(50000);
+      sccb_write(0xFF, 0x01);      // sensor bank (reset returns to bank 0)
+      if (readregister(0x0A) != 0x26) // sensor-bank PIDH = 0x26 for OV2640
+        error("Camera not found");
+      load_camera_regs(OV2640_QVGA, 0); // RGB565 QVGA init (table driven, no read-back)
+    }
+    else
+    {
+      if (readregister(REG_PID) != 118)
+        error("Camera not found");
+      load_camera_regs(OV7670_init, 1); // OV7670 RGB565 init (table driven)
+      saturation(2);                    // boost colour-matrix gains - OV7670 RGB565 is otherwise washed out
+      if (CameraWidth == 320)
+      {
+        // QVGA's PCLK would otherwise run at 2x the QQVGA rate, which the bit-banged
+        // capture loop can't follow without a large CPU overclock (~396MHz). Halving
+        // the sensor master clock (CLKRC prescaler /2) brings QVGA's PCLK down to the
+        // QQVGA rate so the same capture loop keeps up at normal CPU speeds. CLKRC
+        // scales the whole pixel chain, so DCW decimation stays matched to PCLK (unlike
+        // forcing SCALING_PCLK_DIV 0x73, which would desync and corrupt the image).
+        // Trade-off: lower frame rate, fine for still capture. XCLK stays 12MHz (in spec).
+        ov7670_set(REG_CLKRC, 0x01);
+        OV7670_set_size(OV7670_SIZE_DIV2);
+      }
+      else
+        OV7670_set_size(OV7670_SIZE_DIV4);
+      ov7670_set(REG_COM10, 0x02); // 0x02   VSYNC negative (http://nasulica.homelinux.org/?p=959)
+    }
     // check the input signals
     uint64_t us = time_us_64() + 1000000;
     while (!ST_PCLK && time_us_64() < us)
@@ -2849,6 +2904,8 @@ void MIPS16 cmd_camera(void)
   }
   else if ((tp = checkstring(cmdline, (unsigned char *)"TEST")))
   {
+    if (CameraType != CAM_OV7670)
+      error("TEST not supported on this camera");
     getcsargs(&tp, 1);
     OV7670_test_pattern(getint(argv[0], 0, 3));
   }
@@ -2860,7 +2917,10 @@ void MIPS16 cmd_camera(void)
     int a = getint(argv[0], 0, 255);
     int b = getint(argv[2], 0, 255);
     int c = readregister(a);
-    ov7670_set(a, b);
+    if (CameraType == CAM_OV7670)
+      ov7670_set(a, b); // read-back verified
+    else
+      sccb_write(a, b); // OV2640 regs may not read back; set the bank with REGISTER &HFF,n first
     MMPrintString("Register &H");
     PIntH(a);
     MMPrintString(" was &H");
@@ -2876,6 +2936,8 @@ void MIPS16 cmd_camera(void)
     int totaldifference = 0, difference;
     if (!XCLK)
       error("Camera not open");
+    if (CameraType != CAM_OV7670)
+      error("CHANGE not supported on this camera"); // OV2640 YUV mode not wired yet
     getcsargs(&tp, 9);
     if (!(argc == 3 || argc == 5 || argc == 9))
       SyntaxError();
@@ -2891,12 +2953,12 @@ void MIPS16 cmd_camera(void)
     MMFLOAT *outdiff = findvar(argv[2], V_FIND);
     if (!(g_vartbl[g_VarIndex].type & T_NBR))
       StandardError(6);
-    if (size < 160 * 120 / 8)
+    if (size < CameraWidth * CameraHeight / 8)
       error("Array too small");
     int picout = 0;
     if (argc >= 5)
     {
-      scale = getint(argv[4], 1, HRes / 160);
+      scale = getint(argv[4], 1, HRes / CameraWidth);
       picout = 1;
       if (argc == 9)
       {
@@ -2908,7 +2970,19 @@ void MIPS16 cmd_camera(void)
     {
       ov7670_set(OV7670_yuv[i].reg, OV7670_yuv[i].value);
     }
-    char *buff = GetTempMainMemory(160 * 120 * 2);
+#if defined(HDMI) && !defined(HDMICUTDOWN)
+    // A full QVGA capture is too big for a fast temp buffer (GetTempMainMemory returns
+    // slow PSRAM for a 150KB request, which garbles the bit-banged capture), so capture
+    // it straight into the framebuffer (fast SRAM); it fits 1:1 at 640x480 with scale 1,
+    // so the optional difference display can't overwrite the capture. QQVGA is small
+    // enough for a fast temp buffer, which also keeps a scaled difference image from
+    // overwriting the capture (separate buffer).
+    char *buff = (CameraWidth == HRes && CameraHeight <= VRes)
+                     ? (char *)WriteBuf
+                     : GetTempMainMemory(CameraWidth * CameraHeight * 2);
+#else
+    char *buff = GetTempMainMemory(CameraWidth * CameraHeight * 2);
+#endif
     char *k = buff;
     c.rgb = 0;
     disable_interrupts_pico();
@@ -2916,11 +2990,11 @@ void MIPS16 cmd_camera(void)
     enable_interrupts_pico();
     char *linebuff = NULL;
     if (scale)
-      linebuff = GetTempMainMemory(160 * 3);
-    for (int y = ys; y < 120 * scale + ys; y += scale)
+      linebuff = GetTempMainMemory(CameraWidth * 3 * scale);
+    for (int y = ys; y < CameraHeight * scale + ys; y += scale)
     {
       int kk = 0;
-      for (int x = 0; x < 160; x++)
+      for (int x = 0; x < CameraWidth; x++)
       {
         c.rgbbytes[1] = *k++;
         c.rgbbytes[0] = *k++;
@@ -2946,7 +3020,7 @@ void MIPS16 cmd_camera(void)
         {
           if (y + r < VRes)
           {
-            int w = 160 * scale;
+            int w = CameraWidth * scale;
             if (w > HRes - xs)
               w = HRes - xs;
             DrawBuffer(xs, y + r, xs + w - 1, y + r, (unsigned char *)linebuff);
@@ -2954,7 +3028,7 @@ void MIPS16 cmd_camera(void)
         }
       }
     }
-    *outdiff = (MMFLOAT)totaldifference / (160.0 * 120.0 * 255.0) * 100.0;
+    *outdiff = (MMFLOAT)totaldifference / ((MMFLOAT)CameraWidth * CameraHeight * 255.0) * 100.0;
   }
   else if ((tp = checkstring(cmdline, (unsigned char *)"CAPTURE")))
   {
@@ -2965,7 +3039,7 @@ void MIPS16 cmd_camera(void)
     int scale = 1;
     if (argc >= 1)
     {
-      scale = getint(argv[0], 1, HRes / 160);
+      scale = getint(argv[0], 1, HRes / CameraWidth);
       if (argc == 5)
       {
         xs = getint(argv[2], 0, HRes - 1);
@@ -2975,24 +3049,97 @@ void MIPS16 cmd_camera(void)
         SyntaxError();
       ;
     }
-    for (int i = 0; OV7670_rgb[i].reg <= OV7670_REG_LAST; i++)
-    {
-      ov7670_set(OV7670_rgb[i].reg, OV7670_rgb[i].value);
-    }
-    char *buff = GetTempMainMemory(160 * 120 * 2);
+    if (CameraType == CAM_OV7670) // OV2640 is already RGB565 from its init table
+      for (int i = 0; OV7670_rgb[i].reg <= OV7670_REG_LAST; i++)
+        ov7670_set(OV7670_rgb[i].reg, OV7670_rgb[i].value);
     c.rgb = 0;
+#if defined(HDMI) && !defined(HDMICUTDOWN)
+    if (CameraWidth == HRes && CameraHeight <= VRes && xs == 0 && ys == 0)
+    {
+      // Direct path: capture RGB565 straight into the HDMI framebuffer (no temp
+      // buffer), then convert RGB565->RGB555 in place. Requires the framebuffer row
+      // stride to match the capture width (CameraWidth==HRes, i.e. QVGA into a
+      // 640x480/mode-4 320x240 framebuffer) so each camera pixel lands on its own
+      // framebuffer pixel with no stride mismatch. RGB565->RGB555 just drops
+      // the green LSB. (The image shows wrong colours/tears during the IRQ-disabled
+      // capture, then snaps right as the convert pass runs - the cost of drawing live.)
+      disable_interrupts_pico();
+      capture((char *)WriteBuf);
+      enable_interrupts_pico();
+      uint16_t *fb = (uint16_t *)WriteBuf;
+      for (int y = 0; y < CameraHeight && y < VRes; y++)
+      {
+        uint16_t *row = fb + y * HRes;
+        for (int x = 0; x < CameraWidth; x++)
+        {
+          // Column 0 is the OV7670 HREF-edge junk pixel - read pixel 1 instead (OV7670 only).
+          // Only ever peeks forward, so converting left-to-right is safe in place.
+          unsigned char *b = (unsigned char *)(row + ((x == 0 && CameraType == CAM_OV7670) ? 1 : x));
+          uint16_t v = (b[0] << 8) | b[1];           // RGB565, high byte first from capture()
+          row[x] = ((v & 0xFFC0) >> 1) | (v & 0x1F); // -> RGB555
+        }
+      }
+    }
+    else if (CameraWidth == 320)
+    {
+      // A full QVGA capture only has a fast buffer when it goes direct to the
+      // framebuffer (full screen, 640x480). With an x,y offset it can't, and a
+      // 150KB PSRAM temp is too slow for the bit-banged capture (garbled image).
+      error("QVGA capture must fill the screen (no x,y offset; MODE 4 at 640x480)");
+    }
+    else
+    {
+      // QQVGA (160x120): small enough for a fast temp buffer, so capture there and
+      // scale up / position into the framebuffer via DrawBufferFast (= DrawBuffer555Fast
+      // in mode 4). e.g. scale 2 fills the 320x240 screen. RGB565->RGB555 drops green LSB.
+      char *buff = GetTempMainMemory(CameraWidth * CameraHeight * 2);
+      disable_interrupts_pico();
+      capture(buff);
+      enable_interrupts_pico();
+      uint16_t *line555 = (uint16_t *)GetTempMainMemory(CameraWidth * scale * 2);
+      char *k = buff;
+      for (int y = ys; y < CameraHeight * scale + ys; y += scale)
+      {
+        int kk = 0;
+        for (int x = 0; x < CameraWidth; x++)
+        {
+          uint16_t v = ((unsigned char)k[0] << 8) | (unsigned char)k[1]; // RGB565, high byte first
+          uint16_t v555 = ((v & 0xFFC0) >> 1) | (v & 0x1F);
+          k += 2;
+          for (int r = 0; r < scale; r++)
+            line555[kk++] = v555;
+        }
+        for (int r = 0; r < scale; r++)
+        {
+          if (y + r < VRes)
+          {
+            int w = CameraWidth * scale;
+            if (w > HRes - xs)
+              w = HRes - xs;
+            DrawBufferFast(xs, y + r, xs + w - 1, y + r, -1, (unsigned char *)line555);
+          }
+        }
+      }
+    }
+#else
+    char *buff = GetTempMainMemory(CameraWidth * CameraHeight * 2);
     disable_interrupts_pico();
     capture(buff);
     enable_interrupts_pico();
-    char *linebuff = GetTempMainMemory(160 * 3 * scale);
+    char *linebuff = GetTempMainMemory(CameraWidth * 3 * scale);
     char *k = buff;
-    for (int y = ys; y < 120 * scale + ys; y += scale)
+    for (int y = ys; y < CameraHeight * scale + ys; y += scale)
     {
       int kk = 0;
-      for (int x = 0; x < 160; x++)
+      for (int x = 0; x < CameraWidth; x++)
       {
-        c.rgbbytes[1] = *k++;
-        c.rgbbytes[0] = *k++;
+        // The first pixel of each QVGA line is junk (an OV7670 HREF-edge artifact
+        // that can't be removed via the window registers). Show a copy of the
+        // second pixel in column 0 instead of garbage (OV7670 only).
+        char *px = (x == 0 && CameraWidth == 320 && CameraType == CAM_OV7670) ? k + 2 : k;
+        c.rgbbytes[1] = px[0];
+        c.rgbbytes[0] = px[1];
+        k += 2;
         for (int r = 0; r < scale; r++)
         {
           linebuff[kk++] = (c.rgbbytes[0] & 0x1F) << 3;
@@ -3004,13 +3151,14 @@ void MIPS16 cmd_camera(void)
       {
         if (y + r < VRes)
         {
-          int w = 160 * scale;
+          int w = CameraWidth * scale;
           if (w > HRes - xs)
             w = HRes - xs;
           DrawBuffer(xs, y + r, xs + w - 1, y + r, (unsigned char *)linebuff);
         }
       }
     }
+#endif
   }
   else if (checkstring(cmdline, (unsigned char *)"CLOSE"))
   {

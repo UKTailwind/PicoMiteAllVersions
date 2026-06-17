@@ -62,7 +62,7 @@ extern const uint8_t *flash_progmemory;
 // unsigned char __attribute__ ((aligned (256))) AllMemory[ALL_MEMORY_SIZE];
 #ifdef rp2350
 #ifdef PICOMITEVGA
-#ifdef PICOMITEHDMIBTH
+#ifdef HDMICUTDOWN
 unsigned char __attribute__((aligned(256))) AllMemory[HEAP_MEMORY_SIZE + 256 + FRAMEBUFFER_POOL_SIZE];
 unsigned char *FRAMEBUFFER = AllMemory + HEAP_MEMORY_SIZE + 256;
 uint32_t framebuffersize = FRAMEBUFFER_POOL_SIZE;
@@ -143,7 +143,11 @@ unsigned char *FrameBuf = NULL;
 #ifdef GUICONTROLS
 struct s_ctrl *Ctrl = NULL; // Allocated from heap top when Option.MaxCtrls > 0
 #endif
-#ifdef PICOMITEWEB
+/* HDMIWEB defines PICOMITEWEB but is a PICOMITEVGA/HDMI build, so its
+   WriteBuf/LayerBuf/FrameBuf are the real framebuffer pointers defined in the
+   PICOMITEVGA block above. Only the framebuffer-less SPI-LCD WebMite needs the
+   NULL definitions here. */
+#if defined(PICOMITEWEB) && !defined(PICOMITEVGA)
 unsigned char *WriteBuf = NULL;
 unsigned char *LayerBuf = NULL;
 unsigned char *FrameBuf = NULL;
@@ -214,7 +218,67 @@ static inline void share_wait_loop(void)
 #define SHARE_CLK_DETECT_WINDOW_US 2000u
 /* 8-bit sync: host drives 0101 on pins 0-3, client drives 1010 on pins 4-7.
  * 4-bit sync: host drives 01 on pins 0-1, client drives 10 on pins 2-3. */
-#define SHARE_HOST_POST_SYNC_MS 5 /* ms host waits after sync before streaming */
+#define SHARE_HOST_POST_SYNC_MS 5          /* ms host waits after sync before streaming */
+#define SHARE_SYNC_TEST_TIMEOUT_US 200000u /* phase-B (both ends present) fault timeout */
+
+// Drive `count` consecutive pins from `base` as outputs holding `pattern` (bit i -> base+i).
+static void MIPS16 share_drive_half(uint base, int count, uint pattern)
+{
+    for (int i = 0; i < count; i++)
+    {
+        gpio_set_dir(base + i, true);
+        gpio_put(base + i, (pattern >> i) & 1);
+    }
+}
+
+// Set `count` consecutive pins from `base` as inputs with a pull-down, so an absent
+// partner reads 0 and never spuriously satisfies a non-zero sync pattern (this keeps
+// the phase-A rendezvous waiting indefinitely). An active partner drive overrides it.
+static void MIPS16 share_input_half(uint base, int count)
+{
+    for (int i = 0; i < count; i++)
+    {
+        gpio_set_dir(base + i, false);
+        gpio_pull_down(base + i);
+        gpio_set_input_enabled(base + i, true); // RP2350 A9 errata
+    }
+}
+
+// Poll (read >> shift) & mask until it equals `expected`. timeout_us == 0 waits
+// indefinitely (user-abortable); otherwise returns false on timeout.
+static bool MIPS16 share_wait_match(uint shift, uint64_t mask, uint expected, uint32_t timeout_us)
+{
+    uint32_t waited = 0;
+    while ((uint)((gpio_get_all64() >> shift) & mask) != expected)
+    {
+        share_wait_loop();
+        if (timeout_us)
+        {
+            waited += 250; // share_wait_loop() pauses ~250us per iteration
+            if (waited >= timeout_us)
+                return false;
+        }
+    }
+    return true;
+}
+
+// Diagnose which data line(s) failed the connectivity phase. Returns 0 if it actually
+// matches now, -1 if the remote end is not responding (driving nothing / every bit
+// wrong => aborted or mismatched firmware), otherwise the GPIO number of the first
+// stuck line. The caller frees resources before raising the error.
+static int MIPS16 share_sync_fault(uint base_gpio, int count, uint64_t mask, uint expected)
+{
+    uint actual = (uint)((gpio_get_all64() >> base_gpio) & mask);
+    uint bad = actual ^ expected;
+    if (bad == 0)
+        return 0; // matched on the final read - treat as success
+    if (actual == 0 || bad == (uint)mask)
+        return -1;
+    for (int i = 0; i < count; i++)
+        if (bad & (1u << i))
+            return (int)(base_gpio + i);
+    return -1;
+}
 
 // Detect a host that is already streaming (clock toggling).
 static bool MIPS16 share_clock_is_toggling(uint clk_gpio)
@@ -241,6 +305,29 @@ static bool MIPS16 share_clock_is_toggling(uint clk_gpio)
     return false;
 }
 
+static uint32_t share_dma_scratch; // drain sink so teardown can't corrupt the buffer
+
+// Robustly stop a SHARE DMA channel. A channel stalled waiting on a DREQ - e.g. the
+// client RX channel once the host stops clocking, so the PIO RX FIFO never becomes
+// non-empty and its DREQ never fires again - will NOT retire on a plain abort, so the
+// usual wait-for-idle loop hangs the firmware (console dead, heartbeat still running).
+// Redirect writes to a scratch word with no increment, break the chain and switch the
+// channel to unpaced so any stalled transfer drains harmlessly instead of waiting on
+// the dead DREQ (and without overwriting the share buffer), then abort and wait on the
+// channel's own BUSY flag.
+static void MIPS16 share_abort_dma_channel(uint ch)
+{
+    dma_hw->ch[ch].al1_write_addr = (uintptr_t)&share_dma_scratch; // non-trigger alias
+    hw_write_masked(&dma_hw->ch[ch].al1_ctrl,
+                    (ch << DMA_CH0_CTRL_TRIG_CHAIN_TO_LSB) | (0x3fu << DMA_CH0_CTRL_TRIG_TREQ_SEL_LSB),
+                    DMA_CH0_CTRL_TRIG_CHAIN_TO_BITS | DMA_CH0_CTRL_TRIG_TREQ_SEL_BITS | DMA_CH0_CTRL_TRIG_INCR_WRITE_BITS);
+    dma_channel_set_irq0_enabled(ch, false);
+    dma_hw->abort = 1u << ch;
+    while (dma_hw->ch[ch].ctrl_trig & DMA_CH0_CTRL_TRIG_BUSY_BITS)
+        tight_loop_contents();
+    dma_hw->intr = 1u << ch; // clear any spurious IRQ raised by the abort
+}
+
 static void MIPS16 share_prepare_start(PIO pio, uint sm, uint data_base_gpio, uint clk_gpio, int bus_width, uint dma_data_ch, uint dma_ctrl_ch)
 {
     // Force SM, DMA and bus pins to a known idle state before every start.
@@ -248,10 +335,8 @@ static void MIPS16 share_prepare_start(PIO pio, uint sm, uint data_base_gpio, ui
     pio_sm_clear_fifos(pio, sm);
     pio_sm_restart(pio, sm);
 
-    dma_hw->abort = (1u << dma_data_ch) | (1u << dma_ctrl_ch);
-    while (dma_hw->abort)
-        tight_loop_contents();
-    dma_channel_set_irq0_enabled(dma_data_ch, false);
+    share_abort_dma_channel(dma_data_ch);
+    share_abort_dma_channel(dma_ctrl_ch);
 
     for (int i = 0; i < bus_width; i++)
     {
@@ -269,79 +354,139 @@ static void MIPS16 share_prepare_start(PIO pio, uint sm, uint data_base_gpio, ui
     gpio_set_input_enabled(clk_gpio, true); // RP2350 A9 errata
 }
 
-// Host sync: drive pattern on lower half of data pins, wait for client on upper half.
-// 8-bit: host drives 0101 on pins 0-3, reads 1010 on pins 4-7.
-// 4-bit: host drives 01 on pins 0-1, reads 10 on pins 2-3.
-static void MIPS16 share_host_sync(uint data_base_gpio, uint clk_gpio, int bus_width)
+// RP2350B: each PIO instance only reaches a 32-GPIO window (0-31 or 16-47),
+// selected by its GPIO base. Set the base so the SM's OUT/IN/SIDESET/WAIT pins
+// reach the chosen clock + data pins; the SDK then maps the absolute pin numbers
+// passed to sm_config_set_*_pins / pio_sm_set_consecutive_pindirs / wait-gpio
+// relative to it. Must run before pio_add_program and pio_sm_init.
+static void MIPS16 share_set_gpio_base(PIO pio, int data_base_gpio, int clk_gpio, int bus_width)
+{
+#if PICO_PIO_USE_GPIO_BASE
+    int lo = (clk_gpio < data_base_gpio) ? clk_gpio : data_base_gpio;
+    int hi = data_base_gpio + bus_width - 1;
+    if (clk_gpio > hi)
+        hi = clk_gpio;
+    uint gbase = 0;
+    if (hi <= 31)
+        gbase = 0;
+    else if (lo >= 16 && hi <= 47)
+        gbase = 16;
+    else
+        error("Clock and data pins must lie within one 32-GPIO window"); // no return
+    pio_set_gpio_base(pio, gbase);
+#else
+    (void)pio;
+    (void)data_base_gpio;
+    (void)clk_gpio;
+    (void)bus_width;
+#endif
+}
+
+// Host sync: three-phase connectivity test. Phase A is the indefinite, user-abortable
+// rendezvous (drive pattern on the lower half, wait for the client's ack on the upper
+// half - host and client may start in any order, any delay apart). Phase B inverts the
+// pattern so every data line is exercised at BOTH levels; it is timed because both ends
+// are proven present by then, and a stuck/open line is reported by GPIO number. Phase C
+// is a host->client confirmation: each end only reads half the bus, so the host sends a
+// final OK on the lower half (only after the upper half passed) and the client waits for
+// it - otherwise an upper-half fault would let the client falsely sync while the host
+// aborts. 8-bit: lower half = pins 0-3, upper half = pins 4-7.  4-bit: lower 0-1, upper 2-3.
+static int MIPS16 share_host_sync(uint data_base_gpio, uint clk_gpio, int bus_width)
 {
     int half = bus_width / 2;
-    uint host_pattern = (bus_width == 8) ? 0x05u : 0x01u;   // 0101 or 01
-    uint client_pattern = (bus_width == 8) ? 0x0Au : 0x02u; // 1010 or 10
-    uint mask = (1u << half) - 1;
+    uint64_t mask = (1ULL << half) - 1;
+    uint a_lo = (bus_width == 8) ? 0x05u : 0x01u; // host phase-A lower drive (0101 / 01)
+    uint a_up = (bus_width == 8) ? 0x0Au : 0x02u; // client phase-A upper ack  (1010 / 10)
+    uint b_lo = (uint)(~a_lo) & (uint)mask;       // inverted patterns for phase B
+    uint b_up = (uint)(~a_up) & (uint)mask;
 
     // Clock = output LOW
     gpio_set_dir(clk_gpio, true);
     gpio_put(clk_gpio, 0);
 
-    // Lower half = output, drive host pattern
-    for (int i = 0; i < half; i++)
+    // Upper half = input (the client's ack/response is read here).
+    share_input_half(data_base_gpio + half, half);
+
+    // Phase A: rendezvous - drive lower, wait indefinitely for the client's ack.
+    share_drive_half(data_base_gpio, half, a_lo);
+    share_wait_match(data_base_gpio + half, mask, a_up, 0);
+
+    // Phase B: inverted pattern verifies every upper (client-driven) line at the
+    // opposite level (timed). Only the host reads the upper half, so this is the only
+    // place an upper-half fault is caught.
+    share_drive_half(data_base_gpio, half, b_lo);
+    if (!share_wait_match(data_base_gpio + half, mask, b_up, SHARE_SYNC_TEST_TIMEOUT_US))
     {
-        uint pin = data_base_gpio + i;
-        gpio_set_dir(pin, true);
-        gpio_put(pin, (host_pattern >> i) & 1);
+        int fault = share_sync_fault(data_base_gpio + half, half, mask, b_up);
+        if (fault)
+            return fault;
     }
 
-    // Upper half = input
-    for (int i = half; i < bus_width; i++)
-    {
-        gpio_set_dir(data_base_gpio + i, false);
-        gpio_set_input_enabled(data_base_gpio + i, true); // RP2350 A9 errata
-    }
+    // Phase C: the upper half passed - drive the confirmation pattern on the lower half
+    // (a_lo is the complement of b_lo, so it cannot appear while b_lo collapses on a
+    // failing end) so the client, which cannot see its own driven upper half, also
+    // learns the link is good. If the host had failed above it returns without sending
+    // this, and the client's phase-C wait times out and aborts too.
+    share_drive_half(data_base_gpio, half, a_lo);
 
-    // Block until upper half reads client pattern.
-    while (((gpio_get_all() >> (data_base_gpio + half)) & mask) != client_pattern)
-        share_wait_loop();
-
-    // Hold sync pattern for 1ms so the client also registers.
+    // Hold the confirmation so the client registers it.
     uSec(1000);
+    return 0;
 }
 
-// Client sync: error if host already streaming; drive pattern on upper half,
-// wait for host pattern on lower half.
-static void MIPS16 share_client_sync(uint data_base_gpio, uint clk_gpio, int bus_width)
+// Client sync: error if host already streaming, then mirror the host's three-phase
+// handshake - wait for each pattern on the lower half (the host's drive), ack on the
+// upper half. Waiting before acking makes each ack a true "I saw it" confirmation, so
+// the host never advances before the client has captured the previous phase. Phase C
+// waits for the host's final OK so an upper-half fault (invisible to this end, which
+// drives the upper half) still aborts here instead of falsely syncing.
+static int MIPS16 share_client_sync(uint data_base_gpio, uint clk_gpio, int bus_width)
 {
     int half = bus_width / 2;
-    uint host_pattern = (bus_width == 8) ? 0x05u : 0x01u;   // 0101 or 01
-    uint client_pattern = (bus_width == 8) ? 0x0Au : 0x02u; // 1010 or 10
-    uint mask = (1u << half) - 1;
+    uint64_t mask = (1ULL << half) - 1;
+    uint a_lo = (bus_width == 8) ? 0x05u : 0x01u;
+    uint a_up = (bus_width == 8) ? 0x0Au : 0x02u;
+    uint b_lo = (uint)(~a_lo) & (uint)mask;
+    uint b_up = (uint)(~a_up) & (uint)mask;
 
-    // If clock is already toggling the host is streaming — can't synchronise.
+    // If clock is already toggling the host is streaming - can't synchronise.
     gpio_set_dir(clk_gpio, false);
     gpio_set_input_enabled(clk_gpio, true); // RP2350 A9 errata
     if (share_clock_is_toggling(clk_gpio))
-        error("Host already running - cannot synchronise");
+        return -2; // host already running
 
-    // Upper half = output, drive client pattern
-    for (int i = half; i < bus_width; i++)
+    // Lower half = input (the host's drive is read here).
+    share_input_half(data_base_gpio, half);
+
+    // Phase A: rendezvous - wait indefinitely for the host, then ack on the upper half.
+    share_wait_match(data_base_gpio, mask, a_lo, 0);
+    share_drive_half(data_base_gpio + half, half, a_up);
+
+    // Phase B: wait for the inverted host pattern (timed) - verifies every lower
+    // (host-driven) line - then ack on the upper half.
+    if (!share_wait_match(data_base_gpio, mask, b_lo, SHARE_SYNC_TEST_TIMEOUT_US))
     {
-        uint pin = data_base_gpio + i;
-        gpio_set_dir(pin, true);
-        gpio_put(pin, (client_pattern >> (i - half)) & 1);
+        int fault = share_sync_fault(data_base_gpio, half, mask, b_lo);
+        if (fault)
+            return fault;
+    }
+    share_drive_half(data_base_gpio + half, half, b_up);
+
+    // Phase C: wait for the host's confirmation. The host only sends it after the upper
+    // half passed - which only the host can see - so an upper-half fault that this end
+    // cannot detect itself still makes us time out and abort here rather than falsely
+    // syncing and stranding the receiver. (Lower-half faults are already symmetric: we
+    // abort in phase B and stop acking, so the host times out waiting for our ack.)
+    if (!share_wait_match(data_base_gpio, mask, a_lo, SHARE_SYNC_TEST_TIMEOUT_US))
+    {
+        int fault = share_sync_fault(data_base_gpio, half, mask, a_lo);
+        if (fault)
+            return fault;
     }
 
-    // Lower half = input
-    for (int i = 0; i < half; i++)
-    {
-        gpio_set_dir(data_base_gpio + i, false);
-        gpio_set_input_enabled(data_base_gpio + i, true); // RP2350 A9 errata
-    }
-
-    // Block until lower half reads host pattern.
-    while (((gpio_get_all() >> data_base_gpio) & mask) != host_pattern)
-        share_wait_loop();
-
-    // Hold sync pattern for 1ms so the host also registers.
+    // Hold so the host registers our final state.
     uSec(1000);
+    return 0;
 }
 
 static void MIPS16 share_stop_internal(share_state_t *st)
@@ -350,10 +495,8 @@ static void MIPS16 share_stop_internal(share_state_t *st)
         return;
 
     // Always abort DMA channels regardless of active state.
-    dma_hw->abort = (1u << st->dma_data_ch) | (1u << st->dma_ctrl_ch);
-    while (dma_hw->abort)
-        tight_loop_contents();
-    dma_channel_set_irq0_enabled(st->dma_data_ch, false);
+    share_abort_dma_channel(st->dma_data_ch);
+    share_abort_dma_channel(st->dma_ctrl_ch);
 
     // Stop PIO SM and remove program if one was loaded.
     if (st->program_len > 0)
@@ -457,10 +600,13 @@ static void MIPS16 cmd_share_host(unsigned char *tp)
     int data_base_gpio = PinDef[data_pin_phys].GPno;
     int clk_gpio = PinDef[clk_pin_phys].GPno;
 
-    if (data_base_gpio + bus_width - 1 > 29)
+    if (data_base_gpio + bus_width - 1 > NUM_BANK0_GPIOS - 1)
         error("Need % consecutive GPIOs from data pin", bus_width);
     if (clk_gpio >= data_base_gpio && clk_gpio <= data_base_gpio + bus_width - 1)
         error("Clock pin overlaps data pins");
+
+    // RP2350B: select the PIO GPIO base window, or reject clock/data spanning two windows.
+    share_set_gpio_base(pio, data_base_gpio, clk_gpio, bus_width);
 
     // Validate and reserve all data + clock pins
     CheckPin(clk_pin_phys, CP_IGNORE_INUSE);
@@ -553,9 +699,16 @@ static void MIPS16 cmd_share_host(unsigned char *tp)
         ExtCfg(data_pins_phys[i], EXT_COM_RESERVED, 0);
     ExtCfg(clk_pin_phys, EXT_COM_RESERVED, 0);
 
-    // Sync: block until client responds.
-    // Returns after 1ms hold so client has also registered.
-    share_host_sync((uint)data_base_gpio, (uint)clk_gpio, bus_width);
+    // Sync: block until client responds, then run the two-phase connectivity test.
+    // On failure, free the reserved pins/PIO/DMA before reporting so a retry works.
+    int fault = share_host_sync((uint)data_base_gpio, (uint)clk_gpio, bus_width);
+    if (fault)
+    {
+        share_stop_internal(&share_host_state);
+        if (fault == -1)
+            error("Sync failed - remote end not responding");
+        error("Sync failed - data line gp% not responding", fault);
+    }
 
     // Wait 5ms for client to switch to PIO receive mode.
     // Clock is LOW (SIO default) — client PIO starts at "wait 1 gpio CLK"
@@ -611,7 +764,7 @@ static void MIPS16 cmd_share_client(unsigned char *tp)
     uint32_t dma_address = share_dma_address(address);
     int count = getinteger(argv[10]);
     int bus_width = 8; // default 8-bit bus
-    if (argc >= 13 && *argv[12])
+    if (argc == 13)
         bus_width = getint(argv[12], 4, 8);
 
     if (count <= 0 || (count & 3))
@@ -623,10 +776,13 @@ static void MIPS16 cmd_share_client(unsigned char *tp)
     int data_base_gpio = PinDef[data_pin_phys].GPno;
     int clk_gpio = PinDef[clk_pin_phys].GPno;
 
-    if (data_base_gpio + bus_width - 1 > 29)
+    if (data_base_gpio + bus_width - 1 > NUM_BANK0_GPIOS - 1)
         error("Need % consecutive GPIOs from data pin", bus_width);
     if (clk_gpio >= data_base_gpio && clk_gpio <= data_base_gpio + bus_width - 1)
         error("Clock pin overlaps data pins");
+
+    // RP2350B: select the PIO GPIO base window, or reject clock/data spanning two windows.
+    share_set_gpio_base(pio, data_base_gpio, clk_gpio, bus_width);
 
     // Validate and reserve all data + clock pins
     CheckPin(clk_pin_phys, CP_IGNORE_INUSE);
@@ -641,7 +797,7 @@ static void MIPS16 cmd_share_client(unsigned char *tp)
     share_stop_internal(&share_client_state);
 
     // Begin from a clean SM/DMA/GPIO state.
-    share_prepare_start(pio, (uint)sm, (uint)data_base_gpio, (uint)clk_gpio, bus_width, PIO_RX_DMA, PIO_RX_DMA2);
+    share_prepare_start(pio, (uint)sm, (uint)data_base_gpio, (uint)clk_gpio, bus_width, SHARE_DMA_DATA, SHARE_DMA_CTRL);
 
     // Build client RX stream program: autopush after 32 bits.
     // .wrap_target
@@ -674,13 +830,13 @@ static void MIPS16 cmd_share_client(unsigned char *tp)
     pio_sm_init(pio, sm, offset, &cfg);
 
     // Configure DMA: data channel transfers PIO RX FIFO -> memory
-    dma_channel_config c = dma_channel_get_default_config(PIO_RX_DMA);
+    dma_channel_config c = dma_channel_get_default_config(SHARE_DMA_DATA);
     channel_config_set_transfer_data_size(&c, DMA_SIZE_32);
     channel_config_set_read_increment(&c, false);
     channel_config_set_write_increment(&c, true);
     channel_config_set_dreq(&c, pio_get_dreq(pio, sm, false)); // RX FIFO not empty
-    channel_config_set_chain_to(&c, PIO_RX_DMA2);
-    dma_channel_configure(PIO_RX_DMA, &c,
+    channel_config_set_chain_to(&c, SHARE_DMA_CTRL);
+    dma_channel_configure(SHARE_DMA_DATA, &c,
                           (void *)dma_address, // write to shared memory
                           &pio->rxf[sm],       // read from PIO RX FIFO
                           count / 4,           // transfer count (32-bit words)
@@ -689,13 +845,13 @@ static void MIPS16 cmd_share_client(unsigned char *tp)
     // Configure DMA: control channel resets write address and retriggers data channel
     static uint32_t share_write_addr;
     share_write_addr = dma_address;
-    dma_channel_config c2 = dma_channel_get_default_config(PIO_RX_DMA2);
+    dma_channel_config c2 = dma_channel_get_default_config(SHARE_DMA_CTRL);
     channel_config_set_transfer_data_size(&c2, DMA_SIZE_32);
     channel_config_set_read_increment(&c2, false);
     channel_config_set_write_increment(&c2, false);
     channel_config_set_dreq(&c2, 0x3F); // unpaced
-    dma_channel_configure(PIO_RX_DMA2, &c2,
-                          &dma_hw->ch[PIO_RX_DMA].al2_write_addr_trig,
+    dma_channel_configure(SHARE_DMA_CTRL, &c2,
+                          &dma_hw->ch[SHARE_DMA_DATA].al2_write_addr_trig,
                           &share_write_addr, // pointer to the start address constant
                           1,
                           false);
@@ -723,9 +879,18 @@ static void MIPS16 cmd_share_client(unsigned char *tp)
         ExtCfg(data_pins_phys[i], EXT_COM_RESERVED, 0);
     ExtCfg(clk_pin_phys, EXT_COM_RESERVED, 0);
 
-    // Sync: block until host responds.
-    // Returns after 1ms hold so host has also registered.
-    share_client_sync((uint)data_base_gpio, (uint)clk_gpio, bus_width);
+    // Sync: block until host responds, then run the two-phase connectivity test.
+    // On failure, free the reserved pins/PIO/DMA before reporting so a retry works.
+    int fault = share_client_sync((uint)data_base_gpio, (uint)clk_gpio, bus_width);
+    if (fault)
+    {
+        share_stop_internal(&share_client_state);
+        if (fault == -2)
+            error("Host already running - cannot synchronise");
+        if (fault == -1)
+            error("Sync failed - remote end not responding");
+        error("Sync failed - data line gp% not responding", fault);
+    }
 
     // Switch ALL data pins and clock to PIO as inputs.
     for (int i = 0; i < bus_width; i++)
@@ -746,7 +911,7 @@ static void MIPS16 cmd_share_client(unsigned char *tp)
     pio_sm_set_enabled(pio, sm, true);
 
     // Start DMA (blocks on RX FIFO empty — no data until host starts clocking).
-    dma_start_channel_mask(1u << PIO_RX_DMA2);
+    dma_start_channel_mask(1u << SHARE_DMA_CTRL);
 }
 
 void MIPS16 cmd_memory(void)
@@ -1750,8 +1915,11 @@ void MIPS16 ClearSpecificTempMemory(void *addr)
         }
     }
 }
-
-void MIPS64 __not_in_flash_func(FreeMemory)(unsigned char *addr)
+#ifdef RP2350
+void MIPS64 __not_in_flash_func(FreeMemory)(void *addr)
+#else
+void MIPS32 __not_in_flash_func(FreeMemory)(void *addr)
+#endif
 {
     if (addr == NULL)
         return;
@@ -1759,15 +1927,15 @@ void MIPS64 __not_in_flash_func(FreeMemory)(unsigned char *addr)
     int bits;
     if (PSRAMsize)
     {
-        if (addr > (unsigned char *)PSRAMbase && addr < (unsigned char *)(PSRAMbase + PSRAMsize))
+        if ((unsigned char *)addr > (unsigned char *)PSRAMbase && (unsigned char *)addr < (unsigned char *)(PSRAMbase + PSRAMsize))
         {
             // Validate the address is actually allocated before freeing
-            bits = SBitsGet(addr);
+            bits = SBitsGet((unsigned char *)addr);
             if (!(bits & PUSED))
                 return; // Address not allocated - nothing to free
             do
             {
-                bits = SBitsGet(addr);
+                bits = SBitsGet((unsigned char *)addr);
                 SBitsSet(addr, 0);
                 addr += PAGESIZE;
             } while (bits != (PUSED | PLAST));
@@ -1775,12 +1943,12 @@ void MIPS64 __not_in_flash_func(FreeMemory)(unsigned char *addr)
         else
         {
             // Validate the address is actually allocated before freeing
-            bits = MBitsGet(addr);
+            bits = MBitsGet((unsigned char *)addr);
             if (!(bits & PUSED))
                 return; // Address not allocated - nothing to free
             do
             {
-                bits = MBitsGet(addr);
+                bits = MBitsGet((unsigned char *)addr);
                 MBitsSet(addr, 0);
                 addr += PAGESIZE;
             } while (bits != (PUSED | PLAST));
@@ -1789,12 +1957,12 @@ void MIPS64 __not_in_flash_func(FreeMemory)(unsigned char *addr)
     else
     {
         // Validate the address is actually allocated before freeing
-        bits = MBitsGet(addr);
+        bits = MBitsGet((unsigned char *)addr);
         if (!(bits & PUSED))
             return; // Address not allocated - nothing to free
         do
         {
-            bits = MBitsGet(addr);
+            bits = MBitsGet((unsigned char *)addr);
             MBitsSet(addr, 0);
             addr += PAGESIZE;
         } while (bits != (PUSED | PLAST));
@@ -1802,12 +1970,12 @@ void MIPS64 __not_in_flash_func(FreeMemory)(unsigned char *addr)
 #else
     int bits;
     // Validate the address is actually allocated before freeing
-    bits = MBitsGet(addr);
+    bits = MBitsGet((unsigned char *)addr);
     if (!(bits & PUSED))
         return; // Address not allocated - nothing to free
     do
     {
-        bits = MBitsGet(addr);
+        bits = MBitsGet((unsigned char *)addr);
         MBitsSet(addr, 0);
         addr += PAGESIZE;
     } while (bits != (PUSED | PLAST));
@@ -1911,7 +2079,11 @@ void __not_in_flash_func (*GetPSMemory)(int size)
     return NULL; // keep the compiler happy
 }
 #endif
+#ifdef rp2350
 void MIPS64 __not_in_flash_func (*GetSystemMemory)(int size)
+#else
+void MIPS32 __not_in_flash_func (*GetSystemMemory)(int size)
+#endif
 { // get memory from the bottom up
     int n = 0, k;
     unsigned char *addr;
@@ -1946,7 +2118,11 @@ void MIPS64 __not_in_flash_func (*GetSystemMemory)(int size)
     error("Not enough System Heap memory");
     return NULL; // keep the compiler happy
 }
+#ifdef rp2350
 void MIPS64 __not_in_flash_func (*GetMemory)(int size)
+#else
+void MIPS32 __not_in_flash_func (*GetMemory)(int size)
+#endif
 {
 #ifdef rp2350
     if (PSRAMsize && size > heap_memory_size / 2)
@@ -1981,6 +2157,88 @@ void MIPS64 __not_in_flash_func (*GetMemory)(int size)
     ClearTempMemory(); // hopefully this will give us enough to print the prompt
     error("Not enough Heap memory");
     return NULL; // keep the compiler happy
+}
+
+void __not_in_flash_func (*CallocMemory)(size_t num, size_t size)
+{
+    size_t total_size = num * size;
+    void *ptr = GetMemory(total_size);
+    return ptr;
+}
+
+/* NULL-returning allocators for lwIP. GetMemory/CallocMemory call error()
+   (longjmp to the prompt) when the heap is exhausted; that is fine for the
+   synchronous TLS handshake path, but lwIP allocates pbufs deep inside the
+   packet-RX path and relies on a NULL return to drop-and-retry. Unwinding the
+   stack with longjmp from there would corrupt lwIP/cyw43 state, so these
+   variants return NULL instead. Same allocation logic + auto-PSRAM + zeroing
+   as the originals; the originals are left untouched to keep the interpreter's
+   hot path free of an extra call layer. */
+#ifdef rp2350
+void __not_in_flash_func (*GetPSMemoryNull)(int size)
+{
+    unsigned int j, n;
+    unsigned char *addr;
+    j = n = (size + PAGESIZE - 1) / PAGESIZE; // nbr of pages rounded up
+    for (addr = (unsigned char *)(PSRAMbase + PSRAMsize - PAGESIZE); addr >= (unsigned char *)PSRAMbase; addr -= PAGESIZE)
+    {
+        if (!(SBitsGet(addr) & PUSED))
+        {
+            if (--n == 0)
+            { // found a free slot
+                j--;
+                SBitsSet(addr + (j * PAGESIZE), PUSED | PLAST);
+                while (j--)
+                    SBitsSet(addr + (j * PAGESIZE), PUSED);
+                memset(addr, 0, size); // zero the memory (calloc semantics)
+                return (void *)addr;
+            }
+        }
+        else
+            n = j;
+    }
+    return NULL; // out of PSRAM — let the caller (lwIP) handle it
+}
+#endif
+#ifdef rp2350
+void MIPS64 __not_in_flash_func (*GetMemoryNull)(int size)
+#else
+void MIPS32 __not_in_flash_func (*GetMemoryNull)(int size)
+#endif
+{
+#ifdef rp2350
+    if (PSRAMsize && size > heap_memory_size / 2)
+        return GetPSMemoryNull(size);
+#endif
+    unsigned int j, n;
+    unsigned char *addr;
+    j = n = (size + PAGESIZE - 1) / PAGESIZE; // nbr of pages rounded up
+    for (addr = MMHeap + heap_memory_size - PAGESIZE; addr >= MMHeap; addr -= PAGESIZE)
+    {
+        if (!(MBitsGet(addr) & PUSED))
+        {
+            if (--n == 0)
+            { // found a free slot
+                j--;
+                MBitsSet(addr + (j * PAGESIZE), PUSED | PLAST);
+                while (j--)
+                    MBitsSet(addr + (j * PAGESIZE), PUSED);
+                memset(addr, 0, size); // zero the memory (calloc semantics)
+                return (void *)addr;
+            }
+        }
+        else
+            n = j;
+    }
+#ifdef rp2350
+    if (PSRAMsize)
+        return GetPSMemoryNull(size);
+#endif
+    return NULL; // out of heap — let the caller (lwIP) handle it
+}
+void __not_in_flash_func (*CallocMemoryNull)(size_t num, size_t size)
+{
+    return GetMemoryNull((int)(num * size));
 }
 
 void *GetAlignedMemory(int size)

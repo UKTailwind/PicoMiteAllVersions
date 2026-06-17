@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.13)
 
 # Valid builds are PICO, PICOUSB, PICOMIN, VGA, VGAUSB, WEB,
 # PICORP2350, PICOUSBRP2350, VGARP2350, VGAUSBRP2350, WEBRP2350, HDMI, HDMIUSB,
-# PICOBTRP2350, PICOBTHRP2350, HDMIBTH.
+# PICOBTRP2350, PICOBTHRP2350, HDMIBTH, HDMIWEB.
 set(VALID_COMPILE_VARIANTS
 	PICO
 	PICOUSB
@@ -20,14 +20,15 @@ set(VALID_COMPILE_VARIANTS
 	PICOBTRP2350
 	PICOBTHRP2350
 	HDMIBTH
+	HDMIWEB
 )
 
 # VS Code uses this default when COMPILE is not supplied explicitly.
 # Guard restored: without it, this set() shadows the -DCOMPILE=X passed
 # by buildpicomite.bat and every variant silently builds as the default.
-#if(NOT DEFINED COMPILE)
-	set(COMPILE HDMIUSB)
-#endif()
+if(NOT DEFINED COMPILE)
+	set(COMPILE PICO)
+endif()
 
 list(FIND VALID_COMPILE_VARIANTS "${COMPILE}" COMPILE_INDEX)
 if(COMPILE_INDEX EQUAL -1)
@@ -58,6 +59,13 @@ set(COMMON_SOURCES
 	ffunicode.c
 	mmc_stm32.c
 	Draw.c
+	Draw3D.c
+	DrawFill.c
+	TileMap.c
+	Pointer.c
+	Sprite.c
+	Blit.c
+	FrameBuffer.c
 	Editor.c
 	XModem.c
 	MM_Misc.c
@@ -108,6 +116,13 @@ set(OPTIMIZED_SOURCES
 	GUI.c
 	BmpDecoder.c
 	Draw.c
+	Draw3D.c
+	DrawFill.c
+	TileMap.c
+	Pointer.c
+	Sprite.c
+	Blit.c
+	FrameBuffer.c
 	Raycaster.c
 	GPS.c
 	I2C.c
@@ -141,6 +156,7 @@ set(RP2350_VARIANTS
 	PICOBTRP2350
 	PICOBTHRP2350
 	HDMIBTH
+	HDMIWEB
 )
 
 set(BT_VARIANTS
@@ -161,6 +177,7 @@ set(BTH_VARIANTS
 set(WEB_VARIANTS
 	WEB
 	WEBRP2350
+	HDMIWEB
 )
 
 set(GUI_VARIANTS
@@ -180,6 +197,7 @@ set(USB_HOST_VARIANTS
 	VGAUSBRP2350
 	HDMIUSB
 	HDMIBTH
+	HDMIWEB
 )
 
 set(UPNG_VARIANTS
@@ -193,6 +211,7 @@ set(UPNG_VARIANTS
 	PICOBTRP2350
 	PICOBTHRP2350
 	HDMIBTH
+	HDMIWEB
 )
 
 set(RAYCASTER_VARIANTS
@@ -205,6 +224,7 @@ set(RAYCASTER_VARIANTS
 	PICOBTRP2350
 	PICOBTHRP2350
 	HDMIBTH
+	HDMIWEB
 )
 
 set(VGA_PIO_VARIANTS
@@ -225,6 +245,7 @@ set(HDMI_VARIANTS
 	HDMI
 	HDMIUSB
 	HDMIBTH
+	HDMIWEB
 )
 
 set(PICOMITE_VARIANTS
@@ -258,6 +279,7 @@ set(PICO_RAND_VARIANTS
 	PICOBTRP2350
 	PICOBTHRP2350
 	HDMIBTH
+	HDMIWEB
 )
 set(USES_CACHE_VARIANTS
 	HDMIUSB
@@ -270,10 +292,12 @@ set(USES_CACHE_VARIANTS
 	PICOBTRP2350
 	PICOBTHRP2350
 	HDMIBTH
+	HDMIWEB
 )
 compile_is_in(IS_RP2350 ${RP2350_VARIANTS})
 compile_is_in(IS_WEB ${WEB_VARIANTS})
 compile_is_in(IS_WEBRP2350 WEBRP2350)
+compile_is_in(IS_HDMIWEB HDMIWEB)
 compile_is_in(HAS_GUI ${GUI_VARIANTS})
 compile_is_in(IS_PICOMIN PICOMIN)
 compile_is_in(IS_FULL_RP2040 ${FULL_RP2040_VARIANTS})
@@ -304,8 +328,11 @@ if(IS_PICOMIN)
 	set(USES_FM FALSE)
 endif()
 
+# Turtle graphics is off for the SPI-LCD WebMite (no framebuffer/RAM) and
+# PICOMITEMIN, but HDMIWEB is an HDMI graphics build (like HDMIBTH) and its
+# Raycaster needs Turtle's fill_patterns[], so keep it on for HDMIWEB.
 set(USES_TURTLE TRUE)
-if(IS_WEB OR IS_PICOMIN)
+if((IS_WEB OR IS_PICOMIN) AND NOT IS_HDMIWEB)
 	set(USES_TURTLE FALSE)
 endif()
 
@@ -314,28 +341,42 @@ if(IS_PICOMIN)
 	set(USES_STRUCTS FALSE)
 endif()
 
+# Derive the board purely from COMPILE into a local var, then force it into
+# the cache below. The RP2350 wireless variants use the RP2350B + CYW43 board
+# (pimoroni_pico_plus2_w_rp2350) rather than pico2_w. pico2_w is the RP2350A
+# package (PICO_RP2350A=1 -> NUM_BANK0_GPIOS=30), which compiles the SDK's
+# gpio_put/gpio_get inline helpers with the 32-bit-mask path: any GPIO >=32
+# wraps (a bit-banged SD card on GP32/GP33 silently drives GP0/GP1). The
+# Plus 2 W board is RP2350B (NUM_BANK0_GPIOS=48) with identical CYW43 wiring
+# (GP23/24/25/29), so WiFi/BT is unaffected while GP30-47 become usable. Safe
+# on genuine RP2350A silicon too: CheckPin() caps pin numbers at 29 via the
+# runtime-detected package. HDMIBTH lands in the BT/BTH branch (it is in
+# BTH_VARIANTS, so IS_BTH is true). HDMIWEB lands here via IS_HDMIWEB — it
+# uses the CYW43 chip for WiFi just like WEBRP2350, so it needs the same
+# RP2350B + CYW43 board.
 if(IS_RP2350)
 	set(PICO_PLATFORM rp2350)
-	if(IS_WEBRP2350)
-		set(WEBRP2350_BOARD pico2_w CACHE STRING "Board definition used for WEBRP2350 build")
-		set(PICO_BOARD ${WEBRP2350_BOARD})
-	elseif(IS_BT OR IS_BTH)
-		set(PICO_BOARD pico2_w)
-	elseif(COMPILE STREQUAL "HDMIBTH")
-		# Pimoroni Pico Plus 2W: same CYW43 wiring as Pico 2 W
-		# (GP23/24/25/29) plus the Pimoroni HDMI/PSRAM breakout pins.
-		set(PICO_BOARD pico2_w)
+	if(IS_WEBRP2350 OR IS_HDMIWEB OR IS_BT OR IS_BTH)
+		set(_PM_BOARD pimoroni_pico_plus2_w_rp2350)
 	else()
-		set(PICO_BOARD pimoroni_pga2350)
+		set(_PM_BOARD pimoroni_pga2350)
 	endif()
 else()
 	set(PICO_PLATFORM rp2040)
 	if(COMPILE STREQUAL "WEB")
-		set(PICO_BOARD pico_w)
+		set(_PM_BOARD pico_w)
 	else()
-		set(PICO_BOARD pico)
+		set(_PM_BOARD pico)
 	endif()
 endif()
+
+# Force PICO_BOARD on every configure so a build directory reused across
+# variants (your VSCode workflow) never inherits a stale board from
+# CMakeCache.txt. FORCE overwrites any previously cached value, including the
+# Pico SDK's own default and whatever the last-built variant left behind.
+# This is what makes a plain reconfigure (no dir deletion) correct.
+set(PICO_BOARD ${_PM_BOARD} CACHE STRING "PICO target board (derived from COMPILE)" FORCE)
+message(STATUS "PicoMite: COMPILE=${COMPILE} -> PICO_PLATFORM=${PICO_PLATFORM} PICO_BOARD=${PICO_BOARD}")
 
 include(pico_sdk_import.cmake)
 project(PicoMite C CXX ASM)
@@ -360,7 +401,11 @@ if(IS_RP2350)
 	)
 endif()
 
-if(IS_WEB OR HAS_GUI OR IS_PICOMIN)
+# DISPLAY_SOURCES = the SPI-LCD driver (SSD1963.c) + Touch.c. HDMIWEB is a
+# WEB variant (IS_WEB) but its display is HDMI, not a SPI panel — exclude it
+# so it mirrors HDMIBTH (GUI.c supplies the touch stubs). This also keeps
+# SSD1963.h's `nop` macro out of every HDMIWEB TU.
+if((IS_WEB OR HAS_GUI OR IS_PICOMIN) AND NOT IS_HDMIWEB)
 	target_sources(PicoMite PRIVATE ${DISPLAY_SOURCES})
 endif()
 
@@ -561,19 +606,33 @@ endif()
 if(IS_HDMI)
 	# HDMI is RP2350-only.
 	# PICO_HEAP_SIZE / PICO_CORE0_STACK_SIZE are set per-variant below
-	# — HDMIBTH needs 0x4000 each like PICOMITEBT/BTH (cyw43 driver +
-	# async_context + libc allocations push past the 0x800 / 0x2000 the
-	# bare HDMI builds use).
+	# — HDMIBTH and HDMIWEB need 0x4000 each like PICOMITEBT/BTH (cyw43
+	# driver + async_context + libc/mbedtls allocations push past the
+	# 0x800 / 0x2000 the bare HDMI builds use). HDMIWEB additionally runs
+	# the USB host stack on core1, so it is excluded here and sets its own
+	# budget in the IS_WEB block.
 	target_compile_definitions(PicoMite PRIVATE
 		PICOMITEVGA
 		HDMI
 		GUICONTROLS
 	)
-	if(NOT COMPILE STREQUAL "HDMIBTH")
+	if(NOT COMPILE STREQUAL "HDMIBTH" AND NOT COMPILE STREQUAL "HDMIWEB")
 		target_compile_definitions(PicoMite PRIVATE
 			PICO_HEAP_SIZE=0x800
 			PICO_CORE0_STACK_SIZE=0x2000
 		)
+	endif()
+	# HDMICUTDOWN = the reduced HDMI scanout pipeline shared by HDMIBTH and
+	# HDMIWEB (96 KB framebuffer pool, limited resolution set, RGB332
+	# R640x480x8 special mode). Defined as a global -D — NOT in
+	# configuration.h — because AllCommands.h gates on it / on HDMI and is
+	# included before configuration.h. The live no-reboot RESOLUTION switch
+	# is no longer cut-down-only: the full HDMI/HDMIUSB builds get it too
+	# (combined with a runtime clk_sys change between the per-resolution CPU
+	# speeds). This is purely the display concern; the BLE-HID-host concern
+	# stays gated on PICOMITEHDMIBTH so HDMIWEB does not pull in btstack.
+	if(COMPILE STREQUAL "HDMIBTH" OR COMPILE STREQUAL "HDMIWEB")
+		target_compile_definitions(PicoMite PRIVATE HDMICUTDOWN)
 	endif()
 endif()
 
@@ -592,14 +651,40 @@ if(COMPILE STREQUAL "HDMIBTH")
 endif()
 
 if(IS_WEB)
+	# Common WiFi/lwIP defines for every WEB variant (WEB, WEBRP2350, HDMIWEB).
+	# PICO_CYW43_ARCH_POLL = the lwIP poll backend (pumped from core0 in
+	# ProcessWeb); CYW43_PIO_CLOCK_DIV_DYNAMIC lets the SPI link scale with
+	# clk_sys. Per-variant heap/stack/host-name follow.
 	target_compile_definitions(PicoMite PRIVATE
 		PICOMITEWEB
-		PICO_HEAP_SIZE=0x2800
-		CYW43_HOST_NAME=\"WebMite\"
 		PICO_CYW43_ARCH_POLL
-		PICO_CORE0_STACK_SIZE=0x2800
 		CYW43_PIO_CLOCK_DIV_DYNAMIC=1
+		PICO_HEAP_SIZE=0x2800
+		PICO_CORE0_STACK_SIZE=0x2000
 	)
+	if(IS_HDMIWEB)
+		# HDMIWEB = HDMIUSB display + USB host stack + WebMite WiFi/lwIP/TLS,
+		# no Bluetooth. PICOMITEHDMIWEB is the identity marker that disambiguates
+		# the spots where PICOMITEVGA and PICOMITEWEB both apply (MES_SIGNON, the
+		# configuration.h memory/CPU budget).
+		#
+		# Heap/stack = 0x4000/0x4000 (16 KB each). NOTE: in this linker script
+		# these values mainly drive the GetHighestHexAddress fit check; the real
+		# core0 stack grows from __StackTop down through SCRATCH into main RAM and
+		# the C heap grows up from BSS, so the two meet in the gap above bss_end.
+		# Keeping the budget at 0x4000/0x4000 (and HEAP_MEMORY_SIZE at 136 KB in
+		# configuration.h) preserves that gap so a deep mbedtls TLS handshake
+		# stack does not collide with the C heap. A trial at 0x2C00/0x3400 +
+		# 144 KB MMBasic heap shrank the gap by 8 KB and hung mid-handshake.
+		target_compile_definitions(PicoMite PRIVATE
+			PICOMITEHDMIWEB
+			CYW43_HOST_NAME=\"PicoMiteHDMIWEB\"
+		)
+	else()
+		target_compile_definitions(PicoMite PRIVATE
+			CYW43_HOST_NAME=\"WebMite\"
+		)
+	endif()
 endif()
 
 if(USES_USB_HOST)
@@ -734,8 +819,9 @@ if(IS_BTH)
 endif()
 
 # TLS support (mbedtls + lwIP altcp_tls glue) — RP2350 only.
-# Enabled when the WEBRP2350 target is built.
-if(IS_WEBRP2350)
+# Enabled for the WEBRP2350 and HDMIWEB targets (both are RP2350 WiFi builds
+# with the same lwIP MEM_SIZE headroom the mbedtls allocator needs).
+if(IS_WEBRP2350 OR IS_HDMIWEB)
 	target_link_libraries(PicoMite
 		pico_lwip_mbedtls
 		pico_mbedtls

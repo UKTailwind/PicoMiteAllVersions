@@ -53,6 +53,12 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 extern bool stepper_query_position_mm(char axis, float *pos_mm);
 extern int stepper_query_active(void);
 #endif
+#ifdef PICOMITEWEB
+#include "lwip/stats.h" /* lwip_stats.mem — TLS heap diagnostics (MEM_STATS) */
+#if defined(rp2350)
+extern uint32_t StackPeakBytes(void); /* core0 stack high-water (PicoMite.c) */
+#endif
+#endif
 #if PICOMITERP2350
 #include "pico/multicore.h"
 #include "VGA222.h"
@@ -1404,6 +1410,8 @@ void fun_LGetStr(void)
         StandardError(21);
     if (start + nbr > src[0])
         nbr = src[0] - start + 1;
+    if (nbr < 0)
+        nbr = 0;               // start is beyond the end of the longstring: return an empty string
     sret = GetTempStrMemory(); // this will last for the life of the command
     s = (char *)&src[1];
     s += (start - 1);
@@ -1523,7 +1531,17 @@ void fun_LInstr(void)
             tempi = temp;
         else
             tempf = temp;
-        int match_idx = re_match(srch, &str[start + 8], &match_length);
+        // re_match() scans a null-terminated C string, but the LongString data at
+        // &str[start+8] is only src[0] bytes long with no terminator. Copy the
+        // searchable tail into terminated temp memory so re_match can't run off the
+        // end of the array (a hard-fault once the buffer lives in PSRAM).
+        int hay_len = (int)src[0] - (int)start;
+        if (hay_len < 0)
+            hay_len = 0;
+        char *hay = (char *)GetTempMemory(hay_len + 1);
+        memcpy(hay, &str[start + 8], hay_len);
+        hay[hay_len] = 0;
+        int match_idx = re_match(srch, hay, &match_length);
         if (match_idx != -1)
         {
             if (tempf)
@@ -2485,7 +2503,6 @@ void PO5Int(char *s1, int n1, int n2, int n3, int n4)
 
 void MIPS16 printoptions(void)
 {
-    //	LoadOptions();
     MMPrintString(banner);
 #ifndef PICOMITEVGA
     int i = Option.DISPLAY_ORIENTATION;
@@ -2708,8 +2725,15 @@ void MIPS16 printoptions(void)
     if (Option.KeyboardConfig == CONFIG_PICOCALC)
         PO2Str("KEYBOARD", "PICOCALC");
 #ifdef rp2350
+#if defined(PICOMITEWEB) || defined(PICOMITEBT) || defined(PICOMITEBTH) || defined(PICOMITEHDMIBTH)
+    /* CYW43 builds: heartbeat LED is on the wireless chip, present on
+       both A and B packages, so don't gate the listing on rp2350a. */
+    if (Option.NoHeartbeat)
+        PO2Str("HEARTBEAT", "OFF");
+#else
     if (Option.NoHeartbeat && rp2350a)
         PO2Str("HEARTBEAT", "OFF");
+#endif
 #if defined(PICOMITE)
     if (Option.LOCAL_KEYBOARD)
         PO2Str("KEYBOARD", "LOCAL");
@@ -2721,10 +2745,19 @@ void MIPS16 printoptions(void)
     if (Option.AllPins)
         PO2Str("PICO", "OFF");
 #ifdef PICOMITEVGA
-#ifdef PICOMITEHDMIBTH
-    /* Locked to FreqX (1024x600) — emit a single line instead of the
-       full resolution cascade. */
-    PO2StrInt("RESOLUTION", "1024x600", Option.CPU_Speed);
+#ifdef HDMICUTDOWN
+    if (Option.Resolution == R640x480x8)
+        PO2StrInt("RESOLUTION", "640x480", Option.CPU_Speed);
+    else if (Option.Resolution == R720x400x8)
+        PO2StrInt("RESOLUTION", "720x400", Option.CPU_Speed);
+    else if (Option.Resolution == R800x600)
+        PO2StrInt("RESOLUTION", "800x600", Option.CPU_Speed);
+    else if (Option.Resolution == R848x480)
+        PO2StrInt("RESOLUTION", "848x480", Option.CPU_Speed);
+    else if (Option.Resolution == R800x480)
+        PO2StrInt("RESOLUTION", "800x480", Option.CPU_Speed);
+    else
+        PO2StrInt("RESOLUTION", "1024x600", Option.CPU_Speed);
 #else
     if (Option.Resolution == R1280x720)
         PO2StrInt("RESOLUTION", "1280x720", Option.CPU_Speed);
@@ -2954,7 +2987,46 @@ void MIPS16 printoptions(void)
             PO2Int("LCD BACKLIGHT", Option.BackLightLevel);
     }
 
+    if (Option.TOUCH_CS)
+    {
+        PO("TOUCH");
+        if (Option.TOUCH_CAP == 1)
+            (MMPrintString("FT6336 "));
+        else if (Option.TOUCH_CAP == 2)
+            (MMPrintString("GT911 "));
+        MMPrintString((char *)PinDef[Option.TOUCH_CAP ? Option.TOUCH_IRQ : Option.TOUCH_CS].pinname);
+        MMputchar(',', 1);
+        MMPrintString((char *)PinDef[Option.TOUCH_CAP ? Option.TOUCH_CS : Option.TOUCH_IRQ].pinname);
+        if (Option.TOUCH_Click)
+        {
+            MMputchar(',', 1);
+            MMPrintString((char *)PinDef[Option.TOUCH_Click].pinname);
+        }
+        else if (Option.TOUCH_CAP)
+            MMputchar(',', 1);
+        if (Option.TOUCH_CAP)
+        {
+            MMputchar(',', 1);
+            PInt(Option.THRESHOLD_CAP);
+        }
+        MMPrintString("\r\n");
+        if (Option.TOUCH_XZERO != 0 || Option.TOUCH_YZERO != 0)
+        {
+            MMPrintString("GUI CALIBRATE ");
+            PInt(Option.TOUCH_SWAPXY);
+            PIntComma(Option.TOUCH_XZERO);
+            PIntComma(Option.TOUCH_YZERO);
+            PIntComma(Option.TOUCH_XSCALE * 10000);
+            PIntComma(Option.TOUCH_YSCALE * 10000);
+            MMPrintString("\r\n");
+        }
+    }
+#endif
 #ifdef PICOMITEWEB
+    /* WIFI / TCP / UDP / TELNET / TFTP listing — shared across every WEB
+       build. Emitted here (after the PICOMITEVGA/#else split rejoins) rather
+       than inside the non-VGA branch so HDMIWEB (PICOMITEVGA + PICOMITEWEB)
+       lists them too, mirroring the GUI CONTROLS fix below. */
     if (*Option.SSID)
     {
         char password[] = "****************************************************************";
@@ -3001,41 +3073,6 @@ void MIPS16 printoptions(void)
         PO2Str("TELNET", "CONSOLE ONLY");
     if (Option.disabletftp == 1)
         PO2Str("TFTP", "OFF");
-#endif
-    if (Option.TOUCH_CS)
-    {
-        PO("TOUCH");
-        if (Option.TOUCH_CAP == 1)
-            (MMPrintString("FT6336 "));
-        else if (Option.TOUCH_CAP == 2)
-            (MMPrintString("GT911 "));
-        MMPrintString((char *)PinDef[Option.TOUCH_CAP ? Option.TOUCH_IRQ : Option.TOUCH_CS].pinname);
-        MMputchar(',', 1);
-        MMPrintString((char *)PinDef[Option.TOUCH_CAP ? Option.TOUCH_CS : Option.TOUCH_IRQ].pinname);
-        if (Option.TOUCH_Click)
-        {
-            MMputchar(',', 1);
-            MMPrintString((char *)PinDef[Option.TOUCH_Click].pinname);
-        }
-        else if (Option.TOUCH_CAP)
-            MMputchar(',', 1);
-        if (Option.TOUCH_CAP)
-        {
-            MMputchar(',', 1);
-            PInt(Option.THRESHOLD_CAP);
-        }
-        MMPrintString("\r\n");
-        if (Option.TOUCH_XZERO != 0 || Option.TOUCH_YZERO != 0)
-        {
-            MMPrintString("GUI CALIBRATE ");
-            PInt(Option.TOUCH_SWAPXY);
-            PIntComma(Option.TOUCH_XZERO);
-            PIntComma(Option.TOUCH_YZERO);
-            PIntComma(Option.TOUCH_XSCALE * 10000);
-            PIntComma(Option.TOUCH_YSCALE * 10000);
-            MMPrintString("\r\n");
-        }
-    }
 #endif
 #ifdef GUICONTROLS
     /* Report GUI CONTROLS count on every build that compiles the
@@ -3124,13 +3161,9 @@ void MIPS16 printoptions(void)
             MMputchar(',', 1);
             MMPrintString((char *)PinDef[Option.audio_i2s_data].pinname);
         }
-        else if (
 #if !defined(PICOMITEMIN)
-            Option.AUDIO_DCS_PIN && Option.AUDIO_MISO_PIN
-#else
-            0
-#endif
-        )
+        else if (
+            Option.AUDIO_DCS_PIN && Option.AUDIO_MISO_PIN)
         {
             MMPrintString((char *)"VS1053 ");
             MMPrintString((char *)PinDef[Option.AUDIO_CLK_PIN].pinname);
@@ -3147,6 +3180,7 @@ void MIPS16 printoptions(void)
             MMputchar(',', 1);
             MMPrintString((char *)PinDef[Option.AUDIO_RESET_PIN].pinname);
         }
+
         else
         {
             MMPrintString((char *)"SPI ");
@@ -3156,6 +3190,7 @@ void MIPS16 printoptions(void)
             MMputchar(',', 1);
             MMPrintString((char *)PinDef[Option.AUDIO_MOSI_PIN].pinname);
         }
+#endif
         MMPrintString("', ON PWM CHANNEL ");
         PInt(Option.AUDIO_SLICE);
         MMPrintString("\r\n");
@@ -3216,12 +3251,17 @@ void MIPS16 printoptions(void)
     if (Option.PSRAM_CS_PIN != 0)
         PO2Str("PSRAM PIN", PinDef[Option.PSRAM_CS_PIN].pinname);
 #endif
+#if !(defined(PICOMITEWEB) || defined(PICOMITEBT) || defined(PICOMITEBTH) || defined(PICOMITEHDMIBTH))
+    /* CYW43 builds have no GPIO heartbeat (LED is on the wireless chip)
+       so never report a HEARTBEAT PIN, even for legacy saved options
+       that still hold the old GP25 default. */
     if ((Option.heartbeatpin != 43 && !Option.NoHeartbeat)
 #ifdef rp2350
         || (Option.heartbeatpin == 43 && !rp2350a && !Option.NoHeartbeat)
 #endif
     )
         PO2Str("HEARTBEAT PIN", PinDef[Option.heartbeatpin].pinname);
+#endif
 }
 
 int MIPS16 checkslice(int pin1, int pin2, int ignore)
@@ -3658,6 +3698,9 @@ void MIPS16 configure(unsigned char *p, bool noask)
     {
         if (checkstring(p, (unsigned char *)"LIST"))
         {
+#ifdef rp2350
+            MMPrintString("PICO COMPUTER 3\r\n");
+#endif
 #ifdef PICOMITEVGA
 #ifndef HDMI
 #ifdef USBKEYBOARD
@@ -3676,7 +3719,7 @@ void MIPS16 configure(unsigned char *p, bool noask)
             MMPrintString("OLIMEX USB\r\n");
             MMPrintString("PICO COMPUTER\r\n");
             MMPrintString("HDMIUSBI2S\r\n");
-#else
+
             MMPrintString("OLIMEX\r\n");
             MMPrintString("HDMIBasic\r\n");
 #endif
@@ -3703,6 +3746,55 @@ void MIPS16 configure(unsigned char *p, bool noask)
 #endif
             return;
         }
+#ifdef rp2350
+        if (checkstring(p, (unsigned char *)"PICO COMPUTER 3"))
+        {
+            if (rp2350a)
+                error("RP350B chips only");
+            format = testMODBUFF(true, 512, false);
+            strcpy((char *)Option.platform, "PICO COMPUTER 3");
+#if !(defined(PICOMITEBT) || defined(PICOMITEBTH) || defined(PICOMITEHDMIBTH) || defined(PICOMITEHDMIWEB))
+            Option.heartbeatpin = PINMAP[25];
+#endif
+            Option.NoHeartbeat = false;
+            Option.ColourCode = 1;
+            Option.audio_i2s_bclk = PINMAP[10];
+            Option.audio_i2s_data = PINMAP[22];
+            Option.AUDIO_SLICE = 11;
+            Option.SD_CS = PINMAP[33];
+            Option.SD_CLK_PIN = PINMAP[30];
+            Option.SD_MOSI_PIN = PINMAP[31];
+            Option.SD_MISO_PIN = PINMAP[28];
+            Option.SYSTEM_I2C_SDA = PINMAP[20];
+            Option.SYSTEM_I2C_SCL = PINMAP[21];
+            Option.RTC = true;
+#ifdef HDMI
+            Option.HDMIclock = 1;
+            Option.HDMId0 = 3;
+            Option.HDMId1 = 5;
+            Option.HDMId2 = 7;
+#endif
+#if defined PICOMITEVGA && !defined(HDMI)
+            Option.VGA_HSYNC = PINMAP[0];
+            Option.VGA_BLUE = PINMAP[2];
+#endif
+#ifdef USBKEYBOARD
+            Option.SerialTX = PINMAP[8];
+            Option.SerialRX = PINMAP[9];
+            Option.SerialConsole = 2;
+#else
+#endif
+            Option.PSRAM_CS_PIN = PINMAP[47];
+            Option.INT1pin = PINMAP[34];
+            Option.INT2pin = PINMAP[35];
+            Option.INT3pin = PINMAP[36];
+            Option.INT4pin = PINMAP[37];
+            SaveOptions();
+            printoptions();
+            uSec(100000);
+            doreset(format);
+        }
+#endif
 #ifdef PICOMITEVGA
 #ifndef HDMI
 #ifdef USBKEYBOARD
@@ -3959,7 +4051,7 @@ void MIPS16 configure(unsigned char *p, bool noask)
             uSec(100000);
             doreset(format);
         }
-        if (checkstring(p, (unsigned char *)"OLIMEXUSB"))
+
         {
             format = testMODBUFF(true, 192, false);
             strcpy((char *)Option.platform, "OLIMEX USB");
@@ -5560,7 +5652,18 @@ void MIPS16 cmd_option(void)
     if (tp)
     {
         if (checkstring(tp, (unsigned char *)"OFF") || checkstring(tp, (unsigned char *)"DISABLE"))
+        {
             Option.NoHeartbeat = 1;
+#if defined(PICOMITEWEB) || defined(PICOMITEBT) || defined(PICOMITEBTH) || defined(PICOMITEHDMIBTH)
+            /* CYW43 builds skip the pin-reconfigure path below (which is
+               where the non-CYW43 OFF path saves), so save here or the
+               option is lost on reboot. No GPIO heartbeat on these
+               builds, so keep heartbeatpin clear. */
+            Option.heartbeatpin = 0;
+            SaveOptions();
+            return;
+#endif
+        }
         else
         {
 #if defined(PICOMITEWEB) || defined(PICOMITEBT) || defined(PICOMITEBTH) || defined(PICOMITEHDMIBTH)
@@ -5569,9 +5672,13 @@ void MIPS16 cmd_option(void)
                only toggles Option.NoHeartbeat. The polling functions
                (ProcessWeb / bt_keyboard_poll / bt_console_poll) honour
                that flag and either drive the chip LED or leave it
-               dark. No pin to reconfigure. */
+               dark. No pin to reconfigure; clear heartbeatpin so
+               OPTION LIST doesn't report a phantom HEARTBEAT PIN. */
             if (checkstring(tp, (unsigned char *)"ON") || checkstring(tp, (unsigned char *)"ENABLE"))
+            {
                 Option.NoHeartbeat = 0;
+                Option.heartbeatpin = 0;
+            }
             else
                 SyntaxError();
             ;
@@ -5910,11 +6017,78 @@ void MIPS16 cmd_option(void)
 #endif
 
 #ifdef PICOMITEVGA
-#ifndef PICOMITEHDMIBTH
-    /* OPTION RESOLUTION is dead on HDMIBTH — the build is locked to
-       1024x600 (FreqX). Gated out so the command isn't even parsed,
-       which also strips the cascade of resolution-string matchers
-       and the SoftReset path from flash. */
+#ifdef HDMICUTDOWN
+    /* HDMIBTH/HDMIWEB: set the default (boot) resolution. Three 8-bit
+       resolutions are available: 640x480 (takes the same optional
+       252000/315000/378000 CPU speed as the full HDMI build; bare 640
+       defaults to 252000), 720x400 (fixed 283200) and 1024x600 (fixed
+       252000). Saved and rebooted exactly like the full build's OPTION
+       RESOLUTION; the RESOLUTION command performs the same switch live
+       (not saved). */
+    tp = checkstring(cmdline, (unsigned char *)"RESOLUTION");
+    if (tp)
+    {
+        getcsargs(&tp, 3);
+        if (CurrentLinePtr)
+            StandardError(10);
+        if (argc != 1 && argc != 3)
+            SyntaxError();
+        if (checkstring(argv[0], (unsigned char *)"640") || checkstring(argv[0], (unsigned char *)"640x480"))
+        {
+            Option.Resolution = R640x480x8;
+            Option.CPU_Speed = Freq252P;
+            if (argc == 3)
+            {
+                int i = getint(argv[2], Freq252P, Freq378P);
+                if (!(i == Freq252P || i == Freq480P || i == Freq378P))
+                    error("Invalid speed");
+                Option.CPU_Speed = i;
+            }
+        }
+        else if (checkstring(argv[0], (unsigned char *)"720") || checkstring(argv[0], (unsigned char *)"720x400"))
+        {
+            if (argc == 3)
+                SyntaxError(); // 720x400 has a single fixed timing (283.2 MHz)
+            Option.Resolution = R720x400x8;
+            Option.CPU_Speed = Freq400;
+        }
+        else if (checkstring(argv[0], (unsigned char *)"800") || checkstring(argv[0], (unsigned char *)"800x600"))
+        {
+            if (argc == 3)
+                SyntaxError(); // single fixed timing
+            Option.Resolution = R800x600;
+            Option.CPU_Speed = FreqSVGA;
+        }
+        else if (checkstring(argv[0], (unsigned char *)"848") || checkstring(argv[0], (unsigned char *)"848x480"))
+        {
+            if (argc == 3)
+                SyntaxError(); // single fixed timing
+            Option.Resolution = R848x480;
+            Option.CPU_Speed = Freq848;
+        }
+        else if (checkstring(argv[0], (unsigned char *)"800x480"))
+        {
+            if (argc == 3)
+                SyntaxError(); // single fixed timing
+            Option.Resolution = R800x480;
+            Option.CPU_Speed = FreqY;
+        }
+        else if (checkstring(argv[0], (unsigned char *)"1024") || checkstring(argv[0], (unsigned char *)"1024x600"))
+        {
+            if (argc == 3)
+                SyntaxError(); // the speed argument only applies to 640x480
+            Option.Resolution = R1024x600;
+            Option.CPU_Speed = Freq252P;
+        }
+        else
+            SyntaxError();
+        Option.DefaultFont = 1;
+        Option.DISPLAY_TYPE = SCREENMODE1;
+        SaveOptions();
+        SoftReset(SOFT_RESET);
+        return;
+    }
+#else
     tp = checkstring(cmdline, (unsigned char *)"RESOLUTION");
     if (tp)
     {
@@ -5996,7 +6170,7 @@ void MIPS16 cmd_option(void)
         SoftReset(SOFT_RESET);
         return;
     }
-#endif /* !PICOMITEHDMIBTH — end of OPTION RESOLUTION gate */
+#endif /* HDMICUTDOWN / full OPTION RESOLUTION variants */
 #ifndef HDMI
     tp = checkstring(cmdline, (unsigned char *)"VGA PINS");
     if (tp)
@@ -6061,6 +6235,21 @@ void MIPS16 cmd_option(void)
     {
 #ifdef rp2350
         int mode = getint(tp, 1, MAXMODES);
+#ifdef HDMICUTDOWN
+        /* The special RGB332 640x480 / 720x400 (the factory default, also
+           reachable via a live RESOLUTION 640/720 which restartHDMI mirrors
+           into Option.Resolution) only implement modes 1, 2 and 5. Without
+           this guard mode 3 would be accepted, saved AND applied live —
+           HDMIloopBTH640 has no SCREENMODE3 case, so the display goes
+           blank now and again at every boot. Same check as setmode(). */
+        if ((Option.Resolution == R640x480x8 || Option.Resolution == R720x400x8) && (mode == 3 || mode == 4))
+            error("Mode not available in this resolution");
+        /* The RGB332 medium resolutions (HDMIloop3) offer only modes 1 and 2;
+           mode 3/5 framebuffers overflow the 96000-byte cut-down pool. Same
+           check as setmode(). */
+        if ((Option.Resolution == R800x600 || Option.Resolution == R848x480 || Option.Resolution == R800x480) && (mode == 3 || mode == 5))
+            error("Mode not available in this resolution");
+#endif
         if (mode == 3)
         {
             Option.DISPLAY_TYPE = SCREENMODE3;
@@ -6592,7 +6781,7 @@ void MIPS16 cmd_option(void)
             SoftReset(SOFT_RESET);
             return;
         }
-#endif
+
         if ((p = checkstring(tp, (unsigned char *)"SPI")))
         {
             int pin1, pin2, pin3;
@@ -6634,6 +6823,7 @@ void MIPS16 cmd_option(void)
             SoftReset(SOFT_RESET);
             return;
         }
+#endif
         if ((p = checkstring(tp, (unsigned char *)"I2S")))
         {
             int pin1, pin2, pin3;
@@ -7128,6 +7318,8 @@ void MIPS16 fun_device(void)
 #ifdef HDMI
 #ifdef PICOMITEHDMIBTH
     strcpy((char *)sret, "PicoMiteHDMIBTH");
+#elif defined(PICOMITEHDMIWEB)
+    strcpy((char *)sret, "PicoMiteHDMIWEB");
 #else
     strcpy((char *)sret, "PicoMiteHDMIUSB");
 #endif
@@ -7349,6 +7541,29 @@ void MIPS16 fun_info(void)
             targ = T_STR;
             return;
         }
+#ifdef PICOMITEWEB
+        else if (checkstring(ep, (unsigned char *)"CHEAPMAX"))
+        {
+            /* Peak C-heap extent (high-water of sbrk). With MEM_LIBC_MALLOC=1
+               mbedtls allocates its TLS record buffers (~IN 8 KB + OUT 2 KB)
+               and cert-parse working memory from the C heap during each
+               handshake, then frees them — so this captures the transient TLS
+               spike that SYSTEM HEAP (steady-state free) hides. Compare against
+               CHEAPTOTAL; if it approaches that, the handshake is near
+               exhausting the heap (PICO_MALLOC_PANIC -> hang). */
+            struct mallinfo mi = mallinfo();
+            iret = (int64_t)(uint32_t)mi.arena;
+            targ = T_INT;
+            return;
+        }
+        else if (checkstring(ep, (unsigned char *)"CHEAPTOTAL"))
+        {
+            /* Total C-heap region available (__StackLimit - __bss_end__). */
+            iret = (int64_t)(uint32_t)getTotalHeap();
+            targ = T_INT;
+            return;
+        }
+#endif
         else
             SyntaxError();
         ;
@@ -8301,6 +8516,21 @@ void MIPS16 fun_info(void)
             targ = T_INT;
             return;
         }
+#if defined(PICOMITEWEB) && defined(rp2350)
+        /* STACKPEAK is an 'S' keyword so it belongs in this 'S' group. The
+           TLSHEAP* queries start with 'T' and live in the 'T' group below —
+           fun_info dispatches by first letter, so a 'T' keyword placed here
+           would never be reached. */
+        else if (checkstring(ep, (unsigned char *)"STACKPEAK"))
+        {
+            /* Peak core0 stack bytes ever used (high-water). Compare against
+               PICO_CORE0_STACK_SIZE; a value approaching 8192 means the stack
+               reached the end of SCRATCH and is spilling into main RAM. */
+            iret = (int64_t)(uint32_t)StackPeakBytes();
+            targ = T_INT;
+            return;
+        }
+#endif
         else if (checkstring(ep, (unsigned char *)"SOUND"))
         {
             strcpy((char *)sret, PlayingStr[CurrentlyPlaying]);
@@ -8350,6 +8580,37 @@ void MIPS16 fun_info(void)
         targ = T_STR;
         return;
     }
+#ifdef PICOMITEWEB
+    /* TLS-heap diagnostics. Kept as flat else-if checkstring tests (like
+       TOUCH / TRACK above) rather than a `*ep=='t'` letter group — fun_info's
+       other 'T' keywords (TILE HEIGHT, TCP PORT/REQUEST, TOUCH, TRACK) are not
+       all in one group, so a swallowing 't' group here would shadow any T
+       keyword that followed it. */
+    else if (checkstring(ep, (unsigned char *)"TLSHEAPMAX"))
+    {
+        /* Peak bytes used in the lwIP MEM_SIZE heap — the pool mbedtls
+           allocates the TLS in/out buffers and cert transients from.
+           Compare against MEM_SIZE (40960). */
+        iret = (int64_t)(uint32_t)lwip_stats.mem.max;
+        targ = T_INT;
+        return;
+    }
+    else if (checkstring(ep, (unsigned char *)"TLSHEAPERR"))
+    {
+        /* Count of failed lwIP MEM_SIZE allocations — non-zero means the
+           TLS heap was exhausted (a handshake would have failed). */
+        iret = (int64_t)(uint32_t)lwip_stats.mem.err;
+        targ = T_INT;
+        return;
+    }
+    else if (checkstring(ep, (unsigned char *)"TLSHEAP"))
+    {
+        /* Current (live) bytes in use in the lwIP MEM_SIZE heap. */
+        iret = (int64_t)(uint32_t)lwip_stats.mem.used;
+        targ = T_INT;
+        return;
+    }
+#endif
     else if (*ep == 'v' || *ep == 'V')
     {
         if (checkstring(ep, (unsigned char *)"VARCNT"))
@@ -8466,6 +8727,25 @@ void MIPS16 cmd_cpu(void)
         if (totalseconds <= 0.0)
             error("Invalid period");
         sleep_us(totalseconds * 1000000);
+    }
+    else if ((p = checkstring(cmdline, (unsigned char *)"SPEED")))
+    {
+#ifdef PICOMITEVGA
+        /* VGA/HDMI builds drive the pixel clock from clk_sys, so the CPU
+           speed cannot be set independently of the display - it is tied to
+           the resolution. (The full HDMI builds DO move clk_sys at runtime,
+           but only as part of the live RESOLUTION switch, which re-times
+           the scanout to match.) */
+        error("Not available on this version");
+#else
+        uint32_t speed = getint(p, MIN_CPU, MAX_CPU);
+        if (speed > 384000 && Option.PSRAM_CS_PIN != 0)
+            error("CPUSPEED cannot exceed 384000 KHz when PSRAM is enabled");
+        if (UserPIOActive())
+            error("Invalid while PIO in use");
+        if (CPUSpeedRuntime(speed))
+            error("Invalid clock speed");
+#endif
     }
     else
         SyntaxError();

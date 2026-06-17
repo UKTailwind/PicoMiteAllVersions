@@ -2307,7 +2307,13 @@ void __not_in_flash_func(stepper_timer_isr)(void)
     pwm_clear_irq(STEPPER_PWM_SLICE);
 
     // Deassert step pins from the previous tick (deferred pulse deassertion).
-    // Pulse width = time from last ISR's assertion to now, approximately one ISR period (10us).
+    // The pulse went high at the bottom of the previous ISR and is brought low here, so
+    // the high time is approximately one ISR period (~10us) for an isolated step - no
+    // in-ISR busy-wait and no shortened pulse.
+    // Capture whether the previous tick actually emitted a step BEFORE clearing the mask:
+    // if it did, this tick's step (if any) is deferred so the pulse stays low for a full
+    // ISR period before the next rising edge (see the 50 kHz cap below).
+    bool prev_tick_stepped = (stepper_pending_step_mask != 0);
     if (stepper_pending_step_mask)
     {
         gpio_clr_mask64(stepper_pending_step_mask);
@@ -2860,6 +2866,22 @@ void __not_in_flash_func(stepper_timer_isr)(void)
         return;
     }
 
+    // A step is due this tick. Enforce a one-tick minimum spacing between emitted pulses:
+    // if the previous tick already emitted a step, its pins were asserted last tick and
+    // only deasserted at the top of THIS ISR, so emitting again now would collapse the low
+    // interval to the ISR body execution time. Defer this step by one tick instead, so the
+    // pulse stays low for a full ISR period before the next rising edge. This caps the
+    // maximum step rate to ISR_FREQ/2 (50 kHz) - pulses alternate on/off/on across
+    // consecutive ticks - with no in-ISR delay and no shortened pulse width.
+    // The step is deferred, not dropped: total_steps_remaining and the Bresenham state are
+    // left untouched (we park the accumulator just below threshold so the step fires next
+    // tick), so the move still delivers its full step count.
+    if (prev_tick_stepped)
+    {
+        current_move.step_accumulator = STEP_ACCUMULATOR_MAX - 1u;
+        return;
+    }
+
     // Bresenham algorithm (peek): determine which axes would step on this major step.
     // We compute on locals first so we can defer without mutating state.
     bool step_x = false, step_y = false, step_z = false, step_a = false;
@@ -2926,7 +2948,10 @@ void __not_in_flash_func(stepper_timer_isr)(void)
     current_move.z_error = z_error;
     current_move.a_error = a_error;
 
-    // Generate step pulses (multi-axis) with a configurable minimum pulse width.
+    // Generate step pulses (multi-axis). Assert the pins now; they are deasserted at the
+    // top of the next ISR (deferred deassertion), giving an ~10us high time for free with
+    // no in-ISR delay. The 50 kHz back-to-back cap above guarantees the next ISR will not
+    // re-assert, so the intervening low interval is always a full ISR period.
     uint64_t step_mask = 0;
     if (step_x)
         step_mask |= (1ULL << stepper_system.x.step_pin);
@@ -3447,6 +3472,31 @@ static void calculate_default_jerk(void)
     // (allows user override with STEPPER JERK command)
     if (stepper_jerk_limit_mm_s3 <= 0.0f)
         stepper_jerk_limit_mm_s3 = candidate_jerk;
+}
+
+// Print a non-fatal warning if an axis' configured max velocity exceeds what the global
+// step-rate cap (STEPPER_MAX_STEP_RATE_HZ, i.e. one step every two ISR ticks) can actually
+// deliver at its steps/mm. Reports the achievable maximum in the same units the user
+// configured the axis with (mm/min, or deg/min for the rotary A axis). This is informational
+// only - the move is not rejected; the axis simply runs at the capped speed.
+static void stepper_warn_if_velocity_unreachable(const stepper_axis_t *axis, char axis_char)
+{
+    if (axis == NULL || axis->steps_per_mm <= 0.0f || axis->max_velocity <= 0.0f)
+        return;
+
+    float configured_step_rate = axis->max_velocity * axis->steps_per_mm; // steps/s
+    if (configured_step_rate <= (float)STEPPER_MAX_STEP_RATE_HZ)
+        return;
+
+    const bool is_a = (axis == &stepper_system.a);
+    float achievable_per_min = ((float)STEPPER_MAX_STEP_RATE_HZ / axis->steps_per_mm) * 60.0f;
+
+    char buf[160];
+    sprintf(buf,
+            "Warning: %c axis max speed limited to %.1f %s by the %dkHz step-rate cap\r\n",
+            axis_char, (double)achievable_per_min, is_a ? "deg/min" : "mm/min",
+            (int)(STEPPER_MAX_STEP_RATE_HZ / 1000));
+    MMPrintString(buf);
 }
 
 // G28 homing implementation - homes one axis at a time in negative direction
@@ -4128,6 +4178,169 @@ void cmd_stepper(void)
         if (reserve_enable_pin != 0)
             ExtCfg(reserve_enable_pin, EXT_COM_RESERVED, 0);
 
+        stepper_warn_if_velocity_unreachable(axis, axis_chars[axis_idx - 1]);
+
+        return;
+    }
+
+    // STEPPER TUNE X|Y|Z|A [, dir_invert] [, steps_per_mm] [, max_velocity] [, max_accel] [, home_backoff_mm]
+    // Live-adjust the motion parameters of an already-configured axis without tearing
+    // down and rebuilding the subsystem (unlike STEPPER AXIS, which resets the axis and
+    // re-reserves pins). Pins are never changed. Only permitted when nothing is executing
+    // and the G-code buffer is empty.
+    //
+    // Any subset of parameters may be supplied; omit a value (leave the comma) to keep it.
+    // Changing steps_per_mm preserves the raw step count (the motor has not physically
+    // moved) and therefore invalidates the known machine position: the configured soft
+    // limits are rescaled so the same mm working envelope is retained, position_known is
+    // cleared, and the user must re-home (G28) or re-issue STEPPER POSITION before any
+    // further motion can be queued.
+    if ((tp = checkstring(cmdline, (unsigned char *)"TUNE")) != NULL)
+    {
+        if (!stepper_initialized)
+            stepper_error("Stepper not initialized");
+
+        // Refuse while anything is in flight or queued.
+        if (stepper_system.motion_active || current_move.phase != MOVE_PHASE_IDLE ||
+            stepper_dwell_active || gcode_buffer.count > 0)
+            stepper_error("Cannot tune while motion active or G-code queued");
+
+        getcsargs(&tp, 11);
+        if (argc < 1)
+            stepper_error("Syntax: STEPPER TUNE axis [,dir_invert] [,steps_per_mm] [,max_velocity] [,max_accel] [,home_backoff_mm]");
+
+        int axis_idx = checkparam((char *)argv[0], 4, "X", "Y", "Z", "A");
+        if (axis_idx == 0)
+            stepper_error("Axis must be X, Y, Z, or A");
+
+        const char axis_chars[] = "XYZA";
+        stepper_axis_t *axis = get_axis_ptr(axis_chars[axis_idx - 1]);
+        if (axis == NULL)
+            stepper_error("Axis must be X, Y, Z, or A");
+        if (!axis_is_configured(axis))
+            stepper_error("Axis not configured - use STEPPER AXIS first");
+
+        // Parse and validate every requested change BEFORE applying any of them, so a
+        // bad value leaves the axis untouched (the command stays atomic).
+        bool set_invert = false, set_spm = false, set_vel = false, set_accel = false, set_backoff = false;
+        int new_invert = 0;
+        float new_spm = 0.0f, new_vel = 0.0f, new_accel = 0.0f, new_backoff = 0.0f;
+
+        if (argc >= 3 && *argv[2])
+        {
+            new_invert = getint(argv[2], 0, 1);
+            set_invert = true;
+        }
+        if (argc >= 5 && *argv[4])
+        {
+            new_spm = getnumber(argv[4]);
+            if (new_spm <= 0.0f)
+                stepper_error("Steps per mm must be > 0");
+            set_spm = true;
+        }
+        if (argc >= 7 && *argv[6])
+        {
+            float v = getnumber(argv[6]); // mm/min (deg/min for A)
+            if (v <= 0.0f)
+                stepper_error("Max velocity must be > 0");
+            new_vel = v / 60.0f; // store internally as mm/s
+            set_vel = true;
+        }
+        if (argc >= 9 && *argv[8])
+        {
+            new_accel = getnumber(argv[8]);
+            if (new_accel <= 0.0f)
+                stepper_error("Max acceleration must be > 0");
+            set_accel = true;
+        }
+        if (argc >= 11 && *argv[10])
+        {
+            new_backoff = getnumber(argv[10]);
+            if (new_backoff <= 0.0f)
+                stepper_error("Homing backoff distance must be > 0");
+            set_backoff = true;
+        }
+
+        if (!(set_invert || set_spm || set_vel || set_accel || set_backoff))
+            stepper_error("Nothing to tune");
+
+        // Apply parameters that only affect future planning.
+        if (set_invert)
+            axis->dir_invert = (new_invert != 0);
+        if (set_vel)
+            axis->max_velocity = new_vel;
+        if (set_accel)
+            axis->max_accel = new_accel;
+        if (set_backoff)
+            axis->homing_backoff_mm = new_backoff;
+
+        // steps_per_mm: preserve the raw step count, rescale soft limits to keep the same
+        // mm envelope, and invalidate machine position so the user must re-establish it.
+        bool spm_changed = false;
+        if (set_spm)
+        {
+            if (new_spm != axis->steps_per_mm)
+            {
+                float old_spm = axis->steps_per_mm;
+                if (axis->min_limit != INT32_MIN)
+                    axis->min_limit = (int32_t)((double)axis->min_limit * (double)new_spm / (double)old_spm);
+                if (axis->max_limit != INT32_MAX)
+                    axis->max_limit = (int32_t)((double)axis->max_limit * (double)new_spm / (double)old_spm);
+                axis->steps_per_mm = new_spm;
+                stepper_system.position_known = false;
+                spm_changed = true;
+            }
+        }
+
+        // Refresh derived ISR step-tick limits (depend on steps_per_mm & max_velocity).
+        {
+            uint32_t save = save_and_disable_interrupts();
+            stepper_recompute_axis_step_tick_limits();
+            restore_interrupts(save);
+        }
+
+        // Refresh the auto-jerk default (no-op if a jerk has already been set) and ensure
+        // the active jerk limit stays representable as an integer increment for the new
+        // steps/mm. Clamp rather than error so a tune is never left half-applied.
+        calculate_default_jerk();
+        if (stepper_jerk_limit_mm_s3 > 0.0f)
+        {
+            float max_steps_per_mm = 0.0f;
+            if (axis_is_configured(&stepper_system.x) && stepper_system.x.steps_per_mm > max_steps_per_mm)
+                max_steps_per_mm = stepper_system.x.steps_per_mm;
+            if (axis_is_configured(&stepper_system.y) && stepper_system.y.steps_per_mm > max_steps_per_mm)
+                max_steps_per_mm = stepper_system.y.steps_per_mm;
+            if (axis_is_configured(&stepper_system.z) && stepper_system.z.steps_per_mm > max_steps_per_mm)
+                max_steps_per_mm = stepper_system.z.steps_per_mm;
+            if (axis_is_configured(&stepper_system.a) && stepper_system.a.steps_per_mm > max_steps_per_mm)
+                max_steps_per_mm = stepper_system.a.steps_per_mm;
+            if (max_steps_per_mm > 0.0f)
+            {
+                const double denom = (double)max_steps_per_mm * (double)RATE_SCALE;
+                const double isr2 = (double)ISR_FREQ * (double)ISR_FREQ;
+                const double jerk_min = isr2 / denom;            // j_inc == 1
+                const double jerk_max = (1000.0 * isr2) / denom; // j_inc == 1000
+                if ((double)stepper_jerk_limit_mm_s3 < jerk_min)
+                    stepper_jerk_limit_mm_s3 = (float)jerk_min;
+                else if ((double)stepper_jerk_limit_mm_s3 > jerk_max)
+                    stepper_jerk_limit_mm_s3 = (float)jerk_max;
+            }
+        }
+
+        // Keep the float planner position aligned with the (unchanged) step counts.
+        planner_sync_to_physical();
+
+        char buf[160];
+        sprintf(buf, "%c axis tuned: %.3f steps/mm, %.1f mm/min max, %.1f mm/s^2 accel%s\r\n",
+                axis_chars[axis_idx - 1],
+                (double)axis->steps_per_mm,
+                (double)(axis->max_velocity * 60.0f),
+                (double)axis->max_accel,
+                axis->dir_invert ? ", inverted" : "");
+        MMPrintString(buf);
+        stepper_warn_if_velocity_unreachable(axis, axis_chars[axis_idx - 1]);
+        if (spm_changed)
+            MMPrintString("steps/mm changed - machine position invalidated. Re-home (G28) or use STEPPER POSITION.\r\n");
         return;
     }
 

@@ -724,10 +724,16 @@ void fun_tilde(void)
 		iret = Option.DISPLAY_CONSOLE ? 1 : 0;
 		break;
 	case MMWIDTH:
-		iret = HRes / (short)(FontTable[gui_font >> 4][0] * (gui_font & 0b1111));
+		if (Option.DISPLAY_CONSOLE)
+			iret = HRes / (short)(FontTable[gui_font >> 4][0] * (gui_font & 0b1111));
+		else
+			iret = Option.Width;
 		break;
 	case MMHEIGHT:
-		iret = VRes / (short)(FontTable[gui_font >> 4][1] * (gui_font & 0b1111));
+		if (Option.DISPLAY_CONSOLE)
+			iret = VRes / (short)(FontTable[gui_font >> 4][1] * (gui_font & 0b1111));
+		else
+			iret = Option.Height;
 		break;
 	case MMPERSISTENT:
 		iret = _persistent;
@@ -1532,16 +1538,16 @@ void fun_schange(void)
 	{
 		if (argc != 5)
 			StandardError(2);
-		unsigned char *s=getstring(argv[2]);
-		int nbr=getint(argv[4], 0, MAXSTRLEN);
-		fun_left(s,nbr);
+		unsigned char *s = getstring(argv[2]);
+		int nbr = getint(argv[4], 0, MAXSTRLEN);
+		fun_left(s, nbr);
 		return;
 	}
 	else if (*argv[0] == 'R')
 	{
-		unsigned char *s=getstring(argv[2]);
-		int nbr=getint(argv[4], 0, MAXSTRLEN);
-		fun_right(s,nbr);
+		unsigned char *s = getstring(argv[2]);
+		int nbr = getint(argv[4], 0, MAXSTRLEN);
+		fun_right(s, nbr);
 		return;
 	}
 	else

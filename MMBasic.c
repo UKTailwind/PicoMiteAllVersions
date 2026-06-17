@@ -672,8 +672,8 @@ void MIPS16 InitBasic(void)
 #endif
     heapend = (uint32_t)&__heap_start + PICO_HEAP_SIZE;
     //  SInt(CommandTableSize);
-//   SIntComma(TokenTableSize);
-//    SSPrintString("\r\n");
+    //   SIntComma(TokenTableSize);
+    //    SSPrintString("\r\n");
 }
 // test the stack for overflow - this is a NULL function in the DOS version
 static inline void TestStackOverflow(void)
@@ -2060,7 +2060,7 @@ static bool defsubfun_static_in_use = false;
 void MIPS16 DefinedSubFun(int isfun, unsigned char *cmd, int index, MMFLOAT *fa, long long int *i64a, unsigned char **sa, int *typ)
 {
 #else
-#if defined(rp2350) || defined(PICOMITEMIN)
+#if defined(rp2350)
 void __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, int index, MMFLOAT *fa, long long int *i64a, unsigned char **sa, int *typ)
 {
 #else
@@ -2835,8 +2835,16 @@ unsigned char *getFstring(unsigned char *p)
 }
 
 // recursively evaluate an expression observing the rules of operator precedence
-#if defined(rp2350) || defined(PICOMITEMIN)
+/* PICOMITEMIN must NOT use MIPS64 (-O3) here: on the RP2040 (Cortex-M0+,
+   arm-none-eabi GCC) -O3 miscompiles doexpr/getvalue - symptom was PIO READ
+   results never changing in a running BASIC program (V6.03.00RC17). MIN was
+   the only RP2040 build compiling these two functions at -O3; the RP2350
+   builds use -O3 safely (M33 codegen). -O2 (MIPS32) is fine and keeps MIN's
+   faster-than--Os interpreter hot path. */
+#if defined(rp2350)
 unsigned char MIPS64 __not_in_flash_func (*doexpr)(unsigned char *p, MMFLOAT *fa, long long int *ia, unsigned char **sa, int *oo, int *ta)
+#elif defined(PICOMITEMIN)
+unsigned char MIPS32 __not_in_flash_func (*doexpr)(unsigned char *p, MMFLOAT *fa, long long int *ia, unsigned char **sa, int *oo, int *ta)
 #else
 unsigned MIPS16 char __not_in_flash_func (*doexpr)(unsigned char *p, MMFLOAT *fa, long long int *ia, unsigned char **sa, int *oo, int *ta)
 #endif
@@ -2956,8 +2964,12 @@ unsigned MIPS16 char __not_in_flash_func (*doexpr)(unsigned char *p, MMFLOAT *fa
 unsigned char MIPS16 *getvalue(unsigned char *p, MMFLOAT *fa, long long int *ia, unsigned char **sa, int *oo, int *ta)
 {
 #else
-#if defined(rp2350) || defined(PICOMITEMIN)
+/* See doexpr above: -O3 (MIPS64) miscompiles on the RP2040 M0+ - PICOMITEMIN
+   uses MIPS32 (-O2) instead; -O3 stays for the RP2350 builds only. */
+#if defined(rp2350)
 unsigned char MIPS64 __not_in_flash_func (*getvalue)(unsigned char *p, MMFLOAT *fa, long long int *ia, unsigned char **sa, int *oo, int *ta)
+#elif defined(PICOMITEMIN)
+unsigned char MIPS32 __not_in_flash_func (*getvalue)(unsigned char *p, MMFLOAT *fa, long long int *ia, unsigned char **sa, int *oo, int *ta)
 #else
 unsigned char MIPS16 __not_in_flash_func (*getvalue)(unsigned char *p, MMFLOAT *fa, long long int *ia, unsigned char **sa, int *oo, int *ta)
 #endif
@@ -5540,7 +5552,7 @@ void MIPS16 error(char *msg, ...)
     ScrewUpTimer = 0;
     // first build the error message in the global string MMErrMsg
     if (MMerrno == 0)
-        MMerrno = 16;                // indicate an error
+        MMerrno = 16;              // indicate an error
     memset(tstr, 0, sizeof(tstr)); // clear any previous string
     if (*msg)
     {
@@ -5615,7 +5627,10 @@ void MIPS16 error(char *msg, ...)
     {
         SoftReset(SOFT_RESET);
     }
-    LoadOptions(); // make sure that the option struct is in a clean state
+    /* Refresh the option struct from flash for a clean state, but keep the
+       live hardware reality (runtime CPU SPEED / RESOLUTION changes) —
+       unlike boot, execution continues on the reconfigured hardware. */
+    ReloadOptionsKeepLive();
     OptionConsole = 1;
     if (Option.DISPLAY_CONSOLE)
     {

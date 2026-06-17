@@ -355,7 +355,23 @@ extern "C"
                 uint8_t Resolution;
                 uint8_t VRes_reserved;
                 bool Multi;
+#ifdef PICOMITEHDMIWEB
+                /* HDMIWEB defines BOTH PICOMITEWEB and PICOMITEVGA, which were
+                   previously mutually exclusive. Two slots near the top of the
+                   struct that used to overlay each other now coexist, costing
+                   +4 bytes: TCP_PORT/ServerResponceTime (PICOMITEWEB) and
+                   X_TILE/Y_TILE (PICOMITEVGA). HDMIWEB also needs mousespeed
+                   (+4, USB mouse + GUICONTROLS — the plain WebMite stores it in
+                   the network-overlay region HDMIWEB uses for real WiFi config).
+                   Both costs are reclaimed from the extensions[] spare pool:
+                   mousespeed(4) + extensions[67] = 71, i.e. 4 fewer than the
+                   normal extensions[75], so the whole struct stays exactly 896
+                   bytes (== 7 XMODEM blocks). */
+                float mousespeed;
+                unsigned char extensions[67];
+#else
                 unsigned char extensions[75]; // 896 bytes == 7 XMODEM blocks
+#endif
                                               // #else
                                               //                 unsigned char extensions[79];    // 896 bytes == 7 XMODEM blocks
                                               // #endif
@@ -514,6 +530,9 @@ extern "C"
          * Function declarations - Options and configuration
          * ============================================================================ */
         void LoadOptions(void);
+        /* Error-path variant: refresh from flash but preserve the live
+           hardware reality (runtime CPU SPEED / RESOLUTION changes). */
+        void ReloadOptionsKeepLive(void);
         void SaveOptions(void);
         void ResetOptions(bool startup);
 

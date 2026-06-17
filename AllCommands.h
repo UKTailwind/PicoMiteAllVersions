@@ -265,7 +265,7 @@ void cmd_RunCMM2(void);
 #if PICOMITERP2350
 void cmd_mode(void);
 #endif
-#ifdef PICOMITEHDMIBTH
+#ifdef HDMI
 void cmd_resolution(void);
 #endif
 
@@ -601,8 +601,11 @@ void fun_frame(void);
 #ifdef PICOMITEVGA
 	{(unsigned char *)"TILE", T_CMD, 0, cmd_tile},
 	{(unsigned char *)"MODE", T_CMD, 0, cmd_mode},
-#ifdef PICOMITEHDMIBTH
+#ifdef HDMI
 	{(unsigned char *)"RESOLUTION", T_CMD, 0, cmd_resolution},
+#endif
+#if defined(HDMI) && !defined(HDMICUTDOWN)
+	{(unsigned char *)"Camera", T_CMD, 0, cmd_camera},
 #endif
 	{(unsigned char *)"Map(", T_CMD | T_FUN, 0, cmd_map},
 	{(unsigned char *)"Map", T_CMD, 0, cmd_map},
@@ -617,8 +620,19 @@ void fun_frame(void);
 	{(unsigned char *)"Backlight", T_CMD, 0, cmd_backlight},
 #endif
 #ifdef PICOMITEWEB
+#ifndef PICOMITEVGA
+	/* BACKLIGHT drives the SPI-LCD backlight; cmd_backlight is compiled
+	   only for non-VGA builds (External.c, #ifndef PICOMITEVGA). HDMIWEB is
+	   a PICOMITEVGA/HDMI build with no SPI panel, so it omits the command
+	   like every other HDMI variant. */
 	{(unsigned char *)"Backlight", T_CMD, 0, cmd_backlight},
+#endif
 	{(unsigned char *)"WEB", T_CMD, 0, cmd_web},
+#ifdef PICOMITEHDMIWEB
+	/* HDMIWEB carries the full 3D feature like HDMIBTH, so register Draw3D
+	   even though it is a PICOMITEWEB build. */
+	{(unsigned char *)"Draw3D", T_CMD, 0, cmd_3D},
+#endif
 #else
 #if !defined(PICOMITEMIN)
 	{(unsigned char *)"Draw3D", T_CMD, 0, cmd_3D},
@@ -657,15 +671,13 @@ void fun_frame(void);
 #if defined(rp2350) && !defined(USBKEYBOARD)
 	{(unsigned char *)"YModem", T_CMD, 0, cmd_xmodem},
 #endif
-#if !(defined(PICOMITEWEB) || defined(PICOMITEMIN))
+#if (!defined(PICOMITEWEB) || defined(PICOMITEHDMIWEB)) && !defined(PICOMITEMIN)
 	{(unsigned char *)"Turtle", T_CMD, 0, cmd_turtle},
 #endif
 	{(unsigned char *)"LMid(", T_CMD | T_FUN, 0, cmd_lmid},
 	{(unsigned char *)"ReDim", T_CMD, 0, cmd_redim},
 	{(unsigned char *)"Bezier", T_CMD, 0, cmd_bezier},
-	// #ifndef PICOMITEMIN
 	{(unsigned char *)"Tilemap", T_CMD, 0, cmd_tilemap},
-// #endif
 #ifdef rp2350
 	{(unsigned char *)"Star", T_CMD, 0, cmd_star},
 	{(unsigned char *)"Astro", T_CMD, 0, cmd_star},
@@ -838,20 +850,20 @@ void fun_frame(void);
 	{(unsigned char *)"MM.Info(", T_FUN | T_INT | T_NBR | T_STR, 0, fun_info},
 	{(unsigned char *)"~(", T_FUN | T_INT | T_NBR | T_STR, 0, fun_tilde},
 #ifdef PICOMITEVGA
-#if !(defined(PICOMITEWEB) || defined(PICOMITEMIN))
+#if (!defined(PICOMITEWEB) || defined(PICOMITEHDMIWEB)) && !defined(PICOMITEMIN)
 	{(unsigned char *)"DRAW3D(", T_FUN | T_INT, 0, fun_3D},
 #endif
 	{(unsigned char *)"GetScanLine", T_FNA | T_INT, 0, fun_getscanline},
 	{(unsigned char *)"Map(", T_FUN | T_INT, 0, fun_map},
 #endif
-	/* TOUCH() is source-aware:
-	   - touch-LCD targets read the resistive panel directly,
-	   - PICOMITEVGA + GUICONTROLS reads cursor/mouse + USB touch,
-	   - PICOMITEVGA + USBKEYBOARD without GUICONTROLS (VGAUSB RP2040)
-	     reads the USB-decoded mouse + multi-touch state directly via
-	     the minimal Draw.c implementation, so a BASIC program can still
-	     poll TOUCH(X)/(Y)/(DOWN)/(X2)/(Y2) even when the full GUI-
-	     controls stack isn't compiled. */
+/* TOUCH() is source-aware:
+   - touch-LCD targets read the resistive panel directly,
+   - PICOMITEVGA + GUICONTROLS reads cursor/mouse + USB touch,
+   - PICOMITEVGA + USBKEYBOARD without GUICONTROLS (VGAUSB RP2040)
+	 reads the USB-decoded mouse + multi-touch state directly via
+	 the minimal Draw.c implementation, so a BASIC program can still
+	 poll TOUCH(X)/(Y)/(DOWN)/(X2)/(Y2) even when the full GUI-
+	 controls stack isn't compiled. */
 #if !defined(PICOMITEVGA) || defined(GUICONTROLS) || defined(USBKEYBOARD)
 	{(unsigned char *)"Touch(", T_FUN | T_INT, 0, fun_touch},
 #endif
@@ -862,9 +874,9 @@ void fun_frame(void);
 	{(unsigned char *)"MsgBox(", T_FUN | T_INT, 0, fun_msgbox},
 	{(unsigned char *)"CtrlVal(", T_FUN | T_NBR | T_STR, 0, fun_ctrlval},
 #endif
-	/* CLICK() — mouse/touch-equivalent of TOUCH() for GUI controls
-	   (full version, GUICONTROLS) or a USB-mouse+touch reader (minimal
-	   version on PICOMITEVGA + USBKEYBOARD without GUICONTROLS). */
+/* CLICK() — mouse/touch-equivalent of TOUCH() for GUI controls
+   (full version, GUICONTROLS) or a USB-mouse+touch reader (minimal
+   version on PICOMITEVGA + USBKEYBOARD without GUICONTROLS). */
 #if defined(GUICONTROLS) || (defined(PICOMITEVGA) && defined(USBKEYBOARD))
 	{(unsigned char *)"Click(", T_FUN | T_INT, 0, fun_click},
 #endif
@@ -880,7 +892,7 @@ void fun_frame(void);
 #ifdef RAYCASTER
 	{(unsigned char *)"Ray(", T_FUN | T_INT | T_NBR, 0, fun_ray},
 #endif
-#if !(defined(PICOMITEWEB))
+#if !defined(PICOMITEWEB) || defined(PICOMITEHDMIWEB)
 	{(unsigned char *)"Tilemap(", T_FUN | T_INT, 0, fun_tilemap},
 #endif
 
