@@ -43,7 +43,12 @@
 #define LWIP_NETIF_LINK_CALLBACK    1
 #define LWIP_NETIF_HOSTNAME         1
 #define LWIP_NETCONN                0
-#define MEM_STATS                   0
+/* MEM_STATS tracks the lwIP MEM_SIZE heap — the pool that altcp_tls's
+   tls_malloc routes mbedtls allocations through (TLS in/out buffers + cert
+   transients). Enabled as a diagnostic: lwip_stats.mem.max is the peak bytes
+   used, .err counts allocation failures. Surfaced via MM.INFO(TLSHEAPMAX/ERR).
+   Cost is a few counters + a compare in mem_malloc; safe to leave on. */
+#define MEM_STATS                   1
 #define SYS_STATS                   0
 #define MEMP_STATS                  0
 #define LINK_STATS                  0
