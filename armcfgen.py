@@ -38,7 +38,11 @@ GCC = "arm-none-eabi-gcc"
 # load-time relocation). The -O level is added per call (default -O0; higher -O
 # can rearrange the rodata/PIC layout, so -O0 is the safe, simple default).
 CFLAGS = ["-c", "-mcpu=cortex-m0plus", "-mthumb", "-ffreestanding", "-fno-exceptions",
-          "-fpie", "-mpic-data-is-text-relative", "-msingle-pic-base"]
+          "-fpie", "-mpic-data-is-text-relative", "-msingle-pic-base",
+          # each function in its own section so the linker can 4-byte align them
+          # (SUBALIGN below) -> any function is valid as a merge entry. -falign-
+          # functions is ignored at -Os, so this is the reliable route.
+          "-ffunction-sections"]
 
 # Linker script: one resolved .text at 0 holding code AND rodata contiguously, so
 # intra-blob bl's are fixed up, .text.startup/.text.* merge in, and the PC-
@@ -46,7 +50,7 @@ CFLAGS = ["-c", "-mcpu=cortex-m0plus", "-mthumb", "-ffreestanding", "-fno-except
 LINK_SCRIPT = """SECTIONS
 {
   . = 0;
-  .text : {
+  .text : SUBALIGN(4) {
     *(.text.startup) *(.text*) *(.glue_7) *(.glue_7t)
     *(.rodata*)
   }
