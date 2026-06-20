@@ -257,158 +257,304 @@ struct s_vartbl {                               // structure of the variable tab
 
 //The Option structure
 
-struct option_s {
-   int  Magic;
-   char Autorun;
-   char Tab;
-   char Invert;
-   char Listcase; //8
- //
-   unsigned int PROG_FLASH_SIZE;
-   unsigned int HEAP_SIZE;
-   char Height;
-   char Width;
-   unsigned char DISPLAY_TYPE;
-   char DISPLAY_ORIENTATION; //12=20
-//
-   int  PIN;
-   int  Baudrate;
-   char  ColourCode;
-   unsigned char MOUSE_CLOCK;
-   unsigned char MOUSE_DATA;
-   char spare;
-   int CPU_Speed;
-   unsigned int Telnet;           // 40 used to store status on console OFF/ON/BOTH
-   int DefaultFC, DefaultBC;      // 44 the default colours
-   short DefaultBrightness;         // 48 default backlight brightness //40
-   unsigned char KEYBOARD_CLOCK;
-   unsigned char KEYBOARD_DATA;
-   unsigned short VGAFC, VGABC;  // the default colours 36=56  //50?
-//
-   // display related
-   unsigned char DefaultFont;
-   unsigned char KeyboardConfig;
-   unsigned char RTC_Clock;
-   unsigned char RTC_Data; //4=60
-   //
-   #ifdef PICOMITE
-       int dummy;                // maximum number of controls allowed //48
-   #endif
+struct option_s
+{
+		/* Basic settings */
+		int Magic;
+		char Autorun;
+		char Tab;
+		char Invert;
+		char Listcase; // 8 bytes
 
-   #ifdef PICOMITEWEB
-       uint16_t TCP_PORT;             // maximum number of controls allowed //48
-       uint16_t ServerResponceTime;
-   #endif
-   #ifdef PICOMITEVGA
-       int16_t X_TILE;                // maximum number of controls allowed //48
-       int16_t Y_TILE;                // maximum number of controls allowed //48
-   #endif
-   // for the SPI LCDs 4=64
-   unsigned char LCD_CD;
-   unsigned char LCD_CS;
-   unsigned char LCD_Reset;
-   // touch related
-   unsigned char TOUCH_CS;
-   unsigned char TOUCH_IRQ;
-   char TOUCH_SWAPXY;
-   unsigned char repeat;
-   char disabletftp;//56   8=72
-   int  TOUCH_XZERO;
-   int  TOUCH_YZERO;
-   float TOUCH_XSCALE;
-   float TOUCH_YSCALE; //72 16=88
-#ifdef GUICONTROLS
-   int MaxCtrls;
+		/* Memory configuration */
+		unsigned int PROG_FLASH_SIZE;
+		unsigned int HEAP_SIZE;
+
+		/* Display dimensions */
+#ifndef PICOMITEVGA
+		char Height;
+		char Width;
 #else
-   uint8_t HDMIclock;
-   uint8_t HDMId0;
-   uint8_t HDMId1;
-   uint8_t HDMId2;
+short d2;
 #endif
-   unsigned int FlashSize; //8=96
-   unsigned char SD_CS;
-   unsigned char SYSTEM_MOSI;
-   unsigned char SYSTEM_MISO;
-   unsigned char SYSTEM_CLK;
-   unsigned char DISPLAY_BL;
-   unsigned char DISPLAY_CONSOLE;
-   unsigned char TOUCH_Click;
-   char LCD_RD;                   // used for the RD pin for SSD1963  //8=104
-   unsigned char AUDIO_L;
-   unsigned char AUDIO_R;
-   unsigned char AUDIO_SLICE;
-   unsigned char SDspeed;
-   unsigned char pins[8];  //8=116                // general use storage for CFunctions written by PeterM //86
-   char LCDVOP;
-   char I2Coffset;
-   unsigned char NoHeartbeat;
-   char Refresh;
-   unsigned char SYSTEM_I2C_SDA;
-   unsigned char SYSTEM_I2C_SCL;
-   unsigned char RTC;
-   char PWM;  //8=124
-   unsigned char INT1pin;
-   unsigned char INT2pin;
-   unsigned char INT3pin;
-   unsigned char INT4pin;
-   unsigned char SD_CLK_PIN;
-   unsigned char SD_MOSI_PIN;
-   unsigned char SD_MISO_PIN;
-   unsigned char SerialConsole; //8=132
-   unsigned char SerialTX;
-   unsigned char SerialRX;
-   unsigned char numlock;
-   unsigned char capslock; //4=136
-   unsigned int LIBRARY_FLASH_SIZE; // 4=140
-   unsigned char AUDIO_CLK_PIN;
-   unsigned char AUDIO_MOSI_PIN;
-   unsigned char SYSTEM_I2C_SLOW;
-   unsigned char AUDIO_CS_PIN;     //+4=144
-   #ifdef PICOMITEWEB
-       uint16_t UDP_PORT;
-       uint16_t UDPServerResponceTime;
-       char hostname[32];
-       char ipaddress[16];
-       char mask[16];
-       char gateway[16];
-       unsigned char x[1];  //112=256
-   #else
-       unsigned char x[85]; //112=256
-   #endif
-   unsigned char PSRAM_CS_PIN;
-   unsigned char BGR;
-   unsigned char NoScroll;
-   unsigned char CombinedCS;
-   unsigned char USBKeyboard;
-   unsigned char VGA_HSYNC;
-   unsigned char VGA_BLUE;
-   unsigned char AUDIO_MISO_PIN;
-   unsigned char AUDIO_DCS_PIN;
-   unsigned char AUDIO_DREQ_PIN;
-   unsigned char AUDIO_RESET_PIN;
-   unsigned char SSD_DC;
-   unsigned char SSD_WR;
-   unsigned char SSD_RD;
-   unsigned char SSD_RESET;
-   unsigned char BackLightLevel;
-   unsigned char NoReset;
-   unsigned char AllPins;
-   unsigned char modbuff;
-short RepeatStart;
-short RepeatRate;
-   int modbuffsize;                // +18=
-   unsigned char F1key[MAXKEYLEN];    //64=320
-   unsigned char F5key[MAXKEYLEN];    //64=384
-   unsigned char F6key[MAXKEYLEN];    //64=448
-   unsigned char F7key[MAXKEYLEN];    //64=512
-   unsigned char F8key[MAXKEYLEN];    //64=576
-   unsigned char F9key[MAXKEYLEN];    //64=640
-   unsigned char SSID[MAXKEYLEN];     //64=704
-   unsigned char PASSWORD[MAXKEYLEN]; //64=768
-   unsigned char platform[32];
-   unsigned char extensions[96]; //128=896 == 7 XMODEM blocks
-   // To enable older CFunctions to run any new options *MUST* be added at the end of the list
-}  __attribute__((packed));
+
+		/* Display configuration */
+		unsigned char DISPLAY_TYPE;
+		char DISPLAY_ORIENTATION; // 12-20 bytes
+
+		/* Security and communication */
+		int PIN;
+		int Baudrate;
+		int8_t ColourCode;
+		unsigned char MOUSE_CLOCK;
+		unsigned char MOUSE_DATA;
+		char spare;
+		int CPU_Speed;
+		unsigned int Telnet; // Also stores size of program flash (start of LIBRARY code)
+
+		/* Color settings */
+		int DefaultFC, DefaultBC; // Default colors
+		short version;            // 40 bytes
+
+		/* Keyboard configuration */
+		unsigned char KEYBOARD_CLOCK;
+		unsigned char KEYBOARD_DATA;
+		unsigned char continuation;
+		unsigned char LOCAL_KEYBOARD;
+		unsigned char KeyboardBrightness;
+		uint8_t special; // used for special board configurations
+
+		/* Font and RTC */
+		unsigned char DefaultFont;
+		unsigned char KeyboardConfig;
+		unsigned char RTC_Clock;
+		unsigned char RTC_Data; // 60 bytes
+
+		/* Platform-specific configuration */
+#if PICOMITERP2350
+		unsigned char LCD_CLK;
+		unsigned char LCD_MOSI;
+		unsigned char LCD_MISO;
+		char dummy; // 64 bytes
+#endif
+
+#if defined(PICOMITE) && !defined(rp2350)
+		char dummy[4]; // 64 bytes
+#endif
+
+#ifdef PICOMITEWEB
+		uint16_t TCP_PORT;
+		uint16_t ServerResponceTime;
+#endif
+
+#ifdef PICOMITEVGA
+		int16_t X_TILE;
+		int16_t Y_TILE;
+#endif
+
+		/* SPI LCD pins */
+		unsigned char LCD_CD;
+		unsigned char LCD_CS;
+		unsigned char LCD_Reset;
+
+		/* Touch screen configuration */
+		unsigned char TOUCH_CS;
+		unsigned char TOUCH_IRQ;
+		char TOUCH_SWAPXY;
+		unsigned char repeat;
+		char disabletftp; // 72 bytes
+
+		/* Touch calibration */
+#ifndef PICOMITEVGA
+		int TOUCH_XZERO;
+		int TOUCH_YZERO;
+		float TOUCH_XSCALE;
+		float TOUCH_YSCALE; // 88 bytes
+#else
+short Height;
+short Width;
+char dummy[12];
+#endif
+
+		/* GUI or HDMI configuration.
+		   Layout rules (the saved-flash struct must stay
+		   byte-compatible with prior firmwares for each variant):
+		   * Touch-screen builds (GUICONTROLS, !PICOMITEVGA): this
+			 4-byte slot holds MaxCtrls + spare3[3]. Unchanged.
+		   * Legacy HDMI/VGA builds (PICOMITEVGA, !GUICONTROLS):
+			 this slot holds the HDMI lane mapping. Unchanged.
+		   * New mouse-GUI VGA/HDMI builds (both flags): we keep
+			 the HDMI lane mapping in this slot for binary
+			 compatibility, and stash MaxCtrls in the first byte
+			 of extensions[] further down. */
+#if defined(GUICONTROLS) && !defined(PICOMITEVGA)
+		//                uint8_t MaxCtrls;
+		unsigned char spare3[4];
+#else
+uint8_t HDMIclock;
+uint8_t HDMId0;
+uint8_t HDMId1;
+uint8_t HDMId2;
+#endif
+
+		/* Flash and SD card */
+		unsigned int FlashSize; // 96 bytes
+		unsigned char SD_CS;
+		unsigned char SYSTEM_MOSI;
+		unsigned char SYSTEM_MISO;
+		unsigned char SYSTEM_CLK;
+
+		/* Display backlight and console */
+		unsigned char DISPLAY_BL;
+		unsigned char DISPLAY_CONSOLE;
+		unsigned char TOUCH_Click;
+		char LCD_RD; // Used for RD pin for SSD1963, 104 bytes
+
+		/* Audio configuration */
+		unsigned char AUDIO_L;
+		unsigned char AUDIO_R;
+		unsigned char AUDIO_SLICE;
+		unsigned char SDspeed;
+		unsigned char pinsx[3]; // General use storage for CFunctions
+
+		/* Touch and display */
+		unsigned char TOUCH_CAP;
+		unsigned char SSD_DATA;
+		unsigned char THRESHOLD_CAP;
+		unsigned char audio_i2s_data;
+		unsigned char audio_i2s_bclk;
+		char LCDVOP;
+		char I2Coffset;
+		unsigned char NoHeartbeat;
+		char Refresh;
+
+		/* System I2C and RTC */
+		unsigned char SYSTEM_I2C_SDA;
+		unsigned char SYSTEM_I2C_SCL;
+		unsigned char RTC;
+		char PWM; // 124 bytes
+
+		/* Interrupt pins */
+		unsigned char INT1pin;
+		unsigned char INT2pin;
+		unsigned char INT3pin;
+		unsigned char INT4pin;
+
+		/* SD card pins */
+		unsigned char SD_CLK_PIN;
+		unsigned char SD_MOSI_PIN;
+		unsigned char SD_MISO_PIN;
+
+		/* Serial console */
+		unsigned char SerialConsole; // 132 bytes
+		unsigned char SerialTX;
+		unsigned char SerialRX;
+
+		/* Keyboard lock status */
+		unsigned char numlock;
+		unsigned char capslock; // 136 bytes
+
+		/* Library flash size */
+		unsigned int LIBRARY_FLASH_SIZE; // 140 bytes
+
+		/* Audio pins */
+		unsigned char AUDIO_CLK_PIN;
+		unsigned char AUDIO_MOSI_PIN;
+		unsigned char SYSTEM_I2C_SLOW;
+		unsigned char AUDIO_CS_PIN; // 144 bytes
+
+		/* Network configuration (PICOMITEWEB) */
+#ifdef PICOMITEWEB
+		uint16_t UDP_PORT;
+		uint16_t UDPServerResponceTime;
+		char hostname[28];
+		char ipaddress[16];
+		char mask[16];
+		char gateway[16];
+#else
+float mousespeed;
+unsigned char x[76]; // 229 bytes
+#endif
+
+		/* Miscellaneous pins and settings */
+		unsigned short GPSBaudx;
+		unsigned char GPSRX;
+		unsigned char GPSTX;
+		unsigned char heartbeatpin;
+		unsigned char PSRAM_CS_PIN;
+		unsigned char BGR;
+		unsigned char NoScroll;
+		unsigned char CombinedCS;
+		unsigned char USBKeyboard;
+		unsigned char VGA_HSYNC;
+		unsigned char VGA_BLUE; // 236 bytes
+
+		/* Additional audio pins */
+		unsigned char AUDIO_MISO_PIN;
+		unsigned char AUDIO_DCS_PIN;
+		unsigned char AUDIO_DREQ_PIN;
+		unsigned char AUDIO_RESET_PIN;
+
+		/* SSD display pins */
+		unsigned char SSD_DC;
+		unsigned char SSD_WR;
+		unsigned char SSD_RD;
+		signed char SSD_RESET; // 244 bytes
+
+		/* Display and reset settings */
+		unsigned char BackLightLevel;
+		unsigned char NoReset;
+		unsigned char AllPins;
+		unsigned char modbuff; // 248 bytes
+
+		/* Keyboard repeat settings */
+		short RepeatStart;
+		short RepeatRate;
+		int modbuffsize; // 256 bytes
+
+		/* Function keys and network credentials */
+		unsigned char F1key[MAXKEYLEN];
+		unsigned char F5key[MAXKEYLEN];
+		unsigned char F6key[MAXKEYLEN];
+		unsigned char F7key[MAXKEYLEN];
+		unsigned char F8key[MAXKEYLEN];
+		unsigned char F9key[MAXKEYLEN];
+		unsigned char SSID[MAXKEYLEN];
+		unsigned char PASSWORD[MAXKEYLEN]; // 768 bytes
+
+		/* Platform identification and extensions */
+		unsigned char platform[32];
+		uint8_t BACKLIGHT_KBD;           // *EB*
+		uint8_t BACKLIGHT_LCD;           // *EB*
+		uint16_t D4;                     // *EB*
+		unsigned int GPSBaud;            // *EB*
+		unsigned char pins[8];           // General use storage for CFunctions
+		unsigned char wifi_country_code; //
+										 // #if defined(GUICONTROLS) && defined(PICOMITEVGA)
+		/* On mouse-GUI VGA/HDMI builds MaxCtrls rides at the
+		   front of extensions[] because the offset-88 slot is
+		   kept for the HDMI lane mapping (see above). Total
+		   region size stays 79 bytes so the surrounding flash
+		   layout (and the 7-XMODEM-block size) is unchanged. */
+		uint8_t MaxCtrls;
+		uint8_t Resolution;
+		uint8_t VRes_reserved;
+		bool Multi;
+#ifdef PICOMITEHDMIWEB
+		/* HDMIWEB defines BOTH PICOMITEWEB and PICOMITEVGA, which were
+		   previously mutually exclusive. Two slots near the top of the
+		   struct that used to overlay each other now coexist, costing
+		   +4 bytes: TCP_PORT/ServerResponceTime (PICOMITEWEB) and
+		   X_TILE/Y_TILE (PICOMITEVGA). HDMIWEB also needs mousespeed
+		   (+4, USB mouse + GUICONTROLS — the plain WebMite stores it in
+		   the network-overlay region HDMIWEB uses for real WiFi config).
+		   Both costs are reclaimed from the extensions[] spare pool:
+		   mousespeed(4) + extensions[67] = 71, i.e. 4 fewer than the
+		   normal extensions[75], so the whole struct stays exactly 896
+		   bytes (== 7 XMODEM blocks). */
+		float mousespeed;
+		unsigned char extensions[67];
+#else
+		unsigned char extensions[75]; // 896 bytes == 7 XMODEM blocks
+#endif
+									  // #else
+									  //                 unsigned char extensions[79];    // 896 bytes == 7 XMODEM blocks
+									  // #endif
+
+#if defined(PICOMITEBT) || defined(PICOMITEBTH) || defined(PICOMITEHDMIBTH)
+		/* BLE bond storage. Two virtual flash banks of 1 KB each
+		   backing the btstack TLV — keeps the LTK alive across
+		   reboots by riding along with SaveOptions(). Living
+		   inside Option means MMBasic's flash layout treats it
+		   as part of the protected 4 KB options sector and
+		   won't ever overwrite it. PICOMITEBTH / HDMIBTH store
+		   bonded-keyboard LTKs in the same field. */
+		unsigned char bt_tlv[2048];
+#endif
+
+		/* NOTE: To enable older CFunctions to run, any new options MUST be added at the end of the list */
+} __attribute__((packed));
+
 
 
 // Define the offsets from the PORT address
