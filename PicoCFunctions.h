@@ -19,6 +19,11 @@
 *          Note: Use ? HEX$(MM.INFO(CALLTABLE)) to verify the location of the calltable.
 *          struct option_s updated to match v6.00.00RC15
 *  v2.0.1  struct option_s updated to match v6.00.01 Release
+*  v2.1.0  BaseAddress is now found at RUNTIME via the Cortex-M VTOR register
+*          (vector slot 7), published by the firmware. One compiled CSUB now runs
+*          on every variant and on both RP2040 and RP2350 - no per-chip address.
+*          Removed 14 wrapper macros that had no CallTable slot; DrawPixel added
+*          (implemented via DrawRectangle).
 *
 ******************************************************************************************/
 /*** Uncomment one of these three  ***/
@@ -26,7 +31,8 @@
 //#define PICOMITEVGA
 //#define PICOMITEWEB
 
-/***  Uncomment this define if using PICO2 Chip  ***/
+/***  PICO2/RP2350 chip select - no longer affects the CallTable address (found
+ ***  at runtime via VTOR, see below); kept only for any chip-specific user code ***/
 #define PICORP2350
 
 /***  Uncomment this define if HDMI pins required  ***/
@@ -38,12 +44,16 @@
 #define MMFLOAT double
 #define MAXKEYLEN 64
 
-//Addresses in the API Table for the pointers to each function
-#ifdef PICORP2350
- #define BaseAddress   0x1000023C
-#else
- #define BaseAddress   0x100002D4
-#endif
+// Address of the API (Call) Table.
+// Discovered at RUNTIME so one compiled CSUB runs on every PicoMite variant and
+// on both RP2040 and RP2350 with no chip-/build-specific flash address baked in:
+//   VTOR (the Cortex-M architectural register at 0xE000ED08) -> active vector
+//   table -> reserved exception slot 7 (offset 0x1C), which the firmware fills
+//   with the address of the CallTable at startup.
+// NB: requires firmware that publishes slot 7 (it does so at the top of main()).
+// NB: hot loops that call many vectors should cache the base once, e.g.
+//     unsigned int base = BaseAddress;  then use (base + 0x90) etc.
+#define BaseAddress   (((unsigned int *)(*(unsigned int *)0xE000ED08))[7])
 
 #define Vector_uSec               (*(unsigned int *)(BaseAddress+0x00))       // void uSec(unsigned int us)
 #define Vector_putConsole         (*(unsigned int *)(BaseAddress+0x04))       // void putConsole(int C))
@@ -100,6 +110,17 @@
 #define Vector_CFuncInt3          *(unsigned int *)(BaseAddress+0xD0 )        // CFuncInt3
 #define Vector_CFuncInt4          *(unsigned int *)(BaseAddress+0xD4)         // CFuncInt4
 #define Vector_PIOExecute         (*(unsigned int *)(BaseAddress+0xD8))       // void PioExecute(int pio, int sm, uint32_t instruction)
+// --- appended slots (firmware >= the build that added framebuffer access) ---
+#define Vector_WriteBuf           (*(unsigned int *)(BaseAddress+0xDC))       // unsigned char *WriteBuf   (current write framebuffer)
+#define Vector_FrameBuf           (*(unsigned int *)(BaseAddress+0xE0))       // unsigned char *FrameBuf
+#define Vector_LayerBuf           (*(unsigned int *)(BaseAddress+0xE4))       // unsigned char *LayerBuf
+#define Vector_DisplayBuf         (*(unsigned int *)(BaseAddress+0xE8))       // unsigned char *DisplayBuf
+#define Vector_DrawPixel          (*(unsigned int *)(BaseAddress+0xEC))       // void (*DrawPixel)(int x,int y,int c)
+#define Vector_Display_Refresh    (*(unsigned int *)(BaseAddress+0xF0))       // void Display_Refresh(void)
+#define Vector_Cosine             (*(unsigned int *)(BaseAddress+0xF4))       // MMFLOAT cos(MMFLOAT)
+#define Vector_Sqrt               (*(unsigned int *)(BaseAddress+0xF8))       // MMFLOAT sqrt(MMFLOAT)
+#define Vector_Atan2              (*(unsigned int *)(BaseAddress+0xFC))       // MMFLOAT atan2(MMFLOAT,MMFLOAT)
+#define Vector_Power              (*(unsigned int *)(BaseAddress+0x100))      // MMFLOAT pow(MMFLOAT,MMFLOAT)
 
 
 
@@ -120,6 +141,10 @@
 #define FreeMemory(a)                   ((void (*)(void *)) Vector_FreeMemory) (a)
 #define DrawRectangle(a,b,c,d,e)        ((void (*)(int,int,int,int,int)) (*(unsigned int *)Vector_DrawRectangle)) (a,b,c,d,e)
 #define DrawRectangleVector             (*(unsigned int *)Vector_DrawRectangle)
+// DrawPixel(x,y,rgb): the firmware's per-mode pixel writer. Pass a FULL RGB
+// colour; it packs for the active format (RGB121/RGB332/RGB565/...), so this is
+// format- and version-independent - the safe way to plot from a CSUB.
+#define DrawPixel(a,b,c)                ((void (*)(int,int,int)) (*(unsigned int *)Vector_DrawPixel)) (a,b,c)
 #define DrawBitmap(a,b,c,d,e,f,g,h)     ((void (*)(int,int,int,int,int,int,int, char*)) (*(unsigned int *)Vector_DrawBitmap)) (a,b,c,d,e,f,g,h)
 #define DrawBitmapVector                (*(unsigned int *)Vector_DrawBitmap)
 #define DrawLine(a,b,c,d,e,f)           ((void (*)(int,int,int,int,int,int)) Vector_DrawLine) (a,b,c,d,e,f)
@@ -144,31 +169,20 @@
 #define CFuncRam                        ((int *) Vector_CFuncRam)
 #define ScrollLCD(a,b)                  ((void (*)(int, int)) (*(unsigned int *)Vector_ScrollLCD)) (a, b)
 #define ScrollLCDVector                 (*(unsigned int *)Vector_ScrollLCD)
-#define ScrollBufferV(a,b)              ((void (*)(int, int)) (*(unsigned int *)Vector_ScrollBufferV)) (a, b)
-#define ScrollBufferVVector             (*(unsigned int *)Vector_ScrollBufferV)
-#define ScrollBufferH(a)                ((void (*)(int)) (*(unsigned int *)Vector_ScrollBufferH)) (a)
-#define ScrollBufferHVector             (*(unsigned int *)Vector_ScrollBufferH)
-#define DrawBufferFast(a,b,c,d,e)       ((void (*)(int,int,int,int, char*)) (*(unsigned int *)Vector_DrawBufferFast)) (a,b,c,d,e)
-#define DrawBufferFastVector            (*(unsigned int *)Vector_DrawBufferFast)
-#define ReadBufferFast(a,b,c,d,e)       ((void (*)(int,int,int,int, char*)) (*(unsigned int *)Vector_ReadBufferFast)) (a,b,c,d,e)
-#define ReadBufferFastVector            (*(unsigned int *)Vector_ReadBufferFast)
-#define MoveBufferFast(a,b,c,d,e,f,g)   ((void (*)(int,int,int,int, int,int,int)) (*(unsigned int *)Vector_MoveBuffer)) (a,b,c,d,e,f,g)
-#define MoveBufferFastVector            (*(unsigned int *)Vector_MoveBuffer)
-#define DrawPixel(a,b,c)                ((void(*)(int, int, int)) Vector_DrawPixel) (a,b,c)
-#define RoutineChecks()                 ((void (*)(void)) Vector_RoutineChecks) ()
-#define GetPageAddress(a)               ((int(*)(int)) Vector_GetPageAddress) (a)
-//#define memcpy(a,b,c)                   ((void (*)(void *, void *, int)) Vector_mycopysafe) (a,b,c)
+// --- Removed: the wrappers below had NO matching slot in PicoMite's CallTable[]
+//     (carried over from the Micromite/CMM2 ports). They referenced undefined
+//     Vector_* names and would fail to compile if used. If any are ever added to
+//     CallTable[] in PicoMite.c, define the Vector_* offset above and restore the
+//     wrapper here:
+//       ScrollBufferV, ScrollBufferH, DrawBufferFast, ReadBufferFast,
+//       MoveBufferFast, RoutineChecks, GetPageAddress, ReadPageAddress,
+//       WritePageAddress, FastTimer, TicksPerUsec, map, VideoColour
+//       (and their ...Vector aliases)
 #define IntToFloat(a)                   ((MMFLOAT (*)(long long)) Vector_IntToFloat) (a)
 #define FloatToInt(a)                   ((long long (*)(MMFLOAT)) Vector_FloatToInt) (a)
 #define Option (*(struct option_s *)(unsigned int)Vector_Option)
-#define ReadPageAddress                 (*(unsigned int *) Vector_ReadPageAddress)
-#define WritePageAddress                (*(unsigned int *) Vector_WritePageAddress)
 #define uSecTimer                       ((unsigned long long (*)(void)) Vector_Timer)
-#define FastTimer                       ((unsigned long long  (*)(void)) Vector_FastTimer)
-#define TicksPerUsec                    (*(unsigned int *) Vector_TicksPerUsec)
-#define map(a) ((int(*)(int)) Vector_Map) (a)
 #define Sine(a)                         ((MMFLOAT (*)(MMFLOAT)) Vector_Sine) (a)
-#define VideoColour                     (*(int *) Vector_VideoColour)
 #define DrawCircle(a,b,c,d,e,f,g)       ((void (*)(int,int,int,int,int,int,MMFLOAT)) Vector_DrawCircle) (a,b,c,d,e,f,g)
 #define DrawTriangle(a,b,c,d,e,f,g,h)   ((void (*)(int,int,int,int,int,int,int,int)) Vector_DrawTriangle) (a,b,c,d,e,f,g,h)
 #define LoadFloat(a)                    ((MMFLOAT (*)(unsigned int)) Vector_LoadFloat) (a)
@@ -188,6 +202,20 @@
 #define CFuncInt3                       (*(unsigned int *) Vector_CFuncInt3)
 #define CFuncInt4                       (*(unsigned int *) Vector_CFuncInt4)
 #define PIOExecute(a,b,c)               ((void (*)(int, int, unsigned int)) Vector_PIOExecute) (a,b,c)
+// --- appended wrappers ---
+// Framebuffer pointers: each reads the CURRENT pointer value (WriteBuf follows
+// FRAMEBUFFER WRITE). The BYTES are mode-specific (e.g. RGB121 = 4bpp/2-px-per-
+// byte, RGB332 = 1 byte/px), so raw access assumes you know your screen mode.
+// For format-/version-independent plotting use DrawPixel(x,y,rgb) instead.
+#define WriteBuf                        (*(unsigned char **) Vector_WriteBuf)
+#define FrameBuf                        (*(unsigned char **) Vector_FrameBuf)
+#define LayerBuf                        (*(unsigned char **) Vector_LayerBuf)
+#define DisplayBuf                      (*(unsigned char **) Vector_DisplayBuf)
+#define Display_Refresh()               ((void (*)(void)) Vector_Display_Refresh) ()
+#define Cosine(a)                       ((MMFLOAT (*)(MMFLOAT)) Vector_Cosine) (a)
+#define Sqrt(a)                         ((MMFLOAT (*)(MMFLOAT)) Vector_Sqrt) (a)
+#define Atan2(a,b)                      ((MMFLOAT (*)(MMFLOAT, MMFLOAT)) Vector_Atan2) (a,b)
+#define Power(a,b)                      ((MMFLOAT (*)(MMFLOAT, MMFLOAT)) Vector_Power) (a,b)
 
 
 

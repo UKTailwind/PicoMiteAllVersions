@@ -36,6 +36,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "Hardware_Includes.h"
 #include <math.h>
 #include <complex.h>
+#include "hardware/sync.h"
 #ifdef rp2350
 #include "pico/rand.h"
 #endif
@@ -3242,115 +3243,54 @@ if (tp)
     int arraylength = 0;
     MMFLOAT crossing = 0.0;
     int direction = 1;
+    int confirm = 1;
     int found = -1;
-    getcsargs(&tp, 5);
+    getcsargs(&tp, 7);
     if (argc < 1)
         SyntaxError();
 
     if (argc >= 3 && *argv[2])
         crossing = getnumber(argv[2]);
-    if (argc == 5)
+    if (argc >= 5 && *argv[4])
         direction = getint(argv[4], -1, 1);
     if (direction == 0)
         error("Valid are -1 and 1");
     arraylength = parsenumberarray(argv[0], &a1float, &a1int, 1, 1, dims, false, NULL);
+    if (argc == 7 && *argv[6])
+        confirm = getint(argv[6], 1, arraylength);
 
-    // Pass 1: fast crossing detection using triplets.
-    // Returns the index of the middle element (i+1), i.e. the first sample
-    // known to be on the far side of the crossing direction.
-    // Fixed bound: i+2 must be a valid index, so i < arraylength - 2.
-    for (int i = 0; i < arraylength - 2; i++)
+    // Find the first index where the signal crosses 'crossing' in the requested
+    // 'direction' AND stays on the far side for 'confirm' consecutive samples.
+    // The confirm window (default 1) rejects single-sample noise spikes: a brief
+    // excursion past the level that falls back before 'confirm' samples have
+    // elapsed is not reported. The value returned is the first far-side sample.
+    for (int i = 1; i < arraylength && found == -1; i++)
     {
+        int crossed;
         if (a1float)
-        {
-            if (direction == 1 &&
-                a1float[i] < crossing && a1float[i + 2] > crossing &&
-                (a1float[i + 1] >= a1float[i] && a1float[i + 1] <= a1float[i + 2]))
-            {
-                found = i + 1;
-                break;
-            }
-            if (direction == -1 &&
-                a1float[i] > crossing && a1float[i + 2] < crossing &&
-                (a1float[i + 1] <= a1float[i] && a1float[i + 1] >= a1float[i + 2]))
-            {
-                found = i + 1;
-                break;
-            }
-        }
+            crossed = (direction == 1)
+                        ? (a1float[i - 1] <  crossing && a1float[i] >= crossing)
+                        : (a1float[i - 1] >  crossing && a1float[i] <= crossing);
         else
+            crossed = (direction == 1)
+                        ? (a1int[i - 1] <  crossing && a1int[i] >= crossing)
+                        : (a1int[i - 1] >  crossing && a1int[i] <= crossing);
+        if (!crossed)
+            continue;
+        if (i + confirm > arraylength)   // not enough samples left to confirm
+            break;
+        int held = 1;
+        for (int k = i; k < i + confirm; k++)
         {
-            if (direction == 1 &&
-                a1int[i] < crossing && a1int[i + 2] > crossing &&
-                (a1int[i + 1] >= a1int[i] && a1int[i + 1] <= a1int[i + 2]))
+            MMFLOAT v = a1float ? a1float[k] : (MMFLOAT)a1int[k];
+            if ((direction == 1 && v < crossing) || (direction == -1 && v > crossing))
             {
-                found = i + 1;
-                break;
-            }
-            if (direction == -1 &&
-                a1int[i] > crossing && a1int[i + 2] < crossing &&
-                (a1int[i + 1] <= a1int[i] && a1int[i + 1] >= a1int[i + 2]))
-            {
-                found = i + 1;
+                held = 0;
                 break;
             }
         }
-    }
-
-    if (found == -1)
-    {
-        // Pass 2: slower crossing detection using a 5-element window.
-        // Returns the index of the centre element (i+2).
-        // Fixed bound: i+4 must be a valid index, so i < arraylength - 4.
-        for (int i = 0; i < arraylength - 4; i++)
-        {
-            if (a1float)
-            {
-                if (direction == 1 &&
-                    a1float[i + 1] <= crossing && a1float[i + 3] >= crossing &&
-                    (a1float[i + 2] >= a1float[i + 1] && a1float[i + 2] <= a1float[i + 3]))
-                {
-                    if (a1float[i] < a1float[i + 2] && a1float[i + 4] > a1float[i + 2])
-                    {
-                        found = i + 2;
-                        break;
-                    }
-                }
-                if (direction == -1 &&
-                    a1float[i + 1] >= crossing && a1float[i + 3] <= crossing &&
-                    (a1float[i + 2] <= a1float[i + 1] && a1float[i + 2] >= a1float[i + 3]))
-                {
-                    if (a1float[i] > a1float[i + 2] && a1float[i + 4] < a1float[i + 2])
-                    {
-                        found = i + 2;
-                        break;
-                    }
-                }
-            }
-            else
-            {
-                if (direction == 1 &&
-                    a1int[i + 1] <= crossing && a1int[i + 3] >= crossing &&
-                    (a1int[i + 2] >= a1int[i + 1] && a1int[i + 2] <= a1int[i + 3]))
-                {
-                    if (a1int[i] < a1int[i + 2] && a1int[i + 4] > a1int[i + 2])
-                    {
-                        found = i + 2;
-                        break;
-                    }
-                }
-                if (direction == -1 &&
-                    a1int[i + 1] >= crossing && a1int[i + 3] <= crossing &&
-                    (a1int[i + 2] <= a1int[i + 1] && a1int[i + 2] >= a1int[i + 3]))
-                {
-                    if (a1int[i] > a1int[i + 2] && a1int[i + 4] < a1int[i + 2])
-                    {
-                        found = i + 2;
-                        break;
-                    }
-                }
-            }
-        }
+        if (held)
+            found = i;
     }
     targ = T_INT;
     iret = found;
@@ -4149,12 +4089,15 @@ void cmd_SensorFusion(char *passcmdline)
 		ax = getnumber(argv[0]);
 		ay = getnumber(argv[2]);
 		az = getnumber(argv[4]);
-		gx = getnumber(argv[6]);
-		gy = getnumber(argv[8]);
-		gz = getnumber(argv[10]);
-		mx = getnumber(argv[12]);
-		my = getnumber(argv[14]);
-		mz = getnumber(argv[16]);
+		gx = getnumber(argv[6]) / optionangle;  // convert gyro to radians/sec, respecting OPTION ANGLE
+		gy = getnumber(argv[8]) / optionangle;
+		gz = getnumber(argv[10]) / optionangle;
+		// magnetometer values are optional - if omitted, fall back to a 6-axis (IMU-only) update
+		int usemag = 0;
+		mx = my = mz = 0.0;
+		if (*argv[12]) { mx = getnumber(argv[12]); usemag = 1; }
+		if (*argv[14]) my = getnumber(argv[14]);
+		if (*argv[16]) mz = getnumber(argv[16]);
 		pitch = findvar(argv[18], V_FIND);
 		if (!(g_vartbl[g_VarIndex].type & T_NBR))
 			StandardError(6);
@@ -4167,11 +4110,14 @@ void cmd_SensorFusion(char *passcmdline)
 		beta = 0.5;
 		if (argc == 25)
 			beta = getnumber(argv[24]);
-		t = (MMFLOAT)AHRSTimer / 1000.0;
+		uint32_t irqs = save_and_disable_interrupts(); // atomically read-and-clear the ISR-driven tick counter
+		uint32_t ahrs_ticks = AHRSTimer;
+		AHRSTimer = 0;
+		restore_interrupts(irqs);
+		t = (MMFLOAT)ahrs_ticks / 1000.0;
 		if (t > 1.0)
 			t = 1.0;
-		AHRSTimer = 0;
-		MadgwickQuaternionUpdate(ax, ay, az, gx, gy, gz, mx, my, mz, beta, t, pitch, yaw, roll);
+		MadgwickQuaternionUpdate(ax, ay, az, gx, gy, gz, mx, my, mz, beta, t, usemag, pitch, yaw, roll);
 		return;
 	}
 	if ((p = checkstring((unsigned char *)passcmdline, (unsigned char *)"MAHONY")) != NULL)
@@ -4194,12 +4140,15 @@ void cmd_SensorFusion(char *passcmdline)
 		ax = getnumber(argv[0]);
 		ay = getnumber(argv[2]);
 		az = getnumber(argv[4]);
-		gx = getnumber(argv[6]);
-		gy = getnumber(argv[8]);
-		gz = getnumber(argv[10]);
-		mx = getnumber(argv[12]);
-		my = getnumber(argv[14]);
-		mz = getnumber(argv[16]);
+		gx = getnumber(argv[6]) / optionangle;  // convert gyro to radians/sec, respecting OPTION ANGLE
+		gy = getnumber(argv[8]) / optionangle;
+		gz = getnumber(argv[10]) / optionangle;
+		// magnetometer values are optional - if omitted, fall back to a 6-axis (IMU-only) update
+		int usemag = 0;
+		mx = my = mz = 0.0;
+		if (*argv[12]) { mx = getnumber(argv[12]); usemag = 1; }
+		if (*argv[14]) my = getnumber(argv[14]);
+		if (*argv[16]) mz = getnumber(argv[16]);
 		pitch = findvar(argv[18], V_FIND);
 		if (!(g_vartbl[g_VarIndex].type & T_NBR))
 			StandardError(6);
@@ -4215,11 +4164,14 @@ void cmd_SensorFusion(char *passcmdline)
 			Kp = getnumber(argv[24]);
 		if (argc == 27)
 			Ki = getnumber(argv[26]);
-		t = (MMFLOAT)AHRSTimer / 1000.0;
+		uint32_t irqs = save_and_disable_interrupts(); // atomically read-and-clear the ISR-driven tick counter
+		uint32_t ahrs_ticks = AHRSTimer;
+		AHRSTimer = 0;
+		restore_interrupts(irqs);
+		t = (MMFLOAT)ahrs_ticks / 1000.0;
 		if (t > 1.0)
 			t = 1.0;
-		AHRSTimer = 0;
-		MahonyQuaternionUpdate(ax, ay, az, gx, gy, gz, mx, my, mz, Ki, Kp, t, yaw, pitch, roll);
+		MahonyQuaternionUpdate(ax, ay, az, gx, gy, gz, mx, my, mz, Ki, Kp, t, usemag, yaw, pitch, roll);
 		return;
 	}
 	error("Invalid command");
@@ -4229,7 +4181,35 @@ void cmd_SensorFusion(char *passcmdline)
  * The following section will be excluded from the documentation.
  */
 
-void MadgwickQuaternionUpdate(MMFLOAT ax, MMFLOAT ay, MMFLOAT az, MMFLOAT gx, MMFLOAT gy, MMFLOAT gz, MMFLOAT mx, MMFLOAT my, MMFLOAT mz, MMFLOAT beta, MMFLOAT deltat, MMFLOAT *pitch, MMFLOAT *yaw, MMFLOAT *roll)
+// Normalise (q1..q4) in place and copy it into the global orientation q[].
+// If the filter has diverged (norm is zero or non-finite), reset to the
+// identity quaternion so the next sample recovers, instead of latching NaN
+// into q[] for every subsequent call.
+static void StoreQuaternion(MMFLOAT *q1, MMFLOAT *q2, MMFLOAT *q3, MMFLOAT *q4)
+{
+	MMFLOAT norm = sqrt(*q1 * *q1 + *q2 * *q2 + *q3 * *q3 + *q4 * *q4);
+	if (!isfinite(norm) || norm == 0.0)
+	{
+		*q1 = 1.0;
+		*q2 = 0.0;
+		*q3 = 0.0;
+		*q4 = 0.0;
+	}
+	else
+	{
+		norm = 1.0 / norm;
+		*q1 *= norm;
+		*q2 *= norm;
+		*q3 *= norm;
+		*q4 *= norm;
+	}
+	q[0] = *q1;
+	q[1] = *q2;
+	q[2] = *q3;
+	q[3] = *q4;
+}
+
+void MadgwickQuaternionUpdate(MMFLOAT ax, MMFLOAT ay, MMFLOAT az, MMFLOAT gx, MMFLOAT gy, MMFLOAT gz, MMFLOAT mx, MMFLOAT my, MMFLOAT mz, MMFLOAT beta, MMFLOAT deltat, int usemag, MMFLOAT *pitch, MMFLOAT *yaw, MMFLOAT *roll)
 {
 	MMFLOAT q1 = q[0], q2 = q[1], q3 = q[2], q4 = q[3]; // short name local variable for readability
 	MMFLOAT norm;
@@ -4270,33 +4250,51 @@ void MadgwickQuaternionUpdate(MMFLOAT ax, MMFLOAT ay, MMFLOAT az, MMFLOAT gx, MM
 	ay *= norm;
 	az *= norm;
 
-	// Normalise magnetometer measurement
-	norm = sqrt(mx * mx + my * my + mz * mz);
-	if (norm == 0.0)
-		return; // handle NaN
-	norm = 1.0 / norm;
-	mx *= norm;
-	my *= norm;
-	mz *= norm;
+	if (usemag)
+	{
+		// Normalise magnetometer measurement
+		norm = sqrt(mx * mx + my * my + mz * mz);
+		if (norm == 0.0)
+			return; // handle NaN
+		norm = 1.0 / norm;
+		mx *= norm;
+		my *= norm;
+		mz *= norm;
 
-	// Reference direction of Earth's magnetic field
-	_2q1mx = 2.0 * q1 * mx;
-	_2q1my = 2.0 * q1 * my;
-	_2q1mz = 2.0 * q1 * mz;
-	_2q2mx = 2.0 * q2 * mx;
-	hx = mx * q1q1 - _2q1my * q4 + _2q1mz * q3 + mx * q2q2 + _2q2 * my * q3 + _2q2 * mz * q4 - mx * q3q3 - mx * q4q4;
-	hy = _2q1mx * q4 + my * q1q1 - _2q1mz * q2 + _2q2mx * q3 - my * q2q2 + my * q3q3 + _2q3 * mz * q4 - my * q4q4;
-	_2bx = sqrt(hx * hx + hy * hy);
-	_2bz = -_2q1mx * q3 + _2q1my * q2 + mz * q1q1 + _2q2mx * q4 - mz * q2q2 + _2q3 * my * q4 - mz * q3q3 + mz * q4q4;
-	_4bx = 2.0 * _2bx;
-	_4bz = 2.0 * _2bz;
+		// Reference direction of Earth's magnetic field
+		_2q1mx = 2.0 * q1 * mx;
+		_2q1my = 2.0 * q1 * my;
+		_2q1mz = 2.0 * q1 * mz;
+		_2q2mx = 2.0 * q2 * mx;
+		hx = mx * q1q1 - _2q1my * q4 + _2q1mz * q3 + mx * q2q2 + _2q2 * my * q3 + _2q2 * mz * q4 - mx * q3q3 - mx * q4q4;
+		hy = _2q1mx * q4 + my * q1q1 - _2q1mz * q2 + _2q2mx * q3 - my * q2q2 + my * q3q3 + _2q3 * mz * q4 - my * q4q4;
+		_2bx = sqrt(hx * hx + hy * hy);
+		_2bz = -_2q1mx * q3 + _2q1my * q2 + mz * q1q1 + _2q2mx * q4 - mz * q2q2 + _2q3 * my * q4 - mz * q3q3 + mz * q4q4;
+		_4bx = 2.0 * _2bx;
+		_4bz = 2.0 * _2bz;
 
-	// Gradient decent algorithm corrective step
-	s1 = -_2q3 * (2.0 * q2q4 - _2q1q3 - ax) + _2q2 * (2.0 * q1q2 + _2q3q4 - ay) - _2bz * q3 * (_2bx * (0.5 - q3q3 - q4q4) + _2bz * (q2q4 - q1q3) - mx) + (-_2bx * q4 + _2bz * q2) * (_2bx * (q2q3 - q1q4) + _2bz * (q1q2 + q3q4) - my) + _2bx * q3 * (_2bx * (q1q3 + q2q4) + _2bz * (0.5 - q2q2 - q3q3) - mz);
-	s2 = _2q4 * (2.0 * q2q4 - _2q1q3 - ax) + _2q1 * (2.0 * q1q2 + _2q3q4 - ay) - 4.0 * q2 * (1.0 - 2.0 * q2q2 - 2.0 * q3q3 - az) + _2bz * q4 * (_2bx * (0.5 - q3q3 - q4q4) + _2bz * (q2q4 - q1q3) - mx) + (_2bx * q3 + _2bz * q1) * (_2bx * (q2q3 - q1q4) + _2bz * (q1q2 + q3q4) - my) + (_2bx * q4 - _4bz * q2) * (_2bx * (q1q3 + q2q4) + _2bz * (0.5 - q2q2 - q3q3) - mz);
-	s3 = -_2q1 * (2.0 * q2q4 - _2q1q3 - ax) + _2q4 * (2.0 * q1q2 + _2q3q4 - ay) - 4.0 * q3 * (1.0 - 2.0 * q2q2 - 2.0 * q3q3 - az) + (-_4bx * q3 - _2bz * q1) * (_2bx * (0.5 - q3q3 - q4q4) + _2bz * (q2q4 - q1q3) - mx) + (_2bx * q2 + _2bz * q4) * (_2bx * (q2q3 - q1q4) + _2bz * (q1q2 + q3q4) - my) + (_2bx * q1 - _4bz * q3) * (_2bx * (q1q3 + q2q4) + _2bz * (0.5 - q2q2 - q3q3) - mz);
-	s4 = _2q2 * (2.0 * q2q4 - _2q1q3 - ax) + _2q3 * (2.0 * q1q2 + _2q3q4 - ay) + (-_4bx * q4 + _2bz * q2) * (_2bx * (0.5 - q3q3 - q4q4) + _2bz * (q2q4 - q1q3) - mx) + (-_2bx * q1 + _2bz * q3) * (_2bx * (q2q3 - q1q4) + _2bz * (q1q2 + q3q4) - my) + _2bx * q2 * (_2bx * (q1q3 + q2q4) + _2bz * (0.5 - q2q2 - q3q3) - mz);
+		// Gradient decent algorithm corrective step (MARG - 9-axis)
+		s1 = -_2q3 * (2.0 * q2q4 - _2q1q3 - ax) + _2q2 * (2.0 * q1q2 + _2q3q4 - ay) - _2bz * q3 * (_2bx * (0.5 - q3q3 - q4q4) + _2bz * (q2q4 - q1q3) - mx) + (-_2bx * q4 + _2bz * q2) * (_2bx * (q2q3 - q1q4) + _2bz * (q1q2 + q3q4) - my) + _2bx * q3 * (_2bx * (q1q3 + q2q4) + _2bz * (0.5 - q2q2 - q3q3) - mz);
+		s2 = _2q4 * (2.0 * q2q4 - _2q1q3 - ax) + _2q1 * (2.0 * q1q2 + _2q3q4 - ay) - 4.0 * q2 * (1.0 - 2.0 * q2q2 - 2.0 * q3q3 - az) + _2bz * q4 * (_2bx * (0.5 - q3q3 - q4q4) + _2bz * (q2q4 - q1q3) - mx) + (_2bx * q3 + _2bz * q1) * (_2bx * (q2q3 - q1q4) + _2bz * (q1q2 + q3q4) - my) + (_2bx * q4 - _4bz * q2) * (_2bx * (q1q3 + q2q4) + _2bz * (0.5 - q2q2 - q3q3) - mz);
+		s3 = -_2q1 * (2.0 * q2q4 - _2q1q3 - ax) + _2q4 * (2.0 * q1q2 + _2q3q4 - ay) - 4.0 * q3 * (1.0 - 2.0 * q2q2 - 2.0 * q3q3 - az) + (-_4bx * q3 - _2bz * q1) * (_2bx * (0.5 - q3q3 - q4q4) + _2bz * (q2q4 - q1q3) - mx) + (_2bx * q2 + _2bz * q4) * (_2bx * (q2q3 - q1q4) + _2bz * (q1q2 + q3q4) - my) + (_2bx * q1 - _4bz * q3) * (_2bx * (q1q3 + q2q4) + _2bz * (0.5 - q2q2 - q3q3) - mz);
+		s4 = _2q2 * (2.0 * q2q4 - _2q1q3 - ax) + _2q3 * (2.0 * q1q2 + _2q3q4 - ay) + (-_4bx * q4 + _2bz * q2) * (_2bx * (0.5 - q3q3 - q4q4) + _2bz * (q2q4 - q1q3) - mx) + (-_2bx * q1 + _2bz * q3) * (_2bx * (q2q3 - q1q4) + _2bz * (q1q2 + q3q4) - my) + _2bx * q2 * (_2bx * (q1q3 + q2q4) + _2bz * (0.5 - q2q2 - q3q3) - mz);
+	}
+	else
+	{
+		// Gradient decent algorithm corrective step (IMU - 6-axis, accelerometer only)
+		MMFLOAT _4q1 = 4.0 * q1;
+		MMFLOAT _4q2 = 4.0 * q2;
+		MMFLOAT _4q3 = 4.0 * q3;
+		MMFLOAT _8q2 = 8.0 * q2;
+		MMFLOAT _8q3 = 8.0 * q3;
+		s1 = _4q1 * q3q3 + _2q3 * ax + _4q1 * q2q2 - _2q2 * ay;
+		s2 = _4q2 * q4q4 - _2q4 * ax + 4.0 * q1q1 * q2 - _2q1 * ay - _4q2 + _8q2 * q2q2 + _8q2 * q3q3 + _4q2 * az;
+		s3 = 4.0 * q1q1 * q3 + _2q1 * ax + _4q3 * q4q4 - _2q4 * ay - _4q3 + _8q3 * q2q2 + _8q3 * q3q3 + _4q3 * az;
+		s4 = 4.0 * q2q2 * q4 - _2q2 * ax + 4.0 * q3q3 * q4 - _2q3 * ay;
+	}
 	norm = sqrt(s1 * s1 + s2 * s2 + s3 * s3 + s4 * s4); // normalise step magnitude
+	if (norm == 0.0)
+		return; // degenerate gradient - avoid div-by-zero corrupting the quaternion
 	norm = 1.0 / norm;
 	s1 *= norm;
 	s2 *= norm;
@@ -4314,32 +4312,27 @@ void MadgwickQuaternionUpdate(MMFLOAT ax, MMFLOAT ay, MMFLOAT az, MMFLOAT gx, MM
 	q2 += qDot2 * deltat;
 	q3 += qDot3 * deltat;
 	q4 += qDot4 * deltat;
-	norm = sqrt(q1 * q1 + q2 * q2 + q3 * q3 + q4 * q4); // normalise quaternion
-	norm = 1.0 / norm;
-	q[0] = q1 * norm;
-	q[1] = q2 * norm;
-	q[2] = q3 * norm;
-	q[3] = q4 * norm;
+	StoreQuaternion(&q1, &q2, &q3, &q4); // normalise into q[]; resets to identity if diverged
 
 	MMFLOAT ysqr = q3 * q3;
 
-	// roll (x-axis rotation)
+	// roll (x-axis rotation) - scaled by optionangle to respect OPTION ANGLE
 	MMFLOAT t0 = +2.0 * (q1 * q2 + q3 * q4);
 	MMFLOAT t1 = +1.0 - 2.0 * (q2 * q2 + ysqr);
-	*roll = atan2(t0, t1);
+	*roll = atan2(t0, t1) * optionangle;
 
 	// pitch (y-axis rotation)
 	MMFLOAT t2 = +2.0 * (q1 * q3 - q4 * q2);
 	t2 = t2 > 1.0 ? 1.0 : t2;
 	t2 = t2 < -1.0 ? -1.0 : t2;
-	*pitch = asin(t2);
+	*pitch = asin(t2) * optionangle;
 
 	// yaw (z-axis rotation)
 	MMFLOAT t3 = +2.0 * (q1 * q4 + q2 * q3);
 	MMFLOAT t4 = +1.0 - 2.0 * (ysqr + q4 * q4);
-	*yaw = atan2(t3, t4);
+	*yaw = atan2(t3, t4) * optionangle;
 }
-void MahonyQuaternionUpdate(MMFLOAT ax, MMFLOAT ay, MMFLOAT az, MMFLOAT gx, MMFLOAT gy, MMFLOAT gz, MMFLOAT mx, MMFLOAT my, MMFLOAT mz, MMFLOAT Ki, MMFLOAT Kp, MMFLOAT deltat, MMFLOAT *yaw, MMFLOAT *pitch, MMFLOAT *roll)
+void MahonyQuaternionUpdate(MMFLOAT ax, MMFLOAT ay, MMFLOAT az, MMFLOAT gx, MMFLOAT gy, MMFLOAT gz, MMFLOAT mx, MMFLOAT my, MMFLOAT mz, MMFLOAT Ki, MMFLOAT Kp, MMFLOAT deltat, int usemag, MMFLOAT *yaw, MMFLOAT *pitch, MMFLOAT *roll)
 {
 	MMFLOAT q1 = q[0], q2 = q[1], q3 = q[2], q4 = q[3]; // short name local variable for readability
 	MMFLOAT norm;
@@ -4369,33 +4362,43 @@ void MahonyQuaternionUpdate(MMFLOAT ax, MMFLOAT ay, MMFLOAT az, MMFLOAT gx, MMFL
 	ay *= norm;
 	az *= norm;
 
-	// Normalise magnetometer measurement
-	norm = sqrt(mx * mx + my * my + mz * mz);
-	if (norm == 0.0)
-		return;		   // handle NaN
-	norm = 1.0 / norm; // use reciprocal for division
-	mx *= norm;
-	my *= norm;
-	mz *= norm;
-
-	// Reference direction of Earth's magnetic field
-	hx = 2.0 * mx * (0.5 - q3q3 - q4q4) + 2.0 * my * (q2q3 - q1q4) + 2.0 * mz * (q2q4 + q1q3);
-	hy = 2.0 * mx * (q2q3 + q1q4) + 2.0 * my * (0.5 - q2q2 - q4q4) + 2.0 * mz * (q3q4 - q1q2);
-	bx = sqrt((hx * hx) + (hy * hy));
-	bz = 2.0 * mx * (q2q4 - q1q3) + 2.0 * my * (q3q4 + q1q2) + 2.0 * mz * (0.5 - q2q2 - q3q3);
-
-	// Estimated direction of gravity and magnetic field
+	// Estimated direction of gravity
 	vx = 2.0 * (q2q4 - q1q3);
 	vy = 2.0 * (q1q2 + q3q4);
 	vz = q1q1 - q2q2 - q3q3 + q4q4;
-	wx = 2.0 * bx * (0.5 - q3q3 - q4q4) + 2.0 * bz * (q2q4 - q1q3);
-	wy = 2.0 * bx * (q2q3 - q1q4) + 2.0 * bz * (q1q2 + q3q4);
-	wz = 2.0 * bx * (q1q3 + q2q4) + 2.0 * bz * (0.5 - q2q2 - q3q3);
 
-	// Error is cross product between estimated direction and measured direction of gravity
-	ex = (ay * vz - az * vy) + (my * wz - mz * wy);
-	ey = (az * vx - ax * vz) + (mz * wx - mx * wz);
-	ez = (ax * vy - ay * vx) + (mx * wy - my * wx);
+	// Error is cross product between estimated and measured direction of gravity
+	ex = (ay * vz - az * vy);
+	ey = (az * vx - ax * vz);
+	ez = (ax * vy - ay * vx);
+
+	if (usemag)
+	{
+		// Normalise magnetometer measurement
+		norm = sqrt(mx * mx + my * my + mz * mz);
+		if (norm == 0.0)
+			return;		   // handle NaN
+		norm = 1.0 / norm; // use reciprocal for division
+		mx *= norm;
+		my *= norm;
+		mz *= norm;
+
+		// Reference direction of Earth's magnetic field
+		hx = 2.0 * mx * (0.5 - q3q3 - q4q4) + 2.0 * my * (q2q3 - q1q4) + 2.0 * mz * (q2q4 + q1q3);
+		hy = 2.0 * mx * (q2q3 + q1q4) + 2.0 * my * (0.5 - q2q2 - q4q4) + 2.0 * mz * (q3q4 - q1q2);
+		bx = sqrt((hx * hx) + (hy * hy));
+		bz = 2.0 * mx * (q2q4 - q1q3) + 2.0 * my * (q3q4 + q1q2) + 2.0 * mz * (0.5 - q2q2 - q3q3);
+
+		// Estimated direction of magnetic field
+		wx = 2.0 * bx * (0.5 - q3q3 - q4q4) + 2.0 * bz * (q2q4 - q1q3);
+		wy = 2.0 * bx * (q2q3 - q1q4) + 2.0 * bz * (q1q2 + q3q4);
+		wz = 2.0 * bx * (q1q3 + q2q4) + 2.0 * bz * (0.5 - q2q2 - q3q3);
+
+		// Add the magnetometer error contribution (cross product)
+		ex += (my * wz - mz * wy);
+		ey += (mz * wx - mx * wz);
+		ez += (mx * wy - my * wx);
+	}
 	if (Ki > 0.0)
 	{
 		eInt[0] += ex; // accumulate integral error
@@ -4423,30 +4426,25 @@ void MahonyQuaternionUpdate(MMFLOAT ax, MMFLOAT ay, MMFLOAT az, MMFLOAT gx, MMFL
 	q3 = pb + (q1 * gy - pa * gz + pc * gx) * (0.5 * deltat);
 	q4 = pc + (q1 * gz + pa * gy - pb * gx) * (0.5 * deltat);
 
-	// Normalise quaternion
-	norm = sqrt(q1 * q1 + q2 * q2 + q3 * q3 + q4 * q4);
-	norm = 1.0 / norm;
-	q[0] = q1 * norm;
-	q[1] = q2 * norm;
-	q[2] = q3 * norm;
-	q[3] = q4 * norm;
+	// Normalise quaternion (resets to identity if the filter diverged)
+	StoreQuaternion(&q1, &q2, &q3, &q4);
 	MMFLOAT ysqr = q3 * q3;
 
-	// roll (x-axis rotation)
+	// roll (x-axis rotation) - scaled by optionangle to respect OPTION ANGLE
 	MMFLOAT t0 = +2.0 * (q1 * q2 + q3 * q4);
 	MMFLOAT t1 = +1.0 - 2.0 * (q2 * q2 + ysqr);
-	*roll = atan2(t0, t1);
+	*roll = atan2(t0, t1) * optionangle;
 
 	// pitch (y-axis rotation)
 	MMFLOAT t2 = +2.0 * (q1 * q3 - q4 * q2);
 	t2 = t2 > 1.0 ? 1.0 : t2;
 	t2 = t2 < -1.0 ? -1.0 : t2;
-	*pitch = asin(t2);
+	*pitch = asin(t2) * optionangle;
 
 	// yaw (z-axis rotation)
 	MMFLOAT t3 = +2.0 * (q1 * q4 + q2 * q3);
 	MMFLOAT t4 = +1.0 - 2.0 * (ysqr + q4 * q4);
-	*yaw = atan2(t3, t4);
+	*yaw = atan2(t3, t4) * optionangle;
 }
 
 /*Finding transpose of cofactor of matrix*/

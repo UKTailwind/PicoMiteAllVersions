@@ -417,26 +417,22 @@ static void compute_profile_for_block(gcode_block_t *block)
         block->cruise_rate = (int32_t)(v_peak * rate_to_vel);
 
         float accel_dist_peak = (v_peak * v_peak - v_entry * v_entry) / (2.0f * block->min_accel);
-        float decel_dist_peak = (v_peak * v_peak - v_exit * v_exit) / (2.0f * block->min_accel);
         if (accel_dist_peak < 0.0f)
             accel_dist_peak = 0.0f;
-        if (decel_dist_peak < 0.0f)
-            decel_dist_peak = 0.0f;
 
         block->accel_steps = (int32_t)(accel_dist_peak * block->virtual_steps_per_mm);
-        block->decel_steps = (int32_t)(decel_dist_peak * block->virtual_steps_per_mm);
         if (block->accel_steps < 0)
             block->accel_steps = 0;
-        if (block->decel_steps < 0)
-            block->decel_steps = 0;
+        if (block->accel_steps > block->major_steps)
+            block->accel_steps = block->major_steps;
 
-        int32_t used = block->accel_steps + block->decel_steps;
-        if (used > block->major_steps)
-        {
-            // Clamp for rounding
-            block->accel_steps = block->major_steps / 2;
-            block->decel_steps = block->major_steps - block->accel_steps;
-        }
+        // A triangle has no cruise segment, so its two phases must tile major_steps
+        // exactly: the decel phase takes ALL remaining steps. Previously accel_steps and
+        // decel_steps were each truncated independently and only the over-shoot case was
+        // clamped; when both truncated down (the common case for a symmetric move) their
+        // sum fell 1-2 steps short of major_steps, and the ISR silently dropped those
+        // steps when the DECEL phase ended with total_steps_remaining still > 0.
+        block->decel_steps = block->major_steps - block->accel_steps;
         block->cruise_steps = 0;
     }
     else
@@ -1100,11 +1096,22 @@ static inline uint16_t stepper_compute_axis_min_step_ticks(const stepper_axis_t 
     if (max_step_freq <= 0.0)
         return 1;
 
-    // min_ticks = ceil(ISR_FREQ / max_step_freq)
+    // min_ticks = floor(ISR_FREQ / max_step_freq), not ceil.
+    //
+    // This gate is only a per-axis ceiling; the accumulator already paces every axis at
+    // step_rate (which the planner clamps to max_velocity), so the gate must never block a
+    // step the accumulator legitimately schedules. Rounding UP did exactly that: for an axis
+    // whose ideal interval is e.g. 2.0016 ticks (just under the 50 kHz cap), ceil forced a
+    // 3-tick minimum, throttling the axis to ISR_FREQ/3 (~33 kHz). The planner still sized
+    // accel/decel for the un-throttled cruise rate, so the deceleration ramp reached ~0 with
+    // steps still owed; those owed steps were then delivered by the tail guard at the 5 ms
+    // STEPPER_TAIL_MIN_STEP_RATE crawl ("brute force" finish). Flooring lets the gate match
+    // the accumulator's own fractional pacing (and the global 50 kHz / 2-tick deferral cap),
+    // so no phase is discarded and the decel delivers every step on the real ramp.
+    // A burst may momentarily be one tick-quantum faster than max_velocity, but the
+    // accumulator/planner still bound the average, so the axis never actually exceeds its max.
     double ticks_d = (double)ISR_FREQ / max_step_freq;
-    uint32_t ticks = (uint32_t)ticks_d;
-    if (ticks_d > (double)ticks)
-        ticks++;
+    uint32_t ticks = (uint32_t)ticks_d; // floor
     if (ticks < 1u)
         ticks = 1u;
     if (ticks > 65535u)
@@ -3190,16 +3197,21 @@ void __not_in_flash_func(stepper_timer_isr)(void)
             break;
         }
 
-        // Safety check: prevent hanging if exit_rate==0 and step_rate reaches 0 in a decel-family phase
-        if (current_move.exit_rate == 0 &&
-            current_move.step_rate == 0 &&
-            (current_move.phase == MOVE_PHASE_DECEL ||
-             current_move.phase == MOVE_PHASE_S_JERK_UP_DECEL ||
-             current_move.phase == MOVE_PHASE_S_CONST_DECEL ||
-             current_move.phase == MOVE_PHASE_S_JERK_DOWN_DECEL))
+        // Defence in depth: the move is complete ONLY when total_steps_remaining reaches 0,
+        // which is handled by the early-return above. Reaching this point means steps still
+        // remain, so a terminal phase that just transitioned to IDLE (or a decel phase whose
+        // rate quantized to 0) would otherwise drop those steps. Instead, keep decelerating
+        // until total_steps_remaining hits 0, flooring the rate to the tail-guard minimum so
+        // the move can never stall. The trapezoid/triangle and S-curve planners both tile
+        // major_steps exactly, so in normal operation this guard is never taken - it makes the
+        // phase machine self-correcting if the per-phase step counts ever fail to tile.
+        if (current_move.phase == MOVE_PHASE_IDLE)
         {
-            current_move.phase = MOVE_PHASE_IDLE;
-            stepper_system.motion_active = false;
+            current_move.phase = MOVE_PHASE_DECEL;
+            current_move.steps_remaining = current_move.total_steps_remaining;
+            if ((uint32_t)current_move.step_rate < (uint32_t)STEPPER_TAIL_MIN_STEP_RATE)
+                current_move.step_rate = STEPPER_TAIL_MIN_STEP_RATE;
+            stepper_system.motion_active = true;
         }
     }
 }

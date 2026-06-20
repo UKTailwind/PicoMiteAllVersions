@@ -160,11 +160,13 @@ void MahonyQuaternionUpdate(MMFLOAT ax, MMFLOAT ay, MMFLOAT az,
 							MMFLOAT gx, MMFLOAT gy, MMFLOAT gz,
 							MMFLOAT mx, MMFLOAT my, MMFLOAT mz,
 							MMFLOAT Ki, MMFLOAT Kp, MMFLOAT deltat,
+							int usemag,
 							MMFLOAT *yaw, MMFLOAT *pitch, MMFLOAT *roll);
 void MadgwickQuaternionUpdate(MMFLOAT ax, MMFLOAT ay, MMFLOAT az,
 							  MMFLOAT gx, MMFLOAT gy, MMFLOAT gz,
 							  MMFLOAT mx, MMFLOAT my, MMFLOAT mz,
 							  MMFLOAT beta, MMFLOAT deltat,
+							  int usemag,
 							  MMFLOAT *pitch, MMFLOAT *yaw, MMFLOAT *roll);
 
 /* ============================================================================

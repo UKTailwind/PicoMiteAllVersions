@@ -438,11 +438,27 @@ uint8_t PSRAMpin;
         (void *)&CFuncInt2,         // 0xbc
         (void *)&CSubComplete,      // 0xc0
         (void *)&AudioOutput,       // 0xc4
-        (void *)IDiv,               // 0x0xc8
-        (void *)&AUDIO_WRAP,        // 0x0xcc
-        (void *)&CFuncInt3,         // 0xb8
-        (void *)&CFuncInt4,         // 0xbc
-        (void *)PIOExecute,
+        (void *)IDiv,               // 0xc8
+        (void *)&AUDIO_WRAP,        // 0xcc
+        (void *)&CFuncInt3,         // 0xd0
+        (void *)&CFuncInt4,         // 0xd4
+        (void *)PIOExecute,         // 0xd8
+        // --- APPEND-ONLY below: never reorder/insert above this line or every
+        //     existing compiled CSUB breaks (offsets are the ABI). ---
+        (void *)&WriteBuf,          // 0xdc  current write framebuffer pointer
+        (void *)&FrameBuf,          // 0xe0  frame layer pointer
+        (void *)&LayerBuf,          // 0xe4  overlay layer pointer
+#ifndef PICOMITEVGA
+		(void *)&WriteBuf,
+#else
+        (void *)&DisplayBuf,        // 0xe8  display layer pointer
+#endif
+        (void *)&DrawPixel,         // 0xec  per-mode pixel writer DrawPixel(x,y,rgb)
+        (void *)Display_Refresh,    // 0xf0  push direct writes to buffered panels
+        (void *)cos,                // 0xf4  MMFLOAT cos(MMFLOAT)
+        (void *)sqrt,               // 0xf8  MMFLOAT sqrt(MMFLOAT)
+        (void *)atan2,              // 0xfc  MMFLOAT atan2(MMFLOAT,MMFLOAT)
+        (void *)pow,                // 0x100 MMFLOAT pow(MMFLOAT,MMFLOAT)
     };
 #ifdef rp2350
     // this is a frig to place the calltable at 0x1000023C as in previous releases
@@ -6361,6 +6377,11 @@ uint32_t testPSRAM(void)
         static int ErrorInPrompt;
         int i = 0;
         char savewatchdog = false;
+        /* Publish the CFunction CallTable address in reserved Cortex-M vector
+           slot 7 (VTOR+0x1C). Lets CSUBs locate the CallTable via the
+           architectural VTOR register (0xE000ED08) with no chip- or
+           build-specific flash address. See PicoCFunctions.h / armcfgen. */
+        ((volatile uint32_t *)(*(volatile uint32_t *)0xE000ED08))[7] = (uint32_t)CallTable;
         i = watchdog_caused_reboot();
 #ifdef rp2350
         restart_reason = powman_hw->chip_reset | i;
@@ -7253,32 +7274,40 @@ uint32_t testPSRAM(void)
                 int looks_like_calc = 0;
                 if (!file_found)
                 {
-                    // Decide whether the input resembles a calculator expression
-                    // (digit/dot start, or contains parens/operators/dot anywhere).
-                    // Bare names like *foo or *sqrt2 don't, so we report a clear
-                    // error instead of letting CALC fail with "is not declared".
-                    char *q = p + 1;
-                    while (*q == ' ')
-                        q++;
-                    if (IsDigitinline(*q) || *q == '.')
+                    if (*p == '*' && p[1] == 0)
                     {
-                        looks_like_calc = 1;
+                        transform_star_command((char *)inpbuf);
+                        p = (char *)inpbuf;
                     }
                     else
                     {
-                        for (char *r = q; *r; r++)
+                        // Decide whether the input resembles a calculator expression
+                        // (digit/dot start, or contains parens/operators/dot anywhere).
+                        // Bare names like *foo or *sqrt2 don't, so we report a clear
+                        // error instead of letting CALC fail with "is not declared".
+                        char *q = p + 1;
+                        while (*q == ' ')
+                            q++;
+                        if (IsDigitinline(*q) || *q == '.')
                         {
-                            if (*r == '(' || *r == '.' || *r == '+' || *r == '-' ||
-                                *r == '*' || *r == '/' || *r == '^' || *r == '<' ||
-                                *r == '>' || *r == '\\')
+                            looks_like_calc = 1;
+                        }
+                        else
+                        {
+                            for (char *r = q; *r; r++)
                             {
-                                looks_like_calc = 1;
-                                break;
+                                if (*r == '(' || *r == '.' || *r == '+' || *r == '-' ||
+                                    *r == '*' || *r == '/' || *r == '^' || *r == '<' ||
+                                    *r == '>' || *r == '\\')
+                                {
+                                    looks_like_calc = 1;
+                                    break;
+                                }
                             }
                         }
+                        if (!looks_like_calc)
+                            error("Neither file nor function found");
                     }
-                    if (!looks_like_calc)
-                        error("Neither file nor function found");
                 }
                 if (file_found)
 #endif
