@@ -357,6 +357,18 @@ uint8_t PSRAMpin;
     MMFLOAT FAdd(MMFLOAT a, MMFLOAT b) { return a + b; }
     MMFLOAT FSub(MMFLOAT a, MMFLOAT b) { return a - b; }
     MMFLOAT FDiv(MMFLOAT a, MMFLOAT b) { return a / b; }
+    // single-precision (float) helpers for CSUBs - faster software float than
+    // double; exposed at the end of the CallTable (0x104+). Soft-float ABI
+    // (args in core regs) matches the CSUB, same as the double helpers.
+    float SAdd(float a, float b) { return a + b; }
+    float SSub(float a, float b) { return a - b; }
+    float SMul(float a, float b) { return a * b; }
+    float SDiv(float a, float b) { return a / b; }
+    int   SCmp(float a, float b) { if (a > b) return 1; else if (a < b) return -1; else return 0; }
+    float DtoS(double a) { return (float)a; }                                   // double -> single
+    double StoD(float a) { return (double)a; }                                  // single -> double
+    long long StoI(float a) { return (long long)(a >= 0 ? a + 0.5f : a - 0.5f); } // single -> int (rounds)
+    float ItoS(long long a) { return (float)a; }                                // int -> single
     uint32_t CFunc_delay_us;
 #ifndef HDMI
     int QVGA_CLKDIV; // SM divide clock ticks
@@ -459,6 +471,21 @@ uint8_t PSRAMpin;
         (void *)sqrt,               // 0xf8  MMFLOAT sqrt(MMFLOAT)
         (void *)atan2,              // 0xfc  MMFLOAT atan2(MMFLOAT,MMFLOAT)
         (void *)pow,                // 0x100 MMFLOAT pow(MMFLOAT,MMFLOAT)
+        // single-precision (float) routines - append-only, do not reorder
+        (void *)SAdd,               // 0x104 float SAdd(float,float)
+        (void *)SSub,               // 0x108 float SSub(float,float)
+        (void *)SMul,               // 0x10c float SMul(float,float)
+        (void *)SDiv,               // 0x110 float SDiv(float,float)
+        (void *)SCmp,               // 0x114 int   SCmp(float,float)
+        (void *)sinf,               // 0x118 float sinf(float)
+        (void *)cosf,               // 0x11c float cosf(float)
+        (void *)sqrtf,              // 0x120 float sqrtf(float)
+        (void *)atan2f,             // 0x124 float atan2f(float,float)
+        (void *)powf,               // 0x128 float powf(float,float)
+        (void *)DtoS,               // 0x12c float DtoS(double)      double->single
+        (void *)StoD,               // 0x130 double StoD(float)      single->double
+        (void *)StoI,               // 0x134 long long StoI(float)   single->int (rounds)
+        (void *)ItoS,               // 0x138 float ItoS(long long)   int->single
     };
 #ifdef rp2350
     // this is a frig to place the calltable at 0x1000023C as in previous releases
@@ -6580,14 +6607,14 @@ uint32_t testPSRAM(void)
         int mapsize = display_details[Option.DISPLAY_TYPE].vertical * display_details[Option.DISPLAY_TYPE].bits * sizeof(uint32_t);
         int framesize = (display_details[Option.DISPLAY_TYPE].horizontal / 5) * sizeof(uint32_t) * display_details[Option.DISPLAY_TYPE].vertical;
         framebuffersize = mapsize + framesize;
-        heap_memory_size -= framebuffersize;
+        heap_memory_size -= MRoundUp(framebuffersize); // keep heap top 256-aligned (top-down GetMemory relies on it)
         FRAMEBUFFER = (uint8_t *)(AllMemory + heap_memory_size + 256);
         g_vgalinemap = (uint32_t *)(AllMemory + heap_memory_size + 256 + framesize);
     }
     if (Option.DISPLAY_TYPE >= NEXTGEN)
     { // adjust the size of the heap
         framebuffersize = display_details[Option.DISPLAY_TYPE].horizontal * display_details[Option.DISPLAY_TYPE].vertical;
-        heap_memory_size -= framebuffersize;
+        heap_memory_size -= MRoundUp(framebuffersize); // keep heap top 256-aligned
         FRAMEBUFFER = AllMemory + heap_memory_size + 256;
     }
 #endif
@@ -6607,19 +6634,19 @@ uint32_t testPSRAM(void)
     if (Option.Resolution == R800x600)
     { // adjust the size of the heap
         framebuffersize = 400 * 300 * 2;
-        heap_memory_size = HEAP_MEMORY_SIZE - framebuffersize + 320 * 240 * 2;
+        heap_memory_size = HEAP_MEMORY_SIZE - MRoundUp(framebuffersize) + 320 * 240 * 2;
         FRAMEBUFFER = AllMemory + heap_memory_size + 256;
     }
     if (Option.Resolution == R848x480)
     { // adjust the size of the heap
         framebuffersize = 424 * 240 * 2;
-        heap_memory_size = HEAP_MEMORY_SIZE - framebuffersize + 320 * 240 * 2;
+        heap_memory_size = HEAP_MEMORY_SIZE - MRoundUp(framebuffersize) + 320 * 240 * 2;
         FRAMEBUFFER = AllMemory + heap_memory_size + 256;
     }
     if (Option.Resolution == R800x480)
     { // adjust the size of the heap
         framebuffersize = 400 * 240 * 2;
-        heap_memory_size = HEAP_MEMORY_SIZE - framebuffersize + 320 * 240 * 2;
+        heap_memory_size = HEAP_MEMORY_SIZE - MRoundUp(framebuffersize) + 320 * 240 * 2;
         FRAMEBUFFER = AllMemory + heap_memory_size + 256;
     }
 #endif /* !HDMICUTDOWN */
@@ -6630,7 +6657,7 @@ uint32_t testPSRAM(void)
         if (IS_VIRTUAL_DISPLAY(Option.DISPLAY_TYPE))
         {
             int framebuffersize = 320 * 240 / 2;
-            heap_memory_size -= framebuffersize;
+            heap_memory_size -= MRoundUp(framebuffersize); // keep heap top 256-aligned
             FRAMEBUFFER = (uint8_t *)(AllMemory + heap_memory_size + 256);
         }
 #endif
@@ -6639,7 +6666,11 @@ uint32_t testPSRAM(void)
         if (Option.MaxCtrls > 0)
         {
             int ctrlsSize = Option.MaxCtrls * sizeof(struct s_ctrl);
-            heap_memory_size -= ctrlsSize;
+            // Round the carve-out up to a page so the heap top stays 256-aligned.
+            // sizeof(s_ctrl) (52) is not a 256-multiple, so an unrounded subtraction
+            // here offsets every top-down GetMemory() block by ctrlsSize%256 and
+            // breaks VARADDR 8-alignment (MEMORY PACK/POKE INTEGER "not divisible by 8").
+            heap_memory_size -= MRoundUp(ctrlsSize);
             Ctrl = (struct s_ctrl *)(AllMemory + heap_memory_size + 256);
             memset(Ctrl, 0, ctrlsSize);
         }
@@ -6659,7 +6690,7 @@ uint32_t testPSRAM(void)
         if (Option.Resolution == R848x480)
         { // adjust the size of the heap
             framebuffersize = 424 * 240 * 2;
-            heap_memory_size = HEAP_MEMORY_SIZE - framebuffersize + 320 * 240 * 2;
+            heap_memory_size = HEAP_MEMORY_SIZE - MRoundUp(framebuffersize) + 320 * 240 * 2;
             FRAMEBUFFER = AllMemory + heap_memory_size + 256;
             MODE1SIZE = MODE1SIZE_8;
             MODE2SIZE = MODE2SIZE_8;
@@ -6671,7 +6702,7 @@ uint32_t testPSRAM(void)
         if (Option.Resolution == R800x600)
         { // adjust the size of the heap
             framebuffersize = 400 * 300 * 2;
-            heap_memory_size = HEAP_MEMORY_SIZE - framebuffersize + 320 * 240 * 2;
+            heap_memory_size = HEAP_MEMORY_SIZE - MRoundUp(framebuffersize) + 320 * 240 * 2;
             FRAMEBUFFER = AllMemory + heap_memory_size + 256;
             MODE1SIZE = MODE1SIZE_V;
             MODE2SIZE = MODE2SIZE_V;

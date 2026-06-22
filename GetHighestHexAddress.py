@@ -9,6 +9,11 @@ by hand against configuration.h and CMakeLists.txt:
      and the program-storage area aren't overwritten).
   2. Static BSS end + PICO_HEAP_SIZE + PICO_CORE0_STACK_SIZE fits in RAM
      (catches the heap-BSS overlap class of bug).
+  3. The MMBasic heap backing store (AllMemory / Heap) is 256-byte aligned.
+     The firmware assumes every GetMemory() block is page (256-byte) aligned
+     -- arrays and MEMORY PACK/COPY/POKE INTEGER rely on it. If the linker
+     places the symbol off a 256-byte boundary, every allocation inherits
+     the offset and VARADDR returns non-8-aligned addresses.
 
 Inputs:
   hexfile  -- PicoMite.hex (required, positional)
@@ -17,6 +22,7 @@ Inputs:
 The map file is parsed for:
   * The Memory Configuration FLASH origin (for the FLASH base address).
   * `.heap <addr> <size>`           -> __bss_end__ and PICO_HEAP_SIZE.
+  * `AllMemory` / `Heap` symbol      -> MMBasic heap base address.
   * `_fw_flash_target_offset` symbol -> FLASH_TARGET_OFFSET from
     configuration.h, surfaced into the link via an asm `.set` in Memory.c.
 
@@ -65,6 +71,17 @@ _HEAP_RE = re.compile(
 _FLASH_REGION_RE = re.compile(
     r"^FLASH\s+(0x[0-9a-fA-F]+)\s+(0x[0-9a-fA-F]+)"
 )
+# The MMBasic heap backing store. Matches the symbol *definition* line which
+# in the map is: <spaces>0x<addr><spaces><name><eol>. Non-VGA builds use
+# `AllMemory`; the RP2040 VGA build names it `Heap` (section .bss.zheap).
+_HEAP_BASE_RE = re.compile(
+    r"^\s+(0x[0-9a-fA-F]+)\s+(AllMemory|Heap)\s*$"
+)
+
+# Allocation granularity of the MMBasic heap (PAGESIZE in Memory.h). Every
+# GetMemory() block is a multiple of this from the heap base, so the base
+# itself must be aligned to it.
+HEAP_PAGE_SIZE = 256
 
 
 def parse_map(mapfile):
@@ -74,6 +91,8 @@ def parse_map(mapfile):
         "bss_end": None,
         "pico_heap_size": None,
         "flash_base": None,
+        "heap_base": None,
+        "heap_base_sym": None,
     }
     with open(mapfile, "r") as f:
         for line in f:
@@ -85,6 +104,11 @@ def parse_map(mapfile):
             m = _FLASH_REGION_RE.match(line)
             if m and out["flash_base"] is None:
                 out["flash_base"] = int(m.group(1), 16)
+                continue
+            m = _HEAP_BASE_RE.match(line)
+            if m and out["heap_base"] is None:
+                out["heap_base"] = int(m.group(1), 16)
+                out["heap_base_sym"] = m.group(2)
                 continue
     return out
 
@@ -173,6 +197,25 @@ def check_ram(map_info, limits):
     return status == "PASS"
 
 
+def check_heap_alignment(map_info):
+    heap_base = map_info["heap_base"]
+    sym = map_info["heap_base_sym"] or "AllMemory/Heap"
+    if heap_base is None:
+        print("HEAP:  SKIP -- AllMemory/Heap symbol not found in map.")
+        return None
+    offset = heap_base % HEAP_PAGE_SIZE
+    status = "PASS" if offset == 0 else "FAIL"
+    print(f"HEAP:  {sym} base 0x{heap_base:X} "
+          f"(must be {HEAP_PAGE_SIZE}-byte aligned)")
+    if offset == 0:
+        print(f"       aligned: offset 0  [{status}]")
+    else:
+        print(f"       MISALIGNED: base % {HEAP_PAGE_SIZE} = {offset} "
+              f"(% 8 = {heap_base % 8}) -- every GetMemory() block inherits "
+              f"this offset, so VARADDR is not 8-aligned  [{status}]")
+    return status == "PASS"
+
+
 def main(argv):
     if len(argv) < 2:
         print("Usage: python GetHighestHexAddress.py firmware.hex [PicoMite.elf.map]")
@@ -218,7 +261,8 @@ def main(argv):
     print()
     flash_ok = check_flash(highest, flash_base, flash_target_offset)
     ram_ok = check_ram(map_info, limits)
-    if flash_ok is False or ram_ok is False:
+    heap_ok = check_heap_alignment(map_info)
+    if flash_ok is False or ram_ok is False or heap_ok is False:
         return 1
     return 0
 

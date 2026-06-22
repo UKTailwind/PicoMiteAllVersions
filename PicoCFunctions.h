@@ -26,6 +26,9 @@
 *          (implemented via DrawRectangle).
 *
 ******************************************************************************************/
+#include <stdint.h>     /* option_s and the vector prototypes use int8_t/uint16_t/... */
+#include <stdbool.h>    /* and bool - both are freestanding headers, always available  */
+
 /*** Uncomment one of these three  ***/
 #define PICOMITE
 //#define PICOMITEVGA
@@ -121,6 +124,21 @@
 #define Vector_Sqrt               (*(unsigned int *)(BaseAddress+0xF8))       // MMFLOAT sqrt(MMFLOAT)
 #define Vector_Atan2              (*(unsigned int *)(BaseAddress+0xFC))       // MMFLOAT atan2(MMFLOAT,MMFLOAT)
 #define Vector_Power              (*(unsigned int *)(BaseAddress+0x100))      // MMFLOAT pow(MMFLOAT,MMFLOAT)
+// --- single-precision (float) routines (faster software float than double) ---
+#define Vector_SAdd               (*(unsigned int *)(BaseAddress+0x104))      // float SAdd(float,float)
+#define Vector_SSub               (*(unsigned int *)(BaseAddress+0x108))      // float SSub(float,float)
+#define Vector_SMul               (*(unsigned int *)(BaseAddress+0x10C))      // float SMul(float,float)
+#define Vector_SDiv               (*(unsigned int *)(BaseAddress+0x110))      // float SDiv(float,float)
+#define Vector_SCmp               (*(unsigned int *)(BaseAddress+0x114))      // int   SCmp(float,float)
+#define Vector_SSin               (*(unsigned int *)(BaseAddress+0x118))      // float sinf(float)
+#define Vector_SCos               (*(unsigned int *)(BaseAddress+0x11C))      // float cosf(float)
+#define Vector_SSqrt              (*(unsigned int *)(BaseAddress+0x120))      // float sqrtf(float)
+#define Vector_SAtan2             (*(unsigned int *)(BaseAddress+0x124))      // float atan2f(float,float)
+#define Vector_SPow               (*(unsigned int *)(BaseAddress+0x128))      // float powf(float,float)
+#define Vector_DtoS               (*(unsigned int *)(BaseAddress+0x12C))      // float DtoS(double)     double->single
+#define Vector_StoD               (*(unsigned int *)(BaseAddress+0x130))      // double StoD(float)     single->double
+#define Vector_StoI               (*(unsigned int *)(BaseAddress+0x134))      // long long StoI(float)  single->int (rounds)
+#define Vector_ItoS               (*(unsigned int *)(BaseAddress+0x138))      // float ItoS(long long)  int->single
 
 
 
@@ -216,6 +234,21 @@
 #define Sqrt(a)                         ((MMFLOAT (*)(MMFLOAT)) Vector_Sqrt) (a)
 #define Atan2(a,b)                      ((MMFLOAT (*)(MMFLOAT, MMFLOAT)) Vector_Atan2) (a,b)
 #define Power(a,b)                      ((MMFLOAT (*)(MMFLOAT, MMFLOAT)) Vector_Power) (a,b)
+// single-precision (float) wrappers
+#define SAdd(a,b)                       ((float (*)(float, float)) Vector_SAdd) (a,b)
+#define SSub(a,b)                       ((float (*)(float, float)) Vector_SSub) (a,b)
+#define SMul(a,b)                       ((float (*)(float, float)) Vector_SMul) (a,b)
+#define SDiv(a,b)                       ((float (*)(float, float)) Vector_SDiv) (a,b)
+#define SCmp(a,b)                       ((int (*)(float, float)) Vector_SCmp) (a,b)
+#define SSin(a)                         ((float (*)(float)) Vector_SSin) (a)
+#define SCos(a)                         ((float (*)(float)) Vector_SCos) (a)
+#define SSqrt(a)                        ((float (*)(float)) Vector_SSqrt) (a)
+#define SAtan2(a,b)                     ((float (*)(float, float)) Vector_SAtan2) (a,b)
+#define SPow(a,b)                       ((float (*)(float, float)) Vector_SPow) (a,b)
+#define DtoS(a)                         ((float (*)(double)) Vector_DtoS) (a)
+#define StoD(a)                         ((double (*)(float)) Vector_StoD) (a)
+#define StoI(a)                         ((long long (*)(float)) Vector_StoI) (a)
+#define ItoS(a)                         ((float (*)(long long)) Vector_ItoS) (a)
 
 
 

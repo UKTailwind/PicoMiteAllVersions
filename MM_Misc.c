@@ -9221,6 +9221,159 @@ void fun_peek(void)
     iret = *(char *)(((int)getinteger(argv[0]) << 16) + (int)getinteger(argv[2]));
     targ = T_INT;
 }
+// Emulate C "%g"/"%G".  The selected pico printf implementation mishandles it:
+// its float normalisation is wrong at exact powers of ten (it renders 1e6 as
+// "10.00000e+05"), which also makes its "%e" unusable for picking the exponent.
+// So we find the decimal exponent with libm and build the value from "%f" (which
+// is reliable) plus a hand-built exponent.  Honours flags, field width and
+// precision, and copies any literal text surrounding the specifier.  'fmt' is
+// validated by the caller to contain exactly one specifier.
+static void format_g_spec(char *out, const unsigned char *fmt, double val)
+{
+    const unsigned char *pct = (const unsigned char *)strchr((const char *)fmt, '%');
+    const unsigned char *q;
+    char flagbuf[8];
+    int nf = 0, width = 0, prec = 4, upper, alt, neg, X, bl, pad, dec; // manual: default precision is 4
+    char esign, num[256], body[260];
+    double av;
+
+    // copy any literal text before the '%'
+    size_t pre = (size_t)(pct - fmt);
+    memcpy(out, fmt, pre);
+    out += pre;
+
+    // parse the specifier:  %[flags][width][.prec][length]<g|G>
+    q = pct + 1;
+    while (*q == '-' || *q == '+' || *q == ' ' || *q == '#' || *q == '0')
+    {
+        if (nf < 7)
+            flagbuf[nf++] = (char)*q;
+        q++;
+    }
+    flagbuf[nf] = '\0';
+    while (*q >= '0' && *q <= '9')
+        width = width * 10 + (*q++ - '0');
+    if (*q == '.')
+    {
+        q++;
+        prec = 0;
+        while (*q >= '0' && *q <= '9')
+            prec = prec * 10 + (*q++ - '0');
+    }
+    while (*q == 'l' || *q == 'L' || *q == 'h')
+        q++;
+    upper = (*q == 'G');
+    q++; // step past the conversion char; q now points at any trailing literal text
+    alt = (strchr(flagbuf, '#') != NULL);
+    if (prec == 0)
+        prec = 1;
+
+    // decimal exponent X via libm (pico printf's own exponent is unreliable)
+    av = fabs(val);
+    neg = (val < 0);
+    if (av == 0.0)
+        X = 0;
+    else
+    {
+        double p10;
+        X = (int)floor(log10(av));
+        p10 = pow(10.0, (double)X);
+        if (av < p10)
+            X--;
+        else if (av >= p10 * 10.0)
+            X++;
+    }
+
+    // build the unsigned numeric text using only "%f", choosing fixed vs
+    // exponential style per the C "%g" rule (X in [-4, prec) -> fixed)
+    if (X >= -4 && X < prec)
+    {
+        dec = prec - 1 - X;
+        if (dec < 0)
+            dec = 0;
+        sprintf(num, "%.*f", dec, av);
+    }
+    else
+    {
+        double mant = av / pow(10.0, (double)X);
+        dec = prec - 1;
+        sprintf(num, "%.*f", dec, mant);
+        if (num[0] == '1' && num[1] == '0') // rounding pushed the mantissa to 10.x
+        {
+            X++;
+            mant = av / pow(10.0, (double)X);
+            sprintf(num, "%.*f", dec, mant);
+        }
+        sprintf(num + strlen(num), "e%+03d", X);
+    }
+
+    // strip trailing zeros (and a bare decimal point) unless '#' was given
+    if (!alt)
+    {
+        char *dot = strchr(num, '.');
+        if (dot)
+        {
+            char *exp = strchr(num, 'e');
+            char *fe = exp ? exp : num + strlen(num);
+            char *s = fe - 1;
+            while (s > dot && *s == '0')
+                s--;
+            if (s == dot)
+                s--;
+            memmove(s + 1, fe, strlen(fe) + 1);
+        }
+    }
+    if (upper)
+        for (char *s = num; *s; s++)
+            if (*s >= 'a' && *s <= 'z')
+                *s = (char)(*s - 32);
+
+    // prepend the sign ('-' for negatives, else the '+'/' ' flag if present)
+    esign = neg ? '-' : (strchr(flagbuf, '+') ? '+' : (strchr(flagbuf, ' ') ? ' ' : 0));
+    if (esign)
+    {
+        body[0] = esign;
+        strcpy(body + 1, num);
+    }
+    else
+        strcpy(body, num);
+
+    // apply field width
+    bl = (int)strlen(body);
+    pad = width - bl;
+    if (pad > 0 && strchr(flagbuf, '-') == NULL)
+    {
+        if (strchr(flagbuf, '0'))
+        {
+            int sgn = (body[0] == '+' || body[0] == '-' || body[0] == ' ') ? 1 : 0;
+            memcpy(out, body, (size_t)sgn);
+            memset(out + sgn, '0', (size_t)pad);
+            strcpy(out + sgn + pad, body + sgn);
+            out += bl + pad;
+        }
+        else
+        {
+            memset(out, ' ', (size_t)pad);
+            strcpy(out + pad, body);
+            out += bl + pad;
+        }
+    }
+    else if (pad > 0)
+    {
+        strcpy(out, body);
+        memset(out + bl, ' ', (size_t)pad);
+        out += bl + pad;
+    }
+    else
+    {
+        strcpy(out, body);
+        out += bl;
+    }
+
+    // copy any literal text after the specifier
+    strcpy(out, (const char *)q);
+}
+
 void fun_format(void)
 {
     unsigned char *p, *fmt;
@@ -9253,7 +9406,42 @@ void fun_format(void)
     if (inspec != 2)
         error("Format specification not found");
     sret = GetTempStrMemory(); // this will last for the life of the command
-    sprintf((char *)sret, (char *)fmt, getnumber(argv[0]));
+    {
+        // "%g"/"%G" is broken in the pico printf, so emulate it; "%f"/"%e" work
+        // and pass through to sprintf.  The manual specifies a default precision
+        // of 4 (pico sprintf would use 6), so inject ".4" when none was given.
+        unsigned char *cp, conv = 0;
+        for (cp = (unsigned char *)strchr((char *)fmt, '%') + 1; *cp; cp++)
+            if (*cp == 'g' || *cp == 'G' || *cp == 'f' || *cp == 'F' || *cp == 'e' || *cp == 'E')
+            {
+                conv = *cp;
+                break;
+            }
+        if (conv == 'g' || conv == 'G')
+            format_g_spec((char *)sret, fmt, getnumber(argv[0]));
+        else
+        {
+            // does the spec already carry an explicit precision?  scan past the
+            // flags and width to the point where ".precision" would appear
+            unsigned char *w = (unsigned char *)strchr((char *)fmt, '%') + 1;
+            while (*w == '-' || *w == '+' || *w == ' ' || *w == '#' || *w == '0')
+                w++;
+            while (*w >= '0' && *w <= '9')
+                w++;
+            if (*w == '.')
+                sprintf((char *)sret, (char *)fmt, getnumber(argv[0]));
+            else
+            {
+                unsigned char fbuf[STRINGSIZE + 4];
+                size_t head = (size_t)(w - fmt);
+                memcpy(fbuf, fmt, head);
+                fbuf[head] = '.';
+                fbuf[head + 1] = '4';
+                strcpy((char *)fbuf + head + 2, (char *)w);
+                sprintf((char *)sret, (char *)fbuf, getnumber(argv[0]));
+            }
+        }
+    }
     CtoM(sret);
     targ = T_STR;
 }

@@ -43,8 +43,7 @@ int SSD1963PClock1, SSD1963PClock2, SSD1963PClock3;
 int SSD1963Mode1, SSD1963Mode2;
 unsigned int RDpin, RDport;
 int SSD1963PixelInterface, SSD1963PixelFormat;
-#define SSD1963_5_QUIRK_EXTRA_VFP 4
-#define SSD1963_5_QUIRK_18BIT_PATH 1
+// #define SSD1963_5_QUIRK_18BIT_PATH 1
 #define DELAY 0x80  // Bit7 of the count indicates a delay is also added.
 #define REPEAT 0x40 // Bit6 of the count indicates same data is repeated instead of reading next byte.
 int SSD1963rgb = 0;
@@ -836,9 +835,7 @@ void MIPS16 InitDisplaySSD(void)
         SSD1963HorizFrontPorch = 40;
         SSD1963VertPulseWidth = 2;
         SSD1963VertBackPorch = 25;
-        // Panel-specific quirk: some 5" modules require extra vertical blanking
-        // to avoid line 0/1 wrapping to the bottom (visible as lines 480/481).
-        SSD1963VertFrontPorch = 18 + SSD1963_5_QUIRK_EXTRA_VFP;
+        SSD1963VertFrontPorch = 18;
         // Set LSHIFT freq, i.e. the DCLK with PLL freq 120MHz set previously
         // Typical DCLK is 33MHz.  30MHz = 120MHz*(LCDC_FPR+1)/2^20.  LCDC_FPR = 262143 (0x3FFFF)
         SSD1963PClock1 = 0x03;
@@ -1582,6 +1579,26 @@ void MIPS16 InitSSD1963(void)
         uSec(100000);
     }
 
+    // On a software (warm) reset the SSD1963's own reset pin is tied high on
+    // most modules, so the chip keeps the PLL running and the registers it had
+    // from the previous boot. Re-running this init then tries to reprogram the
+    // PLL M/N (CMD_SET_PLL_MN below) while the PLL is still the live system
+    // clock, which the chip ignores - so the panel runs on stale timing and
+    // replicates the top rows at the bottom. Force the chip back to its
+    // power-on state first so the sequence below behaves exactly as it does
+    // after a power-on reset. Order matters: drop the system clock off the PLL
+    // back to the reference oscillator FIRST, THEN soft reset - that way the
+    // soft reset runs on the 10MHz reference clock, the same clock context it
+    // has at power-on. Soft-resetting while still on the 120MHz PLL (a state
+    // that never occurs at cold boot) corrupted the init every warm restart.
+    // Delays are generous (well above the datasheet 5ms reset minimum) since
+    // this only runs once at startup.
+    WriteComandSlow(CMD_PLL_START);  // 0xE0: disable PLL, system clock -> reference osc
+    WriteDataSlow(0x00);
+    uSec(20000);                     // let the VCO spin down and the clock settle
+    WriteComandSlow(CMD_SOFT_RESET); // 0x01: registers back to defaults
+    uSec(20000);
+
     // IMPORTANT: At this stage the SSD1963 is running at a slow speed and cannot respond to high speed commands
     //            So we use slow speed versions of WriteComand/WriteData with a 3 uS delay between each control signal change
 
@@ -1597,7 +1614,7 @@ void MIPS16 InitSSD1963(void)
     WriteComandSlow(CMD_PLL_START); // Start PLL command
     WriteDataSlow(0x01);            // enable PLL
 
-    uSec(1000);                     // wait for it to stabilise
+    uSec(10000);                    // wait for it to lock (generous; warm-restart lock margin)
     WriteComandSlow(CMD_PLL_START); // Start PLL command again
     WriteDataSlow(0x03);            // now, use PLL output as system clock
 

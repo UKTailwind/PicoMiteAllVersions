@@ -9524,8 +9524,8 @@ void MIPS16 cmd_struct(void)
 						else if (nsm->type == T_NBR)
 						{
 							MMFLOAT val = *(MMFLOAT *)nested_ptr;
-							sprintf(buf, "%g", val);
-							MMPrintString(buf);
+							FloatToStr(buf, val, 0, STR_AUTO_PRECISION, ' '); // pico printf %g is broken; use MMBasic's formatter
+							MMPrintString(buf + (val >= 0 ? 1 : 0));         // skip FloatToStr's leading space for positives
 						}
 						else if (nsm->type == T_STR)
 						{
@@ -9560,8 +9560,8 @@ void MIPS16 cmd_struct(void)
 					else if (sm->type == T_NBR)
 					{
 						MMFLOAT val = *(MMFLOAT *)member_ptr;
-						sprintf(buf, "%g", val);
-						MMPrintString(buf);
+						FloatToStr(buf, val, 0, STR_AUTO_PRECISION, ' '); // pico printf %g is broken; use MMBasic's formatter
+						MMPrintString(buf + (val >= 0 ? 1 : 0));         // skip FloatToStr's leading space for positives
 					}
 					else if (sm->type == T_STR)
 					{
@@ -9605,8 +9605,8 @@ void MIPS16 cmd_struct(void)
 						else if (sm->type == T_NBR)
 						{
 							MMFLOAT val = *(MMFLOAT *)arr_ptr;
-							sprintf(buf, "%g", val);
-							MMPrintString(buf);
+							FloatToStr(buf, val, 0, STR_AUTO_PRECISION, ' '); // pico printf %g is broken; use MMBasic's formatter
+							MMPrintString(buf + (val >= 0 ? 1 : 0));         // skip FloatToStr's leading space for positives
 						}
 						else if (sm->type == T_STR)
 						{

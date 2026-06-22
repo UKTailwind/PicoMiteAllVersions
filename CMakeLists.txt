@@ -27,7 +27,7 @@ set(VALID_COMPILE_VARIANTS
 # Guard restored: without it, this set() shadows the -DCOMPILE=X passed
 # by buildpicomite.bat and every variant silently builds as the default.
 if(NOT DEFINED COMPILE)
-	set(COMPILE HDMIUSB)
+	set(COMPILE WEBRP2350)
 endif()
 
 list(FIND VALID_COMPILE_VARIANTS "${COMPILE}" COMPILE_INDEX)
@@ -518,10 +518,17 @@ endif()
 
 pico_enable_stdio_uart(PicoMite 0)
 pico_add_extra_outputs(PicoMite)
-pico_set_printf_implementation(PicoMite compiler)
+pico_set_printf_implementation(PicoMite pico)
 
-if(USES_PICO_RAND)
-	pico_set_float_implementation(PicoMite pico_dcp)
+if(IS_RP2350)
+	# double: 'pico' is the platform impl, which on RP2350 is DCP-backed
+	#   (double_aeabi_dcp.S / double_sci_m33.S). There is NO 'pico_dcp' double
+	#   variant - pico_set_double_implementation(... pico_dcp) links a
+	#   non-existent -lpico_double_pico_dcp and the link fails. DCP is the only
+	#   accelerated double path, so 'pico' IS the DCP one.
+	# float: 'pico_vfp' -> single precision on the M33 FPU (pico_float_pico_vfp).
+	pico_set_double_implementation(PicoMite pico)
+	pico_set_float_implementation(PicoMite pico_vfp)
 endif()
 
 target_compile_definitions(PicoMite PRIVATE

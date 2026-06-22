@@ -61,6 +61,13 @@
 
 #include "cJSON.h"
 
+/* PicoMite: the selected pico printf implementation has a broken "%g" (it does
+   not strip trailing zeros and mis-normalises near 1e6).  Format numbers with
+   MMBasic's own FloatToStr instead.  Declared locally to avoid pulling the full
+   MMBasic headers into this vendored file (MMFLOAT is "double" on PicoMite). */
+extern void FloatToStr(char *p, double f, int m, int n, unsigned char ch);
+#define STR_AUTO_PRECISION 999
+
 /* define our own boolean type */
 #ifdef true
 #undef true
@@ -563,7 +570,6 @@ static cJSON_bool print_number(const cJSON *const item, printbuffer *const outpu
     size_t i = 0;
     unsigned char number_buffer[26] = {0}; /* temporary buffer to print the number into */
     unsigned char decimal_point = get_decimal_point();
-    double test = 0.0;
 
     if (output_buffer == NULL)
     {
@@ -581,15 +587,13 @@ static cJSON_bool print_number(const cJSON *const item, printbuffer *const outpu
     }
     else
     {
-        /* Try 15 decimal places of precision to avoid nonsignificant nonzero digits */
-        length = sprintf((char *)number_buffer, "%1.15g", d);
-
-        /* Check whether the original double can be recovered */
-        if ((sscanf((char *)number_buffer, "%lg", &test) != 1) || !compare_double((double)test, d))
-        {
-            /* If not, print with 17 decimal places of precision */
-            length = sprintf((char *)number_buffer, "%1.17g", d);
-        }
+        /* PicoMite: format with MMBasic's own converter (the pico printf "%g" is
+           broken).  This also drops the original 15-vs-17 sigfig round-trip test,
+           which was overkill for embedded use. */
+        FloatToStr((char *)number_buffer, d, 0, STR_AUTO_PRECISION, ' ');
+        if (number_buffer[0] == ' ') /* FloatToStr pads positives with a leading space */
+            memmove(number_buffer, number_buffer + 1, strlen((char *)number_buffer));
+        length = (int)strlen((char *)number_buffer);
     }
 
     /* sprintf failed or buffer overrun occurred */
