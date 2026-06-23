@@ -4522,6 +4522,465 @@ void cmd_configure(void)
 {
     configure(cmdline, false);
 }
+#ifndef PICOMITEMIN
+/* ===========================================================================
+ * Portable option backup ("OPTION DISK SAVE/LOAD")
+ * ---------------------------------------------------------------------------
+ * Instead of dumping the raw, packed, #ifdef-riddled struct option_s (whose
+ * field offsets shift between firmware builds/variants), we save only the
+ * options the user has CHANGED from this build's factory defaults, as a flat
+ * "NAME=VALUE" text file. On restore we start from the current build's
+ * defaults and overlay the saved values BY NAME. So a config moved to a build
+ * with a different struct layout still restores every field whose name the new
+ * build recognises; unknown names are skipped, missing names keep their
+ * default. The ONLY thing that must be kept in step with the struct is the
+ * name list in OptionMap[] below - offsets/sizes are taken automatically with
+ * offsetof()/sizeof(), so reordering the struct needs no change here.
+ *
+ * Excluded on purpose: Magic/version (build identity), FlashSize (auto-probed
+ * from the chip) and the memory-layout fields PROG_FLASH_SIZE / HEAP_SIZE /
+ * LIBRARY_FLASH_SIZE (these must follow the new build, never the saved file),
+ * the BLE bond store bt_tlv, and CFunction scratch byte-arrays.
+ * =========================================================================== */
+enum optmap_type
+{
+    OPT_U8,
+    OPT_I8,
+    OPT_U16,
+    OPT_I16,
+    OPT_U32,
+    OPT_I32,
+    OPT_FLT,
+    OPT_STR
+};
+struct optmap_s
+{
+    const char *name;
+    uint8_t type;
+    uint16_t off;
+    uint16_t size;
+};
+#define OPT(field, t) {#field, t, (uint16_t)offsetof(struct option_s, field), (uint16_t)sizeof(((struct option_s *)0)->field)}
+static const struct optmap_s OptionMap[] = {
+    OPT(Autorun, OPT_I8),
+    OPT(Tab, OPT_I8),
+    OPT(Invert, OPT_I8),
+    OPT(Listcase, OPT_I8),
+#ifndef PICOMITEVGA
+    OPT(Height, OPT_I8),
+    OPT(Width, OPT_I8),
+#else
+    OPT(Height, OPT_I16),
+    OPT(Width, OPT_I16),
+#endif
+    OPT(DISPLAY_TYPE, OPT_U8),
+    OPT(DISPLAY_ORIENTATION, OPT_I8),
+    OPT(PIN, OPT_I32),
+    OPT(Baudrate, OPT_I32),
+    OPT(ColourCode, OPT_I8),
+    OPT(MOUSE_CLOCK, OPT_U8),
+    OPT(MOUSE_DATA, OPT_U8),
+    OPT(CPU_Speed, OPT_I32),
+    OPT(DefaultFC, OPT_I32),
+    OPT(DefaultBC, OPT_I32),
+    OPT(KEYBOARD_CLOCK, OPT_U8),
+    OPT(KEYBOARD_DATA, OPT_U8),
+    OPT(continuation, OPT_U8),
+    OPT(LOCAL_KEYBOARD, OPT_U8),
+    OPT(KeyboardBrightness, OPT_U8),
+    OPT(special, OPT_U8),
+    OPT(DefaultFont, OPT_U8),
+    OPT(KeyboardConfig, OPT_U8),
+    OPT(RTC_Clock, OPT_U8),
+    OPT(RTC_Data, OPT_U8),
+#if PICOMITERP2350
+    OPT(LCD_CLK, OPT_U8),
+    OPT(LCD_MOSI, OPT_U8),
+    OPT(LCD_MISO, OPT_U8),
+#endif
+#ifdef PICOMITEWEB
+    OPT(TCP_PORT, OPT_U16),
+    OPT(ServerResponceTime, OPT_U16),
+#endif
+#ifdef PICOMITEVGA
+    OPT(X_TILE, OPT_I16),
+    OPT(Y_TILE, OPT_I16),
+#endif
+    OPT(LCD_CD, OPT_U8),
+    OPT(LCD_CS, OPT_U8),
+    OPT(LCD_Reset, OPT_U8),
+    OPT(TOUCH_CS, OPT_U8),
+    OPT(TOUCH_IRQ, OPT_U8),
+    OPT(TOUCH_SWAPXY, OPT_I8),
+    OPT(repeat, OPT_U8),
+    OPT(disabletftp, OPT_I8),
+#ifndef PICOMITEVGA
+    OPT(TOUCH_XZERO, OPT_I32),
+    OPT(TOUCH_YZERO, OPT_I32),
+    OPT(TOUCH_XSCALE, OPT_FLT),
+    OPT(TOUCH_YSCALE, OPT_FLT),
+#endif
+#if !defined(GUICONTROLS) || defined(PICOMITEVGA)
+    OPT(HDMIclock, OPT_U8),
+    OPT(HDMId0, OPT_U8),
+    OPT(HDMId1, OPT_U8),
+    OPT(HDMId2, OPT_U8),
+#endif
+    OPT(SD_CS, OPT_U8),
+    OPT(SYSTEM_MOSI, OPT_U8),
+    OPT(SYSTEM_MISO, OPT_U8),
+    OPT(SYSTEM_CLK, OPT_U8),
+    OPT(DISPLAY_BL, OPT_U8),
+    OPT(DISPLAY_CONSOLE, OPT_U8),
+    OPT(TOUCH_Click, OPT_U8),
+    OPT(LCD_RD, OPT_I8),
+    OPT(AUDIO_L, OPT_U8),
+    OPT(AUDIO_R, OPT_U8),
+    OPT(AUDIO_SLICE, OPT_U8),
+    OPT(SDspeed, OPT_U8),
+    OPT(TOUCH_CAP, OPT_U8),
+    OPT(SSD_DATA, OPT_U8),
+    OPT(THRESHOLD_CAP, OPT_U8),
+    OPT(audio_i2s_data, OPT_U8),
+    OPT(audio_i2s_bclk, OPT_U8),
+    OPT(LCDVOP, OPT_I8),
+    OPT(I2Coffset, OPT_I8),
+    OPT(NoHeartbeat, OPT_U8),
+    OPT(Refresh, OPT_I8),
+    OPT(SYSTEM_I2C_SDA, OPT_U8),
+    OPT(SYSTEM_I2C_SCL, OPT_U8),
+    OPT(RTC, OPT_U8),
+    OPT(PWM, OPT_I8),
+    OPT(INT1pin, OPT_U8),
+    OPT(INT2pin, OPT_U8),
+    OPT(INT3pin, OPT_U8),
+    OPT(INT4pin, OPT_U8),
+    OPT(SD_CLK_PIN, OPT_U8),
+    OPT(SD_MOSI_PIN, OPT_U8),
+    OPT(SD_MISO_PIN, OPT_U8),
+    OPT(SerialConsole, OPT_U8),
+    OPT(SerialTX, OPT_U8),
+    OPT(SerialRX, OPT_U8),
+    OPT(numlock, OPT_U8),
+    OPT(capslock, OPT_U8),
+    OPT(AUDIO_CLK_PIN, OPT_U8),
+    OPT(AUDIO_MOSI_PIN, OPT_U8),
+    OPT(SYSTEM_I2C_SLOW, OPT_U8),
+    OPT(AUDIO_CS_PIN, OPT_U8),
+#ifdef PICOMITEWEB
+    OPT(UDP_PORT, OPT_U16),
+    OPT(UDPServerResponceTime, OPT_U16),
+    OPT(hostname, OPT_STR),
+    OPT(ipaddress, OPT_STR),
+    OPT(mask, OPT_STR),
+    OPT(gateway, OPT_STR),
+#else
+    OPT(mousespeed, OPT_FLT),
+#endif
+    OPT(GPSBaudx, OPT_U16),
+    OPT(GPSRX, OPT_U8),
+    OPT(GPSTX, OPT_U8),
+    OPT(heartbeatpin, OPT_U8),
+    OPT(PSRAM_CS_PIN, OPT_U8),
+    OPT(BGR, OPT_U8),
+    OPT(NoScroll, OPT_U8),
+    OPT(CombinedCS, OPT_U8),
+    OPT(USBKeyboard, OPT_U8),
+    OPT(VGA_HSYNC, OPT_U8),
+    OPT(VGA_BLUE, OPT_U8),
+    OPT(AUDIO_MISO_PIN, OPT_U8),
+    OPT(AUDIO_DCS_PIN, OPT_U8),
+    OPT(AUDIO_DREQ_PIN, OPT_U8),
+    OPT(AUDIO_RESET_PIN, OPT_U8),
+    OPT(SSD_DC, OPT_U8),
+    OPT(SSD_WR, OPT_U8),
+    OPT(SSD_RD, OPT_U8),
+    OPT(SSD_RESET, OPT_I8),
+    OPT(BackLightLevel, OPT_U8),
+    OPT(NoReset, OPT_U8),
+    OPT(AllPins, OPT_U8),
+    OPT(modbuff, OPT_U8),
+    OPT(RepeatStart, OPT_I16),
+    OPT(RepeatRate, OPT_I16),
+    OPT(modbuffsize, OPT_I32),
+    OPT(F1key, OPT_STR),
+    OPT(F5key, OPT_STR),
+    OPT(F6key, OPT_STR),
+    OPT(F7key, OPT_STR),
+    OPT(F8key, OPT_STR),
+    OPT(F9key, OPT_STR),
+    OPT(SSID, OPT_STR),
+    OPT(PASSWORD, OPT_STR),
+    OPT(BACKLIGHT_KBD, OPT_U8),
+    OPT(BACKLIGHT_LCD, OPT_U8),
+    OPT(GPSBaud, OPT_U32),
+    OPT(wifi_country_code, OPT_U8),
+    OPT(MaxCtrls, OPT_U8),
+    OPT(Resolution, OPT_U8),
+    OPT(Multi, OPT_U8),
+};
+#define OPTIONMAP_COUNT (sizeof(OptionMap) / sizeof(OptionMap[0]))
+
+static int64_t OptGetInt(const struct option_s *o, const struct optmap_s *m)
+{
+    const void *p = (const char *)o + m->off;
+    switch (m->type)
+    {
+    case OPT_U8:
+        return *(const uint8_t *)p;
+    case OPT_I8:
+        return *(const int8_t *)p;
+    case OPT_U16:
+        return *(const uint16_t *)p;
+    case OPT_I16:
+        return *(const int16_t *)p;
+    case OPT_U32:
+        return *(const uint32_t *)p;
+    case OPT_I32:
+        return *(const int32_t *)p;
+    default:
+        return 0;
+    }
+}
+static void OptSetInt(struct option_s *o, const struct optmap_s *m, int64_t v)
+{
+    void *p = (char *)o + m->off;
+    switch (m->type)
+    {
+    case OPT_U8:
+        *(uint8_t *)p = (uint8_t)v;
+        break;
+    case OPT_I8:
+        *(int8_t *)p = (int8_t)v;
+        break;
+    case OPT_U16:
+        *(uint16_t *)p = (uint16_t)v;
+        break;
+    case OPT_I16:
+        *(int16_t *)p = (int16_t)v;
+        break;
+    case OPT_U32:
+        *(uint32_t *)p = (uint32_t)v;
+        break;
+    case OPT_I32:
+        *(int32_t *)p = (int32_t)v;
+        break;
+    default:
+        break;
+    }
+}
+static int OptHexVal(char c)
+{
+    if (c >= '0' && c <= '9')
+        return c - '0';
+    if (c >= 'A' && c <= 'F')
+        return c - 'A' + 10;
+    if (c >= 'a' && c <= 'f')
+        return c - 'a' + 10;
+    return -1;
+}
+/* Escape an option string field into dst as a printable, single-line token.
+   src is read up to maxsrc bytes or the first NUL. dst must hold 4*maxsrc+1. */
+static void OptEscape(char *dst, const char *src, int maxsrc)
+{
+    static const char hx[] = "0123456789ABCDEF";
+    int n = 0;
+    for (int i = 0; i < maxsrc && src[i]; i++)
+    {
+        unsigned char c = (unsigned char)src[i];
+        switch (c)
+        {
+        case '"':
+            dst[n++] = '\\';
+            dst[n++] = '"';
+            break;
+        case '\\':
+            dst[n++] = '\\';
+            dst[n++] = '\\';
+            break;
+        case '\r':
+            dst[n++] = '\\';
+            dst[n++] = 'r';
+            break;
+        case '\n':
+            dst[n++] = '\\';
+            dst[n++] = 'n';
+            break;
+        case '\t':
+            dst[n++] = '\\';
+            dst[n++] = 't';
+            break;
+        default:
+            if (c < 0x20 || c >= 0x7f)
+            {
+                dst[n++] = '\\';
+                dst[n++] = 'x';
+                dst[n++] = hx[c >> 4];
+                dst[n++] = hx[c & 15];
+            }
+            else
+                dst[n++] = c;
+        }
+    }
+    dst[n] = 0;
+}
+/* Decode the escapes produced by OptEscape, in place. Returns new length. */
+static int OptUnescape(char *s)
+{
+    char *o = s, *p = s;
+    while (*p)
+    {
+        if (*p == '\\' && p[1])
+        {
+            p++;
+            switch (*p)
+            {
+            case 'r':
+                *o++ = '\r';
+                break;
+            case 'n':
+                *o++ = '\n';
+                break;
+            case 't':
+                *o++ = '\t';
+                break;
+            case 'x':
+            {
+                int hi = OptHexVal(p[1]), lo = OptHexVal(p[2]);
+                if (hi >= 0 && lo >= 0)
+                {
+                    *o++ = (char)((hi << 4) | lo);
+                    p += 2;
+                }
+                break;
+            }
+            default:
+                *o++ = *p; // covers \" and \\ and any stray escape
+                break;
+            }
+            p++;
+        }
+        else
+            *o++ = *p++;
+    }
+    *o = 0;
+    return (int)(o - s);
+}
+static void OptPutLine(int fnbr, const char *s) { FilePutData((char *)s, fnbr, strlen(s)); }
+
+/* Write every option that differs from this build's factory defaults. */
+static void OptionSaveText(int fnbr)
+{
+    struct option_s *def = (struct option_s *)GetMemory(sizeof(struct option_s));
+    BuildDefaultOptions(def);
+    char line[400];
+    OptPutLine(fnbr, "# PicoMite option configuration\r\n");
+    OptPutLine(fnbr, "# Restored by name onto factory defaults; safe across firmware versions.\r\n");
+    for (unsigned i = 0; i < OPTIONMAP_COUNT; i++)
+    {
+        const struct optmap_s *m = &OptionMap[i];
+        if (memcmp((char *)&Option + m->off, (char *)def + m->off, m->size) == 0)
+            continue;
+        if (m->type == OPT_STR)
+        {
+            char esc[4 * 64 + 1];
+            OptEscape(esc, (char *)&Option + m->off, m->size);
+            snprintf(line, sizeof(line), "%s=\"%s\"\r\n", m->name, esc);
+        }
+        else if (m->type == OPT_FLT)
+        {
+            char fb[40];
+            double v = *(float *)((char *)&Option + m->off);
+            FloatToStr(fb, v, 0, STR_AUTO_PRECISION, ' '); // pico printf %g is broken; use MMBasic's formatter
+            snprintf(line, sizeof(line), "%s=%s\r\n", m->name, fb + (v >= 0 ? 1 : 0));
+        }
+        else
+        {
+            snprintf(line, sizeof(line), "%s=%lld\r\n", m->name, (long long)OptGetInt(&Option, m));
+        }
+        OptPutLine(fnbr, line);
+    }
+    FreeMemory((void *)def);
+}
+
+/* Overlay one "NAME=VALUE" line onto *o. Returns 1 if NAME was unknown to this
+   build (so the caller can warn), 0 otherwise (applied, blank or comment). */
+static int OptionApplyLine(struct option_s *o, char *line)
+{
+    while (*line == ' ' || *line == '\t')
+        line++;
+    if (*line == '#' || *line == 0 || *line == '\r' || *line == '\n')
+        return 0;
+    char *eq = strchr(line, '=');
+    if (!eq)
+        return 0;
+    *eq = 0;
+    char *name = line, *val = eq + 1;
+    char *e = eq - 1; // trim trailing blanks from name
+    while (e >= name && (*e == ' ' || *e == '\t'))
+        *e-- = 0;
+    while (*val == ' ' || *val == '\t')
+        val++;
+    const struct optmap_s *m = NULL;
+    for (unsigned i = 0; i < OPTIONMAP_COUNT; i++)
+        if (strcmp(name, OptionMap[i].name) == 0)
+        {
+            m = &OptionMap[i];
+            break;
+        }
+    if (!m)
+        return 1; // option not present in this build - skip
+    if (m->type == OPT_STR)
+    {
+        if (*val == '"')
+        {
+            val++;
+            char *q = strrchr(val, '"');
+            if (q)
+                *q = 0;
+        }
+        OptUnescape(val);
+        char *dst = (char *)o + m->off;
+        memset(dst, 0, m->size);
+        strncpy(dst, val, m->size - 1);
+    }
+    else if (m->type == OPT_FLT)
+        *(float *)((char *)o + m->off) = (float)atof(val);
+    else
+        OptSetInt(o, m, (int64_t)strtoll(val, NULL, 0));
+    return 0;
+}
+
+/* Reset to this build's defaults then overlay the flat-text file held in buf. */
+static void OptionLoadText(char *buf)
+{
+    struct option_s *def = (struct option_s *)GetMemory(sizeof(struct option_s));
+    BuildDefaultOptions(def);
+    memcpy(&Option, def, sizeof(struct option_s));
+    FreeMemory((void *)def);
+    int unknown = 0;
+    char *p = buf;
+    while (*p)
+    {
+        char *nl = strchr(p, '\n');
+        if (nl)
+            *nl = 0;
+        unknown += OptionApplyLine(&Option, p);
+        if (!nl)
+            break;
+        p = nl + 1;
+    }
+    Option.Magic = MagicKey;
+    Option.version = hashversion();
+    if (unknown)
+    {
+        int state = OptionConsole;
+        OptionConsole = 1;
+        MMPrintString("Warning: some saved options are not used by this firmware and were ignored\r\n");
+        OptionConsole = state;
+    }
+}
+#endif
 void MIPS16 cmd_option(void)
 {
     unsigned char *tp;
@@ -7221,6 +7680,7 @@ void MIPS16 cmd_option(void)
         SoftReset(SOFT_RESET);
         return;
     }
+#ifndef PICOMITEMIN
     tp = checkstring(cmdline, (unsigned char *)"DISK SAVE");
     if (tp)
     {
@@ -7237,12 +7697,7 @@ void MIPS16 cmd_option(void)
         AppendDefaultExtension((char *)pp, ".opt");
         if (!BasicFileOpen((char *)pp, fnbr, FA_WRITE | FA_CREATE_ALWAYS))
             return;
-        int i = sizeof(Option);
-        char *s = (char *)&Option.Magic;
-        while (i--)
-        {
-            FilePutChar(*s++, fnbr);
-        }
+        OptionSaveText(fnbr); // portable flat-text "NAME=VALUE" of changed-from-default options
         FileClose(fnbr);
         return;
     }
@@ -7264,33 +7719,48 @@ void MIPS16 cmd_option(void)
         fsize = FileSize((char *)pp);
         if (!BasicFileOpen((char *)pp, fnbr, FA_READ))
             return;
-        if (!(fsize == sizeof(Option) || fsize == sizeof(Option) - 128))
-            error("File size incorrect");
-        char *s = (char *)&Option.Magic;
+        char *buf = (char *)GetMemory(fsize + 1);
         for (int k = 0; k < fsize; k++)
-        { // write to the flash byte by byte
-            *s++ = FileGetChar(fnbr);
-        }
-        Option.Magic = MagicKey; // This isn't ideal but it improves the chances of a older config working in a new build
-        short test = hashversion();
-        if (Option.version != test)
-        {
-            int state = OptionConsole;
-            OptionConsole = 1;
-            MMPrintString("Warning: Version has changed - check options are correct\r\n");
-            OptionConsole = state;
-        }
+            buf[k] = FileGetChar(fnbr);
+        buf[fsize] = 0;
         FileClose(fnbr);
+        /* Distinguish the new flat-text format from a legacy raw binary dump. A
+           legacy dump is EXACTLY sizeof(Option) or sizeof(Option)-128 bytes and is
+           never a text file; new text files always begin with '#'. (We can't sniff
+           on the first byte alone: a legacy dump starts with the low byte of Magic,
+           which is an ASCII letter for several builds.) */
+        int looksBinary = (fsize == (int)sizeof(Option) || fsize == (int)sizeof(Option) - 128) && buf[0] != '#';
+        if (!looksBinary)
+        {
+            /* New portable flat-text format: start from this build's defaults and
+               overlay the saved options by name (see OptionMap[] above). */
+            OptionLoadText(buf);
+        }
+        else
+        {
+            /* Legacy raw binary dump from an identical build. */
+            memcpy((char *)&Option, buf, fsize);
+            Option.Magic = MagicKey; // improves the chance of an older config working in a new build
+            if (Option.version != hashversion())
+            {
+                int state = OptionConsole;
+                OptionConsole = 1;
+                MMPrintString("Warning: Version has changed - check options are correct\r\n");
+                OptionConsole = state;
+            }
+        }
+        FreeMemory((void *)buf);
         uSec(100000);
         disable_interrupts_pico();
         safe_flash_range_erase(FLASH_TARGET_OFFSET, FLASH_ERASE_SIZE);
         enable_interrupts_pico();
         uSec(10000);
         disable_interrupts_pico();
-        safe_flash_range_program(FLASH_TARGET_OFFSET, (const uint8_t *)&Option, 768);
+        safe_flash_range_program(FLASH_TARGET_OFFSET, (const uint8_t *)&Option, sizeof(struct option_s));
         enable_interrupts_pico();
         SoftReset(SOFT_RESET);
     }
+#endif
     tp = checkstring(cmdline, (unsigned char *)"RESET");
     if (tp)
     {
@@ -9221,28 +9691,76 @@ void fun_peek(void)
     iret = *(char *)(((int)getinteger(argv[0]) << 16) + (int)getinteger(argv[2]));
     targ = T_INT;
 }
-// Emulate C "%g"/"%G".  The selected pico printf implementation mishandles it:
-// its float normalisation is wrong at exact powers of ten (it renders 1e6 as
-// "10.00000e+05"), which also makes its "%e" unusable for picking the exponent.
-// So we find the decimal exponent with libm and build the value from "%f" (which
-// is reliable) plus a hand-built exponent.  Honours flags, field width and
-// precision, and copies any literal text surrounding the specifier.  'fmt' is
-// validated by the caller to contain exactly one specifier.
-static void format_g_spec(char *out, const unsigned char *fmt, double val)
+// corrected decimal exponent of a non-zero magnitude (libm log10 can be a hair
+// off at exact powers of ten, so nudge it back into [10^X, 10^(X+1)) )
+static int format_decexp(double av)
+{
+    int X = (int)floor(log10(av));
+    double p10 = pow(10.0, (double)X);
+    if (av < p10)
+        X--;
+    else if (av >= p10 * 10.0)
+        X++;
+    return X;
+}
+
+// strip trailing zeros (and a bare trailing '.') from a fixed-notation string
+static void format_striptz(char *s)
+{
+    char *dot = strchr(s, '.');
+    char *e;
+    if (!dot)
+        return;
+    e = s + strlen(s);
+    while (e > dot + 1 && e[-1] == '0')
+        e--;
+    if (e == dot + 1)
+        e--; // drop the '.' as well
+    *e = '\0';
+}
+
+// render 'val' in exponential form "<mantissa>e<sign><exp>" with 'mantdec'
+// mantissa decimals, using FloatToStr for the mantissa (its exponent handling is
+// correct at powers of ten, unlike pico printf).  Optionally trims the mantissa.
+static void format_exp(char *num, double val, int mantdec, int trimz)
+{
+    double av = fabs(val);
+    int X = (av == 0.0) ? 0 : format_decexp(av);
+    double mant = (av == 0.0) ? 0.0 : val / pow(10.0, (double)X);
+    char *d;
+    FloatToStr(num, mant, 0, mantdec, ' ');
+    d = (num[0] == '-') ? num + 1 : num;
+    if (d[0] == '1' && d[1] == '0') // rounding pushed |mantissa| up to 10.x
+    {
+        X++;
+        mant = val / pow(10.0, (double)X);
+        FloatToStr(num, mant, 0, mantdec, ' ');
+    }
+    if (trimz)
+        format_striptz(num);
+    num += strlen(num);
+    *num++ = 'e';
+    IntToStrPad(num, X, '0', -3, 10); // sign + at least 2 exponent digits, e.g. "+05"
+}
+
+// Render a floating point value per a printf-style spec, using the in-built
+// FloatToStr (NOT pico printf, whose float conversions are broken).  Handles
+// %f/%e/%g (and E/G uppercase), the -, 0, + and space flags, field width,
+// precision (default 4 per the manual) and any literal text around the
+// specifier.  'fmt' is validated by the caller to contain exactly one specifier.
+static void format_float(char *out, const unsigned char *fmt, double val)
 {
     const unsigned char *pct = (const unsigned char *)strchr((const char *)fmt, '%');
     const unsigned char *q;
-    char flagbuf[8];
-    int nf = 0, width = 0, prec = 4, upper, alt, neg, X, bl, pad, dec; // manual: default precision is 4
-    char esign, num[256], body[260];
-    double av;
+    char flagbuf[8], num[80], body[88];
+    int nf = 0, width = 0, prec = 4, type, upper, bl, pad; // manual: default precision is 4
 
     // copy any literal text before the '%'
     size_t pre = (size_t)(pct - fmt);
     memcpy(out, fmt, pre);
     out += pre;
 
-    // parse the specifier:  %[flags][width][.prec][length]<g|G>
+    // parse the specifier:  %[flags][width][.prec][length]<type>
     q = pct + 1;
     while (*q == '-' || *q == '+' || *q == ' ' || *q == '#' || *q == '0')
     {
@@ -9262,81 +9780,60 @@ static void format_g_spec(char *out, const unsigned char *fmt, double val)
     }
     while (*q == 'l' || *q == 'L' || *q == 'h')
         q++;
-    upper = (*q == 'G');
-    q++; // step past the conversion char; q now points at any trailing literal text
-    alt = (strchr(flagbuf, '#') != NULL);
-    if (prec == 0)
-        prec = 1;
+    type = *q;
+    upper = (type == 'E' || type == 'G' || type == 'F');
+    if (q[0])
+        q++; // step past the conversion char; q now points at any trailing literal text
+    if (prec > 30)
+        prec = 30; // keep the result inside num[] (double has ~17 significant digits)
+    if (width > 250)
+        width = 250; // keep the result inside the caller's STRINGSIZE buffer
 
-    // decimal exponent X via libm (pico printf's own exponent is unreliable)
-    av = fabs(val);
-    neg = (val < 0);
-    if (av == 0.0)
-        X = 0;
-    else
+    // generate the core number string (FloatToStr emits '-' for negatives and no
+    // leading character for positives; flags/width are applied afterwards)
+    if (type == 'e' || type == 'E')
     {
-        double p10;
-        X = (int)floor(log10(av));
-        p10 = pow(10.0, (double)X);
-        if (av < p10)
-            X--;
-        else if (av >= p10 * 10.0)
-            X++;
+        format_exp(num, val, prec, 0);
     }
-
-    // build the unsigned numeric text using only "%f", choosing fixed vs
-    // exponential style per the C "%g" rule (X in [-4, prec) -> fixed)
-    if (X >= -4 && X < prec)
+    else if (type == 'g' || type == 'G')
     {
-        dec = prec - 1 - X;
-        if (dec < 0)
-            dec = 0;
-        sprintf(num, "%.*f", dec, av);
-    }
-    else
-    {
-        double mant = av / pow(10.0, (double)X);
-        dec = prec - 1;
-        sprintf(num, "%.*f", dec, mant);
-        if (num[0] == '1' && num[1] == '0') // rounding pushed the mantissa to 10.x
+        int P = prec ? prec : 1;
+        double av = fabs(val);
+        int X = (av == 0.0) ? 0 : format_decexp(av);
+        if (X >= -4 && X < P) // fixed notation, trimmed
         {
-            X++;
-            mant = av / pow(10.0, (double)X);
-            sprintf(num, "%.*f", dec, mant);
+            int dec = P - 1 - X;
+            if (dec < 0)
+                dec = 0;
+            FloatToStr(num, val, 0, dec, ' ');
+            format_striptz(num);
         }
-        sprintf(num + strlen(num), "e%+03d", X);
+        else // exponential notation, trimmed
+            format_exp(num, val, P - 1, 1);
+    }
+    else // 'f' / 'F'
+    {
+        FloatToStr(num, val, 0, prec, ' ');
     }
 
-    // strip trailing zeros (and a bare decimal point) unless '#' was given
-    if (!alt)
-    {
-        char *dot = strchr(num, '.');
-        if (dot)
-        {
-            char *exp = strchr(num, 'e');
-            char *fe = exp ? exp : num + strlen(num);
-            char *s = fe - 1;
-            while (s > dot && *s == '0')
-                s--;
-            if (s == dot)
-                s--;
-            memmove(s + 1, fe, strlen(fe) + 1);
-        }
-    }
     if (upper)
         for (char *s = num; *s; s++)
-            if (*s >= 'a' && *s <= 'z')
-                *s = (char)(*s - 32);
+            if (*s == 'e')
+                *s = 'E';
 
-    // prepend the sign ('-' for negatives, else the '+'/' ' flag if present)
-    esign = neg ? '-' : (strchr(flagbuf, '+') ? '+' : (strchr(flagbuf, ' ') ? ' ' : 0));
-    if (esign)
+    // sign: FloatToStr already emitted '-' for negatives; add '+'/' ' for positives
     {
-        body[0] = esign;
-        strcpy(body + 1, num);
+        char esign = 0;
+        if (num[0] != '-')
+            esign = strchr(flagbuf, '+') ? '+' : (strchr(flagbuf, ' ') ? ' ' : 0);
+        if (esign)
+        {
+            body[0] = esign;
+            strcpy(body + 1, num);
+        }
+        else
+            strcpy(body, num);
     }
-    else
-        strcpy(body, num);
 
     // apply field width
     bl = (int)strlen(body);
@@ -9406,42 +9903,9 @@ void fun_format(void)
     if (inspec != 2)
         error("Format specification not found");
     sret = GetTempStrMemory(); // this will last for the life of the command
-    {
-        // "%g"/"%G" is broken in the pico printf, so emulate it; "%f"/"%e" work
-        // and pass through to sprintf.  The manual specifies a default precision
-        // of 4 (pico sprintf would use 6), so inject ".4" when none was given.
-        unsigned char *cp, conv = 0;
-        for (cp = (unsigned char *)strchr((char *)fmt, '%') + 1; *cp; cp++)
-            if (*cp == 'g' || *cp == 'G' || *cp == 'f' || *cp == 'F' || *cp == 'e' || *cp == 'E')
-            {
-                conv = *cp;
-                break;
-            }
-        if (conv == 'g' || conv == 'G')
-            format_g_spec((char *)sret, fmt, getnumber(argv[0]));
-        else
-        {
-            // does the spec already carry an explicit precision?  scan past the
-            // flags and width to the point where ".precision" would appear
-            unsigned char *w = (unsigned char *)strchr((char *)fmt, '%') + 1;
-            while (*w == '-' || *w == '+' || *w == ' ' || *w == '#' || *w == '0')
-                w++;
-            while (*w >= '0' && *w <= '9')
-                w++;
-            if (*w == '.')
-                sprintf((char *)sret, (char *)fmt, getnumber(argv[0]));
-            else
-            {
-                unsigned char fbuf[STRINGSIZE + 4];
-                size_t head = (size_t)(w - fmt);
-                memcpy(fbuf, fmt, head);
-                fbuf[head] = '.';
-                fbuf[head + 1] = '4';
-                strcpy((char *)fbuf + head + 2, (char *)w);
-                sprintf((char *)sret, (char *)fbuf, getnumber(argv[0]));
-            }
-        }
-    }
+    // Render the value with the in-built FloatToStr rather than pico printf,
+    // whose float conversions are broken (wrong normalisation at powers of ten).
+    format_float((char *)sret, fmt, getnumber(argv[0]));
     CtoM(sret);
     targ = T_STR;
 }

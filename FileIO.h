@@ -461,6 +461,8 @@ extern "C"
          * ============================================================================ */
         extern union uFileTable FileTable[MAXOPENFILES + 1];
         extern struct option_s Option;
+        extern bool SuppressOptionFlash;
+        void BuildDefaultOptions(struct option_s *dst);
         extern unsigned char filesource[MAXOPENFILES + 1];
 
         /* ============================================================================

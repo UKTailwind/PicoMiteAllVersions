@@ -67,6 +67,7 @@ extern const uint8_t *flash_libgmemory;
 extern void routinechecks(void);
 extern int TraceOn;
 struct option_s __attribute__((aligned(256))) Option;
+bool SuppressOptionFlash = false; // when set, ResetOptions skips its flash-read/SaveOptions tail (see BuildDefaultOptions)
 int dirflags;
 int GPSfnbr = 0;
 int lfs_FileFnbr = 0;
@@ -4872,111 +4873,160 @@ int strcicmp(char const *a, char const *b)
 }
 void B2A(unsigned char *fromfile, unsigned char *tofile, int srcfs)
 {
-    char buff[4096];
+    // 1 KB transfer chunk, not 4 KB: keeps this leaf's stack frame small so the
+    // FM copy path (cmd_fm + fm_copy_selected already ~5 KB deep, plus USB-host
+    // IRQ stacking on HDMIUSB) does not overflow the 8 KB core-0 stack. FatFS /
+    // littlefs buffer their own reads, so throughput is essentially unchanged.
+    char buff[1024];
     unsigned int nbr = 0;
     int fnbr1, fnbr2;
+    // Suppress the abort-on-error longjmp for the duration of the copy so that a
+    // mid-copy I/O error can never escape with a file handle still open (that
+    // would leak the GetMemory'd FIL/SDbuffer/lfs_file_t until the next RUN/NEW).
+    // Errors are collected in MMerrno, both handles are closed unconditionally,
+    // and the error is re-thrown afterwards if the caller wanted aborts.
+    int oldabort = OptionFileErrorAbort;
+    OptionFileErrorAbort = 0;
+    MMerrno = 0;
+    MMErrMsg[0] = 0;
     fnbr1 = FindFreeFileNbr();
     FatFSFileSystem = srcfs; // set to source FatFS drive
-    BasicFileOpen((char *)fromfile, fnbr1, FA_READ);
-    fnbr2 = FindFreeFileNbr();
-    FatFSFileSystem = 0; // set to flash
-    if (!BasicFileOpen((char *)tofile, fnbr2, FA_WRITE | FA_CREATE_ALWAYS))
+    if (BasicFileOpen((char *)fromfile, fnbr1, FA_READ))
     {
+        fnbr2 = FindFreeFileNbr();
+        FatFSFileSystem = 0; // set to flash
+        if (BasicFileOpen((char *)tofile, fnbr2, FA_WRITE | FA_CREATE_ALWAYS))
+        {
+            while (!MMerrno && !f_eof(FileTable[fnbr1].fptr))
+            {
+                FSerror = f_read(FileTable[fnbr1].fptr, buff, sizeof(buff), &nbr);
+                ErrorCheck(fnbr1);
+                if (MMerrno)
+                    break;
+                FSerror = lfs_file_write(&lfs, FileTable[fnbr2].lfsptr, buff, nbr);
+                if (FSerror > 0)
+                    FSerror = 0;
+                ErrorCheck(fnbr2);
+            }
+            FileClose(fnbr2);
+        }
         FileClose(fnbr1);
     }
-    while (!f_eof(FileTable[fnbr1].fptr))
-    {
-        FSerror = f_read(FileTable[fnbr1].fptr, buff, sizeof(buff), &nbr);
-        ErrorCheck(fnbr1);
-        FSerror = lfs_file_write(&lfs, FileTable[fnbr2].lfsptr, buff, nbr);
-        if (FSerror > 0)
-            FSerror = 0;
-        ErrorCheck(fnbr2);
-    }
-    FileClose(fnbr1);
-    FileClose(fnbr2);
+    OptionFileErrorAbort = oldabort;
     FatFSFileSystem = FatFSFileSystemSave;
+    if (MMerrno && oldabort)
+        error(MMErrMsg);
 }
 void A2B(unsigned char *fromfile, unsigned char *tofile, int dstfs)
 {
-    char buff[4096];
+    char buff[1024]; // see B2A: small chunk to bound FM-copy stack depth
     unsigned int nbr = 0, bw;
     int fnbr1, fnbr2;
+    int oldabort = OptionFileErrorAbort; // see B2A: keep handles closable on error
+    OptionFileErrorAbort = 0;
+    MMerrno = 0;
+    MMErrMsg[0] = 0;
     FatFSFileSystem = 0; // set to flash
     fnbr1 = FindFreeFileNbr();
-    BasicFileOpen((char *)fromfile, fnbr1, FA_READ);
-    fnbr2 = FindFreeFileNbr();
-    FatFSFileSystem = dstfs; // set to dest FatFS drive
-    if (!BasicFileOpen((char *)tofile, fnbr2, FA_WRITE | FA_CREATE_ALWAYS))
+    if (BasicFileOpen((char *)fromfile, fnbr1, FA_READ))
     {
+        fnbr2 = FindFreeFileNbr();
+        FatFSFileSystem = dstfs; // set to dest FatFS drive
+        if (BasicFileOpen((char *)tofile, fnbr2, FA_WRITE | FA_CREATE_ALWAYS))
+        {
+            while (!MMerrno && lfs_file_tell(&lfs, FileTable[fnbr1].lfsptr) != lfs_file_size(&lfs, FileTable[fnbr1].lfsptr))
+            {
+                nbr = lfs_file_read(&lfs, FileTable[fnbr1].lfsptr, buff, sizeof(buff));
+                if ((int)nbr < 0)
+                    FSerror = nbr;
+                ErrorCheck(fnbr1);
+                if (MMerrno)
+                    break;
+                FSerror = f_write(FileTable[fnbr2].fptr, buff, nbr, &bw);
+                ErrorCheck(fnbr2);
+            }
+            FileClose(fnbr2);
+        }
         FileClose(fnbr1);
     }
-    while (!(lfs_file_tell(&lfs, FileTable[fnbr1].lfsptr) == lfs_file_size(&lfs, FileTable[fnbr1].lfsptr)))
-    {
-        nbr = lfs_file_read(&lfs, FileTable[fnbr1].lfsptr, buff, sizeof(buff));
-        if (nbr < 0)
-            FSerror = nbr;
-        ErrorCheck(fnbr1);
-        FSerror = f_write(FileTable[fnbr2].fptr, buff, nbr, &bw);
-        ErrorCheck(fnbr2);
-    }
-    FileClose(fnbr1);
-    FileClose(fnbr2);
+    OptionFileErrorAbort = oldabort;
     FatFSFileSystem = FatFSFileSystemSave;
+    if (MMerrno && oldabort)
+        error(MMErrMsg);
 }
 void B2B(unsigned char *fromfile, unsigned char *tofile, int srcfs, int dstfs)
 {
-    char buff[4096];
+    char buff[1024]; // see B2A: small chunk to bound FM-copy stack depth
     unsigned int nbr = 0, bw;
     int fnbr1, fnbr2;
+    int oldabort = OptionFileErrorAbort; // see B2A: keep handles closable on error
+    OptionFileErrorAbort = 0;
+    MMerrno = 0;
+    MMErrMsg[0] = 0;
     fnbr1 = FindFreeFileNbr();
     FatFSFileSystem = srcfs; // set to source FatFS drive
-    BasicFileOpen((char *)fromfile, fnbr1, FA_READ);
-    FatFSFileSystem = dstfs; // set to dest FatFS drive
-    fnbr2 = FindFreeFileNbr();
-    if (!BasicFileOpen((char *)tofile, fnbr2, FA_WRITE | FA_CREATE_ALWAYS))
+    if (BasicFileOpen((char *)fromfile, fnbr1, FA_READ))
     {
+        FatFSFileSystem = dstfs; // set to dest FatFS drive
+        fnbr2 = FindFreeFileNbr();
+        if (BasicFileOpen((char *)tofile, fnbr2, FA_WRITE | FA_CREATE_ALWAYS))
+        {
+            while (!MMerrno && !f_eof(FileTable[fnbr1].fptr))
+            {
+                FSerror = f_read(FileTable[fnbr1].fptr, buff, sizeof(buff), &nbr);
+                ErrorCheck(fnbr1);
+                if (MMerrno)
+                    break;
+                FSerror = f_write(FileTable[fnbr2].fptr, buff, nbr, &bw);
+                ErrorCheck(fnbr2);
+            }
+            FileClose(fnbr2);
+        }
         FileClose(fnbr1);
     }
-    while (!f_eof(FileTable[fnbr1].fptr))
-    {
-        FSerror = f_read(FileTable[fnbr1].fptr, buff, sizeof(buff), &nbr);
-        ErrorCheck(fnbr1);
-        FSerror = f_write(FileTable[fnbr2].fptr, buff, nbr, &bw);
-        ErrorCheck(fnbr2);
-    }
-    FileClose(fnbr1);
-    FileClose(fnbr2);
+    OptionFileErrorAbort = oldabort;
     FatFSFileSystem = FatFSFileSystemSave;
+    if (MMerrno && oldabort)
+        error(MMErrMsg);
 }
 void A2A(unsigned char *fromfile, unsigned char *tofile)
 {
     char buff[512];
     unsigned int nbr = 0;
     int fnbr1, fnbr2;
+    int oldabort = OptionFileErrorAbort; // see B2A: keep handles closable on error
+    OptionFileErrorAbort = 0;
+    MMerrno = 0;
+    MMErrMsg[0] = 0;
     fnbr1 = FindFreeFileNbr();
     FatFSFileSystem = 0; // set to FLASH
-    BasicFileOpen((char *)fromfile, fnbr1, FA_READ);
-    fnbr2 = FindFreeFileNbr();
-    FatFSFileSystem = 0; // set to FLASH
-    if (!BasicFileOpen((char *)tofile, fnbr2, FA_WRITE | FA_CREATE_ALWAYS))
+    if (BasicFileOpen((char *)fromfile, fnbr1, FA_READ))
     {
+        fnbr2 = FindFreeFileNbr();
+        FatFSFileSystem = 0; // set to FLASH
+        if (BasicFileOpen((char *)tofile, fnbr2, FA_WRITE | FA_CREATE_ALWAYS))
+        {
+            while (!MMerrno && lfs_file_tell(&lfs, FileTable[fnbr1].lfsptr) != lfs_file_size(&lfs, FileTable[fnbr1].lfsptr))
+            {
+                nbr = lfs_file_read(&lfs, FileTable[fnbr1].lfsptr, buff, 512);
+                if ((int)nbr < 0)
+                    FSerror = nbr;
+                ErrorCheck(fnbr1);
+                if (MMerrno)
+                    break;
+                FSerror = lfs_file_write(&lfs, FileTable[fnbr2].lfsptr, buff, nbr);
+                if (FSerror > 0)
+                    FSerror = 0;
+                ErrorCheck(fnbr2);
+            }
+            FileClose(fnbr2);
+        }
         FileClose(fnbr1);
     }
-    while (!(lfs_file_tell(&lfs, FileTable[fnbr1].lfsptr) == lfs_file_size(&lfs, FileTable[fnbr1].lfsptr)))
-    {
-        nbr = lfs_file_read(&lfs, FileTable[fnbr1].lfsptr, buff, 512);
-        if (nbr < 0)
-            FSerror = nbr;
-        ErrorCheck(fnbr1);
-        FSerror = lfs_file_write(&lfs, FileTable[fnbr2].lfsptr, buff, nbr);
-        if (FSerror > 0)
-            FSerror = 0;
-        ErrorCheck(fnbr2);
-    }
-    FileClose(fnbr1);
-    FileClose(fnbr2);
+    OptionFileErrorAbort = oldabort;
     FatFSFileSystem = FatFSFileSystemSave;
+    if (MMerrno && oldabort)
+        error(MMErrMsg);
 }
 int drivecheck(char *p, int *waste)
 {
@@ -6829,13 +6879,41 @@ void ResetOptions(bool startup)
         Option.AllPins = 1;
     }
 #endif
-    disable_interrupts_pico();
-    flash_do_cmd(txbuf, rxbuf, 4);
-    Option.FlashSize = 1 << rxbuf[3];
-    enable_interrupts_pico();
-    SaveOptions();
-    uSec(250000);
+    if (!SuppressOptionFlash)
+    {
+        /* The default-builder (BuildDefaultOptions) drives ResetOptions purely to
+           populate a scratch copy of the defaults in RAM; it must not touch the SPI
+           flash (read its size or commit via SaveOptions) nor stall for 250 ms. */
+        disable_interrupts_pico();
+        flash_do_cmd(txbuf, rxbuf, 4);
+        Option.FlashSize = 1 << rxbuf[3];
+        enable_interrupts_pico();
+        SaveOptions();
+        uSec(250000);
+    }
 }
+
+/* Populate *dst with the factory defaults for THIS build, without disturbing the
+   live configuration or touching flash. ResetOptions writes the defaults into the
+   global Option as a long series of field assignments, so we snapshot the live
+   Option, let ResetOptions (with the flash tail suppressed) overwrite it with
+   defaults, copy those out, then put the live config back. This keeps a SINGLE
+   source of truth for the per-build defaults (ResetOptions) shared with the
+   OPTION DISK SAVE/LOAD diff/overlay mechanism. FlashSize is hardware-derived, so
+   carry the live value across to stop it being seen as a "changed" field. */
+void BuildDefaultOptions(struct option_s *dst)
+{
+    struct option_s *live = (struct option_s *)GetMemory(sizeof(struct option_s));
+    memcpy(live, &Option, sizeof(struct option_s));
+    SuppressOptionFlash = true;
+    ResetOptions(true); // startup=true -> skips the disable_* hardware teardown too
+    SuppressOptionFlash = false;
+    Option.FlashSize = live->FlashSize;
+    memcpy(dst, &Option, sizeof(struct option_s));
+    memcpy(&Option, live, sizeof(struct option_s));
+    FreeMemory((void *)live);
+}
+
 void ResetAllFlash(void)
 {
     ResetOptions(true);

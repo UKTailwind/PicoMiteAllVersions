@@ -3242,8 +3242,9 @@ static int fm_duplicate_selected(fm_panel_t *panel, char *status, int statuslen)
 {
     fm_entry_t entry;
     char errmsg[STRINGSIZE];
+    // srcpath/dstpath are reused for the full-filename file copy below (the dir
+    // and file branches are mutually exclusive) — no separate srcfile/dstfile.
     char srcpath[FM_PATH_MAX], dstpath[FM_PATH_MAX];
-    char srcfile[FM_PATH_MAX], dstfile[FM_PATH_MAX];
     char newname[FF_MAX_LFN + 1];
     int files = 0, dirs = 0;
 
@@ -3301,13 +3302,13 @@ static int fm_duplicate_selected(fm_panel_t *panel, char *status, int statuslen)
         return 1;
     }
 
-    if (!fm_make_full_filename(panel->filesystem, panel->path, entry.name, srcfile, sizeof(srcfile)) ||
-        !fm_make_full_filename(panel->filesystem, panel->path, newname, dstfile, sizeof(dstfile)))
+    if (!fm_make_full_filename(panel->filesystem, panel->path, entry.name, srcpath, sizeof(srcpath)) ||
+        !fm_make_full_filename(panel->filesystem, panel->path, newname, dstpath, sizeof(dstpath)))
     {
         snprintf(status, statuslen, "Path too long");
         return 0;
     }
-    if (!fm_copy_file_path(panel->filesystem, srcfile, panel->filesystem, dstfile,
+    if (!fm_copy_file_path(panel->filesystem, srcpath, panel->filesystem, dstpath,
                            status, statuslen, &files, &dirs))
         return 0;
 
@@ -3319,8 +3320,10 @@ static int fm_move_selected(fm_panel_t *src, fm_panel_t *dst, char *status, int 
 {
     fm_entry_t entry;
     char errmsg[STRINGSIZE];
+    // dstpath doubles as the cross-drive copy destination filename (it is unused
+    // in that branch as a child path); srcpath stays live there for the delete.
     char srcpath[FM_PATH_MAX], dstpath[FM_PATH_MAX];
-    char srcfile[FM_PATH_MAX], dstfile[FM_PATH_MAX];
+    char srcfile[FM_PATH_MAX];
     int files = 0, dirs = 0;
 
     if (src->count <= 0 || src->selected < 0 || src->selected >= src->count)
@@ -3370,12 +3373,12 @@ static int fm_move_selected(fm_panel_t *src, fm_panel_t *dst, char *status, int 
         }
 
         if (!fm_make_full_filename(src->filesystem, src->path, entry.name, srcfile, sizeof(srcfile)) ||
-            !fm_make_full_filename(dst->filesystem, dst->path, entry.name, dstfile, sizeof(dstfile)))
+            !fm_make_full_filename(dst->filesystem, dst->path, entry.name, dstpath, sizeof(dstpath)))
         {
             snprintf(status, statuslen, "Path too long");
             return 0;
         }
-        if (!fm_copy_file_path(src->filesystem, srcfile, dst->filesystem, dstfile,
+        if (!fm_copy_file_path(src->filesystem, srcfile, dst->filesystem, dstpath,
                                status, statuslen, &files, &dirs))
             return 0;
         if (!fm_delete_path(src->filesystem, srcpath, 0, status, statuslen))
@@ -3685,19 +3688,22 @@ static int fm_copy_dir_recursive(int srcfs, const char *srcdir, int dstfs, const
         }
         while ((rc = lfs_dir_read(&lfs, &dir, &info)) > 0)
         {
-            char csrc[FM_PATH_MAX], cdst[FM_PATH_MAX], srcfile[FM_PATH_MAX], dstfile[FM_PATH_MAX];
+            // One src/dst pair, reused for either the child-dir recursion or the
+            // file copy (mutually exclusive). Halves the per-recursion-level
+            // path-buffer footprint, which is what bounds deep-tree copy depth.
+            char src[FM_PATH_MAX], dst[FM_PATH_MAX];
             if (strcmp(info.name, ".") == 0 || strcmp(info.name, "..") == 0)
                 continue;
-            if (!fm_make_child_path(srcdir, info.name, csrc, sizeof(csrc)) ||
-                !fm_make_child_path(dstdir, info.name, cdst, sizeof(cdst)))
-            {
-                lfs_dir_close(&lfs, &dir);
-                snprintf(status, statuslen, "Path too long");
-                return 0;
-            }
             if (info.type == LFS_TYPE_DIR)
             {
-                if (!fm_copy_dir_recursive(srcfs, csrc, dstfs, cdst, status, statuslen, file_count, dir_count))
+                if (!fm_make_child_path(srcdir, info.name, src, sizeof(src)) ||
+                    !fm_make_child_path(dstdir, info.name, dst, sizeof(dst)))
+                {
+                    lfs_dir_close(&lfs, &dir);
+                    snprintf(status, statuslen, "Path too long");
+                    return 0;
+                }
+                if (!fm_copy_dir_recursive(srcfs, src, dstfs, dst, status, statuslen, file_count, dir_count))
                 {
                     lfs_dir_close(&lfs, &dir);
                     return 0;
@@ -3705,14 +3711,14 @@ static int fm_copy_dir_recursive(int srcfs, const char *srcdir, int dstfs, const
             }
             else
             {
-                if (!fm_make_full_filename(srcfs, srcdir, info.name, srcfile, sizeof(srcfile)) ||
-                    !fm_make_full_filename(dstfs, dstdir, info.name, dstfile, sizeof(dstfile)))
+                if (!fm_make_full_filename(srcfs, srcdir, info.name, src, sizeof(src)) ||
+                    !fm_make_full_filename(dstfs, dstdir, info.name, dst, sizeof(dst)))
                 {
                     lfs_dir_close(&lfs, &dir);
                     snprintf(status, statuslen, "Path too long");
                     return 0;
                 }
-                if (!fm_copy_file_path(srcfs, srcfile, dstfs, dstfile, status, statuslen, file_count, dir_count))
+                if (!fm_copy_file_path(srcfs, src, dstfs, dst, status, statuslen, file_count, dir_count))
                 {
                     lfs_dir_close(&lfs, &dir);
                     return 0;
@@ -3747,7 +3753,9 @@ static int fm_copy_dir_recursive(int srcfs, const char *srcdir, int dstfs, const
         fr = f_findfirst(&dir, &info, srcdir, "*");
         while (fr == FR_OK && info.fname[0])
         {
-            char csrc[FM_PATH_MAX], cdst[FM_PATH_MAX], srcfile[FM_PATH_MAX], dstfile[FM_PATH_MAX];
+            // See the littlefs branch: one src/dst pair reused for the child-dir
+            // recursion or the file copy, to bound per-level stack use.
+            char src[FM_PATH_MAX], dst[FM_PATH_MAX];
             if (strcmp(info.fname, ".") == 0 || strcmp(info.fname, "..") == 0)
             {
                 fr = f_findnext(&dir, &info);
@@ -3758,18 +3766,18 @@ static int fm_copy_dir_recursive(int srcfs, const char *srcdir, int dstfs, const
                 fr = f_findnext(&dir, &info);
                 continue;
             }
-            if (!fm_make_child_path(srcdir, info.fname, csrc, sizeof(csrc)) ||
-                !fm_make_child_path(dstdir, info.fname, cdst, sizeof(cdst)))
-            {
-                f_closedir(&dir);
-                OptionFileErrorAbort = oldabort;
-                FatFSFileSystem = oldfs;
-                snprintf(status, statuslen, "Path too long");
-                return 0;
-            }
             if (info.fattrib & AM_DIR)
             {
-                if (!fm_copy_dir_recursive(srcfs, csrc, dstfs, cdst, status, statuslen, file_count, dir_count))
+                if (!fm_make_child_path(srcdir, info.fname, src, sizeof(src)) ||
+                    !fm_make_child_path(dstdir, info.fname, dst, sizeof(dst)))
+                {
+                    f_closedir(&dir);
+                    OptionFileErrorAbort = oldabort;
+                    FatFSFileSystem = oldfs;
+                    snprintf(status, statuslen, "Path too long");
+                    return 0;
+                }
+                if (!fm_copy_dir_recursive(srcfs, src, dstfs, dst, status, statuslen, file_count, dir_count))
                 {
                     f_closedir(&dir);
                     OptionFileErrorAbort = oldabort;
@@ -3779,8 +3787,8 @@ static int fm_copy_dir_recursive(int srcfs, const char *srcdir, int dstfs, const
             }
             else
             {
-                if (!fm_make_full_filename(srcfs, srcdir, info.fname, srcfile, sizeof(srcfile)) ||
-                    !fm_make_full_filename(dstfs, dstdir, info.fname, dstfile, sizeof(dstfile)))
+                if (!fm_make_full_filename(srcfs, srcdir, info.fname, src, sizeof(src)) ||
+                    !fm_make_full_filename(dstfs, dstdir, info.fname, dst, sizeof(dst)))
                 {
                     f_closedir(&dir);
                     OptionFileErrorAbort = oldabort;
@@ -3788,7 +3796,7 @@ static int fm_copy_dir_recursive(int srcfs, const char *srcdir, int dstfs, const
                     snprintf(status, statuslen, "Path too long");
                     return 0;
                 }
-                if (!fm_copy_file_path(srcfs, srcfile, dstfs, dstfile, status, statuslen, file_count, dir_count))
+                if (!fm_copy_file_path(srcfs, src, dstfs, dst, status, statuslen, file_count, dir_count))
                 {
                     f_closedir(&dir);
                     OptionFileErrorAbort = oldabort;
@@ -3815,10 +3823,11 @@ static int fm_copy_selected(fm_panel_t *src, fm_panel_t *dst, char *status, int 
 {
     fm_entry_t entry;
     char errmsg[STRINGSIZE];
-    char srcdir[FM_PATH_MAX];
-    char dstdir[FM_PATH_MAX];
-    char srcfile[FM_PATH_MAX];
-    char dstfile[FM_PATH_MAX];
+    // One src/dst pair reused for the dir branch (child paths) and the file
+    // branch (full filenames) — they are never live at the same time. Keeps
+    // this frame ~0.5 KB smaller in the FM copy stack chain.
+    char srcpath[FM_PATH_MAX];
+    char dstpath[FM_PATH_MAX];
     int file_count = 0;
     int dir_count = 0;
     if (src->count <= 0 || src->selected < 0 || src->selected >= src->count)
@@ -3833,35 +3842,35 @@ static int fm_copy_selected(fm_panel_t *src, fm_panel_t *dst, char *status, int 
     }
     if (entry.is_dir)
     {
-        if (!fm_make_child_path(src->path, entry.name, srcdir, sizeof(srcdir)) ||
-            !fm_make_child_path(dst->path, entry.name, dstdir, sizeof(dstdir)))
+        if (!fm_make_child_path(src->path, entry.name, srcpath, sizeof(srcpath)) ||
+            !fm_make_child_path(dst->path, entry.name, dstpath, sizeof(dstpath)))
         {
             snprintf(status, statuslen, "Path too long");
             return 0;
         }
-        if (src->filesystem == dst->filesystem && fm_path_contains_icase(srcdir, dstdir))
+        if (src->filesystem == dst->filesystem && fm_path_contains_icase(srcpath, dstpath))
         {
             snprintf(status, statuslen, "Destination inside source not allowed");
             return 0;
         }
-        if (!fm_copy_dir_recursive(src->filesystem, srcdir, dst->filesystem, dstdir, status, statuslen, &file_count, &dir_count))
+        if (!fm_copy_dir_recursive(src->filesystem, srcpath, dst->filesystem, dstpath, status, statuslen, &file_count, &dir_count))
             return 0;
         snprintf(status, statuslen, "Copied directory %s (%d files, %d dirs)", entry.name, file_count, dir_count);
         return 1;
     }
-    if (!fm_make_full_filename(src->filesystem, src->path, entry.name, srcfile, sizeof(srcfile)) ||
-        !fm_make_full_filename(dst->filesystem, dst->path, entry.name, dstfile, sizeof(dstfile)))
+    if (!fm_make_full_filename(src->filesystem, src->path, entry.name, srcpath, sizeof(srcpath)) ||
+        !fm_make_full_filename(dst->filesystem, dst->path, entry.name, dstpath, sizeof(dstpath)))
     {
         snprintf(status, statuslen, "Path too long");
         return 0;
     }
-    if (fm_stricmp(srcfile, dstfile) == 0)
+    if (fm_stricmp(srcpath, dstpath) == 0)
     {
         snprintf(status, statuslen, "Source and destination are the same");
         return 0;
     }
 
-    if (!fm_copy_file_path(src->filesystem, srcfile, dst->filesystem, dstfile, status, statuslen, &file_count, &dir_count))
+    if (!fm_copy_file_path(src->filesystem, srcpath, dst->filesystem, dstpath, status, statuslen, &file_count, &dir_count))
         return 0;
 
     snprintf(status, statuslen, "Copied %s", entry.name);

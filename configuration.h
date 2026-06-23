@@ -57,84 +57,84 @@ extern "C"
  * ============================================================================ */
 #ifdef PICOMITEVGA
 
-/* RP2350 configuration */
-	#ifdef rp2350
-		#define MAXSUBFUN 512
-		#define MAXGLOBALVARS 480 // Configurable split
-		#define MAXLOCALVARS 256
-		#define MAXVARS (MAXGLOBALVARS + MAXLOCALVARS)
+   /* RP2350 configuration */
+#ifdef rp2350
+#define MAXSUBFUN 512
+#define MAXGLOBALVARS 480 // Configurable split
+#define MAXLOCALVARS 256
+#define MAXVARS (MAXGLOBALVARS + MAXLOCALVARS)
 
-		#ifdef HDMI // RP2350 HDMI
-			#define MAXMODES 5
-			#define MAX_CPU Freq378P
-			#define MIN_CPU FreqX
-			#ifdef USBKEYBOARD
-			#ifdef PICOMITEHDMIBTH
-/* HDMIBTH: HDMIUSB-style display stack + CYW43 wireless + BLE HID
-   host. The CYW43 firmware blob (~220 KB linked via the IS_BTH
-   block) pushes the firmware image well past HDMIUSB's 1056 KB
-   limit, so FLASH_TARGET_OFFSET matches PICOMITEBTH's 1408 KB.
-   HEAP_MEMORY_SIZE = 180 KB — reclaimed from the framebuffer-pool
-   shrink (HDMIBTH only needs 96000 B vs HDMIUSB's 153600 B). Leaves
-   ~11 KB RAM margin after BSS + PICO_HEAP_SIZE (0x4000) + stack
-   (0x4000); shrink if a future BSS bump narrows it further
-   (see [[heap-bss-overlap-on-rp2350]]). Bump MagicKey when Option
-   layout or defaults change. */
-				#define FLASH_TARGET_OFFSET (1392 * 1024)
-				#define HEAP_MEMORY_SIZE (180 * 1024)
-				#define MagicKey 0x4DB1F60E
-			#elif defined(PICOMITEHDMIWEB)
-/* HDMIWEB: HDMIUSB-style display stack + USB host + WebMite WiFi /
-   lwIP / mbedtls TLS (no Bluetooth). The cyw43 WiFi firmware blob plus
-   the lwIP + mbedtls code push the firmware image past HDMIUSB's 1072 KB
-   limit, so FLASH_TARGET_OFFSET is set well above it (16 KB-aligned per
-   [[flash-target-offset-16-kb-alignment]]). HEAP_MEMORY_SIZE is smaller
-   than HDMIBTH's 180 KB because the lwIP MEM_SIZE pool + mbedtls cert
-   transients + USB host buffers all live in BSS alongside the GUICONTROLS
-   Ctrl[] array. HDMIWEB reuses HDMIBTH's shrunk 96000-byte framebuffer
-   pool (FRAMEBUFFER_POOL_SIZE below). Both FLASH_TARGET_OFFSET and
-   HEAP_MEMORY_SIZE are provisional — tune against build_limits.txt /
-   GetHighestHexAddress.py. Bump MagicKey when Option layout/defaults
-   change so stale cached options get rewritten. */
-				#define FLASH_TARGET_OFFSET (1504 * 1024)
-/* 136 KB MMBasic program/variable heap (arrays, strings, max program size) —
-   kept large deliberately. This is NOT the framebuffer (the 96 KB cut-down HDMI
-   pool is added separately in AllMemory[]). NOTE the TLS tension: a handshake
-   transiently mallocs ~28-35 KB from the C heap (SSL in/out buffers + RSA
-   cert-chain parse; MEM_LIBC_MALLOC=1) which competes for the RAM between
-   __bss_end__ and the stack — long RSA chains (www.microsoft.com) can overrun
-   it. Do NOT shrink this to "fix" TLS; instead route mbedtls to PSRAM and/or
-   make malloc-fail graceful (see [[hdmiweb-build]]). Watch
-   [[heap-bss-overlap-on-rp2350]]. */
-				#define HEAP_MEMORY_SIZE (144 * 1024)
-/* Bumped 0x57EB1A44 -> 0x57EB1A45 when the factory default resolution
-   changed from 1024x600 to 640x480@315000 so existing devices pick up
-   the new default via ResetOptions on first boot. */
-				#define MagicKey 0x57EB1A45
-			#else
-				#define FLASH_TARGET_OFFSET (1072 * 1024)
-				#define HEAP_MEMORY_SIZE (156 * 1024)
-				#define MagicKey 0xD340BBCD
-			#endif
-		#else
-			#define MagicKey 0xD1F6F86C
-			#define FLASH_TARGET_OFFSET (1024 * 1024)
-			#define HEAP_MEMORY_SIZE (160 * 1024)
-		#endif
-	#else // rp2350 VGA
-		#define MAXMODES 3
-		#define MAX_CPU 378000
-		#define MIN_CPU 252000
-		#ifdef USBKEYBOARD
-			#define FLASH_TARGET_OFFSET (1040 * 1024)
-			#define HEAP_MEMORY_SIZE (164 * 1024)
-			#define MagicKey 0x4C73A942
-		#else
-			#define FLASH_TARGET_OFFSET (992 * 1024)
-			#define HEAP_MEMORY_SIZE (168 * 1024)
-			#define MagicKey 0xDAEA58BA
-		#endif
-	#endif
+#ifdef HDMI // RP2350 HDMI
+#define MAXMODES 5
+#define MAX_CPU Freq378P
+#define MIN_CPU FreqX
+#ifdef USBKEYBOARD
+#ifdef PICOMITEHDMIBTH
+   /* HDMIBTH: HDMIUSB-style display stack + CYW43 wireless + BLE HID
+      host. The CYW43 firmware blob (~220 KB linked via the IS_BTH
+      block) pushes the firmware image well past HDMIUSB's 1056 KB
+      limit, so FLASH_TARGET_OFFSET matches PICOMITEBTH's 1408 KB.
+      HEAP_MEMORY_SIZE = 180 KB — reclaimed from the framebuffer-pool
+      shrink (HDMIBTH only needs 96000 B vs HDMIUSB's 153600 B). Leaves
+      ~11 KB RAM margin after BSS + PICO_HEAP_SIZE (0x4000) + stack
+      (0x4000); shrink if a future BSS bump narrows it further
+      (see [[heap-bss-overlap-on-rp2350]]). Bump MagicKey when Option
+      layout or defaults change. */
+#define FLASH_TARGET_OFFSET (1392 * 1024)
+#define HEAP_MEMORY_SIZE (180 * 1024)
+#define MagicKey 0x4DB1F60E
+#elif defined(PICOMITEHDMIWEB)
+   /* HDMIWEB: HDMIUSB-style display stack + USB host + WebMite WiFi /
+      lwIP / mbedtls TLS (no Bluetooth). The cyw43 WiFi firmware blob plus
+      the lwIP + mbedtls code push the firmware image past HDMIUSB's 1072 KB
+      limit, so FLASH_TARGET_OFFSET is set well above it (16 KB-aligned per
+      [[flash-target-offset-16-kb-alignment]]). HEAP_MEMORY_SIZE is smaller
+      than HDMIBTH's 180 KB because the lwIP MEM_SIZE pool + mbedtls cert
+      transients + USB host buffers all live in BSS alongside the GUICONTROLS
+      Ctrl[] array. HDMIWEB reuses HDMIBTH's shrunk 96000-byte framebuffer
+      pool (FRAMEBUFFER_POOL_SIZE below). Both FLASH_TARGET_OFFSET and
+      HEAP_MEMORY_SIZE are provisional — tune against build_limits.txt /
+      GetHighestHexAddress.py. Bump MagicKey when Option layout/defaults
+      change so stale cached options get rewritten. */
+#define FLASH_TARGET_OFFSET (1504 * 1024)
+   /* 136 KB MMBasic program/variable heap (arrays, strings, max program size) —
+      kept large deliberately. This is NOT the framebuffer (the 96 KB cut-down HDMI
+      pool is added separately in AllMemory[]). NOTE the TLS tension: a handshake
+      transiently mallocs ~28-35 KB from the C heap (SSL in/out buffers + RSA
+      cert-chain parse; MEM_LIBC_MALLOC=1) which competes for the RAM between
+      __bss_end__ and the stack — long RSA chains (www.microsoft.com) can overrun
+      it. Do NOT shrink this to "fix" TLS; instead route mbedtls to PSRAM and/or
+      make malloc-fail graceful (see [[hdmiweb-build]]). Watch
+      [[heap-bss-overlap-on-rp2350]]. */
+#define HEAP_MEMORY_SIZE (144 * 1024)
+   /* Bumped 0x57EB1A44 -> 0x57EB1A45 when the factory default resolution
+      changed from 1024x600 to 640x480@315000 so existing devices pick up
+      the new default via ResetOptions on first boot. */
+#define MagicKey 0x57EB1A45
+#else
+#define FLASH_TARGET_OFFSET (1088 * 1024)
+#define HEAP_MEMORY_SIZE (156 * 1024)
+#define MagicKey 0xD340BBCD
+#endif
+#else
+#define MagicKey 0xD1F6F86C
+#define FLASH_TARGET_OFFSET (1024 * 1024)
+#define HEAP_MEMORY_SIZE (160 * 1024)
+#endif
+#else // rp2350 VGA
+#define MAXMODES 3
+#define MAX_CPU 378000
+#define MIN_CPU 252000
+#ifdef USBKEYBOARD
+#define FLASH_TARGET_OFFSET (1040 * 1024)
+#define HEAP_MEMORY_SIZE (164 * 1024)
+#define MagicKey 0x4C73A942
+#else
+#define FLASH_TARGET_OFFSET (1008 * 1024)
+#define HEAP_MEMORY_SIZE (168 * 1024)
+#define MagicKey 0xDAEA58BA
+#endif
+#endif
 
 /* RP2040 configuration */
 #else
@@ -345,83 +345,83 @@ extern "C"
  * ============================================================================ */
 #ifdef PICOMITE
 
-	#define MIN_CPU 48000
+#define MIN_CPU 48000
 
-	#ifdef rp2350
-	#define MAXGLOBALVARS 512 // Configurable split
-	#define MAXLOCALVARS 240
-	#define MAXVARS (MAXGLOBALVARS + MAXLOCALVARS)
-	#define MAX_CPU 420000
-	#define MAXSUBFUN 512
+#ifdef rp2350
+#define MAXGLOBALVARS 512 // Configurable split
+#define MAXLOCALVARS 240
+#define MAXVARS (MAXGLOBALVARS + MAXLOCALVARS)
+#define MAX_CPU 420000
+#define MAXSUBFUN 512
 
-	#ifdef USBKEYBOARD
-		#define MagicKey 0x029A7245
-		#define FLASH_TARGET_OFFSET (1120 * 1024)
-	/* Was 304 KB. Reduced by 4 KB to make headroom for the BSS growth
-	   from the cursor module (~650 bytes for user_cursor.pixels +
-	   state) and the click/cursor ownership tracking. Heap and BSS
-	   share the same SRAM block; growing BSS past the boundary
-	   silently corrupts heap-adjacent statics (see memory note
-	   "heap-bss-overlap-on-rp2350"). */
-		#define HEAP_MEMORY_SIZE (300 * 1024)
-		#elif defined(PICOMITEBT)
-		/* PICOMITEBT replaces USB CDC console with BLE Nordic UART Service over
-		   CYW43439. The CYW43 + btstack stack can't reliably keep up at very
-		   low CPU speeds during heavy bidirectional traffic (AutoSave, large
-		   pastes); enforce 200 MHz as the practical floor and cap at 396 MHz
-		   which is well within RP2350-A overclocking headroom. Bump MagicKey
-		   whenever default Option layout or CPU bounds change so cached
-		   options from older firmware get rewritten on next boot via
-		   ResetOptions(). */
-			#undef MIN_CPU
-			#define MIN_CPU 200000
-			#undef MAX_CPU
-			#define MAX_CPU 396000
-			#define MagicKey 0x90E5E945
-			#define FLASH_TARGET_OFFSET (1376 * 1024)
-			#define HEAP_MEMORY_SIZE (272 * 1024)
-		#elif defined(PICOMITEBTH)
-		/* PICOMITEBTH = PicoMite + USB CDC console + BLE HID host. Same CYW43
-		   + btstack memory pressure as PICOMITEBT, so mirror its CPU floor and
-		   flash/heap split. Distinct MagicKey ensures cached options from
-		   PICOMITEBT (or any earlier firmware) get rewritten on first boot. */
-			#undef MIN_CPU
-			#define MIN_CPU 200000
-			#undef MAX_CPU
-			#define MAX_CPU 396000
-			#define MagicKey 0x6FACAA50
-			#define FLASH_TARGET_OFFSET (1408 * 1024)
-			#define HEAP_MEMORY_SIZE (256 * 1024)
-		#else
-			#define FLASH_TARGET_OFFSET (1072 * 1024)
-		/* See note above PICOUSBRP2350 HEAP_MEMORY_SIZE. */
-			#define HEAP_MEMORY_SIZE (300 * 1024)
-			#define MagicKey 0x29672F8B
-		#endif
+#ifdef USBKEYBOARD
+#define MagicKey 0x029A7245
+#define FLASH_TARGET_OFFSET (1120 * 1024)
+   /* Was 304 KB. Reduced by 4 KB to make headroom for the BSS growth
+      from the cursor module (~650 bytes for user_cursor.pixels +
+      state) and the click/cursor ownership tracking. Heap and BSS
+      share the same SRAM block; growing BSS past the boundary
+      silently corrupts heap-adjacent statics (see memory note
+      "heap-bss-overlap-on-rp2350"). */
+#define HEAP_MEMORY_SIZE (300 * 1024)
+#elif defined(PICOMITEBT)
+   /* PICOMITEBT replaces USB CDC console with BLE Nordic UART Service over
+      CYW43439. The CYW43 + btstack stack can't reliably keep up at very
+      low CPU speeds during heavy bidirectional traffic (AutoSave, large
+      pastes); enforce 200 MHz as the practical floor and cap at 396 MHz
+      which is well within RP2350-A overclocking headroom. Bump MagicKey
+      whenever default Option layout or CPU bounds change so cached
+      options from older firmware get rewritten on next boot via
+      ResetOptions(). */
+#undef MIN_CPU
+#define MIN_CPU 200000
+#undef MAX_CPU
+#define MAX_CPU 396000
+#define MagicKey 0x90E5E945
+#define FLASH_TARGET_OFFSET (1376 * 1024)
+#define HEAP_MEMORY_SIZE (272 * 1024)
+#elif defined(PICOMITEBTH)
+   /* PICOMITEBTH = PicoMite + USB CDC console + BLE HID host. Same CYW43
+      + btstack memory pressure as PICOMITEBT, so mirror its CPU floor and
+      flash/heap split. Distinct MagicKey ensures cached options from
+      PICOMITEBT (or any earlier firmware) get rewritten on first boot. */
+#undef MIN_CPU
+#define MIN_CPU 200000
+#undef MAX_CPU
+#define MAX_CPU 396000
+#define MagicKey 0x6FACAA50
+#define FLASH_TARGET_OFFSET (1408 * 1024)
+#define HEAP_MEMORY_SIZE (256 * 1024)
+#else
+#define FLASH_TARGET_OFFSET (1088 * 1024)
+   /* See note above PICOUSBRP2350 HEAP_MEMORY_SIZE. */
+#define HEAP_MEMORY_SIZE (300 * 1024)
+#define MagicKey 0x29672F8B
+#endif
 
-	#else                     // RP2040
-		#define MAXGLOBALVARS 256 // Configurable split
-		#define MAXLOCALVARS 240
-		#define MAXVARS (MAXGLOBALVARS + MAXLOCALVARS)
-		#define MAX_CPU 420000
-		#define MAXSUBFUN 256
+#else                     // RP2040
+#define MAXGLOBALVARS 256 // Configurable split
+#define MAXLOCALVARS 240
+#define MAXVARS (MAXGLOBALVARS + MAXLOCALVARS)
+#define MAX_CPU 420000
+#define MAXSUBFUN 256
 
-		#ifdef USBKEYBOARD
-			#define MagicKey 0xEE897110
-			#define FLASH_TARGET_OFFSET (912 * 1024)
-			#define HEAP_MEMORY_SIZE (132 * 1024)
-		#else
-			#ifdef PICOMITEMIN
-				#define FLASH_TARGET_OFFSET (688 * 1024)
-				#define MagicKey 0x452EC40A
-				#define HEAP_MEMORY_SIZE (128 * 1024)
-			#else
-				#define HEAP_MEMORY_SIZE (120 * 1024)
-				#define FLASH_TARGET_OFFSET (896 * 1024)
-				#define MagicKey 0x5E503A67
-			#endif
-		#endif
-	#endif
+#ifdef USBKEYBOARD
+#define MagicKey 0xEE897110
+#define FLASH_TARGET_OFFSET (912 * 1024)
+#define HEAP_MEMORY_SIZE (132 * 1024)
+#else
+#ifdef PICOMITEMIN
+#define FLASH_TARGET_OFFSET (688 * 1024)
+#define MagicKey 0x452EC40A
+#define HEAP_MEMORY_SIZE (128 * 1024)
+#else
+#define HEAP_MEMORY_SIZE (120 * 1024)
+#define FLASH_TARGET_OFFSET (912 * 1024)
+#define MagicKey 0x5E503A67
+#endif
+#endif
+#endif
 
 #endif /* PICOMITE */
 
