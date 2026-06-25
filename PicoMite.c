@@ -2739,15 +2739,72 @@ int __not_in_flash_func(MMInkey)(void)
     void __no_inline_not_in_flash_func(sigbus_c)(uint32_t *frame)
     {
         char hex[] = "0123456789ABCDEF";
+        /* Stacked exception frame: [r0 r1 r2 r3 r12 lr pc xpsr]. The pre-fault
+           SP is just above the 8-word basic frame. */
         uint32_t pc = frame[6];
         uint32_t lr = frame[5];
-        MMPrintString("PC=");
-        for (int i = 28; i >= 0; i -= 4)
-            putConsole(hex[(pc >> i) & 0xF], 0);
-        MMPrintString(" LR=");
-        for (int i = 28; i >= 0; i -= 4)
-            putConsole(hex[(lr >> i) & 0xF], 0);
-        MMPrintString("\r\n");
+        uint32_t sp = (uint32_t)frame + 0x20;
+        /* Cortex-M33 fault status: CFSR bit 20 (UFSR STKOF) = stack overflow,
+           MMFSR bits flag MemManage; HFSR bit 30 (FORCED) = escalated fault. */
+        uint32_t cfsr = *(volatile uint32_t *)0xE000ED28;
+        uint32_t hfsr = *(volatile uint32_t *)0xE000ED2C;
+
+        if (Option.SerialConsole >= 1 && Option.SerialConsole <= 4)
+        {
+            /* Emit the fault dump by polling the console UART's TX FIFO
+               directly. The normal console path (USB CDC / buffered IRQ output)
+               is unreliable inside a hard-fault and previously produced garbled
+               output that collided with the reboot banner. Register polling
+               needs no interrupts, buffering or USB stack, so it survives. */
+            uart_hw_t *hw = uart_get_hw(((Option.SerialConsole & 3) == 1) ? uart0 : uart1);
+#define FAULT_PUTC(c)                                          \
+    do                                                         \
+    {                                                          \
+        while (hw->fr & UART_UARTFR_TXFF_BITS)                 \
+            tight_loop_contents();                             \
+        hw->dr = (uint8_t)(c);                                 \
+    } while (0)
+#define FAULT_PUTS(str)                                        \
+    do                                                         \
+    {                                                          \
+        const char *_p = (str);                               \
+        while (*_p)                                            \
+            FAULT_PUTC(*_p++);                                 \
+    } while (0)
+#define FAULT_PUTHEX(v)                                        \
+    do                                                         \
+    {                                                          \
+        for (int _i = 28; _i >= 0; _i -= 4)                    \
+            FAULT_PUTC(hex[((v) >> _i) & 0xF]);                \
+    } while (0)
+            FAULT_PUTS("\r\n*** FAULT PC=");
+            FAULT_PUTHEX(pc);
+            FAULT_PUTS(" LR=");
+            FAULT_PUTHEX(lr);
+            FAULT_PUTS(" SP=");
+            FAULT_PUTHEX(sp);
+            FAULT_PUTS(" CFSR=");
+            FAULT_PUTHEX(cfsr);
+            FAULT_PUTS(" HFSR=");
+            FAULT_PUTHEX(hfsr);
+            FAULT_PUTS("\r\n");
+            /* wait for the line to fully shift out before we reset */
+            while (hw->fr & UART_UARTFR_BUSY_BITS)
+                tight_loop_contents();
+#undef FAULT_PUTC
+#undef FAULT_PUTS
+#undef FAULT_PUTHEX
+        }
+        else
+        {
+            MMPrintString("PC=");
+            for (int i = 28; i >= 0; i -= 4)
+                putConsole(hex[(pc >> i) & 0xF], 0);
+            MMPrintString(" LR=");
+            for (int i = 28; i >= 0; i -= 4)
+                putConsole(hex[(lr >> i) & 0xF], 0);
+            MMPrintString("\r\n");
+        }
         uSec(250000);
         disable_interrupts_pico();
         LoadOptions();

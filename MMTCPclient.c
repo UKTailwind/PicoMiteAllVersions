@@ -134,16 +134,25 @@ err_t tcp_client_recv(void *arg, struct altcp_pcb *tpcb, struct pbuf *p, err_t e
     }
     if (p->tot_len > 0)
     {
-        routinechecks(); // don't know why I'm doing this but it solves a race condition for the RP2350
-        const uint16_t buffer_left = state->BUF_SIZE - state->buffer_len;
-        state->buffer_len += pbuf_copy_partial(p, (void *)state->buffer + state->buffer_len,
-                                               p->tot_len > buffer_left ? buffer_left : p->tot_len, 0);
+        if (state->buffer != NULL)
+        {
+            routinechecks(); // don't know why I'm doing this but it solves a race condition for the RP2350
+            const uint16_t buffer_left = state->BUF_SIZE - state->buffer_len;
+            state->buffer_len += pbuf_copy_partial(p, (void *)state->buffer + state->buffer_len,
+                                                   p->tot_len > buffer_left ? buffer_left : p->tot_len, 0);
+            cyw43_arch_lwip_begin();
+            uint64_t *x = (uint64_t *)state->buffer;
+            x--;
+            *x = state->buffer_len;
+            cyw43_arch_lwip_end();
+        }
+        /* Consume from lwIP even when no receive buffer is armed. A server that
+           speaks first — notably SMTP-over-TLS, which sends its 220 greeting the
+           instant the handshake completes, before any WEB TCP CLIENT READ/REQUEST
+           has set state->buffer — would otherwise make us write through a NULL
+           state->buffer (precise BusFault at OPEN time). Drop the unsolicited
+           data instead; the following READ/REQUEST reads the next response. */
         altcp_recved(tpcb, p->tot_len);
-        cyw43_arch_lwip_begin();
-        uint64_t *x = (uint64_t *)state->buffer;
-        x--;
-        *x = state->buffer_len;
-        cyw43_arch_lwip_end();
     }
     pbuf_free(p);
     return ERR_OK;
@@ -160,15 +169,21 @@ err_t tcp_client_recv_stream(void *arg, struct altcp_pcb *tpcb, struct pbuf *p, 
     }
     if (p->tot_len > 0)
     {
-        /* For chained pbufs we need to walk the chain — payload is only the
-           first segment. Use pbuf_get_at to avoid that complication. */
-        for (int j = 0; j < p->tot_len; j++)
+        /* Guard against unsolicited data before a STREAM buffer is armed (same
+           NULL-deref hazard as tcp_client_recv — e.g. a server that speaks
+           first). Drop it rather than fault, but still consume from lwIP. */
+        if (state->buffer != NULL && state->buffer_write != NULL && state->buffer_read != NULL)
         {
-            state->buffer[*state->buffer_write] = pbuf_get_at(p, j);
-            *state->buffer_write = (*state->buffer_write + 1) % state->BUF_SIZE; // advance head
-            if (*state->buffer_write == *state->buffer_read)
+            /* For chained pbufs we need to walk the chain — payload is only the
+               first segment. Use pbuf_get_at to avoid that complication. */
+            for (int j = 0; j < p->tot_len; j++)
             {
-                *state->buffer_read = (*state->buffer_read + 1) % state->BUF_SIZE; // discard oldest
+                state->buffer[*state->buffer_write] = pbuf_get_at(p, j);
+                *state->buffer_write = (*state->buffer_write + 1) % state->BUF_SIZE; // advance head
+                if (*state->buffer_write == *state->buffer_read)
+                {
+                    *state->buffer_read = (*state->buffer_read + 1) % state->BUF_SIZE; // discard oldest
+                }
             }
         }
         altcp_recved(tpcb, p->tot_len);
@@ -452,9 +467,22 @@ int cmd_tcpclient(void)
         while (!state->connected && Timer4)
             if (startupcomplete)
                 cyw43_arch_poll();
-        web_async_check_error();
-        if (!Timer4)
+        if (!state->connected)
+        {
+            /* Handshake never completed (timeout or async TLS error). Tear the
+               half-open TLS pcb down BEFORE we longjmp out, otherwise its altcp
+               callbacks stay registered and the next ProcessWeb/cyw43_arch_poll
+               services a dead handshake and hard-faults — the "error message
+               then a crash a moment later" symptom. close_tcpclient() NULLs all
+               callbacks and aborts the pcb, so the following error() unwinds
+               cleanly. web_async_check_error() surfaces a specific TLS error
+               (e.g. a cert that overflows MBEDTLS_SSL_IN_CONTENT_LEN) if one was
+               flagged; otherwise fall through to the generic timeout. */
+            close_tcpclient();
+            web_async_check_error();
             error("No response from TLS server (handshake timeout)");
+        }
+        web_async_check_error();
         return 1;
     }
     tp = checkstring(cmdline, (unsigned char *)"OPEN TLS STREAM");
@@ -515,8 +543,15 @@ int cmd_tcpclient(void)
             if (startupcomplete)
                 ProcessWeb(0);
         }
-        if (!Timer4)
+        if (!state->connected)
+        {
+            /* See OPEN TLS CLIENT above: tear down the half-open handshake
+               before erroring so a later poll can't fault on dead callbacks. */
+            close_tcpclient();
+            web_async_check_error();
             error("No response from TLS server (handshake timeout)");
+        }
+        web_async_check_error();
         return 1;
     }
 #endif /* PICOMITEWEB_TLS */
@@ -557,6 +592,123 @@ int cmd_tcpclient(void)
             Timer4 = 500;
         while (Timer4)
             ProcessWeb(0);
+        return 1;
+    }
+    /* WEB TCP CLIENT READ array%() [, timeout]
+       Wait for and read the next data the server sends, WITHOUT transmitting
+       anything first. Use this to consume an unsolicited greeting (e.g. the
+       SMTP 220 banner) before issuing EHLO, so we are not flagged as an
+       "early talker" by anti-spam MTAs that delay/withhold the banner and
+       tarpit clients that speak first. Same buffer semantics as REQUEST. */
+    tp = checkstring(cmdline, (unsigned char *)"TCP CLIENT READ");
+    if (tp)
+    {
+        int64_t *dest = NULL;
+        uint8_t *q = NULL;
+        int size = 0, timeout = 5000;
+        TCP_CLIENT_T *state = TCP_CLIENT;
+        getcsargs(&tp, 3);
+        if (!state)
+            error("No connection");
+        if (!state->connected)
+            error("No connection");
+        if (argc < 1)
+            SyntaxError();
+        ;
+        size = parseintegerarray(argv[0], &dest, 1, 1, NULL, true, NULL) * 8;
+        dest[0] = 0;
+        q = (uint8_t *)&dest[1];
+        if (argc == 3)
+            timeout = getint(argv[2], 1, 100000);
+        state->BUF_SIZE = size;
+        state->buffer = q;
+        state->buffer_len = 0;
+        Timer4 = timeout;
+        while (!state->buffer_len && Timer4)
+            ProcessWeb(0);
+        if (!Timer4)
+            error("No response from server");
+        else
+            Timer4 = 500;
+        while (Timer4)
+            ProcessWeb(0);
+        return 1;
+    }
+    /* WEB TCP CLIENT WRITE longstring%() [, timeout]
+       Push the entire contents of a LongString to the server in one call,
+       segmented to the available TCP send buffer, WITHOUT waiting for a reply.
+       Use this to stream a large payload (e.g. a base64 attachment) inside an
+       SMTP DATA block far faster than many small REQUESTs: there is no
+       per-chunk round-trip wait and the 255-byte string limit does not apply.
+       Data is copied into lwIP (TCP_WRITE_FLAG_COPY) so the BASIC array may be
+       cleared/reused as soon as the command returns. Read the server's reply
+       with a following REQUEST (e.g. the terminating "." for SMTP). */
+    tp = checkstring(cmdline, (unsigned char *)"TCP CLIENT WRITE");
+    if (tp)
+    {
+        int64_t *src = NULL;
+        int timeout = 10000;
+        TCP_CLIENT_T *state = TCP_CLIENT;
+        getcsargs(&tp, 3);
+        if (!state)
+            error("No connection");
+        if (!state->connected)
+            error("No connection");
+        if (argc < 1)
+            SyntaxError();
+        ;
+        parseintegerarray(argv[0], &src, 1, 1, NULL, true, NULL);
+        if (argc == 3)
+            timeout = getint(argv[2], 1, 100000);
+        uint32_t len = (uint32_t)src[0];        // LongString length is held in element [0]
+        uint8_t *data = (uint8_t *)&src[1];     // payload bytes start after the length word
+        uint32_t sent = 0;
+        Timer4 = timeout;
+        while (sent < len && Timer4)
+        {
+            uint16_t space = altcp_sndbuf((struct altcp_pcb *)state->tcp_pcb);
+            if (space == 0)
+            {
+                /* send buffer full — flush what we have and let ACKs free space */
+                altcp_output((struct altcp_pcb *)state->tcp_pcb);
+                ProcessWeb(0);
+                continue;
+            }
+            uint32_t n = len - sent;
+            if (n > space)
+                n = space;
+            /* Cap each write so a single altcp_write doesn't fan out into many
+               simultaneously-queued encrypted records over TLS. mbedtls splits
+               app data into MBEDTLS_SSL_OUT_CONTENT_LEN records, each a
+               heap-allocated pbuf; writing a large chunk at once queued them all
+               and exhausted the lwIP/libc heap, tripping the pico malloc panic
+               (CFSR=0, HFSR=DEBUGEVT, PC in _exit/panic) right after DATA. Small
+               chunks + an output/drain after every write keep the in-flight
+               footprint low. Plain TCP just does more iterations — negligible. */
+            if (n > 1024)
+                n = 1024;
+            err_t err = altcp_write((struct altcp_pcb *)state->tcp_pcb, data + sent, (uint16_t)n, TCP_WRITE_FLAG_COPY);
+            if (err == ERR_OK)
+            {
+                sent += n;
+                /* push it out and let the encrypted record drain (freeing its
+                   pbuf) before queueing the next one */
+                altcp_output((struct altcp_pcb *)state->tcp_pcb);
+                ProcessWeb(0);
+            }
+            else if (err == ERR_MEM)
+            {
+                /* momentarily out of pbufs — drain and retry the same segment */
+                altcp_output((struct altcp_pcb *)state->tcp_pcb);
+                ProcessWeb(0);
+            }
+            else
+                error("write failed %", err);
+        }
+        altcp_output((struct altcp_pcb *)state->tcp_pcb);
+        ProcessWeb(0);
+        if (sent < len)
+            error("Send timeout");
         return 1;
     }
     tp = checkstring(cmdline, (unsigned char *)"TCP CLIENT STREAM");

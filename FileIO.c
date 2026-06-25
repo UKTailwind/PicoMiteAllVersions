@@ -1856,8 +1856,9 @@ void MIPS16 cmd_LoadJPGImage(unsigned char *p)
 
     int xOrigin, yOrigin;
     int xOffset, yOffset;
+    int scale = 1; // pixel-binning factor: 1=full, 2=50%, 4=25%, 8=12.5%
 
-    getcsargs(&p, 11);
+    getcsargs(&p, 13);
     if (argc == 0)
         StandardError(2);
     if (!InitSDCard())
@@ -1897,12 +1898,25 @@ void MIPS16 cmd_LoadJPGImage(unsigned char *p)
 
     if (argc >= 9 && *argv[8])
         xOffset = getint(argv[8], 0, image_info.m_width - 1);
-    if (argc == 11)
+    if (argc >= 11 && *argv[10])
         yOffset = getint(argv[10], 0, image_info.m_height - 1);
+    if (argc >= 13 && *argv[12])
+    {
+        scale = getint(argv[12], 1, 8);
+        if (scale != 1 && scale != 2 && scale != 4 && scale != 8)
+            error("Scale must be 1, 2, 4 or 8");
+    }
 
     int mcu_row_width = image_info.m_width * image_info.m_comps;
     int mcu_row_height = image_info.m_MCUHeight;
     unsigned char *mcu_row_buffer = GetTempMainMemory(mcu_row_height * mcu_row_width);
+
+    // When binning, decoded source lines are averaged into this one output line.
+    // MCU height is always a multiple of 8, so it divides evenly by 2, 4 or 8 and
+    // a bin never straddles an MCU-row boundary.
+    unsigned char *scaled_line_buffer = NULL;
+    if (scale > 1)
+        scaled_line_buffer = GetTempMainMemory((image_info.m_width / scale + 1) * 3);
 
     // Allocate error buffers for full image width
     int16_t *error_buffer_0 = NULL;
@@ -1931,11 +1945,14 @@ void MIPS16 cmd_LoadJPGImage(unsigned char *p)
         int image_y = mcu_y * image_info.m_MCUHeight;
 
         // We can stop decoding if we're past the visible region
-        // but we must decode all previous MCU rows sequentially
+        // but we must decode all previous MCU rows sequentially.
+        // With binning each screen row consumes "scale" source rows, so the
+        // visible source height grows by the same factor.
+        int src_visible_limit = yOffset + scale * (VRes - yOrigin);
         bool should_display = (image_y + image_info.m_MCUHeight > yOffset) &&
-                              (image_y < yOffset + VRes - yOrigin);
+                              (image_y < src_visible_limit);
 
-        if (image_y >= yOffset + VRes - yOrigin)
+        if (image_y >= src_visible_limit)
             break;
 
         // Decode all MCUs in this row into the buffer
@@ -2018,7 +2035,7 @@ void MIPS16 cmd_LoadJPGImage(unsigned char *p)
 
         // Display this MCU row line by line
         // Only display lines that are within the yOffset region
-        if (should_display)
+        if (should_display && scale == 1)
         {
             // Draw each line individually to prevent overflow
             for (int line = 0; line < image_info.m_MCUHeight; line++)
@@ -2057,6 +2074,72 @@ void MIPS16 cmd_LoadJPGImage(unsigned char *p)
                 // Draw just this line from the buffer, starting at xOffset
                 uint8_t *line_ptr = mcu_row_buffer + (line * mcu_row_width) + (source_start_x * 3);
                 DrawBuffer(screen_x, screen_y, screen_x + display_width - 1, screen_y, line_ptr);
+            }
+        }
+        else if (should_display)
+        {
+            // Scaled output: bin each scale x scale block of source pixels into
+            // a single averaged output pixel. Bins step "scale" source lines at
+            // a time; MCU height is a multiple of scale so bins stay inside this
+            // MCU row buffer.
+            for (int line = 0; line < image_info.m_MCUHeight; line += scale)
+            {
+                int image_line_y = image_y + line; // top source row of this bin
+
+                if (image_line_y >= image_info.m_height)
+                    break;
+
+                // Skip bins that start before yOffset
+                if (image_line_y < yOffset)
+                    continue;
+
+                // Screen Y maps the cropped, binned source row
+                int screen_y = yOrigin + (image_line_y - yOffset) / scale;
+                if (screen_y < 0 || screen_y >= VRes)
+                    continue;
+
+                int screen_x = xOrigin;
+                if (screen_x >= HRes)
+                    continue;
+
+                int source_start_x = xOffset;
+                int available_out = (image_info.m_width - source_start_x) / scale;
+                int display_width = min(available_out, HRes - screen_x);
+
+                if (display_width <= 0)
+                    continue;
+
+                for (int ox = 0; ox < display_width; ox++)
+                {
+                    int sx0 = source_start_x + ox * scale;
+                    uint32_t sumB = 0, sumG = 0, sumR = 0;
+                    int count = 0;
+
+                    for (int dy = 0; dy < scale; dy++)
+                    {
+                        if (image_y + line + dy >= image_info.m_height)
+                            break;
+                        uint8_t *sp = mcu_row_buffer + ((line + dy) * mcu_row_width) + sx0 * 3;
+                        for (int dx = 0; dx < scale; dx++)
+                        {
+                            if (sx0 + dx >= image_info.m_width)
+                                break;
+                            sumB += sp[0];
+                            sumG += sp[1];
+                            sumR += sp[2];
+                            sp += 3;
+                            count++;
+                        }
+                    }
+
+                    // Average the sub-area, rounding to nearest
+                    uint8_t *op = scaled_line_buffer + ox * 3;
+                    op[0] = (uint8_t)((sumB + count / 2) / count);
+                    op[1] = (uint8_t)((sumG + count / 2) / count);
+                    op[2] = (uint8_t)((sumR + count / 2) / count);
+                }
+
+                DrawBuffer(screen_x, screen_y, screen_x + display_width - 1, screen_y, scaled_line_buffer);
             }
         }
     }

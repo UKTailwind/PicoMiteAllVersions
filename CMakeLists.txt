@@ -27,7 +27,7 @@ set(VALID_COMPILE_VARIANTS
 # Guard restored: without it, this set() shadows the -DCOMPILE=X passed
 # by buildpicomite.bat and every variant silently builds as the default.
 if(NOT DEFINED COMPILE)
-	set(COMPILE HDMIUSB)
+	set(COMPILE WEBRP2350)
 endif()
 
 list(FIND VALID_COMPILE_VARIANTS "${COMPILE}" COMPILE_INDEX)
@@ -535,7 +535,14 @@ target_compile_definitions(PicoMite PRIVATE
 	NDEBUG
 	PICO_STDIO_USB_ENABLE_RESET_VIA_VENDOR_INTERFACE=0
 	PICO_ADC_CLKDIV_ROUND_NEAREST
-	PICO_XOSC_STARTUP_DELAY_MULTIPLIER=64
+	# Raised from 64: gives the crystal more settle time before the SDK's
+	# pre-main xosc_init() declares it stable. On the PicoCalc the Pico shares
+	# VSYS with the rest of the device, so on battery the rail rises slowly
+	# under the power-on inrush and a short startup count could lock the PLL on
+	# an immature crystal. STARTUP.DELAY = ((XOSC_HZ/1000+128)/256)*MULT must be
+	# < 8192 (xosc.c). For a 12 MHz xosc the base is 47, so the hard ceiling is
+	# MULT < 174; here MULT ~= ms of startup delay, so 160 ~= 160 ms with margin.
+	PICO_XOSC_STARTUP_DELAY_MULTIPLIER=160
 	PICO_CLOCK_AJDUST_PERI_CLOCK_WITH_SYS_CLOCK
 	PICO_FLASH_SIZE_BYTES=16777216
 	PICO_CORE1_STACK_SIZE=0x00

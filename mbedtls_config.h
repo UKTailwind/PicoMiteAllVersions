@@ -10,11 +10,18 @@ void FreeMemory(void *addr);
 #define MBEDTLS_ENTROPY_HARDWARE_ALT
 
 #define MBEDTLS_SSL_OUT_CONTENT_LEN 2048
-/* Cap the TLS record IN buffer at 8 KB instead of the 16 KB spec default.
-   Saves ~8 KB heap per active session. Server cert chains larger than ~7 KB
-   will fail the handshake; in practice that excludes a small minority of
-   public HTTPS sites (those with 4+ cert chains plus large CT extensions). */
-#define MBEDTLS_SSL_IN_CONTENT_LEN 8192
+/* Full 16 KB TLS record IN buffer (the spec maximum plaintext record size).
+   An 8 KB cap previously truncated large server cert chains: any Certificate
+   handshake record bigger than the buffer was mishandled and CRASHED the
+   firmware (not a graceful fail) — reproduced on microsoft.com (10738 B cert
+   message) and mail.smtp2go.com (6508 B), while amazon.com (5147 B) worked.
+   At 16384 no compliant server record can exceed the buffer, so the crash
+   cannot occur. Costs ~8 KB more heap per active TLS session (routed through
+   the MMBasic heap via MBEDTLS_PLATFORM_CALLOC_MACRO).
+   IMPORTANT: changing this header alone does NOT rebuild mbedtls — the
+   -DMBEDTLS_CONFIG_FILE dependency is not tracked by CMake/Ninja. Do a CLEAN
+   build (wipe the build dir) or this value will not take effect. */
+#define MBEDTLS_SSL_IN_CONTENT_LEN 16384
 
 /* lwIP's altcp_tls_mbedtls layer installs its own mbedtls allocator
    (tls_malloc/tls_free backed by lwIP's MEM_SIZE heap) via

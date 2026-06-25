@@ -126,7 +126,7 @@ extern "C"
 #define MAX_CPU 378000
 #define MIN_CPU 252000
 #ifdef USBKEYBOARD
-#define FLASH_TARGET_OFFSET (1040 * 1024)
+#define FLASH_TARGET_OFFSET (1056 * 1024)
 #define HEAP_MEMORY_SIZE (164 * 1024)
 #define MagicKey 0x4C73A942
 #else

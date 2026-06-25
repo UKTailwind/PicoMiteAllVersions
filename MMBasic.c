@@ -2829,6 +2829,22 @@ unsigned char *getFstring(unsigned char *p)
         tp[0]++;
     }
     MtoC(tp);
+    // Reject characters that are illegal in a FAT filename. ':' is the worst offender:
+    // FatFS misparses an embedded colon (e.g. the HH:MM:SS from DateTime$) as a drive
+    // separator and returns the misleading "invalid drive number". A legal drive prefix
+    // (A:/B:/C:) and a serial-port spec (COMn:) are skipped first; '*' and '?' are left
+    // alone for DIR/FILES wildcard patterns; '/' '\' are path separators.
+    {
+        unsigned char *q = tp;
+        if ((mytoupper(q[0]) == 'A' || mytoupper(q[0]) == 'B' || mytoupper(q[0]) == 'C') && q[1] == ':')
+            q += 2; // drive prefix (already normalised to "X:/...")
+        else if (mytoupper(q[0]) == 'C' && mytoupper(q[1]) == 'O' && mytoupper(q[2]) == 'M' &&
+                 q[3] >= '1' && q[3] <= '6' && q[4] == ':')
+            q += 5; // serial port spec COMn: (handled by OPEN, not a filename)
+        for (; *q; q++)
+            if (*q == ':' || *q == '"' || *q == '<' || *q == '>' || *q == '|')
+                error("Invalid character in filename");
+    }
     if (strlen((char *)tp) > FF_MAX_LFN)
         error("Filename > % characters", FF_MAX_LFN);
     return tp;
