@@ -1,3 +1,16 @@
+> ## ⚠️ This repository has been superseded
+>
+> Active development of the PicoMite / WebMite / PicoMiteVGA / PicoMiteHDMI firmware has **moved to a new repository:**
+>
+> ### ➜ [github.com/UKTailwind/PicoMite](https://github.com/UKTailwind/PicoMite)
+>
+> Please use the new repository for the latest source code and pre-built `.uf2` binaries:
+> **[Download the latest release](https://github.com/UKTailwind/PicoMite/releases/latest)**
+>
+> This repository is kept online for reference and for access to older versions, but is **no longer updated**.
+
+---
+
 # PicoMiteRP2350
 This contains files to build MMbasic 6.03.00RC25 to run on both RP2040 and RP2350<br>
 Compile with GCC 13.3.1 arm-none-eabi<br>
